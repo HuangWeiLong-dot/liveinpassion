@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIVEINPASSION</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #FAFAFA;
+            --text-primary: #1A1A1A;
+            --text-secondary: #888888;
+            --accent: #2C2C2C;
+            --border: #E5E5E5;
+            --font-serif: 'Cormorant Garamond', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+
+        :root.dark {
+            --bg: #1A1A1A;
+            --text-primary: #FAFAFA;
+            --text-secondary: #888888;
+            --accent: #E5E5E5;
+            --border: #333333;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-weight: 300;
+            line-height: 1.6;
+            overflow-x: hidden;
+            will-change: scroll-position;
+        }
+
+        ::selection {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 24px 64px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.3s ease;
+        }
+
+        header.scrolled {
+            background-color: rgba(250, 250, 250, 0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        :root.dark header.scrolled {
+            background-color: rgba(26, 26, 26, 0.9);
+        }
+
+        .logo {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        nav {
+            display: flex;
+            gap: 32px;
+        }
+
+        nav a {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s ease;
+            letter-spacing: 0.02em;
+        }
+
+        nav a:hover {
+            color: var(--text-primary);
+        }
+
+        .hero {
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px 64px 0 64px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-family: var(--font-serif);
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 400;
+            letter-spacing: 0.02em;
+            margin-bottom: 24px;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        .hero p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            max-width: 500px;
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.2s forwards;
+        }
+
+        .hero-image {
+            margin-top: 48px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 60vh;
+            overflow: hidden;
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.4s forwards;
+            will-change: transform, opacity;
+        }
+
+        .hero-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            backface-visibility: hidden;
+            transform: translateZ(0);
+        }
+
+        .hero-image:hover img {
+            transform: scale(1.02);
+        }
+
+        .gallery-section {
+            padding: 80px 64px 120px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 48px;
+        }
+
+        .section-title {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            font-weight: 500;
+        }
+
+        .section-count {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .gallery-item {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            will-change: transform, opacity;
+            backface-visibility: hidden;
+        }
+
+        .gallery-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .gallery-item::before {
+            content: '';
+            display: block;
+            padding-top: 120%;
+        }
+
+        .gallery-item.tall::before {
+            padding-top: 150%;
+        }
+
+        .gallery-item.wide {
+            grid-column: span 2;
+        }
+
+        .gallery-item.wide::before {
+            padding-top: 75%;
+        }
+
+        .gallery-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            backface-visibility: hidden;
+            transform: translateZ(0);
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .gallery-item::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.1) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .gallery-item:hover::after {
+            opacity: 1;
+        }
+
+        .toggle-item {
+            position: relative;
+        }
+
+        .toggle-img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            transform: scale(1.02);
+            backface-visibility: hidden;
+            will-change: opacity, transform;
+        }
+
+        .toggle-img.active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .lightbox-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        .lightbox-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            z-index: 1;
+        }
+
+        .lightbox-content img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .lightbox.active .lightbox-content img {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 32px;
+            right: 32px;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 2;
+            transition: transform 0.3s ease;
+        }
+
+        .lightbox-close::before,
+        .lightbox-close::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 1px;
+            background: rgba(255,255,255,0.6);
+            transition: background 0.3s ease;
+        }
+
+        .lightbox-close::before {
+            transform: rotate(45deg);
+        }
+
+        .lightbox-close::after {
+            transform: rotate(-45deg);
+        }
+
+        .lightbox-close:hover::before,
+        .lightbox-close:hover::after {
+            background: white;
+        }
+
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 2;
+            transition: transform 0.3s ease;
+        }
+
+        .lightbox-nav:hover {
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .lightbox-nav::before,
+        .lightbox-nav::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 1px;
+            background: rgba(255,255,255,0.6);
+            transition: background 0.3s ease;
+        }
+
+        .lightbox-nav:hover::before,
+        .lightbox-nav:hover::after {
+            background: white;
+        }
+
+        .lightbox-prev {
+            left: 32px;
+        }
+
+        .lightbox-prev::before {
+            transform: rotate(-45deg);
+        }
+
+        .lightbox-prev::after {
+            transform: rotate(45deg);
+            top: auto;
+            bottom: 12px;
+        }
+
+        .lightbox-next {
+            right: 32px;
+        }
+
+        .lightbox-next::before {
+            top: auto;
+            bottom: 12px;
+            transform: rotate(-45deg);
+        }
+
+        .lightbox-next::after {
+            transform: rotate(45deg);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 999;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .theme-toggle svg {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.3s ease;
+            backface-visibility: hidden;
+        }
+
+        .theme-toggle.dark svg {
+            transform: rotate(180deg);
+        }
+
+        .author-section {
+            position: fixed;
+            bottom: 32px;
+            left: 32px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .social-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+        }
+
+        .author-section:hover .social-links {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .social-link {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .social-link:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .social-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .author-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .author-avatar:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+            border-color: var(--text-primary);
+        }
+
+        .author-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .blog-section {
+            padding: 80px 64px 120px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .blog-posts {
+            display: flex;
+            flex-direction: column;
+            gap: 48px;
+        }
+
+        .blog-post {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 40px;
+            align-items: center;
+            padding: 32px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .blog-post:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+        }
+
+        .blog-image {
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        .blog-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .blog-post:hover .blog-image img {
+            transform: scale(1.05);
+        }
+
+        .blog-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .blog-date {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .blog-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .blog-excerpt {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin: 0;
+        }
+
+        .blog-link {
+            display: inline-block;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+            align-self: flex-start;
+            transition: all 0.3s ease;
+        }
+
+        .blog-link:hover {
+            border-color: var(--text-primary);
+            padding-bottom: 6px;
+        }
+
+        footer {
+            padding: 48px 64px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        footer p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            header {
+                padding: 24px 32px;
+            }
+
+            .hero {
+                padding: 0 32px;
+            }
+
+            .gallery-section {
+                padding: 60px 32px 80px;
+            }
+
+            .gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .gallery-item.wide {
+                grid-column: span 1;
+            }
+
+            .gallery-item.wide::before,
+            .gallery-item.tall::before {
+                padding-top: 100%;
+            }
+
+            .blog-section {
+                padding: 60px 32px 80px;
+            }
+
+            .blog-post {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            header {
+                padding: 20px 24px;
+            }
+
+            nav {
+                display: none;
+            }
+
+            .hero {
+                height: 70vh;
+                padding: 0 24px;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .gallery-section {
+                padding: 48px 24px 64px;
+            }
+
+            .gallery-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .gallery-item::before {
+                padding-top: 100% !important;
+            }
+
+            .blog-section {
+                padding: 48px 24px 64px;
+            }
+
+            .blog-post {
+                padding: 20px;
+            }
+
+            .author-section {
+                bottom: 20px;
+                left: 16px;
+            }
+
+            .author-avatar {
+                width: 56px;
+                height: 56px;
+            }
+
+            .social-link {
+                width: 36px;
+                height: 36px;
+            }
+
+            .social-link svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            footer {
+                padding: 32px 24px;
+            }
+
+            .lightbox-nav {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header id="header">
+        <a href="#" class="logo">LIVEINPASSION</a>
+        <nav>
+            <a href="#photos">Photos</a>
+            <a href="#blogs">Blogs</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <h1>LIVE IN PASSION</h1>
+        <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
+        <div class="hero-image">
+            <img src="../photos/5.jpg" alt="Hero Image">
+        </div>
+    </section>
+
+    <section class="gallery-section" id="gallery">
+        <div class="section-header">
+            <h2 class="section-title">Recent</h2>
+            <span class="section-count">6 Images</span>
+        </div>
+        <div class="gallery-grid" id="galleryGrid">
+        </div>
+    </section>
+
+    <section class="blog-section" id="blogs">
+        <div class="section-header">
+            <h2 class="section-title">Blogs</h2>
+            <span class="section-count">Latest Post</span>
+        </div>
+        <div class="blog-posts">
+            <article class="blog-post">
+                <div class="blog-image">
+                    <img src="../blogs/1.jpg" alt="Blog Featured Image">
+                </div>
+                <div class="blog-content">
+                    <span class="blog-date">May 22, 2026</span>
+                    <h3 class="blog-title">Life is a Fantasy</h3>
+                    <p class="blog-excerpt">Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all. Life's beauty lies in its imperfection—its chaotic, wonderful, unpredictable nature that makes every day feel like a new adventure.</p>
+                    <a href="blog-detail.html" class="blog-link">Read More</a>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <div class="lightbox" id="lightbox">
+        <div class="lightbox-bg" id="lightboxBg"></div>
+        <div class="lightbox-close" id="lightboxClose"></div>
+        <div class="lightbox-nav lightbox-prev" id="lightboxPrev"></div>
+        <div class="lightbox-nav lightbox-next" id="lightboxNext"></div>
+        <div class="lightbox-content">
+            <img src="" alt="Lightbox Image" id="lightboxImg">
+        </div>
+    </div>
+
+    <footer>
+        <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+    </footer>
+
+    <button class="theme-toggle dark" id="themeToggle" aria-label="Toggle theme" tabindex="-1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+    </button>
+
+    <div class="author-section">
+        <div class="social-links">
+            <a href="https://x.com/HuangWeiLong525" class="social-link" aria-label="Twitter/X" target="_blank" rel="noopener noreferrer">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path>
+                </svg>
+            </a>
+        </div>
+        <div class="author-avatar">
+            <img src="../Avatar/1.jpg" alt="Author Avatar">
+        </div>
+    </div>
+
+    <script>
+        const galleryData = [
+            { id: 1, src: '../photos/1.jpg', altSrc: '../photos/2.jpg', tall: true },
+            { id: 3, src: '../photos/3.jpg' },
+            { id: 4, src: '../photos/4.jpg' },
+            { id: 6, src: '../photos/6.jpg', tall: true },
+            { id: 7, src: '../photos/7.jpg' },
+            { id: 8, src: '../photos/8.jpg' },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        const galleryGrid = document.getElementById('galleryGrid');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightboxImg');
+        const lightboxBg = document.getElementById('lightboxBg');
+        const lightboxClose = document.getElementById('lightboxClose');
+        const lightboxPrev = document.getElementById('lightboxPrev');
+        const lightboxNext = document.getElementById('lightboxNext');
+        const header = document.getElementById('header');
+        const themeToggle = document.getElementById('themeToggle');
+
+        let currentIndex = 0;
+
+        function createGallery(container, data, startIndex) {
+            data.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'gallery-item';
+                if (item.tall) div.classList.add('tall');
+                if (item.wide) div.classList.add('wide');
+
+                if (item.altSrc) {
+                    div.classList.add('toggle-item');
+                    const img1 = document.createElement('img');
+                    img1.src = item.src;
+                    img1.alt = `Gallery Image ${startIndex + index + 1}`;
+                    img1.className = 'toggle-img active';
+                    img1.loading = 'lazy';
+
+                    const img2 = document.createElement('img');
+                    img2.src = item.altSrc;
+                    img2.alt = `Gallery Image ${startIndex + index + 2}`;
+                    img2.className = 'toggle-img';
+                    img2.loading = 'lazy';
+
+                    div.appendChild(img1);
+                    div.appendChild(img2);
+
+                    const preloadImgs = [item.src, item.altSrc];
+                    let loadedCount = 0;
+                    
+                    preloadImgs.forEach(src => {
+                        const preload = new Image();
+                        preload.onload = () => {
+                            loadedCount++;
+                            if (loadedCount === preloadImgs.length) {
+                                setInterval(() => {
+                                    const imgs = div.querySelectorAll('.toggle-img');
+                                    imgs.forEach(img => img.classList.toggle('active'));
+                                }, 3000);
+                            }
+                        };
+                        preload.src = src;
+                    });
+
+                    div.addEventListener('click', () => {
+                        const activeImg = div.querySelector('.toggle-img.active');
+                        currentIndex = startIndex + index;
+                        openLightbox(activeImg.src);
+                    });
+                } else {
+                    const img = document.createElement('img');
+                    img.src = item.src;
+                    img.alt = `Gallery Image ${startIndex + index + 1}`;
+                    img.loading = 'lazy';
+
+                    div.appendChild(img);
+                    div.addEventListener('click', () => {
+                        currentIndex = startIndex + index;
+                        openLightbox(item.src);
+                    });
+                }
+                container.appendChild(div);
+            });
+
+            observeGalleryItems();
+        }
+
+        function observeGalleryItems() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry, index) => {
+                    if (entry.isIntersecting) {
+                        setTimeout(() => {
+                            entry.target.classList.add('visible');
+                        }, index * 100);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            document.querySelectorAll('.gallery-item').forEach(item => {
+                observer.observe(item);
+            });
+        }
+
+        function openLightbox(src) {
+            lightboxImg.src = src;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function showPrev() {
+            currentIndex = (currentIndex - 1 + galleryData.length) % galleryData.length;
+            const currentItem = galleryData[currentIndex];
+            const activeSrc = currentItem.altSrc ? currentItem.src : currentItem.src;
+            lightboxImg.src = activeSrc;
+        }
+
+        function showNext() {
+            currentIndex = (currentIndex + 1) % galleryData.length;
+            const currentItem = galleryData[currentIndex];
+            const activeSrc = currentItem.altSrc ? currentItem.src : currentItem.src;
+            lightboxImg.src = activeSrc;
+        }
+
+        lightboxBg.addEventListener('click', closeLightbox);
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightboxPrev.addEventListener('click', showPrev);
+        lightboxNext.addEventListener('click', showNext);
+
+        document.addEventListener('keydown', (e) => {
+            if (!lightbox.classList.contains('active')) return;
+            if (e.key === 'Escape') closeLightbox();
+            if (e.key === 'ArrowLeft') showPrev();
+            if (e.key === 'ArrowRight') showNext();
+        });
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        const handleScroll = debounce(() => {
+            if (window.scrollY > 50) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        }, 15);
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            themeToggle.classList.toggle('dark');
+        });
+
+        createGallery(galleryGrid, galleryData, 0);
+    </script>
+</body>
+</html>
