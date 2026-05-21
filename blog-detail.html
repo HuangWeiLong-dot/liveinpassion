@@ -273,7 +273,7 @@
             }
 
             .theme-toggle {
-                bottom: 100px;
+                bottom: 20px;
                 right: 16px;
                 width: 48px;
                 height: 48px;
@@ -285,7 +285,7 @@
             }
 
             .author-section {
-                bottom: 100px;
+                bottom: 20px;
                 left: 16px;
             }
 
@@ -304,59 +304,16 @@
                 height: 14px;
             }
 
-            footer {
-                padding: 32px 24px 140px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            header {
-                padding: 16px 20px;
-            }
-
-            .blog-detail-content {
-                padding: 40px 20px;
-            }
-
-            .blog-detail-title {
-                font-size: 2rem;
-            }
-
-            .author-section {
-                bottom: 90px;
-                left: 12px;
-            }
-
-            .author-avatar {
-                width: 44px;
-                height: 44px;
-            }
-
-            .social-link {
-                width: 28px;
-                height: 28px;
-            }
-
-            .social-link svg {
-                width: 12px;
-                height: 12px;
-            }
-
-            .theme-toggle {
-                bottom: 90px;
-                right: 12px;
-                width: 44px;
-                height: 44px;
-            }
-
-            .theme-toggle svg {
-                width: 18px;
-                height: 18px;
-            }
-
             .music-player {
-                padding: 8px 12px;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 10px 14px;
                 gap: 6px;
+            }
+
+            .music-player:hover {
+                transform: translateX(-50%) translateY(-4px);
             }
 
             .music-btn {
@@ -377,6 +334,102 @@
             .music-toggle svg {
                 width: 16px;
                 height: 16px;
+            }
+
+            .music-info {
+                display: none;
+            }
+
+            .music-progress {
+                display: none;
+            }
+
+            .music-volume-slider {
+                display: none;
+            }
+
+            .music-volume-btn {
+                display: none;
+            }
+
+            footer {
+                padding: 32px 24px 100px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            header {
+                padding: 16px 20px;
+            }
+
+            .blog-detail-content {
+                padding: 40px 20px;
+            }
+
+            .blog-detail-title {
+                font-size: 2rem;
+            }
+
+            .author-section {
+                bottom: 16px;
+                left: 12px;
+            }
+
+            .author-avatar {
+                width: 44px;
+                height: 44px;
+            }
+
+            .social-link {
+                width: 28px;
+                height: 28px;
+            }
+
+            .social-link svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            .theme-toggle {
+                bottom: 16px;
+                right: 12px;
+                width: 44px;
+                height: 44px;
+            }
+
+            .theme-toggle svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .music-player {
+                bottom: 16px;
+                padding: 8px 12px;
+                gap: 4px;
+            }
+
+            .music-btn {
+                width: 24px;
+                height: 24px;
+            }
+
+            .music-btn svg {
+                width: 12px;
+                height: 12px;
+            }
+
+            .music-toggle {
+                width: 32px;
+                height: 32px;
+            }
+
+            .music-toggle svg {
+                width: 14px;
+                height: 14px;
+            }
+
+            footer {
+                padding: 32px 24px 90px;
             }
         }
 
