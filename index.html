@@ -1167,6 +1167,30 @@
         const header = document.getElementById('header');
         const themeToggle = document.getElementById('themeToggle');
 
+        function saveThemeState() {
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.setItem('themeState', JSON.stringify({ isDark }));
+        }
+
+        function loadThemeState() {
+            const savedState = localStorage.getItem('themeState');
+            if (savedState) {
+                const state = JSON.parse(savedState);
+                if (state.isDark) {
+                    document.documentElement.classList.add('dark');
+                    themeToggle.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    themeToggle.classList.remove('dark');
+                }
+            } else {
+                document.documentElement.classList.add('dark');
+                themeToggle.classList.add('dark');
+            }
+        }
+
+        loadThemeState();
+
         let currentIndex = 0;
 
         function createGallery(container, data, startIndex) {
@@ -1323,6 +1347,7 @@
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
             themeToggle.classList.toggle('dark');
+            saveThemeState();
         });
 
         const audioPlayer = document.getElementById('audioPlayer');
