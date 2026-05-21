@@ -257,6 +257,112 @@
             opacity: 1;
         }
 
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            margin-bottom: 32px;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .blog-detail {
+            padding: 160px 64px 120px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .blog-meta {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 32px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .blog-date {
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .blog-detail-title {
+            font-family: var(--font-serif);
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 400;
+            line-height: 1.2;
+            margin-bottom: 32px;
+        }
+
+        .blog-featured-image {
+            width: 100%;
+            aspect-ratio: 16/10;
+            overflow: hidden;
+            margin-bottom: 48px;
+        }
+
+        .blog-featured-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: filter 0.5s ease, opacity 0.5s ease;
+        }
+
+        .blog-featured-image img.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .blog-featured-image img.loaded {
+            filter: blur(0);
+            transform: scale(1);
+        }
+
+        .blog-detail-content {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+        }
+
+        .blog-detail-content p {
+            margin-bottom: 24px;
+        }
+
+        .blog-detail-content h2 {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin: 40px 0 20px;
+        }
+
+        .blog-detail-content blockquote {
+            border-left: 2px solid var(--text-primary);
+            padding-left: 24px;
+            margin: 32px 0;
+            font-style: italic;
+            color: var(--text-primary);
+        }
+
         .gallery-item:hover img {
             transform: scale(1.05);
         }
@@ -462,6 +568,12 @@
             z-index: 999;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
         }
 
         .theme-toggle:hover {
@@ -519,6 +631,12 @@
             text-decoration: none;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
         }
 
         .social-link:hover {
@@ -540,6 +658,12 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
         }
 
         .author-avatar:hover {
@@ -571,7 +695,58 @@
             transition: all 0.3s ease;
         }
 
-        .music-player:hover {
+        .music-player.collapsed {
+            transform: translateX(-50%) translateY(calc(100% + 10px));
+            opacity: 0;
+        }
+
+        .music-toggle-btn {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--text-primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
+        }
+
+        .music-toggle-btn:active {
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .music-toggle-btn:hover {
+            transform: translateX(-50%) scale(1.2);
+        }
+
+        .music-toggle-btn svg {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        .music-player.collapsed + .music-toggle-btn {
+            bottom: 20px;
+            z-index: 1001;
+        }
+
+        .music-player:hover:not(.collapsed) {
             transform: translateX(-50%) translateY(-4px);
             box-shadow: 0 8px 30px rgba(0,0,0,0.2);
         }
@@ -589,6 +764,17 @@
             align-items: center;
             transition: all 0.3s ease;
             flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
+        }
+
+        .music-btn:active {
+            background: transparent;
+            box-shadow: none;
         }
 
         .music-btn:hover {
@@ -614,6 +800,12 @@
             align-items: center;
             transition: all 0.3s ease;
             flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
         }
 
         .music-toggle:hover {
@@ -870,9 +1062,13 @@
                 grid-template-columns: 1fr;
                 gap: 24px;
             }
+
+            .blog-detail {
+                padding: 120px 24px 80px;
+            }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 800px) {
             header {
                 padding: 20px 24px;
             }
@@ -883,11 +1079,14 @@
 
             .hero {
                 height: 70vh;
-                padding: 0 24px;
+                padding: 100px 24px 0 24px;
+                justify-content: flex-start;
             }
 
             .hero h1 {
-                font-size: 2.5rem;
+                font-size: 2rem;
+                margin-top: 40px;
+                line-height: 1.2;
             }
 
             .gallery-section {
@@ -941,6 +1140,26 @@
             .theme-toggle svg {
                 width: 20px;
                 height: 20px;
+            }
+
+            .blog-detail {
+                padding: 100px 24px 60px;
+            }
+
+            .blog-meta {
+                gap: 16px;
+                margin-bottom: 24px;
+            }
+
+            .blog-detail-title {
+                font-size: 2rem;
+                line-height: 1.2;
+                margin-bottom: 24px;
+            }
+
+            .back-link {
+                margin-bottom: 24px;
+                font-size: 0.8rem;
             }
 
             .music-player {
@@ -1048,6 +1267,21 @@
                 gap: 4px;
             }
 
+            .music-toggle-btn {
+                bottom: 80px;
+                width: 36px;
+                height: 36px;
+            }
+
+            .music-toggle-btn svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .music-player.collapsed + .music-toggle-btn {
+                bottom: 16px;
+            }
+
             .music-btn {
                 width: 24px;
                 height: 24px;
@@ -1076,49 +1310,93 @@
 </head>
 <body>
     <header id="header">
-        <a href="#" class="logo">LIVEINPASSION</a>
+        <a href="#" class="logo" onclick="navigateTo('home')">LIVEINPASSION</a>
         <nav>
-            <a href="#photos">Photos</a>
-            <a href="#blogs">Blogs</a>
+            <a href="#photos" onclick="navigateTo('home'); scrollToSection('gallery')">Photos</a>
+            <a href="#blogs" onclick="navigateTo('home'); scrollToSection('blogs')">Blogs</a>
         </nav>
     </header>
 
-    <section class="hero">
-        <h1>LIVE IN PASSION</h1>
-        <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
-        <div class="hero-image">
-            <img src="" data-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
-        </div>
-    </section>
+    <main id="home-page" class="page active">
+        <section class="hero">
+            <h1>LIVE IN PASSION</h1>
+            <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
+            <div class="hero-image">
+                <img src="" data-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
+            </div>
+        </section>
 
-    <section class="gallery-section" id="gallery">
-        <div class="section-header">
-            <h2 class="section-title">Recent</h2>
-            <span class="section-count">6 Images</span>
-        </div>
-        <div class="gallery-grid" id="galleryGrid">
-        </div>
-    </section>
+        <section class="gallery-section" id="gallery">
+            <div class="section-header">
+                <h2 class="section-title">Recent</h2>
+                <span class="section-count">6 Images</span>
+            </div>
+            <div class="gallery-grid" id="galleryGrid">
+            </div>
+        </section>
 
-    <section class="blog-section" id="blogs">
-        <div class="section-header">
-            <h2 class="section-title">Blogs</h2>
-            <span class="section-count">Latest Post</span>
-        </div>
-        <div class="blog-posts">
-            <article class="blog-post">
-                <div class="blog-image">
-                    <img src="" data-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
-                </div>
-                <div class="blog-content">
-                    <span class="blog-date">May 22, 2026</span>
-                    <h3 class="blog-title">Life is a Fantasy</h3>
-                    <p class="blog-excerpt">Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all. Life's beauty lies in its imperfection—its chaotic, wonderful, unpredictable nature that makes every day feel like a new adventure.</p>
-                    <a href="blog-detail.html" class="blog-link">Read More</a>
-                </div>
-            </article>
-        </div>
-    </section>
+        <section class="blog-section" id="blogs">
+            <div class="section-header">
+                <h2 class="section-title">Blogs</h2>
+                <span class="section-count">Latest Post</span>
+            </div>
+            <div class="blog-posts">
+                <article class="blog-post">
+                    <div class="blog-image">
+                        <img src="" data-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-content">
+                        <span class="blog-date">May 22, 2026</span>
+                        <h3 class="blog-title">Life is a Fantasy</h3>
+                        <p class="blog-excerpt">Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all. Life's beauty lies in its imperfection—its chaotic, wonderful, unpredictable nature that makes every day feel like a new adventure.</p>
+                        <a href="#" onclick="navigateTo('blog-detail'); return false;" class="blog-link">Read More</a>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="blog-detail-page" class="page">
+        <section class="blog-detail">
+            <span class="back-link" onclick="navigateTo('home')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back
+            </span>
+            <div class="blog-meta">
+                <span class="blog-date">May 22, 2026</span>
+                <span>·</span>
+                <span>8 min read</span>
+            </div>
+            <h1 class="blog-detail-title">Life is a Fantasy</h1>
+            <div class="blog-featured-image">
+                <img src="" data-src="blogs/1.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all.</p>
+                <p>Life's beauty lies in its imperfection—its chaotic, wonderful, unpredictable nature that makes every day feel like a new adventure. We meet people who change our perspective, experience moments that take our breath away, and create memories that will last a lifetime.</p>
+                <h2>The Magic of Everyday Moments</h2>
+                <p>It's easy to overlook the extraordinary in the ordinary. A cup of coffee in the morning, a conversation with a friend, a walk in the park—these simple moments hold more magic than we often realize. When we learn to see the beauty in the mundane, life becomes a constant source of wonder and joy.</p>
+                <blockquote>
+                    "The world is full of magical things patiently waiting for our senses to grow sharper."
+                </blockquote>
+                <p>Every sunset is a masterpiece, every rainstorm a symphony, every person a story waiting to be told. When we approach life with curiosity and wonder, we discover that reality itself is the most fantastic fantasy we could ever imagine.</p>
+                <h2>Embracing the Unknown</h2>
+                <p>Life's greatest adventures often come from the places we never expected. The unplanned detours, the spontaneous decisions, the leaps of faith—these are the moments that shape our stories and define who we are. Instead of fearing the unknown, we can choose to embrace it as the blank page upon which we write our own fairy tale.</p>
+                <p>Every ending is a new beginning, every goodbye is a hello in disguise, every challenge is an opportunity for growth. When we trust in the journey and have faith in ourselves, we find that life's most incredible surprises are often waiting just around the corner.</p>
+                <p>Remember, the greatest stories aren't the ones with perfect endings, but the ones with the most interesting journeys. Make your journey one worth telling.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
 
     <div class="lightbox" id="lightbox">
         <div class="lightbox-bg" id="lightboxBg"></div>
@@ -1129,10 +1407,6 @@
             <img src="" alt="Lightbox Image" id="lightboxImg">
         </div>
     </div>
-
-    <footer>
-        <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
-    </footer>
 
     <button class="theme-toggle dark" id="themeToggle" aria-label="Toggle theme" tabindex="-1">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1161,7 +1435,7 @@
         </div>
     </div>
 
-    <div class="music-player">
+    <div class="music-player" id="musicPlayer">
         <audio id="audioPlayer" preload="auto"></audio>
         <button class="music-btn music-prev" id="musicPrev" aria-label="Previous song">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1208,8 +1482,17 @@
             <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.01" value="0.7">
         </div>
     </div>
+    <button class="music-toggle-btn" id="musicToggleBtn" aria-label="Toggle music player">
+        <svg class="toggle-arrow-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+        <svg class="toggle-arrow-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+    </button>
 
     <script>
+        let currentPage = 'home';
         const galleryData = [
             { id: 1, src: 'photos/1.jpg', altSrc: 'photos/2.jpg', tall: true },
             { id: 3, src: 'photos/3.jpg' },
@@ -1219,23 +1502,68 @@
             { id: 8, src: 'photos/8.jpg' },
         ];
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function navigateTo(page) {
+            if (currentPage === page) return;
+            
+            const currentPageEl = document.getElementById(`${currentPage}-page`);
+            const newPageEl = document.getElementById(`${page}-page`);
+            
+            if (currentPageEl) currentPageEl.classList.remove('active');
+            if (newPageEl) newPageEl.classList.add('active');
+            
+            currentPage = page;
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
-            function loadImage(img) {
-                const src = img.dataset.src;
-                if (!src) return;
-                
-                const preload = new Image();
-                preload.onload = () => {
-                    img.src = src;
-                    img.classList.remove('blur-placeholder');
-                    img.classList.add('loaded');
-                };
-                preload.src = src;
+            // Load images for the new page
+            const images = newPageEl.querySelectorAll('.blur-placeholder, [data-src]');
+            images.forEach(loadImage);
+            
+            // 如果回到主页，重新观察 gallery 元素以确保它们可见
+            if (page === 'home') {
+                setTimeout(() => {
+                    observeGalleryItems();
+                }, 100);
             }
             
+            // Update URL
+            history.pushState({ page }, '', page === 'home' ? '/' : `#${page}`);
+        }
+
+        function scrollToSection(sectionId) {
+            setTimeout(() => {
+                const section = document.getElementById(sectionId);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, 100);
+        }
+
+        function loadImage(img) {
+            const src = img.dataset.src;
+            if (!src) return;
+            
+            // 如果图片已经加载过了，直接返回
+            if (img.classList.contains('loaded')) return;
+            
+            const preload = new Image();
+            preload.onload = () => {
+                img.src = src;
+                img.classList.remove('blur-placeholder');
+                img.classList.add('loaded');
+            };
+            preload.src = src;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Handle browser back/forward
+            window.addEventListener('popstate', (e) => {
+                const page = e.state?.page || 'home';
+                navigateTo(page);
+            });
+            
+            // Load initial images
             document.querySelectorAll('.hero-image img, .blog-image img').forEach(loadImage);
+            document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
         });
 
         const galleryGrid = document.getElementById('galleryGrid');
@@ -1349,20 +1677,34 @@
             observeGalleryItems();
         }
 
+        let galleryObserver = null;
+        
         function observeGalleryItems() {
-            const observer = new IntersectionObserver((entries) => {
+            // 先取消之前的观察
+            if (galleryObserver) {
+                galleryObserver.disconnect();
+            }
+            
+            galleryObserver = new IntersectionObserver((entries) => {
                 entries.forEach((entry, index) => {
                     if (entry.isIntersecting) {
                         setTimeout(() => {
                             entry.target.classList.add('visible');
                         }, index * 100);
-                        observer.unobserve(entry.target);
+                        galleryObserver.unobserve(entry.target);
                     }
                 });
             }, { threshold: 0.1 });
 
-            document.querySelectorAll('.gallery-item').forEach(item => {
-                observer.observe(item);
+            const galleryItems = document.querySelectorAll('.gallery-item');
+            galleryItems.forEach(item => {
+                // 如果已经可见，确保有 visible 类
+                const rect = item.getBoundingClientRect();
+                if (rect.top < window.innerHeight && rect.bottom > 0) {
+                    item.classList.add('visible');
+                } else {
+                    galleryObserver.observe(item);
+                }
             });
         }
 
@@ -1445,6 +1787,10 @@
         const progressFill = document.getElementById('progressFill');
         const musicTitle = document.getElementById('musicTitle');
         const musicArtist = document.getElementById('musicArtist');
+        const musicPlayer = document.getElementById('musicPlayer');
+        const musicToggleBtn = document.getElementById('musicToggleBtn');
+        const toggleArrowUp = musicToggleBtn.querySelector('.toggle-arrow-up');
+        const toggleArrowDown = musicToggleBtn.querySelector('.toggle-arrow-down');
 
         const playlist = [
             { 
@@ -1473,6 +1819,7 @@
         let isPlaying = false;
         let isMuted = false;
         let previousVolume = 0.7;
+        let isPlayerCollapsed = false;
 
         const audioElements = {};
 
@@ -1496,7 +1843,8 @@
                 volume: audioPlayer.volume,
                 isPlaying,
                 isMuted,
-                previousVolume
+                previousVolume,
+                isPlayerCollapsed
             };
             localStorage.setItem('musicState', JSON.stringify(state));
         }
@@ -1508,6 +1856,13 @@
                 currentTrackIndex = state.currentTrackIndex;
                 previousVolume = state.previousVolume;
                 isMuted = state.isMuted;
+                isPlayerCollapsed = state.isPlayerCollapsed || false;
+
+                if (isPlayerCollapsed) {
+                    musicPlayer.classList.add('collapsed');
+                    toggleArrowUp.style.display = 'block';
+                    toggleArrowDown.style.display = 'none';
+                }
 
                 loadTrack(currentTrackIndex);
                 audioPlayer.volume = state.volume;
@@ -1655,6 +2010,20 @@
 
         audioPlayer.addEventListener('ended', () => {
             nextTrack();
+        });
+
+        musicToggleBtn.addEventListener('click', () => {
+            isPlayerCollapsed = !isPlayerCollapsed;
+            if (isPlayerCollapsed) {
+                musicPlayer.classList.add('collapsed');
+                toggleArrowUp.style.display = 'block';
+                toggleArrowDown.style.display = 'none';
+            } else {
+                musicPlayer.classList.remove('collapsed');
+                toggleArrowUp.style.display = 'none';
+                toggleArrowDown.style.display = 'block';
+            }
+            saveMusicState();
         });
 
         window.addEventListener('beforeunload', () => {
