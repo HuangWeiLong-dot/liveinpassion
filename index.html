@@ -1081,7 +1081,7 @@
     </div>
 
     <div class="music-player">
-        <audio id="audioPlayer"></audio>
+        <audio id="audioPlayer" preload="auto"></audio>
         <button class="music-btn music-prev" id="musicPrev" aria-label="Previous song">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="19 20 9 12 19 4 19 20"></polygon>
@@ -1393,6 +1393,21 @@
         let isMuted = false;
         let previousVolume = 0.7;
 
+        const audioElements = {};
+
+        function preloadAudios() {
+            playlist.forEach((track, index) => {
+                if (!audioElements[index]) {
+                    const audio = new Audio();
+                    audio.src = track.src;
+                    audio.preload = 'auto';
+                    audioElements[index] = audio;
+                }
+            });
+        }
+
+        preloadAudios();
+
         function saveMusicState() {
             const state = {
                 currentTrackIndex,
@@ -1412,19 +1427,31 @@
                 currentTrackIndex = state.currentTrackIndex;
                 previousVolume = state.previousVolume;
                 isMuted = state.isMuted;
-                
+
                 loadTrack(currentTrackIndex);
                 audioPlayer.volume = state.volume;
                 musicVolumeSlider.value = state.volume;
-                audioPlayer.currentTime = state.currentTime;
-                
-                if (state.isPlaying) {
-                    playTrack();
-                }
-                
+
                 if (isMuted) {
                     volumeOnIcon.style.display = 'none';
                     volumeOffIcon.style.display = 'block';
+                }
+
+                audioPlayer.currentTime = state.currentTime;
+
+                if (state.isPlaying) {
+                    requestAnimationFrame(() => {
+                        const playPromise = audioPlayer.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                playIcon.style.display = 'none';
+                                pauseIcon.style.display = 'block';
+                                isPlaying = true;
+                            }).catch(() => {
+                                isPlaying = false;
+                            });
+                        }
+                    });
                 }
             } else {
                 currentTrackIndex = Math.floor(Math.random() * playlist.length);
@@ -1436,6 +1463,7 @@
         function loadTrack(index) {
             const track = playlist[index];
             audioPlayer.src = track.src;
+            audioPlayer.preload = 'auto';
             musicTitle.textContent = track.title;
             musicArtist.textContent = track.artist;
             progressFill.style.width = '0%';
@@ -1532,7 +1560,7 @@
         });
 
         audioPlayer.addEventListener('timeupdate', () => {
-            if (Math.floor(audioPlayer.currentTime) % 5 === 0) {
+            if (Math.floor(audioPlayer.currentTime) % 2 === 0) {
                 saveMusicState();
             }
         });
@@ -1546,6 +1574,10 @@
 
         audioPlayer.addEventListener('ended', () => {
             nextTrack();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            saveMusicState();
         });
 
         loadMusicState();
