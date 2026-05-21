@@ -933,16 +933,15 @@
                     const preloadImgs = [item.src, item.altSrc];
                     let loadedCount = 0;
                     
-                    preloadImgs.forEach(src => {
+                    preloadImgs.forEach((src, srcIndex) => {
                         const preload = new Image();
                         preload.onload = () => {
                             loadedCount++;
-                            if (loadedCount === 1) {
-                                const imgToLoad = src === item.src ? img1 : img2;
-                                imgToLoad.src = src;
-                                imgToLoad.classList.remove('blur-placeholder');
-                                imgToLoad.classList.add('loaded');
-                            }
+                            const imgToLoad = srcIndex === 0 ? img1 : img2;
+                            imgToLoad.src = src;
+                            imgToLoad.classList.remove('blur-placeholder');
+                            imgToLoad.classList.add('loaded');
+                            
                             if (loadedCount === preloadImgs.length) {
                                 setInterval(() => {
                                     const imgs = div.querySelectorAll('.toggle-img');
