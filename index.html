@@ -554,6 +554,95 @@
             object-fit: cover;
         }
 
+        .music-player {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+
+        .music-player:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+
+        .music-toggle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            color: var(--bg);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .music-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .music-toggle svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .music-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 150px;
+        }
+
+        .music-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-artist {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .music-progress {
+            width: 100px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--text-primary);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
         .blog-section {
             padding: 80px 64px 120px;
             max-width: 1200px;
@@ -770,6 +859,39 @@
                 height: 16px;
             }
 
+            .music-player {
+                bottom: 20px;
+                right: 16px;
+                padding: 12px 16px;
+                gap: 12px;
+            }
+
+            .music-toggle {
+                width: 40px;
+                height: 40px;
+            }
+
+            .music-toggle svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .music-info {
+                min-width: 100px;
+            }
+
+            .music-title {
+                font-size: 0.75rem;
+            }
+
+            .music-artist {
+                font-size: 0.6875rem;
+            }
+
+            .music-progress {
+                width: 60px;
+            }
+
             footer {
                 padding: 32px 24px;
             }
@@ -864,6 +986,28 @@
         </div>
         <div class="author-avatar">
             <img src="avatar/1.jpg" alt="Author Avatar">
+        </div>
+    </div>
+
+    <div class="music-player">
+        <audio id="audioPlayer" src="music/Almost Nothing - Silent Poet/Okay Kaya.mp3"></audio>
+        <button class="music-toggle" id="musicToggle" aria-label="Toggle music">
+            <svg class="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg class="pause-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+        </button>
+        <div class="music-info">
+            <div class="music-title">Almost Nothing</div>
+            <div class="music-artist">Silent Poets, Okay Kaya</div>
+        </div>
+        <div class="music-progress">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
         </div>
     </div>
 
@@ -1062,6 +1206,45 @@
         themeToggle.addEventListener('click', () => {
             document.documentElement.classList.toggle('dark');
             themeToggle.classList.toggle('dark');
+        });
+
+        const audioPlayer = document.getElementById('audioPlayer');
+        const musicToggle = document.getElementById('musicToggle');
+        const playIcon = musicToggle.querySelector('.play-icon');
+        const pauseIcon = musicToggle.querySelector('.pause-icon');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+
+        let isPlaying = false;
+
+        musicToggle.addEventListener('click', () => {
+            if (isPlaying) {
+                audioPlayer.pause();
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+            } else {
+                audioPlayer.play();
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+            }
+            isPlaying = !isPlaying;
+        });
+
+        audioPlayer.addEventListener('timeupdate', () => {
+            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            progressFill.style.width = progress + '%';
+        });
+
+        progressBar.addEventListener('click', (e) => {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            audioPlayer.currentTime = percent * audioPlayer.duration;
+        });
+
+        audioPlayer.addEventListener('ended', () => {
+            isPlaying = false;
+            playIcon.style.display = 'block';
+            pauseIcon.style.display = 'none';
         });
 
         createGallery(galleryGrid, galleryData, 0);
