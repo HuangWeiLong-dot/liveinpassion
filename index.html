@@ -1814,7 +1814,7 @@
             </svg>
         </button>
         <div class="music-volume-slider">
-            <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.01" value="0.7">
+            <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.01" value="0.1">
         </div>
     </div>
     <button class="music-toggle-btn" id="musicToggleBtn" aria-label="Toggle music player">
@@ -2357,7 +2357,11 @@
                 toggleArrowUp.style.display = 'block';
                 toggleArrowDown.style.display = 'none';
                 loadTrack(currentTrackIndex);
-                audioPlayer.volume = 0.7;
+                audioPlayer.volume = 0.1;
+                musicVolumeSlider.value = 0.1;
+                isMuted = false;
+                volumeOnIcon.style.display = 'block';
+                volumeOffIcon.style.display = 'none';
                 
                 requestAnimationFrame(() => {
                     const playPromise = audioPlayer.play();
