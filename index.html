@@ -36,6 +36,8 @@
             scroll-behavior: smooth;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            width: 100%;
         }
 
         body {
@@ -45,12 +47,24 @@
             font-weight: 300;
             line-height: 1.6;
             overflow-x: hidden;
+            width: 100%;
             will-change: scroll-position;
         }
 
         ::selection {
             background: var(--text-primary);
             color: var(--bg);
+        }
+
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+
+        button:focus,
+        a:focus {
+            outline: none;
         }
 
         header {
@@ -73,6 +87,21 @@
 
         :root.dark header.scrolled {
             background-color: rgba(26, 26, 26, 0.9);
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 8px;
+            z-index: 101;
+        }
+
+        .menu-toggle svg {
+            width: 24px;
+            height: 24px;
         }
 
         .logo {
@@ -102,7 +131,7 @@
         }
 
         .hero {
-            height: 85vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -191,6 +220,8 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 24px;
+            width: 100%;
+            overflow-x: hidden;
         }
 
         .gallery-item {
@@ -198,15 +229,22 @@
             overflow: hidden;
             cursor: pointer;
             opacity: 0;
-            transform: translateY(30px);
             transition: opacity 0.8s ease, transform 0.8s ease;
             will-change: transform, opacity;
             backface-visibility: hidden;
         }
 
+        .gallery-item:nth-child(odd) {
+            transform: translateX(-100px);
+        }
+
+        .gallery-item:nth-child(even) {
+            transform: translateX(100px);
+        }
+
         .gallery-item.visible {
             opacity: 1;
-            transform: translateY(0);
+            transform: translateX(0);
         }
 
         .gallery-item::before {
@@ -259,10 +297,17 @@
 
         .page {
             display: none;
+            width: 100%;
+            overflow-x: hidden;
         }
 
         .page.active {
             display: block;
+        }
+
+        section {
+            width: 100%;
+            overflow-x: hidden;
         }
 
         .back-link {
@@ -538,6 +583,69 @@
             bottom: 12px;
         }
 
+        .friends-section {
+            padding: 120px 64px 80px;
+        }
+
+        .page-title {
+            font-family: var(--font-serif);
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .friends-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .friend-card {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .friend-avatar {
+            width: 100%;
+            aspect-ratio: 1;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border-color 0.2s ease;
+        }
+
+        .friend-card:hover .friend-avatar {
+            border-color: var(--text-secondary);
+        }
+
+        .friend-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .friend-name {
+            font-family: var(--font-serif);
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            padding: 8px 0 0 0;
+            text-align: center;
+        }
+
+        .friend-gallery-section {
+            padding: 120px 64px 80px;
+        }
+
+        .friend-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
         .lightbox-next {
             right: 32px;
         }
@@ -560,6 +668,7 @@
             height: 56px;
             border-radius: 50%;
             background: var(--text-primary);
+            background-image: linear-gradient(to right, var(--text-primary) 0%, var(--text-primary) 100%);
             color: var(--bg);
             display: flex;
             justify-content: center;
@@ -567,13 +676,17 @@
             cursor: pointer;
             z-index: 999;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
             outline: none;
             touch-action: manipulation;
+            border: 0;
+            background-clip: padding-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .theme-toggle:hover {
@@ -908,15 +1021,15 @@
         }
 
         .blog-section {
-            padding: 80px 64px 120px;
-            max-width: 1200px;
-            margin: 0 auto;
+            padding: 120px 64px 80px;
         }
 
         .blog-posts {
             display: flex;
             flex-direction: column;
             gap: 48px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
 
         .blog-post {
@@ -1034,7 +1147,7 @@
             }
 
             .hero {
-                padding: 0 32px;
+                padding: 80px 32px 0 32px;
             }
 
             .gallery-section {
@@ -1054,8 +1167,10 @@
                 padding-top: 100%;
             }
 
-            .blog-section {
-                padding: 60px 32px 80px;
+            .blog-section,
+            .friends-section,
+            .friend-gallery-section {
+                padding: 140px 32px 80px;
             }
 
             .blog-post {
@@ -1074,13 +1189,35 @@
             }
 
             nav {
-                display: none;
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 100%;
+                height: 100vh;
+                background-color: var(--bg);
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 32px;
+                transition: right 0.3s ease;
+            }
+
+            nav.active {
+                right: 0;
+            }
+
+            nav a {
+                font-size: 1.5rem;
+            }
+
+            .menu-toggle {
+                display: block;
             }
 
             .hero {
-                height: 70vh;
+                height: 100vh;
                 padding: 100px 24px 0 24px;
-                justify-content: flex-start;
+                justify-content: center;
             }
 
             .hero h1 {
@@ -1102,12 +1239,22 @@
                 padding-top: 100% !important;
             }
 
-            .blog-section {
-                padding: 48px 24px 64px;
+            .blog-section,
+            .friends-section,
+            .friend-gallery-section {
+                padding: 120px 24px 64px;
             }
 
             .blog-post {
                 padding: 20px;
+            }
+
+            .blog-excerpt {
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
             .author-section {
@@ -1310,11 +1457,19 @@
 </head>
 <body>
     <header id="header">
-        <a href="#" class="logo" onclick="navigateTo('home')">LIVEINPASSION</a>
+        <a href="#" class="logo" onclick="navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); return false;">LIVEINPASSION</a>
         <nav>
-            <a href="#photos" onclick="navigateTo('home'); scrollToSection('gallery')">Photos</a>
-            <a href="#blogs" onclick="navigateTo('home'); scrollToSection('blogs')">Blogs</a>
+            <a href="#" onclick="navigateTo('home'); return false;">Home</a>
+            <a href="#" onclick="navigateTo('blogs'); return false;">Blogs</a>
+            <a href="#" onclick="navigateTo('friends'); return false;">My Friends</a>
         </nav>
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
     </header>
 
     <main id="home-page" class="page active">
@@ -1322,7 +1477,7 @@
             <h1>LIVE IN PASSION</h1>
             <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
             <div class="hero-image">
-                <img src="" data-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
+                <img src="" data-src="photos/compressed/5.jpg" data-full-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
             </div>
         </section>
 
@@ -1335,15 +1490,36 @@
             </div>
         </section>
 
-        <section class="blog-section" id="blogs">
-            <div class="section-header">
-                <h2 class="section-title">Blogs</h2>
-                <span class="section-count">Latest Post</span>
-            </div>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="blogs-page" class="page">
+        <section class="blog-section">
+            <span class="back-link" onclick="navigateTo('home')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back
+            </span>
+            <h1 class="page-title">Blogs</h1>
             <div class="blog-posts">
                 <article class="blog-post">
                     <div class="blog-image">
-                        <img src="" data-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                        <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-content">
+                        <span class="blog-date">May 23, 2026</span>
+                        <h3 class="blog-title">The Two Halves of a Heart</h3>
+                        <p class="blog-excerpt">I don't remember how the dream began. I was sitting at a long, brown wooden desk in a large, open room — the kind I remember from earlier school days. To my left sat someone I once knew well from a shared course of study. To my right sat someone I had quietly held feelings for. Between us on the desk lay a small pile of loose chips or fragments.</p>
+                        <a href="#" onclick="navigateTo('blog-detail-2'); return false;" class="blog-link">Read More</a>
+                    </div>
+                </article>
+                <article class="blog-post">
+                    <div class="blog-image">
+                        <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
                     </div>
                     <div class="blog-content">
                         <span class="blog-date">May 22, 2026</span>
@@ -1354,7 +1530,6 @@
                 </article>
             </div>
         </section>
-
         <footer>
             <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
         </footer>
@@ -1362,7 +1537,7 @@
 
     <main id="blog-detail-page" class="page">
         <section class="blog-detail">
-            <span class="back-link" onclick="navigateTo('home')">
+            <span class="back-link" onclick="navigateTo('blogs')">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="19" y1="12" x2="5" y2="12"></line>
                     <polyline points="12 19 5 12 12 5"></polyline>
@@ -1376,7 +1551,7 @@
             </div>
             <h1 class="blog-detail-title">Life is a Fantasy</h1>
             <div class="blog-featured-image">
-                <img src="" data-src="blogs/1.jpg" alt="Featured Image" class="blur-placeholder">
+                <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Featured Image" class="blur-placeholder">
             </div>
             <div class="blog-detail-content">
                 <p>Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all.</p>
@@ -1391,6 +1566,93 @@
                 <p>Life's greatest adventures often come from the places we never expected. The unplanned detours, the spontaneous decisions, the leaps of faith—these are the moments that shape our stories and define who we are. Instead of fearing the unknown, we can choose to embrace it as the blank page upon which we write our own fairy tale.</p>
                 <p>Every ending is a new beginning, every goodbye is a hello in disguise, every challenge is an opportunity for growth. When we trust in the journey and have faith in ourselves, we find that life's most incredible surprises are often waiting just around the corner.</p>
                 <p>Remember, the greatest stories aren't the ones with perfect endings, but the ones with the most interesting journeys. Make your journey one worth telling.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="blog-detail-2-page" class="page">
+        <section class="blog-detail">
+            <span class="back-link" onclick="navigateTo('blogs')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back
+            </span>
+            <div class="blog-meta">
+                <span class="blog-date">May 23, 2026</span>
+                <span>·</span>
+                <span>10 min read</span>
+            </div>
+            <h1 class="blog-detail-title">The Two Halves of a Heart</h1>
+            <div class="blog-featured-image">
+                <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>I don't remember how the dream began. I was sitting at a long, brown wooden desk in a large, open room — the kind I remember from earlier school days. To my left sat someone I once knew well from a shared course of study. To my right sat someone I had quietly held feelings for. Between us on the desk lay a small pile of loose chips or fragments. The person in front of me partly blocked my view toward the front of the room.</p>
+                <p>The one on my right suggested I push the fragments aside. When I did, I found two halves of a heart — split down the middle, but together they made a whole shape.</p>
+                <p>Then she turned her face away. I asked her to come a little closer, so I could say something quietly. I glanced to my left. The person there gave a small smile. Then she turned back and said, almost lightly: "You don't really think I like you, do you?"</p>
+                <p>I didn't feel shattered. Just… a little hollow. As if something had been teased out of me again. Still, somewhere underneath, I held on to a thread of hope — more than a small one.</p>
+                <p>Before that moment in the dream, I had the sense of a voice from somewhere near the front — a teacher's voice — saying something like: Be brave.</p>
+                <p>Then she spoke a little louder, toward the rows behind us, saying something like: "I turned him down again. I outed him." And from the back, I heard familiar voices — people I had known — responding in ways I could not quite make out. Then I woke up suddenly, my skin damp.</p>
+                <p>After waking, I sat with the feeling for a long time.</p>
+                <blockquote>
+                    Two halves. Still a heart. Still hoping.
+                </blockquote>
+                <h2>Here is what I learned after waking.</h2>
+                <p>The teacher in the dream reminds me of someone who, not long ago, pushed me to a place I could not hold myself together. There was a conversation I still remember — one where I was pressed to speak when I had nothing left to say, and something in me broke. I said things I had never said out loud. That moment came, indirectly, because someone at home had grown concerned — not enough to truly see me, but enough to ask for help on my behalf. I had learned, over time, not to ask for anything. I had learned to carry things alone.</p>
+                <p>The person on my left in the dream? Someone I once pulled away from, out of hurt, because their presence felt distant when I needed closeness. Later, I reached out again. In the dream, their small smile did not feel unkind — it felt like a quiet recognition.</p>
+                <p>The person on my right? The one I had feelings for. Once, in a moment I still remember clearly, we stood a short distance apart. She wore a cap that shaded her eyes. With her hands behind her back, she asked me something about the summer ahead. From where I stood, I felt something unspoken pass between us. I let myself believe there might be something there — even just a little.</p>
+                <p>The voices from the back of the dream belong to someone I was never truly close to. Others used to make quiet jokes, linking us together in ways that never felt true to me. But during a long stretch of isolation, feeling more alone than I knew how to say, I reached out to them. We spoke for a while, then stopped. Later, they reached out to me. Then we stopped again. Then I reached out once more. And something was said that did not feel entirely real or gentle. So I let that connection fall away.</p>
+                <p>Before all of this, I kept nearly everything inside. I told no one what I was carrying. I was not simply private — I was sealed.</p>
+                <p>Now, slowly, I try to be brave. To be present. To be honest. To be soft, even when it is hard.</p>
+                <p>I used to think the voice saying "be brave" was a command — something to obey or break under. But now I wonder: maybe the real bravery is different. Not about performing ease or confidence for someone else's glance. But about brushing aside the small fragments in front of you, looking at the heart that is not quite whole, and still hoping — even after someone says they have turned away.</p>
+                <p>The dream did not undo me. It showed me something about what I am quietly becoming.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="friends-page" class="page">
+        <section class="friends-section">
+            <span class="back-link" onclick="navigateTo('home')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back
+            </span>
+            <h1 class="page-title">My Friends</h1>
+            <div class="friends-grid">
+                <div class="friend-card" onclick="navigateTo('friend-lijiazu')">
+                    <div class="friend-avatar">
+                        <img src="" data-src="photos/LiJiaZu/compressed_lijiazu/1.jpg" data-full-src="photos/LiJiaZu/1.jpg" alt="Li Jiazu" class="blur-placeholder">
+                    </div>
+                    <h3 class="friend-name">Li Jiazu</h3>
+                </div>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="friend-lijiazu-page" class="page">
+        <section class="friend-gallery-section">
+            <span class="back-link" onclick="navigateTo('friends')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back
+            </span>
+            <h1 class="page-title">Li Jiazu</h1>
+            <div class="friend-gallery-grid" id="lijiazuGalleryGrid">
             </div>
         </section>
         <footer>
@@ -1494,12 +1756,19 @@
     <script>
         let currentPage = 'home';
         const galleryData = [
-            { id: 1, src: 'photos/1.jpg', altSrc: 'photos/2.jpg', tall: true },
-            { id: 3, src: 'photos/3.jpg' },
-            { id: 4, src: 'photos/4.jpg' },
-            { id: 6, src: 'photos/6.jpg', tall: true },
-            { id: 7, src: 'photos/7.jpg' },
-            { id: 8, src: 'photos/8.jpg' },
+            { id: 1, src: 'photos/compressed/1.jpg', fullSrc: 'photos/1.jpg', altSrc: 'photos/compressed/2.jpg', altFullSrc: 'photos/2.jpg', tall: true },
+            { id: 3, src: 'photos/compressed/3.jpg', fullSrc: 'photos/3.jpg' },
+            { id: 4, src: 'photos/compressed/4.jpg', fullSrc: 'photos/4.jpg' },
+            { id: 6, src: 'photos/compressed/6.jpg', fullSrc: 'photos/6.jpg', tall: true },
+            { id: 7, src: 'photos/compressed/7.jpg', fullSrc: 'photos/7.jpg' },
+            { id: 8, src: 'photos/compressed/8.jpg', fullSrc: 'photos/8.jpg' },
+        ];
+
+        const lijiazuGalleryData = [
+            { id: 1, src: 'photos/LiJiaZu/compressed_lijiazu/1.jpg', fullSrc: 'photos/LiJiaZu/1.jpg' },
+            { id: 2, src: 'photos/LiJiaZu/compressed_lijiazu/2.jpg', fullSrc: 'photos/LiJiaZu/2.jpg' },
+            { id: 3, src: 'photos/LiJiaZu/compressed_lijiazu/3.jpg', fullSrc: 'photos/LiJiaZu/3.jpg' },
+            { id: 4, src: 'photos/LiJiaZu/compressed_lijiazu/4.jpg', fullSrc: 'photos/LiJiaZu/4.jpg' },
         ];
 
         function navigateTo(page) {
@@ -1514,19 +1783,23 @@
             currentPage = page;
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
+            // Close menu when navigating
+            nav.classList.remove('active');
+            
+            // 如果进入LiJiazu页面，创建画廊
+            if (page === 'friend-lijiazu') {
+                const lijiazuGalleryGrid = document.getElementById('lijiazuGalleryGrid');
+                if (lijiazuGalleryGrid && lijiazuGalleryGrid.children.length === 0) {
+                    createFriendGallery(lijiazuGalleryGrid, lijiazuGalleryData);
+                }
+            }
+            
             // Load images for the new page
             const images = newPageEl.querySelectorAll('.blur-placeholder, [data-src]');
             images.forEach(loadImage);
             
-            // 如果回到主页，重新观察 gallery 元素以确保它们可见
-            if (page === 'home') {
-                setTimeout(() => {
-                    observeGalleryItems();
-                }, 100);
-            }
-            
-            // Update URL
-            history.pushState({ page }, '', page === 'home' ? '/' : `#${page}`);
+            // Update URL - 只改变哈希，不改变基础路径
+            history.pushState({ page }, '', `#${page}`);
         }
 
         function scrollToSection(sectionId) {
@@ -1540,31 +1813,31 @@
 
         function loadImage(img) {
             const src = img.dataset.src;
+            const fullSrc = img.dataset.fullSrc;
             if (!src) return;
             
-            // 如果图片已经加载过了，直接返回
             if (img.classList.contains('loaded')) return;
             
-            const preload = new Image();
-            preload.onload = () => {
+            // 先加载压缩图
+            const preloadCompressed = new Image();
+            preloadCompressed.onload = () => {
                 img.src = src;
                 img.classList.remove('blur-placeholder');
-                img.classList.add('loaded');
+                
+                // 如果有实际的高清图，继续加载
+                if (fullSrc) {
+                    const preloadFull = new Image();
+                    preloadFull.onload = () => {
+                        img.src = fullSrc;
+                        img.classList.add('loaded');
+                    };
+                    preloadFull.src = fullSrc;
+                } else {
+                    img.classList.add('loaded');
+                }
             };
-            preload.src = src;
+            preloadCompressed.src = src;
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Handle browser back/forward
-            window.addEventListener('popstate', (e) => {
-                const page = e.state?.page || 'home';
-                navigateTo(page);
-            });
-            
-            // Load initial images
-            document.querySelectorAll('.hero-image img, .blog-image img').forEach(loadImage);
-            document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
-        });
 
         const galleryGrid = document.getElementById('galleryGrid');
         const lightbox = document.getElementById('lightbox');
@@ -1575,6 +1848,29 @@
         const lightboxNext = document.getElementById('lightboxNext');
         const header = document.getElementById('header');
         const themeToggle = document.getElementById('themeToggle');
+        const nav = document.querySelector('nav');
+        const menuToggle = document.getElementById('menuToggle');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Handle browser back/forward
+            window.addEventListener('popstate', (e) => {
+                const page = e.state?.page || 'home';
+                navigateTo(page);
+            });
+            
+            // Menu toggle
+            menuToggle.addEventListener('click', () => {
+                nav.classList.toggle('active');
+            });
+            
+            // Load initial images
+            document.querySelectorAll('.hero-image img').forEach(loadImage);
+            document.querySelectorAll('#blogs-page .blur-placeholder').forEach(loadImage);
+            document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
+            document.querySelectorAll('#friends-page .blur-placeholder').forEach(loadImage);
+        });
+
+
 
         function saveThemeState() {
             const isDark = document.documentElement.classList.contains('dark');
@@ -1601,6 +1897,7 @@
         loadThemeState();
 
         let currentIndex = 0;
+        let currentGalleryData = galleryData;
 
         function createGallery(container, data, startIndex) {
             data.forEach((item, index) => {
@@ -1613,64 +1910,95 @@
                     div.classList.add('toggle-item');
                     const img1 = document.createElement('img');
                     img1.dataset.src = item.src;
+                    img1.dataset.fullSrc = item.fullSrc;
                     img1.alt = `Gallery Image ${startIndex + index + 1}`;
                     img1.className = 'toggle-img active blur-placeholder';
 
                     const img2 = document.createElement('img');
                     img2.dataset.src = item.altSrc;
+                    img2.dataset.fullSrc = item.altFullSrc;
                     img2.alt = `Gallery Image ${startIndex + index + 2}`;
                     img2.className = 'toggle-img blur-placeholder';
 
                     div.appendChild(img1);
                     div.appendChild(img2);
 
-                    const preloadImgs = [item.src, item.altSrc];
+                    // 使用统一的loadImage函数加载图片
+                    loadImage(img1);
+                    loadImage(img2);
+
+                    // 等待两张图片都加载完成后开始切换
                     let loadedCount = 0;
+                    const checkAllLoaded = () => {
+                        loadedCount++;
+                        if (loadedCount === 2) {
+                            setInterval(() => {
+                                const imgs = div.querySelectorAll('.toggle-img');
+                                imgs.forEach(img => img.classList.toggle('active'));
+                            }, 3000);
+                        }
+                    };
                     
-                    preloadImgs.forEach((src, srcIndex) => {
-                        const preload = new Image();
-                        preload.onload = () => {
-                            loadedCount++;
-                            const imgToLoad = srcIndex === 0 ? img1 : img2;
-                            imgToLoad.src = src;
-                            imgToLoad.classList.remove('blur-placeholder');
-                            imgToLoad.classList.add('loaded');
-                            
-                            if (loadedCount === preloadImgs.length) {
-                                setInterval(() => {
-                                    const imgs = div.querySelectorAll('.toggle-img');
-                                    imgs.forEach(img => img.classList.toggle('active'));
-                                }, 3000);
-                            }
-                        };
-                        preload.src = src;
-                    });
+                    // 监听图片加载完成
+                    img1.addEventListener('load', checkAllLoaded);
+                    img2.addEventListener('load', checkAllLoaded);
+                    // 防止图片已经缓存导致load事件不触发
+                    if (img1.complete) checkAllLoaded();
+                    if (img2.complete) checkAllLoaded();
 
                     div.addEventListener('click', () => {
-                        const activeImg = div.querySelector('.toggle-img.active');
+                        currentGalleryData = data;
                         currentIndex = startIndex + index;
-                        openLightbox(activeImg.src || activeImg.dataset.src);
+                        const activeImg = div.querySelector('.toggle-img.active');
+                        const activeImgFullSrc = activeImg.dataset.fullSrc || activeImg.dataset.src || activeImg.src;
+                        openLightbox(activeImgFullSrc);
                     });
                 } else {
                     const img = document.createElement('img');
                     img.dataset.src = item.src;
+                    img.dataset.fullSrc = item.fullSrc;
                     img.alt = `Gallery Image ${startIndex + index + 1}`;
                     img.className = 'blur-placeholder';
 
-                    const preload = new Image();
-                    preload.onload = () => {
-                        img.src = item.src;
-                        img.classList.remove('blur-placeholder');
-                        img.classList.add('loaded');
-                    };
-                    preload.src = item.src;
-
                     div.appendChild(img);
+                    
+                    // 使用统一的loadImage函数加载图片
+                    loadImage(img);
+
                     div.addEventListener('click', () => {
+                        currentGalleryData = data;
                         currentIndex = startIndex + index;
-                        openLightbox(item.src);
+                        openLightbox(item.fullSrc || item.src);
                     });
                 }
+                container.appendChild(div);
+            });
+
+            observeGalleryItems();
+        }
+
+        function createFriendGallery(container, data) {
+            data.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'gallery-item';
+
+                const img = document.createElement('img');
+                img.dataset.src = item.src;
+                img.dataset.fullSrc = item.fullSrc;
+                img.alt = `Gallery Image ${index + 1}`;
+                img.className = 'blur-placeholder';
+
+                div.appendChild(img);
+                
+                // 使用统一的loadImage函数加载图片
+                loadImage(img);
+
+                div.addEventListener('click', () => {
+                    currentGalleryData = data;
+                    currentIndex = index;
+                    openLightbox(item.fullSrc || item.src);
+                });
+
                 container.appendChild(div);
             });
 
@@ -1690,26 +2018,23 @@
                     if (entry.isIntersecting) {
                         setTimeout(() => {
                             entry.target.classList.add('visible');
-                        }, index * 100);
-                        galleryObserver.unobserve(entry.target);
+                        }, index * 50);
+                    } else {
+                        entry.target.classList.remove('visible');
                     }
                 });
             }, { threshold: 0.1 });
 
             const galleryItems = document.querySelectorAll('.gallery-item');
             galleryItems.forEach(item => {
-                // 如果已经可见，确保有 visible 类
-                const rect = item.getBoundingClientRect();
-                if (rect.top < window.innerHeight && rect.bottom > 0) {
-                    item.classList.add('visible');
-                } else {
-                    galleryObserver.observe(item);
-                }
+                galleryObserver.observe(item);
             });
         }
 
         function openLightbox(src) {
-            lightboxImg.src = src;
+            // 使用 new URL 确保路径正确解析
+            const fullUrl = new URL(src, window.location.href);
+            lightboxImg.src = fullUrl.href;
             lightbox.classList.add('active');
             document.body.style.overflow = 'hidden';
         }
@@ -1720,17 +2045,19 @@
         }
 
         function showPrev() {
-            currentIndex = (currentIndex - 1 + galleryData.length) % galleryData.length;
-            const currentItem = galleryData[currentIndex];
-            const activeSrc = currentItem.altSrc ? currentItem.src : currentItem.src;
-            lightboxImg.src = activeSrc;
+            currentIndex = (currentIndex - 1 + currentGalleryData.length) % currentGalleryData.length;
+            const currentItem = currentGalleryData[currentIndex];
+            const activeSrc = currentItem.fullSrc || currentItem.src;
+            const fullUrl = new URL(activeSrc, window.location.href);
+            lightboxImg.src = fullUrl.href;
         }
 
         function showNext() {
-            currentIndex = (currentIndex + 1) % galleryData.length;
-            const currentItem = galleryData[currentIndex];
-            const activeSrc = currentItem.altSrc ? currentItem.src : currentItem.src;
-            lightboxImg.src = activeSrc;
+            currentIndex = (currentIndex + 1) % currentGalleryData.length;
+            const currentItem = currentGalleryData[currentIndex];
+            const activeSrc = currentItem.fullSrc || currentItem.src;
+            const fullUrl = new URL(activeSrc, window.location.href);
+            lightboxImg.src = fullUrl.href;
         }
 
         lightboxBg.addEventListener('click', closeLightbox);
@@ -1799,6 +2126,26 @@
                 artist: 'Silent Poets, Okay Kaya' 
             },
             { 
+                src: 'music/Don\'t Be So Serious - Low Roar.mp3', 
+                title: 'Don\'t Be So Serious', 
+                artist: 'Low Roar' 
+            },
+            { 
+                src: 'music/Ghost - AuRaAlan Walker.mp3', 
+                title: 'Ghost', 
+                artist: 'AuRa, Alan Walker' 
+            },
+            { 
+                src: 'music/I\'ll Keep Coming - Low Roar.mp3', 
+                title: 'I\'ll Keep Coming', 
+                artist: 'Low Roar' 
+            },
+            { 
+                src: 'music/Rolling Over - Low Roar.mp3', 
+                title: 'Rolling Over', 
+                artist: 'Low Roar' 
+            },
+            { 
                 src: 'music/I\'m Leaving - Low Roar.mp3', 
                 title: 'I\'m Leaving', 
                 artist: 'Low Roar' 
@@ -1856,7 +2203,7 @@
                 currentTrackIndex = state.currentTrackIndex;
                 previousVolume = state.previousVolume;
                 isMuted = state.isMuted;
-                isPlayerCollapsed = state.isPlayerCollapsed || false;
+                isPlayerCollapsed = state.isPlayerCollapsed || true;
 
                 if (isPlayerCollapsed) {
                     musicPlayer.classList.add('collapsed');
@@ -1890,9 +2237,26 @@
                     });
                 }
             } else {
-                currentTrackIndex = Math.floor(Math.random() * playlist.length);
+                currentTrackIndex = 0;
+                isPlayerCollapsed = true;
+                isPlaying = true;
+                musicPlayer.classList.add('collapsed');
+                toggleArrowUp.style.display = 'block';
+                toggleArrowDown.style.display = 'none';
                 loadTrack(currentTrackIndex);
                 audioPlayer.volume = 0.7;
+                
+                requestAnimationFrame(() => {
+                    const playPromise = audioPlayer.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            playIcon.style.display = 'none';
+                            pauseIcon.style.display = 'block';
+                        }).catch(() => {
+                            isPlaying = false;
+                        });
+                    }
+                });
             }
         }
 
