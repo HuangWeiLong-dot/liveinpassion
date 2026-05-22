@@ -162,7 +162,8 @@
             margin-top: 48px;
             width: 100%;
             max-width: 900px;
-            max-height: 60vh;
+            min-height: 300px;
+            aspect-ratio: 16/10;
             overflow: hidden;
             opacity: 0;
             animation: fadeInUp 1s ease 0.4s forwards;
@@ -285,6 +286,51 @@
         .gallery-item img.loaded {
             filter: blur(0);
             transform: scale(1);
+        }
+
+        /* Skeleton Loader */
+        .skeleton-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                var(--border) 25%,
+                var(--text-secondary) 50%,
+                var(--border) 75%
+            );
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s ease-in-out infinite;
+            z-index: 1;
+        }
+
+        .skeleton-loader.hidden {
+            display: none;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* 模糊图片的闪烁效果 */
+        img.blur-placeholder {
+            animation: blur-pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blur-pulse {
+            0%, 100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
         }
 
         .lazy-image {
@@ -445,6 +491,16 @@
 
         .toggle-img.active {
             opacity: 1;
+            transform: scale(1);
+        }
+
+        .toggle-img.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .toggle-img.loaded {
+            filter: blur(0);
             transform: scale(1);
         }
 
@@ -624,6 +680,17 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transition: filter 0.5s ease, opacity 0.5s ease;
+        }
+
+        .friend-avatar img.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .friend-avatar img.loaded {
+            filter: blur(0);
+            transform: scale(1);
         }
 
         .friend-name {
@@ -1476,7 +1543,8 @@
         <section class="hero">
             <h1>LIVE IN PASSION</h1>
             <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
-            <div class="hero-image">
+            <div class="hero-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
                 <img src="" data-src="photos/compressed/5.jpg" data-full-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
             </div>
         </section>
@@ -1507,7 +1575,8 @@
             <h1 class="page-title">Blogs</h1>
             <div class="blog-posts">
                 <article class="blog-post">
-                    <div class="blog-image">
+                    <div class="blog-image" style="position: relative;">
+                        <div class="skeleton-loader"></div>
                         <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Blog Featured Image" class="blur-placeholder">
                     </div>
                     <div class="blog-content">
@@ -1518,7 +1587,8 @@
                     </div>
                 </article>
                 <article class="blog-post">
-                    <div class="blog-image">
+                    <div class="blog-image" style="position: relative;">
+                        <div class="skeleton-loader"></div>
                         <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
                     </div>
                     <div class="blog-content">
@@ -1550,7 +1620,8 @@
                 <span>8 min read</span>
             </div>
             <h1 class="blog-detail-title">Life is a Fantasy</h1>
-            <div class="blog-featured-image">
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
                 <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Featured Image" class="blur-placeholder">
             </div>
             <div class="blog-detail-content">
@@ -1588,7 +1659,8 @@
                 <span>10 min read</span>
             </div>
             <h1 class="blog-detail-title">The Two Halves of a Heart</h1>
-            <div class="blog-featured-image">
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
                 <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Featured Image" class="blur-placeholder">
             </div>
             <div class="blog-detail-content">
@@ -1630,7 +1702,8 @@
             <h1 class="page-title">My Friends</h1>
             <div class="friends-grid">
                 <div class="friend-card" onclick="navigateTo('friend-lijiazu')">
-                    <div class="friend-avatar">
+                    <div class="friend-avatar" style="position: relative;">
+                        <div class="skeleton-loader"></div>
                         <img src="" data-src="photos/LiJiaZu/compressed_lijiazu/1.jpg" data-full-src="photos/LiJiaZu/1.jpg" alt="Li Jiazu" class="blur-placeholder">
                     </div>
                     <h3 class="friend-name">Li Jiazu</h3>
@@ -1818,25 +1891,55 @@
             
             if (img.classList.contains('loaded')) return;
             
-            // 先加载压缩图
+            // 先预加载压缩图
             const preloadCompressed = new Image();
-            preloadCompressed.onload = () => {
-                img.src = src;
-                img.classList.remove('blur-placeholder');
-                
-                // 如果有实际的高清图，继续加载
-                if (fullSrc) {
-                    const preloadFull = new Image();
-                    preloadFull.onload = () => {
-                        img.src = fullSrc;
-                        img.classList.add('loaded');
-                    };
-                    preloadFull.src = fullSrc;
-                } else {
-                    img.classList.add('loaded');
-                }
-            };
             preloadCompressed.src = src;
+            
+            // 如果有实际的高清图，加载它
+            if (fullSrc) {
+                const preloadFull = new Image();
+                preloadFull.onload = () => {
+                    // 高清图加载完成后，才显示图片
+                    img.src = fullSrc;
+                    img.classList.remove('blur-placeholder');
+                    img.classList.add('loaded');
+                    
+                    // 隐藏skeleton loader
+                    const parent = img.parentElement;
+                    const skeleton = parent?.querySelector('.skeleton-loader');
+                    if (skeleton) {
+                        skeleton.classList.add('hidden');
+                    }
+                };
+                preloadFull.onerror = () => {
+                    // 如果高清图加载失败，才使用压缩图
+                    img.src = src;
+                    img.classList.remove('blur-placeholder');
+                    img.classList.add('loaded');
+                    
+                    // 隐藏skeleton loader
+                    const parent = img.parentElement;
+                    const skeleton = parent?.querySelector('.skeleton-loader');
+                    if (skeleton) {
+                        skeleton.classList.add('hidden');
+                    }
+                };
+                preloadFull.src = fullSrc;
+            } else {
+                // 没有高清图，直接显示压缩图
+                preloadCompressed.onload = () => {
+                    img.src = src;
+                    img.classList.remove('blur-placeholder');
+                    img.classList.add('loaded');
+                    
+                    // 隐藏skeleton loader
+                    const parent = img.parentElement;
+                    const skeleton = parent?.querySelector('.skeleton-loader');
+                    if (skeleton) {
+                        skeleton.classList.add('hidden');
+                    }
+                };
+            }
         }
 
         const galleryGrid = document.getElementById('galleryGrid');
@@ -1905,6 +2008,11 @@
                 div.className = 'gallery-item';
                 if (item.tall) div.classList.add('tall');
                 if (item.wide) div.classList.add('wide');
+
+                // 添加skeleton loader
+                const skeleton = document.createElement('div');
+                skeleton.className = 'skeleton-loader';
+                div.appendChild(skeleton);
 
                 if (item.altSrc) {
                     div.classList.add('toggle-item');
@@ -1981,6 +2089,11 @@
             data.forEach((item, index) => {
                 const div = document.createElement('div');
                 div.className = 'gallery-item';
+
+                // 添加skeleton loader
+                const skeleton = document.createElement('div');
+                skeleton.className = 'skeleton-loader';
+                div.appendChild(skeleton);
 
                 const img = document.createElement('img');
                 img.dataset.src = item.src;
