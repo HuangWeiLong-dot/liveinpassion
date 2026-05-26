@@ -184,9 +184,17 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.5s ease;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.8s ease;
             backface-visibility: hidden;
             transform: translateZ(0);
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+
+        .hero-image img.hero-img.active {
+            opacity: 1;
         }
 
         .hero-image img.blur-placeholder {
@@ -2805,7 +2813,8 @@
             <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
             <div class="hero-image" style="position: relative;">
                 <div class="skeleton-loader"></div>
-                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="blur-placeholder">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="blur-placeholder hero-img active">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/2.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/2.jpg" alt="Hero Image" class="blur-placeholder hero-img">
             </div>
         </section>
 
@@ -3723,6 +3732,19 @@
             document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#blog-detail-2-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#friends-page .blur-placeholder').forEach(loadImage);
+            
+            // Hero image auto toggle
+            let currentHeroIndex = 0;
+            const heroImages = document.querySelectorAll('.hero-image .hero-img');
+            
+            function toggleHeroImage() {
+                heroImages[currentHeroIndex].classList.remove('active');
+                currentHeroIndex = (currentHeroIndex + 1) % heroImages.length;
+                heroImages[currentHeroIndex].classList.add('active');
+            }
+            
+            // Switch every 5 seconds
+            setInterval(toggleHeroImage, 5000);
         });
 
 
