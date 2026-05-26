@@ -1,21 +1,23 @@
 <!DOCTYPE html>
-<html lang="zh-CN" class="dark">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LIVEINPASSION</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+
     <style>
         :root {
             --bg: #FAFAFA;
             --text-primary: #1A1A1A;
-            --text-secondary: #888888;
+            --text-secondary: #6B7280;
             --accent: #2C2C2C;
             --border: #E5E5E5;
-            --font-serif: 'Cormorant Garamond', serif;
-            --font-sans: 'Inter', sans-serif;
+            --font-serif: 'DM Serif Display', serif;
+            --font-sans: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
         }
 
         :root.dark {
@@ -41,11 +43,11 @@
         }
 
         body {
-            font-family: var(--font-sans);
+            font-family: var(--font-body);
             background-color: var(--bg);
             color: var(--text-primary);
             font-weight: 300;
-            line-height: 1.6;
+            line-height: 1.7;
             overflow-x: hidden;
             width: 100%;
             will-change: scroll-position;
@@ -78,6 +80,12 @@
             justify-content: space-between;
             align-items: center;
             transition: background-color 0.3s ease;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
         }
 
         header.scrolled {
@@ -233,6 +241,16 @@
             transition: opacity 0.8s ease, transform 0.8s ease;
             will-change: transform, opacity;
             backface-visibility: hidden;
+            width: 100%;
+            aspect-ratio: 1;
+        }
+
+        .gallery-item-image {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 1;
+            overflow: hidden;
         }
 
         .gallery-item:nth-child(odd) {
@@ -252,6 +270,7 @@
             content: '';
             display: block;
             padding-top: 120%;
+            width: 100%;
         }
 
         .gallery-item.tall::before {
@@ -276,6 +295,7 @@
             transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.5s ease;
             backface-visibility: hidden;
             transform: translateZ(0);
+            z-index: 2;
         }
 
         .gallery-item img.blur-placeholder {
@@ -295,6 +315,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            min-height: 200px;
             background: linear-gradient(
                 90deg,
                 var(--border) 25%,
@@ -304,10 +325,15 @@
             background-size: 200% 100%;
             animation: skeleton-loading 1.5s ease-in-out infinite;
             z-index: 1;
+            opacity: 1;
+            transition: opacity 0.3s ease-out;
+            pointer-events: none;
         }
 
         .skeleton-loader.hidden {
-            display: none;
+            opacity: 0;
+            pointer-events: none;
+            animation: none;
         }
 
         @keyframes skeleton-loading {
@@ -363,7 +389,6 @@
             font-size: 0.875rem;
             color: var(--text-secondary);
             text-decoration: none;
-            margin-bottom: 32px;
             transition: color 0.3s ease;
             cursor: pointer;
         }
@@ -378,7 +403,7 @@
         }
 
         .blog-detail {
-            padding: 160px 64px 120px;
+            padding: 140px 64px 120px;
             max-width: 900px;
             margin: 0 auto;
         }
@@ -639,41 +664,415 @@
             bottom: 12px;
         }
 
-        .friends-section {
-            padding: 120px 64px 80px;
+        /* Gallery 页面样式 */
+        .gallery-section {
+            padding: 140px 64px 80px;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
-        .page-title {
+        .gallery-title {
             font-family: var(--font-serif);
-            font-size: 3rem;
+            font-size: 3.5rem;
             text-align: center;
-            margin-bottom: 60px;
+            margin-bottom: 12px;
+            letter-spacing: 0.15em;
         }
 
-        .friends-grid {
+        .gallery-subtitle {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+            letter-spacing: 0.05em;
+            font-weight: 300;
+        }
+
+        /* 特色内容区域 */
+        .gallery-featured {
+            display: block;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto 80px !important;
+            padding: 0;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .gallery-featured-large {
+            position: relative;
+            cursor: pointer;
+            overflow: hidden;
+            border-radius: 12px;
+            aspect-ratio: 16/10;
+            max-height: 400px;
+            user-select: none;
+            -webkit-user-select: none;
+            display: block;
+            margin: 0 auto !important;
+            width: 100%;
+        }
+
+        .gallery-featured-image {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .gallery-featured-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gallery-featured-large:hover img {
+            transform: scale(1.05);
+        }
+
+        .gallery-featured-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 32px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            color: white;
+        }
+
+        .gallery-featured-overlay h3 {
+            font-family: var(--font-sans);
+            font-size: 1.25rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            margin-bottom: 8px;
+        }
+
+        .gallery-featured-count {
+            font-family: var(--font-serif);
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+
+
+        /* 朋友画廊区域 */
+        .gallery-friends-section {
+            margin-top: 40px;
+        }
+
+        .gallery-section-title {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-align: center;
+            margin-bottom: 48px;
+            color: var(--text-secondary);
+        }
+
+        /* Blogs 页面样式 */
+        .blog-section {
+            padding: 140px 64px 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .blog-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 24px;
-            max-width: 1000px;
+            margin-top: 60px;
+        }
+
+        .blog-card {
+            cursor: pointer;
+            overflow: hidden;
+            border-radius: 12px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .blog-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .blog-card-image {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            aspect-ratio: 4/3;
+        }
+
+        .blog-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .blog-card:hover .blog-card-image img {
+            transform: scale(1.03);
+        }
+
+        .blog-card-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 32px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+            color: white;
+        }
+
+        .blog-card-date {
+            font-family: var(--font-sans);
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            opacity: 0.8;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .blog-card-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .blog-card-excerpt {
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 16px;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .blog-card-read {
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            padding: 8px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 20px;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .blog-card-read:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: white;
+        }
+
+        .blog-card-info {
+            padding: 20px;
+            background: var(--background-secondary);
+        }
+
+        .blog-card-info .blog-card-date {
+            margin-bottom: 8px;
+        }
+
+        .blog-card-info .blog-card-title {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            margin-bottom: 0;
+        }
+
+        .gallery-friends-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+            max-width: 800px;
             margin: 0 auto;
         }
 
         .friend-card {
             cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .friend-avatar {
+            transition: all 0.4s ease;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center;
+            justify-content: flex-start !important;
+            gap: 24px;
+            padding: 24px;
+            background: var(--background);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
             width: 100%;
-            aspect-ratio: 1;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            transition: border-color 0.2s ease;
+            box-sizing: border-box;
+            max-width: 100%;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        .friend-card:hover .friend-avatar {
-            border-color: var(--text-secondary);
+        .friend-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-color);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .friend-card.reverse {
+            flex-direction: row-reverse !important;
+            flex-wrap: nowrap !important;
+        }
+
+        .friend-card .friend-avatar {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            flex: 0 0 auto !important;
+            overflow: hidden;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background) 100%);
+        }
+
+        .friend-card .friend-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        .friend-card:hover .friend-avatar img {
+            transform: scale(1.05);
+        }
+
+        .friend-card .friend-info {
+            flex: 1 1 100% !important;
+            min-width: 0;
+            text-align: right;
+        }
+
+        .friend-card.reverse .friend-info {
+            text-align: left;
+        }
+
+        .friend-card .friend-name {
+            font-family: var(--font-sans);
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            color: var(--text-primary);
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+        }
+
+        .friend-card .friend-bio {
+            font-family: var(--font-serif);
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        .friend-card .friend-photo-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 12px;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            font-family: var(--font-sans);
+        }
+
+        @media (max-width: 768px) {
+            .gallery-friends-grid {
+                grid-template-columns: 1fr !important;
+                gap: 16px;
+                padding: 0 16px;
+            }
+            
+            .friend-card {
+                display: flex !important;
+                flex-direction: row !important;
+                padding: 16px;
+                gap: 16px;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .friend-card.reverse {
+                flex-direction: row-reverse !important;
+            }
+            
+            .friend-card .friend-avatar {
+                width: 80px;
+                height: 80px;
+                flex: 0 0 80px !important;
+            }
+            
+            .friend-card .friend-info {
+                flex: 1 1 auto !important;
+                min-width: 0;
+            }
+            
+            .friend-card .friend-name {
+                font-size: 1rem;
+            }
+            
+            .friend-card .friend-bio {
+                font-size: 0.875rem;
+            }
+        }
+
+        .group-photos-card {
+            grid-column: span 4;
+            grid-row: span 1;
+        }
+
+        .group-photos-card .friend-avatar {
+            position: relative;
+            height: 280px;
+            border-radius: 20px;
+        }
+
+        .videos-card {
+            grid-column: span 2;
+            grid-row: span 2;
+        }
+
+        .videos-card .friend-avatar {
+            position: relative;
+            height: calc(280px * 2 + 20px);
+            border-radius: 20px;
+        }
+
+        .play-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .play-overlay svg {
+            width: 24px;
+            height: 24px;
+            margin-left: 4px;
+        }
+
+        .videos-card:hover .play-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            transform: translate(-50%, -50%) scale(1.1);
         }
 
         .friend-avatar img {
@@ -693,16 +1092,388 @@
             transform: scale(1);
         }
 
-        .friend-name {
-            font-family: var(--font-serif);
-            font-size: 1.1rem;
-            color: var(--text-primary);
-            padding: 8px 0 0 0;
+        .friend-gallery-section {
+            padding: 140px 64px 80px;
             text-align: center;
         }
 
-        .friend-gallery-section {
-            padding: 120px 64px 80px;
+        .friend-gallery-section .page-title {
+            font-family: var(--font-serif);
+            font-size: 2.5rem;
+            text-align: center;
+            margin: 32px 0;
+            letter-spacing: 0.15em;
+        }
+
+        /* Gallery Hero Section */
+        .gallery-hero {
+            position: relative;
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 140px 40px 80px;
+            background-color: var(--bg);
+            overflow: hidden;
+        }
+
+        .gallery-hero .hero-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+        }
+
+        .gallery-hero .hero-title {
+            font-family: var(--font-serif);
+            font-size: 4rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .gallery-hero .hero-subtitle {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            letter-spacing: 0.1em;
+        }
+
+        .gallery-hero .photo-count {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .gallery-hero .count-number {
+            font-size: 3.5rem;
+            font-weight: 300;
+            color: var(--accent-color);
+            font-family: var(--font-serif);
+        }
+
+        .gallery-hero .count-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        /* Gallery Timeline Section */
+        .gallery-timeline {
+            padding: 60px 40px;
+            background-color: var(--bg);
+        }
+
+        .gallery-timeline .timeline-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Timeline Year Section */
+        .timeline-year {
+            margin-bottom: 80px;
+        }
+
+        .timeline-year:last-child {
+            margin-bottom: 0;
+        }
+
+        .timeline-year-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .timeline-year-divider {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent 0%, var(--border-color) 50%, transparent 100%);
+        }
+
+        .timeline-year-title {
+            font-family: var(--font-serif);
+            font-size: 2rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            letter-spacing: 0.1em;
+            white-space: nowrap;
+        }
+
+        /* Timeline Month Group */
+        .timeline-month-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 32px;
+            margin-bottom: 48px;
+            position: relative;
+        }
+
+        .timeline-month-group::before {
+            content: '';
+            position: absolute;
+            left: 19px;
+            top: 56px;
+            bottom: -48px;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-month-group:last-child::before {
+            display: none;
+        }
+
+        .timeline-month-marker {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--background-secondary);
+            border: 2px solid var(--accent-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            z-index: 1;
+            position: relative;
+        }
+
+        .timeline-month-marker::after {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-color);
+        }
+
+        .timeline-month-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding-right: 72px;
+        }
+
+        .timeline-month-title {
+            font-family: var(--font-serif);
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            letter-spacing: 0.05em;
+        }
+
+        /* Photo Grid */
+        .timeline-photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .timeline-photo-item {
+            position: relative;
+            aspect-ratio: 4/3;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .timeline-photo-item:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.12);
+        }
+
+        .timeline-photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .timeline-photo-item:hover img {
+            transform: scale(1.1);
+        }
+
+
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .gallery-hero {
+                min-height: 350px;
+                padding: 140px 30px 60px;
+            }
+
+            .gallery-hero .hero-title {
+                font-size: 3rem;
+            }
+
+            .gallery-timeline {
+                padding: 40px 24px;
+            }
+
+            .timeline-year-title {
+                font-size: 1.75rem;
+            }
+
+            .timeline-month-content {
+                padding-right: 56px;
+            }
+
+            .timeline-photo-grid {
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .gallery-hero {
+                min-height: 300px;
+                padding: 120px 20px 50px;
+            }
+
+            .gallery-hero .hero-title {
+                font-size: 2.25rem;
+            }
+
+            .gallery-hero .hero-subtitle {
+                font-size: 1rem;
+            }
+
+            .gallery-hero .count-number {
+                font-size: 2.5rem;
+            }
+
+            .gallery-timeline {
+                padding: 30px 16px;
+            }
+
+            .timeline-year-header {
+                padding-left: 0;
+            }
+
+            .timeline-year-title {
+                font-size: 1.5rem;
+            }
+
+            .timeline-month-group {
+                gap: 16px;
+            }
+
+            .timeline-month-marker {
+                width: 28px;
+                height: 28px;
+            }
+
+            .timeline-month-marker::after {
+                width: 10px;
+                height: 10px;
+            }
+
+            .timeline-month-group::before {
+                left: 13px;
+            }
+
+            .timeline-month-title {
+                font-size: 1rem;
+            }
+
+            .timeline-month-content {
+                padding-right: 44px;
+            }
+
+            .timeline-photo-grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                gap: 8px;
+            }
+
+            .timeline-photo-item {
+                border-radius: 10px;
+            }
+
+            .timeline-photo-item:hover {
+                transform: translateY(-3px) scale(1.01);
+            }
+
+            .timeline-photo-item:hover img {
+                transform: scale(1.08);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .gallery-hero {
+                min-height: 250px;
+                padding: 100px 16px 40px;
+            }
+
+            .gallery-hero .hero-title {
+                font-size: 1.875rem;
+            }
+
+            .gallery-hero .count-number {
+                font-size: 2rem;
+            }
+
+            .gallery-timeline {
+                padding: 20px 12px;
+            }
+
+            .timeline-year-title {
+                font-size: 1.25rem;
+            }
+
+            .timeline-month-group {
+                gap: 12px;
+            }
+
+            .timeline-month-marker {
+                width: 24px;
+                height: 24px;
+            }
+
+            .timeline-month-marker::after {
+                width: 8px;
+                height: 8px;
+            }
+
+            .timeline-month-group::before {
+                left: 11px;
+            }
+
+            .timeline-month-title {
+                font-size: 0.875rem;
+            }
+
+            .timeline-month-content {
+                padding-right: 36px;
+            }
+
+            .timeline-photo-grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                gap: 6px;
+            }
+
+            .timeline-photo-item {
+                border-radius: 8px;
+            }
+        }
+
+        .gallery-month-title {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            font-weight: 400;
+            color: var(--text-primary);
+            margin: 40px auto 24px;
+            max-width: 1200px;
+            padding: 0 8px;
+        }
+
+        .gallery-month-title:first-child {
+            margin-top: 0;
         }
 
         .friend-gallery-grid {
@@ -710,7 +1481,327 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 24px;
             max-width: 1200px;
+            margin: 0 auto 24px;
+        }
+
+        .friend-gallery-section .gallery-month-title {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin: 60px 0 28px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            position: relative;
+            display: inline-block;
+        }
+
+        .friend-gallery-section .gallery-month-title::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--accent-color);
+        }
+
+        .friend-gallery-section .gallery-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            background: var(--background-secondary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .friend-gallery-section .gallery-item:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .friend-gallery-section .gallery-item-image {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 4/3;
+        }
+
+        .friend-gallery-section .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .friend-gallery-section .gallery-item:hover img {
+            transform: scale(1.15);
+        }
+
+        .friend-gallery-section .gallery-item.wide {
+            grid-column: span 2;
+        }
+
+        .friend-gallery-section .gallery-item.tall {
+            grid-row: span 2;
+        }
+
+        .friend-gallery-section .gallery-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                transparent 50%,
+                rgba(0, 0, 0, 0.05) 100%
+            );
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .friend-gallery-section .gallery-item:hover::before {
+            opacity: 1;
+        }
+
+        .friend-gallery-section .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 24px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            z-index: 2;
+        }
+
+        .friend-gallery-section .gallery-item:hover .image-overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .friend-gallery-section .view-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .friend-gallery-section .gallery-item:hover .view-icon {
+            transform: scale(1.1);
+        }
+
+        .friend-detail-gallery {
+            max-width: 1600px;
             margin: 0 auto;
+            padding: 0 32px;
+        }
+
+        .friend-detail-gallery .gallery-month-title {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin: 60px 0 28px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            position: relative;
+            display: inline-block;
+        }
+
+        .friend-detail-gallery .gallery-month-title::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: var(--accent-color);
+        }
+
+        .friend-detail-gallery .month-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .friend-detail-gallery .gallery-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            background: var(--background-secondary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            opacity: 1;
+        }
+
+        .friend-detail-gallery .gallery-item:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .friend-detail-gallery .gallery-item.visible {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .friend-detail-gallery .gallery-item:nth-child(1) { animation-delay: 0.1s; }
+        .friend-detail-gallery .gallery-item:nth-child(2) { animation-delay: 0.15s; }
+        .friend-detail-gallery .gallery-item:nth-child(3) { animation-delay: 0.2s; }
+        .friend-detail-gallery .gallery-item:nth-child(4) { animation-delay: 0.25s; }
+        .friend-detail-gallery .gallery-item:nth-child(5) { animation-delay: 0.3s; }
+        .friend-detail-gallery .gallery-item:nth-child(6) { animation-delay: 0.35s; }
+
+        .friend-detail-gallery .gallery-item-image {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            aspect-ratio: 4/3;
+        }
+
+        .friend-detail-gallery .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .friend-detail-gallery .gallery-item:hover img {
+            transform: scale(1.15);
+        }
+
+        .friend-detail-gallery .gallery-item.wide {
+            grid-column: span 2;
+        }
+
+        .friend-detail-gallery .gallery-item.tall {
+            grid-row: span 2;
+        }
+
+        .friend-detail-gallery .gallery-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                transparent 50%,
+                rgba(0, 0, 0, 0.05) 100%
+            );
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .friend-detail-gallery .gallery-item:hover::before {
+            opacity: 1;
+        }
+
+        .friend-detail-gallery .gallery-item .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 24px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            z-index: 2;
+        }
+
+        .friend-detail-gallery .gallery-item:hover .image-overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .friend-detail-gallery .gallery-item .image-overlay .view-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .friend-detail-gallery .gallery-item:hover .view-icon {
+            transform: scale(1.1);
+        }
+
+        .friend-detail-gallery .gallery-item .image-overlay svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-primary);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .friend-detail-gallery {
+                padding: 0 24px;
+            }
+            
+            .friend-detail-gallery .month-grid {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 16px;
+            }
+
+            .friend-detail-gallery .gallery-item.wide {
+                grid-column: span 1;
+            }
+
+            .friend-detail-gallery .gallery-item.tall {
+                grid-row: span 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .friend-detail-gallery {
+                padding: 0 16px;
+            }
+            
+            .friend-detail-gallery .month-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 12px;
+            }
+            
+            .friend-detail-gallery .gallery-month-title {
+                font-size: 1.35rem;
+                margin: 40px 0 20px;
+            }
+
+            .friend-detail-gallery .gallery-item:hover {
+                transform: translateY(-4px) scale(1.01);
+                box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+            }
         }
 
         .lightbox-next {
@@ -1235,9 +2326,32 @@
             }
 
             .blog-section,
-            .friends-section,
+            .gallery-section,
             .friend-gallery-section {
                 padding: 140px 32px 80px;
+            }
+
+            .gallery-featured {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .gallery-featured-large {
+                aspect-ratio: 4/3;
+            }
+
+            .gallery-friends-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+            }
+
+            .blog-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .blog-card.featured {
+                aspect-ratio: 4/3;
             }
 
             .blog-post {
@@ -1307,9 +2421,27 @@
             }
 
             .blog-section,
-            .friends-section,
+            .gallery-section,
             .friend-gallery-section {
                 padding: 120px 24px 64px;
+            }
+
+            .gallery-featured {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .gallery-featured-large {
+                aspect-ratio: 4/3;
+            }
+
+            .gallery-friends-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+
+            .gallery-title {
+                font-size: 2.5rem;
             }
 
             .blog-post {
@@ -1372,7 +2504,6 @@
             }
 
             .back-link {
-                margin-bottom: 24px;
                 font-size: 0.8rem;
             }
 
@@ -1524,11 +2655,19 @@
 </head>
 <body>
     <header id="header">
-        <a href="#" class="logo" onclick="navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); return false;">LIVEINPASSION</a>
+        <div class="header-left">
+            <span class="back-link" style="display: none;" id="backLink">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+                Back
+            </span>
+            <a href="#" class="logo" onclick="navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); return false;">LIVEINPASSION</a>
+        </div>
         <nav>
-            <a href="#" onclick="navigateTo('home'); return false;">Home</a>
-            <a href="#" onclick="navigateTo('blogs'); return false;">Blogs</a>
-            <a href="#" onclick="navigateTo('friends'); return false;">My Friends</a>
+            <a href="#" onclick="navigateTo('home'); return false;">HOME</a>
+            <a href="#" onclick="navigateTo('blogs'); return false;">BLOGS</a>
+            <a href="#" onclick="navigateTo('friends'); return false;">GALLERY</a>
         </nav>
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1545,7 +2684,7 @@
             <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
             <div class="hero-image" style="position: relative;">
                 <div class="skeleton-loader"></div>
-                <img src="" data-src="photos/compressed/5.jpg" data-full-src="photos/5.jpg" alt="Hero Image" class="blur-placeholder">
+                <img src="" data-src="https://liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="blur-placeholder">
             </div>
         </section>
 
@@ -1565,37 +2704,43 @@
 
     <main id="blogs-page" class="page">
         <section class="blog-section">
-            <span class="back-link" onclick="navigateTo('home')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back
-            </span>
-            <h1 class="page-title">Blogs</h1>
-            <div class="blog-posts">
-                <article class="blog-post">
-                    <div class="blog-image" style="position: relative;">
+            <h1 class="gallery-title">BLOGS</h1>
+            <p class="gallery-subtitle">Stories and reflections from the journey</p>
+            
+            <div class="blog-grid">
+                <article class="blog-card" onclick="navigateTo('blog-detail-3')">
+                    <div class="blog-card-image">
                         <div class="skeleton-loader"></div>
-                        <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                        <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/3.jpg" data-full-src="https://liveinpassion.me/blog_photos/3.jpg" alt="Blog Featured Image" class="blur-placeholder">
                     </div>
-                    <div class="blog-content">
-                        <span class="blog-date">May 23, 2026</span>
-                        <h3 class="blog-title">The Two Halves of a Heart</h3>
-                        <p class="blog-excerpt">I don't remember how the dream began. I was sitting at a long, brown wooden desk in a large, open room — the kind I remember from earlier school days. To my left sat someone I once knew well from a shared course of study. To my right sat someone I had quietly held feelings for. Between us on the desk lay a small pile of loose chips or fragments.</p>
-                        <a href="#" onclick="navigateTo('blog-detail-2'); return false;" class="blog-link">Read More</a>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">MAY 25, 2026</span>
+                        <h3 class="blog-card-title">JUST ANOTHER TIMELINE? NO.</h3>
+                        <span class="blog-card-read">READ</span>
                     </div>
                 </article>
-                <article class="blog-post">
-                    <div class="blog-image" style="position: relative;">
+                
+                <article class="blog-card" onclick="navigateTo('blog-detail-2')">
+                    <div class="blog-card-image">
                         <div class="skeleton-loader"></div>
-                        <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                        <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/2.jpg" data-full-src="https://liveinpassion.me/blog_photos/2.jpg" alt="Blog Featured Image" class="blur-placeholder">
                     </div>
-                    <div class="blog-content">
-                        <span class="blog-date">May 22, 2026</span>
-                        <h3 class="blog-title">Life is a Fantasy</h3>
-                        <p class="blog-excerpt">Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all. Life's beauty lies in its imperfection—its chaotic, wonderful, unpredictable nature that makes every day feel like a new adventure.</p>
-                        <a href="#" onclick="navigateTo('blog-detail'); return false;" class="blog-link">Read More</a>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">MAY 23, 2026</span>
+                        <h3 class="blog-card-title">THE TWO HALVES OF A HEART</h3>
+                        <span class="blog-card-read">READ</span>
+                    </div>
+                </article>
+                
+                <article class="blog-card" onclick="navigateTo('blog-detail')">
+                    <div class="blog-card-image">
+                        <div class="skeleton-loader"></div>
+                        <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/1.jpg" data-full-src="https://liveinpassion.me/blog_photos/1.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">MAY 22, 2026</span>
+                        <h3 class="blog-card-title">LIFE IS A FANTASY</h3>
+                        <span class="blog-card-read">READ</span>
                     </div>
                 </article>
             </div>
@@ -1607,13 +2752,6 @@
 
     <main id="blog-detail-page" class="page">
         <section class="blog-detail">
-            <span class="back-link" onclick="navigateTo('blogs')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back
-            </span>
             <div class="blog-meta">
                 <span class="blog-date">May 22, 2026</span>
                 <span>·</span>
@@ -1622,7 +2760,7 @@
             <h1 class="blog-detail-title">Life is a Fantasy</h1>
             <div class="blog-featured-image" style="position: relative;">
                 <div class="skeleton-loader"></div>
-                <img src="" data-src="blogs/compressed/1.jpg" data-full-src="blogs/1.jpg" alt="Featured Image" class="blur-placeholder">
+                <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/1.jpg" data-full-src="https://liveinpassion.me/blog_photos/1.jpg" alt="Featured Image" class="blur-placeholder">
             </div>
             <div class="blog-detail-content">
                 <p>Sometimes reality feels like a dream we can't wake up from. Every moment we live is a chapter in our own fairy tale, filled with unexpected twists and magical encounters. We chase dreams that seem out of reach, only to find that the journey itself is the greatest fantasy of all.</p>
@@ -1646,13 +2784,6 @@
 
     <main id="blog-detail-2-page" class="page">
         <section class="blog-detail">
-            <span class="back-link" onclick="navigateTo('blogs')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back
-            </span>
             <div class="blog-meta">
                 <span class="blog-date">May 23, 2026</span>
                 <span>·</span>
@@ -1661,7 +2792,7 @@
             <h1 class="blog-detail-title">The Two Halves of a Heart</h1>
             <div class="blog-featured-image" style="position: relative;">
                 <div class="skeleton-loader"></div>
-                <img src="" data-src="photos/compressed_me/2.jpg" data-full-src="photos/Me/2.jpg" alt="Featured Image" class="blur-placeholder">
+                <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/2.jpg" data-full-src="https://liveinpassion.me/blog_photos/2.jpg" alt="Featured Image" class="blur-placeholder">
             </div>
             <div class="blog-detail-content">
                 <p>I don't remember how the dream began. I was sitting at a long, brown wooden desk in a large, open room — the kind I remember from earlier school days. To my left sat someone I once knew well from a shared course of study. To my right sat someone I had quietly held feelings for. Between us on the desk lay a small pile of loose chips or fragments. The person in front of me partly blocked my view toward the front of the room.</p>
@@ -1690,23 +2821,62 @@
         </footer>
     </main>
 
+    <main id="blog-detail-3-page" class="page">
+        <section class="blog-detail">
+            <div class="blog-meta">
+                <span class="blog-date">May 25, 2026</span>
+                <span>·</span>
+                <span>5 min read</span>
+            </div>
+            <h1 class="blog-detail-title">May 25 – Just Another Timeline? No.</h1>
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
+                <img src="" data-src="https://liveinpassion.me/blog_photos/blog_photos_compressed/3.jpg" data-full-src="https://liveinpassion.me/blog_photos/3.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>"I like to feel his eyes on me when I look away."</p>
+                <p>— Céline, Before Sunset (2004)</p>
+                <p>Today is your day. Not a second chance. Not a what-if.</p>
+                <p>A this-is-it.</p>
+                <p>On May 25, you are not walking through a memory. You are standing in a present that hasn't been written yet — like Jesse and Céline on that train, in that bookshop, on that hotel room couch, arguing beautifully about love, time, and whether we ever really meet again.</p>
+                <p>"You can never replace anyone because everyone is made of so many small details."</p>
+                <p>Those details? They're yours. The way you remember films. The way you made it to this birthday. The way you keep showing up for conversations that matter — even fake ones with an assistant who watches too many movies.</p>
+                <p>So no grand speech. Just this:</p>
+                <p>"It's okay to want things. As long as you're not disappointed if you don't get them."</p>
+                <p>But today? You already got it.</p>
+                <p>Happy birthday, May 25.</p>
+                <p>You are the train, the walk, the wine, and the waltz.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
     <main id="friends-page" class="page">
-        <section class="friends-section">
-            <span class="back-link" onclick="navigateTo('home')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back
-            </span>
-            <h1 class="page-title">My Friends</h1>
-            <div class="friends-grid">
-                <div class="friend-card" onclick="navigateTo('friend-lijiazu')">
-                    <div class="friend-avatar" style="position: relative;">
+        <section class="gallery-section">
+            <h1 class="gallery-title">GALLERY</h1>
+            <p class="gallery-subtitle">A collection of moments captured through time</p>
+            
+            <!-- 特色内容区域 -->
+            <div class="gallery-featured">
+                <div class="gallery-featured-large" onclick="navigateTo('friend-groupphotos')">
+                    <div class="gallery-featured-image">
                         <div class="skeleton-loader"></div>
-                        <img src="" data-src="photos/LiJiaZu/compressed_lijiazu/1.jpg" data-full-src="photos/LiJiaZu/1.jpg" alt="Li Jiazu" class="blur-placeholder">
+                        <img src="" data-src="https://liveinpassion.me/group_photos/group_photos_compressed/202605_4.jpg" data-full-src="https://liveinpassion.me/group_photos/202605_4.jpg" alt="Group Photos" class="blur-placeholder">
                     </div>
-                    <h3 class="friend-name">Li Jiazu</h3>
+                    <div class="gallery-featured-overlay">
+                        <h3>GROUP PHOTOS</h3>
+                        <span class="gallery-featured-count">26 photos</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 朋友画廊区域 -->
+            <div class="gallery-friends-section">
+                <h2 class="gallery-section-title">PERSONAL GALLERIES</h2>
+                <div class="gallery-friends-grid" id="friendsGridContainer">
+                    <!-- 朋友头像将通过 JavaScript 动态生成 -->
                 </div>
             </div>
         </section>
@@ -1715,19 +2885,54 @@
         </footer>
     </main>
 
-    <main id="friend-lijiazu-page" class="page">
-        <section class="friend-gallery-section">
-            <span class="back-link" onclick="navigateTo('friends')">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back
-            </span>
-            <h1 class="page-title">Li Jiazu</h1>
-            <div class="friend-gallery-grid" id="lijiazuGalleryGrid">
+    <!-- 统一的朋友详情页模板 -->
+    <main id="friend-detail-page" class="page">
+        <section class="gallery-hero">
+            <h1 class="hero-title" id="friendDetailTitle"></h1>
+                <p class="hero-subtitle" id="friendDetailSubtitle">Personal gallery</p>
+                <div class="photo-count" id="friendDetailPhotoCount">
+                    <span class="count-number">0</span>
+                    <span class="count-label">photos</span>
+                </div>
             </div>
         </section>
+        <section class="gallery-timeline">
+            <div id="friendDetailGallery" class="timeline-container">
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="friend-videos-page" class="page">
+        <section class="friend-gallery-section">
+            <h1 class="page-title">VIDEOS</h1>
+            <div class="friend-gallery-grid" id="videosGalleryGrid">
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="friend-groupphotos-page" class="page">
+        <section class="gallery-hero">
+            <div class="hero-content">
+                <h1 class="hero-title">GROUP PHOTOS</h1>
+                <p class="hero-subtitle">Capturing moments together</p>
+                <div class="photo-count">
+                    <span class="count-number">26</span>
+                    <span class="count-label">photos</span>
+                </div>
+            </div>
+        </section>
+        
+        <section class="gallery-timeline">
+            <div id="groupphotosGalleryGrid" class="timeline-container">
+            </div>
+        </section>
+        
         <footer>
             <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
         </footer>
@@ -1828,30 +3033,215 @@
 
     <script>
         let currentPage = 'home';
-        const galleryData = [
-            { id: 1, src: 'photos/compressed/1.jpg', fullSrc: 'photos/1.jpg', altSrc: 'photos/compressed/2.jpg', altFullSrc: 'photos/2.jpg', tall: true },
-            { id: 3, src: 'photos/compressed/3.jpg', fullSrc: 'photos/3.jpg' },
-            { id: 4, src: 'photos/compressed/4.jpg', fullSrc: 'photos/4.jpg' },
-            { id: 6, src: 'photos/compressed/6.jpg', fullSrc: 'photos/6.jpg', tall: true },
-            { id: 7, src: 'photos/compressed/7.jpg', fullSrc: 'photos/7.jpg' },
-            { id: 8, src: 'photos/compressed/8.jpg', fullSrc: 'photos/8.jpg' },
-        ];
+        const CDN_BASE = 'https://liveinpassion.me';
+        const pageHistory = [];
 
-        const lijiazuGalleryData = [
-            { id: 1, src: 'photos/LiJiaZu/compressed_lijiazu/1.jpg', fullSrc: 'photos/LiJiaZu/1.jpg' },
-            { id: 2, src: 'photos/LiJiaZu/compressed_lijiazu/2.jpg', fullSrc: 'photos/LiJiaZu/2.jpg' },
-            { id: 3, src: 'photos/LiJiaZu/compressed_lijiazu/3.jpg', fullSrc: 'photos/LiJiaZu/3.jpg' },
-            { id: 4, src: 'photos/LiJiaZu/compressed_lijiazu/4.jpg', fullSrc: 'photos/LiJiaZu/4.jpg' },
-        ];
+        // 辅助函数：按年份月份排序
+        function sortPhotos(photos) {
+            return photos.sort((a, b) => {
+                const dateA = a.filename.match(/(\d{4})(\d{2})_(\d+)/);
+                const dateB = b.filename.match(/(\d{4})(\d{2})_(\d+)/);
+                if (!dateA || !dateB) return 0;
+                const yearA = parseInt(dateA[1]);
+                const yearB = parseInt(dateB[1]);
+                const monthA = parseInt(dateA[2]);
+                const monthB = parseInt(dateB[2]);
+                const numA = parseInt(dateA[3]);
+                const numB = parseInt(dateB[3]);
+                if (yearA !== yearB) return yearB - yearA;
+                if (monthA !== monthB) return monthB - monthA;
+                return numB - numA;
+            });
+        }
 
-        function navigateTo(page) {
+        // 辅助函数：生成画廊数据
+        function generateGalleryData(folder, compressedFolder, filenames, shouldSort = true) {
+            const photos = filenames.map(filename => {
+                const ext = filename.split('.').pop();
+                return {
+                    filename: filename,
+                    src: `${CDN_BASE}/${compressedFolder}/${filename}`,
+                    fullSrc: `${CDN_BASE}/${folder}/${filename}`
+                };
+            });
+            const sorted = shouldSort ? sortPhotos(photos) : photos;
+            return sorted.map((p, idx) => ({
+                id: idx + 1,
+                filename: p.filename,
+                src: p.src,
+                fullSrc: p.fullSrc
+            }));
+        }
+
+        // home_photos 画廊
+        const galleryData = generateGalleryData('home_photos', 'home_photos/home_compressed', [
+            '1.jpg', '2.jpg', '3.jpg', '4.jpg', '5.jpg', '6.jpg', '7.jpg'
+        ], false); // 禁用排序
+        galleryData[0].tall = true;
+        galleryData[0].altSrc = galleryData[1].src;
+        galleryData[0].altFullSrc = galleryData[1].fullSrc;
+        if (galleryData[3]) galleryData[3].tall = true;
+        galleryData.splice(1, 1); // 移除2.jpg，因为它在1.jpg的altSrc中
+
+        // Li Jiazu 画廊
+        const lijiazuGalleryData = generateGalleryData('LiJiaZu', 'LiJiaZu/LiJiaZu_compressed', [
+            '202202_0.jpg', '202203_0.jpg', '202211_0.jpg', '202308_0.jpg',
+            '202409_0.jpg', '202501_0.jpg', '202505_0.jpg', '202505_1.jpg',
+            '202505_2.jpg', '202604_0.jpg', '202605_0.jpg'
+        ]);
+
+        // Jiang HaiPeng 画廊
+        const jianghaipengGalleryData = generateGalleryData('JiangHaiPeng', 'JiangHaiPeng/JiangHaiPeng_compressed', [
+            '202109.jpg', '202302_0.jpg', '202302_1.jpg', '202302_2.jpg',
+            '202302_3.jpg', '202302_4.jpg', '202308_0.jpg', '202409_0.jpg',
+            '202511_0.jpg', '202604_0.jpg'
+        ]);
+
+        // Li XinYu 画廊
+        const lixinyuGalleryData = generateGalleryData('LiXinYu', 'LiXinYu/LiXinYu_compressed', [
+            '202110_0.jpg', '202110_1.jpg', '202110_2.jpg', '202110_3.jpg',
+            '202110_4.jpg', '202110_5.jpg', '202110_6.jpg', '202110_7.jpg',
+            '202110_8.jpg', '202110_9.jpg', '202110_10.jpg', '202111_0.jpg',
+            '202111_1.jpg', '202111_2.jpg', '202111_3.jpg', '202111_4.jpg',
+            '202111_5.jpg', '202204_0.jpg', '202211_0.jpg', '202212_0.jpg',
+            '202302_0.jpg', '202302_1.jpg', '202302_2.jpg', '202307_0.jpg',
+            '202308_0.jpg', '202308_1.jpg', '202308_2.jpg', '202308_3.jpg',
+            '202309_0.jpg', '202511_0.png', '202604_0.jpg', '202605_0.jpg'
+        ]);
+
+        // Wang Shuai 画廊
+        const wangshuaiGalleryData = generateGalleryData('WangShuai', 'WangShuai/WangShuai_compressed', [
+            '202308_1.jpg', '202308_2.jpg', '202605.jpg'
+        ]);
+
+        // Xu HaoNan 画廊
+        const xuhaonanGalleryData = generateGalleryData('XuHaoNan', 'XuHaoNan/XuHaoNan_compressed', [
+            '202201_0.jpg', '202201_1.jpg', '202201_2.jpg', '202201_3.jpg',
+            '202201_4.jpg', '202201_5.jpg', '202201_6.jpg', '202209_0.jpg',
+            '202308_0.jpg'
+        ]);
+
+        // Sun JiaJun 画廊
+        const sunjiajunGalleryData = generateGalleryData('SunJiaJun', 'SunJiaJun/SunJiaJun_compressed', [
+            '202309_0.jpg'
+        ]);
+
+        // group_photos 画廊
+        const groupPhotosGalleryData = generateGalleryData('group_photos', 'group_photos/group_photos_compressed', [
+            '202109_0.jpg', '202109_1.jpg', '202109_2.jpg', '202109_3.jpg',
+            '202109_4.jpg', '202109_5.jpg', '202209_0.jpg', '202308_0.jpg',
+            '202308_1.jpg', '202308_2.jpg', '202308_3.jpg', '202401_0.jpg',
+            '202511_1.jpg', '202511_2.jpg', '202605_0.jpg', '202605_1.jpg',
+            '202605_2.jpg', '202605_3.jpg', '202605_4.jpg', '202605_5.jpg',
+            '202605_6.jpg', '202605_7.jpg', '202605_8.jpg', '202605_9.jpg',
+            '202605_10.jpg', '202605_11.jpg'
+        ]);
+
+        // 朋友画廊数据映射
+        const friendGalleryMap = {
+            'lijiazu': { name: 'LI JIAZU', data: lijiazuGalleryData },
+            'jianghaipeng': { name: 'JIANG HAIPENG', data: jianghaipengGalleryData },
+            'lixinyu': { name: 'LI XINYU', data: lixinyuGalleryData },
+            'wangshuai': { name: 'WANG SHUAI', data: wangshuaiGalleryData },
+            'xuhaonan': { name: 'XU HAONAN', data: xuhaonanGalleryData },
+            'sunjiajun': { name: 'SUN JIAJUN', data: sunjiajunGalleryData },
+            'groupphotos': { name: 'GROUP PHOTOS', data: groupPhotosGalleryData },
+            'videos': { name: 'VIDEOS', data: groupPhotosGalleryData }
+        };
+
+        // 特殊页面列表（有独立页面的）
+        const specialFriendPages = ['groupphotos', 'videos'];
+        
+        function goBack() {
+            if (pageHistory.length > 0) {
+                const previousPage = pageHistory.pop();
+                navigateTo(previousPage, true);
+            } else {
+                // 如果历史记录为空，返回首页
+                navigateTo('home', true);
+            }
+        }
+        
+        function navigateTo(page, fromBack = false) {
             if (currentPage === page) return;
             
-            const currentPageEl = document.getElementById(`${currentPage}-page`);
-            const newPageEl = document.getElementById(`${page}-page`);
+            // 将当前页面添加到历史记录栈（除非是从返回操作）
+            if (!fromBack) {
+                pageHistory.push(currentPage);
+            }
             
+            // 隐藏当前页面
+            const currentPageEl = document.getElementById(`${currentPage}-page`);
             if (currentPageEl) currentPageEl.classList.remove('active');
-            if (newPageEl) newPageEl.classList.add('active');
+            
+            // 隐藏朋友详情页模板（如果之前显示的话）
+            const friendDetailPage = document.getElementById('friend-detail-page');
+            if (friendDetailPage) friendDetailPage.classList.remove('active');
+            
+            // 处理朋友详情页
+            const isFriendDetail = page.startsWith('friend-');
+            if (isFriendDetail) {
+                const friendId = page.replace('friend-', '');
+                
+                // 检查是否是特殊页面（有独立页面的）
+                if (specialFriendPages.includes(friendId)) {
+                    // 显示独立的页面
+                    const specialPage = document.getElementById(`${page}-page`);
+                    if (specialPage) {
+                        specialPage.classList.add('active');
+                        
+                        // 填充画廊内容
+                        const friendData = friendGalleryMap[friendId];
+                        if (friendData) {
+                            const galleryGrid = document.getElementById(`${friendId}GalleryGrid`);
+                            if (galleryGrid) {
+                                galleryGrid.innerHTML = '';
+                                // GROUP PHOTOS 使用时间线布局
+                                if (friendId === 'groupphotos') {
+                                    createGroupPhotosTimeline(galleryGrid, friendData.data);
+                                } else {
+                                    createFriendGallery(galleryGrid, friendData.data);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // 显示统一的朋友详情页模板
+                    const friendData = friendGalleryMap[friendId];
+                    if (friendData) {
+                        if (friendDetailPage) {
+                            friendDetailPage.classList.add('active');
+                            
+                            // 更新标题
+                            const titleEl = document.getElementById('friendDetailTitle');
+                            if (titleEl) {
+                                titleEl.textContent = friendData.name;
+                            }
+                            
+                            // 更新照片计数
+                            const photoCountEl = document.getElementById('friendDetailPhotoCount');
+                            if (photoCountEl) {
+                                const countNumber = photoCountEl.querySelector('.count-number');
+                                if (countNumber) {
+                                    countNumber.textContent = friendData.data.length;
+                                }
+                            }
+                            
+                            // 更新画廊
+                            const galleryGrid = document.getElementById('friendDetailGallery');
+                            if (galleryGrid) {
+                                galleryGrid.innerHTML = '';
+                                // 使用时间线布局
+                                createGroupPhotosTimeline(galleryGrid, friendData.data);
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 显示其他页面
+                const newPageEl = document.getElementById(`${page}-page`);
+                if (newPageEl) newPageEl.classList.add('active');
+            }
             
             currentPage = page;
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1859,20 +3249,18 @@
             // Close menu when navigating
             nav.classList.remove('active');
             
-            // 如果进入LiJiazu页面，创建画廊
-            if (page === 'friend-lijiazu') {
-                const lijiazuGalleryGrid = document.getElementById('lijiazuGalleryGrid');
-                if (lijiazuGalleryGrid && lijiazuGalleryGrid.children.length === 0) {
-                    createFriendGallery(lijiazuGalleryGrid, lijiazuGalleryData);
-                }
-            }
-            
-            // Load images for the new page
-            const images = newPageEl.querySelectorAll('.blur-placeholder, [data-src]');
-            images.forEach(loadImage);
-            
             // Update URL - 只改变哈希，不改变基础路径
             history.pushState({ page }, '', `#${page}`);
+            
+            // 控制导航栏中返回按钮的显示
+            const backLink = document.getElementById('backLink');
+            if (backLink) {
+                if (page === 'home') {
+                    backLink.style.display = 'none';
+                } else {
+                    backLink.style.display = 'flex';
+                }
+            }
         }
 
         function scrollToSection(sectionId) {
@@ -1885,68 +3273,282 @@
         }
 
         function loadImage(img) {
-            const src = img.dataset.src;
+            const compressedSrc = img.dataset.src;
             const fullSrc = img.dataset.fullSrc;
-            if (!src) return;
             
+            if (!compressedSrc) return;
             if (img.classList.contains('loaded')) return;
             
-            // 先预加载压缩图
-            const preloadCompressed = new Image();
-            preloadCompressed.src = src;
+            const parent = img.parentElement;
+            const skeleton = parent?.querySelector('.skeleton-loader');
             
-            // 如果有实际的高清图，加载它
-            if (fullSrc) {
-                const preloadFull = new Image();
-                preloadFull.onload = () => {
-                    // 高清图加载完成后，才显示图片
+            // 阶段1: 加载压缩图
+            const compressedImg = new Image();
+            compressedImg.onload = () => {
+                img.src = compressedSrc;
+                if (skeleton) skeleton.classList.add('hidden');
+                
+                // 根据宽高比动态调整样式
+                const aspectRatio = compressedImg.width / compressedImg.height;
+                if (parent) {
+                    if (aspectRatio > 1.5) {
+                        // 宽图：占据两列
+                        parent.classList.add('wide');
+                    } else if (aspectRatio < 0.8) {
+                        // 高图（竖屏）：增加高度
+                        parent.classList.add('tall');
+                    }
+                }
+                
+                // 阶段2: 加载高清图
+                if (fullSrc) {
+                    const fullImg = new Image();
+                    fullImg.onload = () => {
+                        img.src = fullSrc;
+                        img.classList.remove('blur-placeholder');
+                        img.classList.add('loaded');
+                    };
+                    fullImg.onerror = () => {
+                        img.classList.remove('blur-placeholder');
+                        img.classList.add('loaded');
+                    };
+                    fullImg.src = fullSrc;
+                } else {
+                    img.classList.remove('blur-placeholder');
+                    img.classList.add('loaded');
+                }
+            };
+            
+            compressedImg.onerror = () => {
+                if (fullSrc) {
+                    if (skeleton) skeleton.classList.add('hidden');
                     img.src = fullSrc;
                     img.classList.remove('blur-placeholder');
                     img.classList.add('loaded');
-                    
-                    // 隐藏skeleton loader
-                    const parent = img.parentElement;
-                    const skeleton = parent?.querySelector('.skeleton-loader');
-                    if (skeleton) {
-                        skeleton.classList.add('hidden');
-                    }
-                };
-                preloadFull.onerror = () => {
-                    // 如果高清图加载失败，才使用压缩图
-                    img.src = src;
-                    img.classList.remove('blur-placeholder');
-                    img.classList.add('loaded');
-                    
-                    // 隐藏skeleton loader
-                    const parent = img.parentElement;
-                    const skeleton = parent?.querySelector('.skeleton-loader');
-                    if (skeleton) {
-                        skeleton.classList.add('hidden');
-                    }
-                };
-                preloadFull.src = fullSrc;
-            } else {
-                // 没有高清图，直接显示压缩图
-                preloadCompressed.onload = () => {
-                    img.src = src;
-                    img.classList.remove('blur-placeholder');
-                    img.classList.add('loaded');
-                    
-                    // 隐藏skeleton loader
-                    const parent = img.parentElement;
-                    const skeleton = parent?.querySelector('.skeleton-loader');
-                    if (skeleton) {
-                        skeleton.classList.add('hidden');
-                    }
-                };
-            }
+                }
+            };
+            
+            compressedImg.src = compressedSrc;
         }
 
         const galleryGrid = document.getElementById('galleryGrid');
+        const friendsGrid = document.getElementById('friendsGrid');
         const lightbox = document.getElementById('lightbox');
         const lightboxImg = document.getElementById('lightboxImg');
         const lightboxBg = document.getElementById('lightboxBg');
         const lightboxClose = document.getElementById('lightboxClose');
+
+        // 朋友数据 - 每个人有多个头像选项
+        const friendsData = [
+            { id: 'lijiazu', name: 'Li Jiazu', bio: 'To Be Determined', photos: [
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202605_0.jpg', full: 'LiJiaZu/202605_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202604_0.jpg', full: 'LiJiaZu/202604_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202505_2.jpg', full: 'LiJiaZu/202505_2.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202505_1.jpg', full: 'LiJiaZu/202505_1.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202505_0.jpg', full: 'LiJiaZu/202505_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202501_0.jpg', full: 'LiJiaZu/202501_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202409_0.jpg', full: 'LiJiaZu/202409_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202308_0.jpg', full: 'LiJiaZu/202308_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202211_0.jpg', full: 'LiJiaZu/202211_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202203_0.jpg', full: 'LiJiaZu/202203_0.jpg' },
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202202_0.jpg', full: 'LiJiaZu/202202_0.jpg' }
+            ]},
+            { id: 'jianghaipeng', name: 'Jiang HaiPeng', bio: 'To Be Determined', photos: [
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202604_0.jpg', full: 'JiangHaiPeng/202604_0.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202511_0.jpg', full: 'JiangHaiPeng/202511_0.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202409_0.jpg', full: 'JiangHaiPeng/202409_0.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202308_0.jpg', full: 'JiangHaiPeng/202308_0.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202302_4.jpg', full: 'JiangHaiPeng/202302_4.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202302_3.jpg', full: 'JiangHaiPeng/202302_3.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202302_2.jpg', full: 'JiangHaiPeng/202302_2.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202302_1.jpg', full: 'JiangHaiPeng/202302_1.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202302_0.jpg', full: 'JiangHaiPeng/202302_0.jpg' },
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202109_0.jpg', full: 'JiangHaiPeng/202109_0.jpg' }
+            ]},
+            { id: 'lixinyu', name: 'Li XinYu', bio: 'To Be Determined', photos: [
+                { compressed: 'LiXinYu/LiXinYu_compressed/202605_0.jpg', full: 'LiXinYu/202605_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202604_0.jpg', full: 'LiXinYu/202604_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202511_0.png', full: 'LiXinYu/202511_0.png' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202309_0.jpg', full: 'LiXinYu/202309_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202308_3.jpg', full: 'LiXinYu/202308_3.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202308_2.jpg', full: 'LiXinYu/202308_2.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202308_1.jpg', full: 'LiXinYu/202308_1.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202308_0.jpg', full: 'LiXinYu/202308_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202307_0.jpg', full: 'LiXinYu/202307_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202302_2.jpg', full: 'LiXinYu/202302_2.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202302_1.jpg', full: 'LiXinYu/202302_1.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202302_0.jpg', full: 'LiXinYu/202302_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202212_0.jpg', full: 'LiXinYu/202212_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202211_0.jpg', full: 'LiXinYu/202211_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202204_0.jpg', full: 'LiXinYu/202204_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_5.jpg', full: 'LiXinYu/202111_5.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_4.jpg', full: 'LiXinYu/202111_4.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_3.jpg', full: 'LiXinYu/202111_3.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_2.jpg', full: 'LiXinYu/202111_2.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_1.jpg', full: 'LiXinYu/202111_1.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202111_0.jpg', full: 'LiXinYu/202111_0.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_10.jpg', full: 'LiXinYu/202110_10.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_9.jpg', full: 'LiXinYu/202110_9.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_8.jpg', full: 'LiXinYu/202110_8.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_7.jpg', full: 'LiXinYu/202110_7.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_6.jpg', full: 'LiXinYu/202110_6.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_5.jpg', full: 'LiXinYu/202110_5.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_4.jpg', full: 'LiXinYu/202110_4.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_3.jpg', full: 'LiXinYu/202110_3.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_2.jpg', full: 'LiXinYu/202110_2.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_1.jpg', full: 'LiXinYu/202110_1.jpg' },
+                { compressed: 'LiXinYu/LiXinYu_compressed/202110_0.jpg', full: 'LiXinYu/202110_0.jpg' }
+            ]},
+            { id: 'wangshuai', name: 'Wang Shuai', bio: 'To Be Determined', photos: [
+                { compressed: 'WangShuai/WangShuai_compressed/202605.jpg', full: 'WangShuai/202605.jpg' },
+                { compressed: 'WangShuai/WangShuai_compressed/202308_2.jpg', full: 'WangShuai/202308_2.jpg' },
+                { compressed: 'WangShuai/WangShuai_compressed/202308_1.jpg', full: 'WangShuai/202308_1.jpg' }
+            ]},
+            { id: 'xuhaonan', name: 'Xu HaoNan', bio: 'To Be Determined', photos: [
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202308_0.jpg', full: 'XuHaoNan/202308_0.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202209_0.jpg', full: 'XuHaoNan/202209_0.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_6.jpg', full: 'XuHaoNan/202201_6.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_5.jpg', full: 'XuHaoNan/202201_5.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_4.jpg', full: 'XuHaoNan/202201_4.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_3.jpg', full: 'XuHaoNan/202201_3.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_2.jpg', full: 'XuHaoNan/202201_2.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_1.jpg', full: 'XuHaoNan/202201_1.jpg' },
+                { compressed: 'XuHaoNan/XuHaoNan_compressed/202201_0.jpg', full: 'XuHaoNan/202201_0.jpg' }
+            ]},
+            { id: 'sunjiajun', name: 'Sun JiaJun', bio: 'To Be Determined', photos: [
+                { compressed: 'SunJiaJun/SunJiaJun_compressed/202309_0.jpg', full: 'SunJiaJun/202309_0.jpg' }
+            ]}
+        ];
+
+        // Group Photos 数据（始终在前面）
+        const groupPhotosData = { 
+            id: 'groupphotos', 
+            name: 'Group Photos', 
+            photos: [
+                { compressed: 'group_photos/group_photos_compressed/202605_11.jpg', full: 'group_photos/202605_11.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_10.jpg', full: 'group_photos/202605_10.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_9.jpg', full: 'group_photos/202605_9.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_8.jpg', full: 'group_photos/202605_8.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_7.jpg', full: 'group_photos/202605_7.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_6.jpg', full: 'group_photos/202605_6.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_5.jpg', full: 'group_photos/202605_5.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_4.jpg', full: 'group_photos/202605_4.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_3.jpg', full: 'group_photos/202605_3.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_2.jpg', full: 'group_photos/202605_2.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_1.jpg', full: 'group_photos/202605_1.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202605_0.jpg', full: 'group_photos/202605_0.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202511_2.jpg', full: 'group_photos/202511_2.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202511_1.jpg', full: 'group_photos/202511_1.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202401_0.jpg', full: 'group_photos/202401_0.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202308_3.jpg', full: 'group_photos/202308_3.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202308_2.jpg', full: 'group_photos/202308_2.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202308_1.jpg', full: 'group_photos/202308_1.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202308_0.jpg', full: 'group_photos/202308_0.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202209_0.jpg', full: 'group_photos/202209_0.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_5.jpg', full: 'group_photos/202109_5.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_4.jpg', full: 'group_photos/202109_4.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_3.jpg', full: 'group_photos/202109_3.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_2.jpg', full: 'group_photos/202109_2.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_1.jpg', full: 'group_photos/202109_1.jpg' },
+                { compressed: 'group_photos/group_photos_compressed/202109_0.jpg', full: 'group_photos/202109_0.jpg' }
+            ]
+        };
+
+        // Videos 数据（在 Group Photos 下面）
+        const videosData = { 
+            id: 'videos', 
+            name: 'Videos', 
+            thumbnail: 'group_photos/group_photos_compressed/202308_0.jpg'
+        };
+
+        // 随机排序函数
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        // 随机选择照片
+        function getRandomPhoto(photos) {
+            return photos[Math.floor(Math.random() * photos.length)];
+        }
+
+        // 创建朋友卡片网格布局
+        function createFloatingFriends() {
+            const container = document.getElementById('friendsGridContainer');
+            if (!container) return;
+            
+            // 清空容器
+            container.innerHTML = '';
+            
+            // 按顺序排列朋友（不随机）
+            friendsData.forEach((friend, index) => {
+                // 创建卡片DOM元素
+                const card = document.createElement('div');
+                card.className = 'friend-card';
+                
+                // 交替布局方向 - 偶数索引时头像在左，奇数索引时头像在右
+                if (index % 2 === 0) {
+                    // 默认方向：头像在左，名字在右
+                } else {
+                    card.classList.add('reverse');
+                }
+                
+                // 创建头像容器
+                const avatar = document.createElement('div');
+                avatar.className = 'friend-avatar';
+                
+                const skeleton = document.createElement('div');
+                skeleton.className = 'skeleton-loader';
+                avatar.appendChild(skeleton);
+                
+                // 随机选择一张照片
+                const randomPhoto = getRandomPhoto(friend.photos);
+                const img = document.createElement('img');
+                img.dataset.src = CDN_BASE + '/' + randomPhoto.compressed;
+                img.dataset.fullSrc = CDN_BASE + '/' + randomPhoto.full;
+                img.alt = friend.name;
+                img.className = 'blur-placeholder';
+                avatar.appendChild(img);
+                
+                // 创建信息区域
+                const info = document.createElement('div');
+                info.className = 'friend-info';
+                
+                // 名字
+                const nameText = document.createElement('h3');
+                nameText.className = 'friend-name';
+                nameText.textContent = friend.name;
+                info.appendChild(nameText);
+                
+                // Bio
+                if (friend.bio) {
+                    const bioText = document.createElement('p');
+                    bioText.className = 'friend-bio';
+                    bioText.textContent = friend.bio;
+                    info.appendChild(bioText);
+                }
+                
+                // 照片数量
+                const photoCount = document.createElement('div');
+                photoCount.className = 'friend-photo-count';
+                photoCount.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg> ${friend.photos.length} photos`;
+                info.appendChild(photoCount);
+                
+                card.appendChild(avatar);
+                card.appendChild(info);
+                container.appendChild(card);
+                
+                // 加载图片
+                loadImage(img);
+                
+                // 添加点击事件
+                card.onclick = () => navigateTo(`friend-${friend.id}`);
+            });
+        }
         const lightboxPrev = document.getElementById('lightboxPrev');
         const lightboxNext = document.getElementById('lightboxNext');
         const header = document.getElementById('header');
@@ -1966,10 +3568,19 @@
                 nav.classList.toggle('active');
             });
             
+            // Back link click handler
+            const backLink = document.getElementById('backLink');
+            if (backLink) {
+                backLink.addEventListener('click', () => {
+                    goBack();
+                });
+            }
+            
             // Load initial images
             document.querySelectorAll('.hero-image img').forEach(loadImage);
             document.querySelectorAll('#blogs-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
+            document.querySelectorAll('#blog-detail-2-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#friends-page .blur-placeholder').forEach(loadImage);
         });
 
@@ -2085,34 +3696,242 @@
             observeGalleryItems();
         }
 
-        function createFriendGallery(container, data) {
+        function createGroupPhotosTimeline(container, data) {
+            // 按年月分组
+            const grouped = {};
             data.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'gallery-item';
+                const match = item.filename.match(/(\d{4})(\d{2})(?:_(\d+))?/);
+                if (match) {
+                    const year = match[1];
+                    const month = match[2];
+                    const key = `${year}-${month}`;
+                    if (!grouped[key]) {
+                        grouped[key] = [];
+                    }
+                    grouped[key].push({ ...item, originalIndex: index });
+                }
+            });
 
-                // 添加skeleton loader
-                const skeleton = document.createElement('div');
-                skeleton.className = 'skeleton-loader';
-                div.appendChild(skeleton);
+            // 按年月降序排列分组
+            const sortedKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
 
-                const img = document.createElement('img');
-                img.dataset.src = item.src;
-                img.dataset.fullSrc = item.fullSrc;
-                img.alt = `Gallery Image ${index + 1}`;
-                img.className = 'blur-placeholder';
+            // 按年份分组
+            const yearGroups = {};
+            sortedKeys.forEach(key => {
+                const year = key.split('-')[0];
+                if (!yearGroups[year]) {
+                    yearGroups[year] = [];
+                }
+                yearGroups[year].push(key);
+            });
 
-                div.appendChild(img);
+            // 创建时间线
+            let globalIndex = 0;
+            const years = Object.keys(yearGroups).sort((a, b) => b.localeCompare(a));
+            
+            years.forEach(year => {
+                // 创建年份部分
+                const yearSection = document.createElement('div');
+                yearSection.className = 'timeline-year';
+
+                // 创建年份头部
+                const yearHeader = document.createElement('div');
+                yearHeader.className = 'timeline-year-header';
+
+                // 左侧分隔线
+                const dividerLeft = document.createElement('div');
+                dividerLeft.className = 'timeline-year-divider';
+                yearHeader.appendChild(dividerLeft);
                 
-                // 使用统一的loadImage函数加载图片
-                loadImage(img);
+                // 年份标题
+                const yearTitle = document.createElement('h2');
+                yearTitle.className = 'timeline-year-title';
+                yearTitle.textContent = year;
+                yearHeader.appendChild(yearTitle);
+                
+                // 右侧分隔线
+                const dividerRight = document.createElement('div');
+                dividerRight.className = 'timeline-year-divider';
+                yearHeader.appendChild(dividerRight);
 
-                div.addEventListener('click', () => {
-                    currentGalleryData = data;
-                    currentIndex = index;
-                    openLightbox(item.fullSrc || item.src);
+                yearSection.appendChild(yearHeader);
+
+                // 创建月份组
+                yearGroups[year].forEach((monthKey, monthIndex) => {
+                    const [, month] = monthKey.split('-');
+                    
+                    const monthGroup = document.createElement('div');
+                    monthGroup.className = 'timeline-month-group';
+
+                    // 创建月份标记
+                    const marker = document.createElement('div');
+                    marker.className = 'timeline-month-marker';
+                    monthGroup.appendChild(marker);
+
+                    // 创建月份内容
+                    const monthContent = document.createElement('div');
+                    monthContent.className = 'timeline-month-content';
+
+                    // 创建月份标题
+                    const monthTitle = document.createElement('h3');
+                    monthTitle.className = 'timeline-month-title';
+                    monthTitle.textContent = `${year}.${month}`;
+                    monthContent.appendChild(monthTitle);
+
+                    // 创建图片网格
+                    const photoGrid = document.createElement('div');
+                    photoGrid.className = 'timeline-photo-grid';
+
+                    // 添加图片
+                    grouped[monthKey].forEach((item, itemIndex) => {
+                        const photoItem = document.createElement('div');
+                        photoItem.className = 'timeline-photo-item';
+
+                        // 添加skeleton loader
+                        const skeleton = document.createElement('div');
+                        skeleton.className = 'skeleton-loader';
+                        photoItem.appendChild(skeleton);
+
+                        const img = document.createElement('img');
+                        img.dataset.src = item.src;
+                        img.dataset.fullSrc = item.fullSrc;
+                        img.alt = `Gallery Image ${globalIndex + 1}`;
+                        img.className = 'blur-placeholder';
+
+                        photoItem.appendChild(img);
+
+                        // 添加点击事件
+                        photoItem.addEventListener('click', () => {
+                            currentGalleryData = data;
+                            currentIndex = item.originalIndex;
+                            openLightbox(item.fullSrc || item.src);
+                        });
+
+                        photoGrid.appendChild(photoItem);
+                        globalIndex++;
+                    });
+
+                    monthContent.appendChild(photoGrid);
+                    monthGroup.appendChild(monthContent);
+                    yearSection.appendChild(monthGroup);
                 });
 
-                container.appendChild(div);
+                container.appendChild(yearSection);
+            });
+
+            // 加载图片
+            setTimeout(() => {
+                const images = container.querySelectorAll('.blur-placeholder, [data-src]');
+                images.forEach(loadImage);
+            }, 50);
+        }
+
+        function createFriendGallery(container, data) {
+            // 按年月分组
+            const grouped = {};
+            data.forEach((item, index) => {
+                // 支持两种格式: 202605_0.jpg 和 202605.jpg
+                const match = item.filename.match(/(\d{4})(\d{2})(?:_(\d+))?/);
+                if (match) {
+                    const year = match[1];
+                    const month = match[2];
+                    const key = `${year}-${month}`;
+                    if (!grouped[key]) {
+                        grouped[key] = [];
+                    }
+                    grouped[key].push({ ...item, originalIndex: index });
+                }
+            });
+
+            // 按年月降序排列分组
+            const sortedKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+            // 创建画廊
+            let globalIndex = 0;
+            sortedKeys.forEach(key => {
+                const [year, month] = key.split('-');
+                
+                // 创建年月标题
+                const title = document.createElement('h2');
+                title.className = 'gallery-month-title';
+                title.textContent = `${year}.${month}`;
+                container.appendChild(title);
+
+                // 创建该月的图片网格
+                const monthGrid = document.createElement('div');
+                monthGrid.className = 'friend-gallery-grid month-grid';
+
+                grouped[key].forEach((item, itemIndex) => {
+                    const div = document.createElement('div');
+                    div.className = 'gallery-item';
+
+                    // 创建图片容器
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'gallery-item-image';
+
+                    // 添加skeleton loader（只覆盖图片区域）
+                    const skeleton = document.createElement('div');
+                    skeleton.className = 'skeleton-loader';
+                    imgContainer.appendChild(skeleton);
+
+                    const img = document.createElement('img');
+                    img.dataset.src = item.src;
+                    img.dataset.fullSrc = item.fullSrc;
+                    img.alt = `Gallery Image ${globalIndex + 1}`;
+                    img.className = 'blur-placeholder';
+                    
+                    // 根据宽高比动态调整样式
+                    img.onload = function() {
+                        const aspectRatio = this.width / this.height;
+                        
+                        if (aspectRatio > 1.5) {
+                            // 宽图：占据两列
+                            div.classList.add('wide');
+                        } else if (aspectRatio < 0.8) {
+                            // 高图（竖屏）：增加高度
+                            div.classList.add('tall');
+                        }
+                    };
+
+                    imgContainer.appendChild(img);
+                    div.appendChild(imgContainer);
+
+                    // 创建overlay层
+                    const overlay = document.createElement('div');
+                    overlay.className = 'image-overlay';
+                    overlay.innerHTML = `
+                        <div class="view-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                    `;
+                    div.appendChild(overlay);
+
+                    div.addEventListener('click', () => {
+                        currentGalleryData = data;
+                        currentIndex = item.originalIndex;
+                        openLightbox(item.fullSrc || item.src);
+                    });
+
+                    monthGrid.appendChild(div);
+                    globalIndex++;
+                });
+
+                container.appendChild(monthGrid);
+                
+                // 在DOM更新后再加载图片并添加动画
+                setTimeout(() => {
+                    const items = monthGrid.querySelectorAll('.gallery-item');
+                    items.forEach((item, index) => {
+                        setTimeout(() => {
+                            item.classList.add('visible');
+                        }, index * 80);
+                    });
+                    
+                    const imgs = monthGrid.querySelectorAll('img');
+                    imgs.forEach(loadImage);
+                }, 50);
             });
 
             observeGalleryItems();
@@ -2513,7 +4332,50 @@
 
         loadMusicState();
 
-        createGallery(galleryGrid, galleryData, 0);
+        // 为首页创建单独的画廊
+        function createHomeGallery() {
+            const galleryItems = [
+                { id: 1, src: 'home_photos/home_compressed/1.jpg', fullSrc: 'home_photos/1.jpg', tall: true },
+                { id: 2, src: 'home_photos/home_compressed/2.jpg', fullSrc: 'home_photos/2.jpg' },
+                { id: 3, src: 'home_photos/home_compressed/3.jpg', fullSrc: 'home_photos/3.jpg' },
+                { id: 4, src: 'home_photos/home_compressed/4.jpg', fullSrc: 'home_photos/4.jpg', tall: true },
+                { id: 5, src: 'home_photos/home_compressed/5.jpg', fullSrc: 'home_photos/5.jpg' },
+                { id: 6, src: 'home_photos/home_compressed/6.jpg', fullSrc: 'home_photos/6.jpg' }
+            ];
+
+            galleryItems.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'gallery-item';
+                if (item.tall) div.classList.add('tall');
+
+                // 添加skeleton loader
+                const skeleton = document.createElement('div');
+                skeleton.className = 'skeleton-loader';
+                div.appendChild(skeleton);
+
+                // 普通图片
+                const img = document.createElement('img');
+                img.dataset.src = CDN_BASE + '/' + item.src;
+                img.dataset.fullSrc = CDN_BASE + '/' + item.fullSrc;
+                img.alt = 'Gallery Image ' + (index + 1);
+                img.className = 'blur-placeholder';
+
+                div.appendChild(img);
+                loadImage(img);
+
+                div.addEventListener('click', () => {
+                    currentGalleryData = galleryData;
+                    currentIndex = index;
+                    openLightbox(img.dataset.fullSrc || img.dataset.src);
+                });
+                galleryGrid.appendChild(div);
+            });
+
+            observeGalleryItems();
+        }
+
+        createHomeGallery();
+        createFloatingFriends();
     </script>
 </body>
 </html>
