@@ -4179,7 +4179,7 @@
 
         // 为首页创建单独的画廊
         function createHomeGallery() {
-            window.homeGalleryItems = [
+            const galleryItems = [
                 { id: 1, src: 'home_photos/home_compressed/1.jpg', fullSrc: 'home_photos/1.jpg', tall: true },
                 { id: 2, src: 'home_photos/home_compressed/2.jpg', fullSrc: 'home_photos/2.jpg' },
                 { id: 3, src: 'home_photos/home_compressed/3.jpg', fullSrc: 'home_photos/3.jpg' },
@@ -4187,6 +4187,7 @@
                 { id: 5, src: 'home_photos/home_compressed/5.jpg', fullSrc: 'home_photos/5.jpg' },
                 { id: 6, src: 'home_photos/home_compressed/6.jpg', fullSrc: 'home_photos/6.jpg' }
             ];
+            window.homeGalleryItems = galleryItems;
 
             galleryItems.forEach((item, index) => {
                 const div = document.createElement('div');
