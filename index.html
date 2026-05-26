@@ -18,6 +18,7 @@
             --font-serif: 'DM Serif Display', serif;
             --font-sans: 'Space Grotesk', sans-serif;
             --font-body: 'Inter', sans-serif;
+            --invert: 0;
         }
 
         :root.dark {
@@ -26,6 +27,7 @@
             --text-secondary: #888888;
             --accent: #E5E5E5;
             --border: #333333;
+            --invert: 1;
         }
 
         * {
@@ -704,7 +706,6 @@
             position: relative;
             cursor: pointer;
             overflow: hidden;
-            border-radius: 12px;
             aspect-ratio: 16/10;
             max-height: 400px;
             user-select: none;
@@ -789,7 +790,6 @@
         .blog-card {
             cursor: pointer;
             overflow: hidden;
-            border-radius: 12px;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
         }
@@ -862,7 +862,6 @@
             letter-spacing: 0.1em;
             padding: 8px 20px;
             border: 1px solid rgba(255, 255, 255, 0.5);
-            border-radius: 20px;
             display: inline-block;
             transition: all 0.3s ease;
         }
@@ -907,7 +906,6 @@
             gap: 24px;
             padding: 24px;
             background: var(--background);
-            border-radius: 16px;
             border: 1px solid var(--border-color);
             width: 100%;
             box-sizing: border-box;
@@ -933,7 +931,6 @@
             height: 120px;
             flex: 0 0 auto !important;
             overflow: hidden;
-            border-radius: 12px;
             background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background) 100%);
         }
 
@@ -1034,7 +1031,6 @@
         .group-photos-card .friend-avatar {
             position: relative;
             height: 280px;
-            border-radius: 20px;
         }
 
         .videos-card {
@@ -1045,7 +1041,6 @@
         .videos-card .friend-avatar {
             position: relative;
             height: calc(280px * 2 + 20px);
-            border-radius: 20px;
         }
 
         .play-overlay {
@@ -1276,7 +1271,6 @@
         .timeline-photo-item {
             position: relative;
             aspect-ratio: 4/3;
-            border-radius: 12px;
             overflow: hidden;
             cursor: pointer;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
@@ -1391,9 +1385,7 @@
                 gap: 8px;
             }
 
-            .timeline-photo-item {
-                border-radius: 10px;
-            }
+            
 
             .timeline-photo-item:hover {
                 transform: translateY(-3px) scale(1.01);
@@ -1456,10 +1448,6 @@
                 grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
                 gap: 6px;
             }
-
-            .timeline-photo-item {
-                border-radius: 8px;
-            }
         }
 
         .gallery-month-title {
@@ -1509,7 +1497,6 @@
         .friend-gallery-section .gallery-item {
             position: relative;
             overflow: hidden;
-            border-radius: 16px;
             cursor: pointer;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
             background: var(--background-secondary);
@@ -1641,7 +1628,6 @@
         .friend-detail-gallery .gallery-item {
             position: relative;
             overflow: hidden;
-            border-radius: 16px;
             cursor: pointer;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
             background: var(--background-secondary);
@@ -1818,6 +1804,65 @@
             transform: rotate(45deg);
         }
 
+        .music-toggle-btn {
+            position: fixed;
+            bottom: 100px;
+            right: 32px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            color: var(--bg);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 999;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            outline: none;
+            touch-action: manipulation;
+            border: 0;
+        }
+
+        .music-toggle-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+        }
+
+        .music-toggle-btn svg,
+        .music-toggle-btn img {
+            width: 24px;
+            height: 24px;
+            filter: invert(calc(1 - var(--invert)));
+        }
+
+        .music-toggle-btn.active {
+            background: var(--text-secondary);
+        }
+
+        .player-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 997;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .player-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
         .theme-toggle {
             position: fixed;
             bottom: 32px;
@@ -1923,7 +1968,6 @@
         .author-avatar {
             width: 64px;
             height: 64px;
-            border-radius: 8px;
             overflow: hidden;
             border: 2px solid var(--border);
             cursor: pointer;
@@ -1943,159 +1987,111 @@
             border-color: var(--text-primary);
         }
 
-        .author-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
+        /* 音乐播放器样式 */
         .music-player {
             position: fixed;
-            bottom: 20px;
+            top: 50%;
             left: 50%;
-            transform: translateX(-50%);
-            z-index: 999;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 20px;
+            transform: translate(-50%, -50%) scale(0.9);
+            z-index: 998;
             background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 50px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-            transition: all 0.3s ease;
-        }
-
-        .music-player.collapsed {
-            transform: translateX(-50%) translateY(calc(100% + 10px));
+            border-radius: 16px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+            width: 460px;
+            max-width: calc(100% - 32px);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
             opacity: 0;
+            pointer-events: none;
         }
 
-        .music-toggle-btn {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: transparent;
-            color: var(--text-primary);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.3s ease;
+        .music-player.visible {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
             pointer-events: auto;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
         }
 
-        .music-toggle-btn:active {
-            background: transparent;
-            box-shadow: none;
+        .music-player:hover {
+            box-shadow: 0 12px 50px rgba(0,0,0,0.35);
         }
 
-        .music-toggle-btn:hover {
-            transform: translateX(-50%) scale(1.2);
+        .player-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
         }
 
-        .music-toggle-btn svg {
-            width: 24px;
-            height: 24px;
-            transition: transform 0.3s ease;
+        .player-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .music-player.collapsed + .music-toggle-btn {
-            bottom: 20px;
-            z-index: 1001;
-        }
-
-        .music-player:hover:not(.collapsed) {
-            transform: translateX(-50%) translateY(-4px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
-        }
-
-        .music-btn {
-            width: 36px;
-            height: 36px;
+        .player-btn {
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: transparent;
-            color: var(--text-primary);
             border: none;
+            color: var(--text-primary);
             cursor: pointer;
             display: flex;
-            justify-content: center;
             align-items: center;
-            transition: all 0.3s ease;
+            justify-content: center;
+            transition: all 0.2s ease;
             flex-shrink: 0;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
         }
 
-        .music-btn:active {
-            background: transparent;
-            box-shadow: none;
-        }
-
-        .music-btn:hover {
+        .player-btn:hover {
             background: var(--border);
             transform: scale(1.1);
         }
 
-        .music-btn svg {
-            width: 18px;
-            height: 18px;
+        .player-btn svg,
+        .player-btn img {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .player-btn img {
+            filter: invert(var(--invert, 0));
         }
 
-        .music-toggle {
-            width: 44px;
-            height: 44px;
+        .player-play-btn {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: var(--text-primary);
-            color: var(--bg);
             border: none;
+            color: var(--bg);
             cursor: pointer;
             display: flex;
-            justify-content: center;
             align-items: center;
-            transition: all 0.3s ease;
+            justify-content: center;
+            transition: all 0.2s ease;
             flex-shrink: 0;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
         }
 
-        .music-toggle:hover {
+        .player-play-btn:hover {
             transform: scale(1.1);
         }
 
-        .music-toggle svg {
-            width: 20px;
-            height: 20px;
+        .player-play-btn svg,
+        .player-play-btn img {
+            width: 18px;
+            height: 18px;
+            filter: invert(calc(1 - var(--invert)));
         }
 
-        .music-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            min-width: 150px;
+        .player-info {
+            display: none;
         }
 
-        .music-title {
+        .player-title {
             font-size: 0.875rem;
             font-weight: 500;
             color: var(--text-primary);
@@ -2104,7 +2100,7 @@
             text-overflow: ellipsis;
         }
 
-        .music-artist {
+        .player-artist {
             font-size: 0.75rem;
             color: var(--text-secondary);
             white-space: nowrap;
@@ -2112,17 +2108,22 @@
             text-overflow: ellipsis;
         }
 
-        .music-progress {
-            width: 100px;
+        .player-progress {
+            flex: 2;
+            min-width: 120px;
+            max-width: 200px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .progress-bar {
-            width: 100%;
+        .progress-track {
+            flex: 1;
             height: 4px;
             background: var(--border);
             border-radius: 2px;
-            overflow: hidden;
             cursor: pointer;
+            overflow: hidden;
         }
 
         .progress-fill {
@@ -2132,51 +2133,182 @@
             transition: width 0.1s linear;
         }
 
-        .music-volume-slider {
-            width: 80px;
-            display: flex;
-            align-items: center;
+        .progress-time {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 32px;
         }
 
-        .music-volume-slider input[type="range"] {
-            width: 100%;
+        .player-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-slider {
+            width: 50px;
             height: 4px;
             -webkit-appearance: none;
             appearance: none;
             background: var(--border);
             border-radius: 2px;
-            outline: none;
             cursor: pointer;
+            outline: none;
         }
 
-        .music-volume-slider input[type="range"]::-webkit-slider-thumb {
+        .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: var(--text-primary);
             cursor: pointer;
-            transition: transform 0.2s ease;
         }
 
-        .music-volume-slider input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-
-        .music-volume-slider input[type="range"]::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
+        .volume-slider::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: var(--text-primary);
             cursor: pointer;
             border: none;
-            transition: transform 0.2s ease;
         }
 
-        .music-volume-slider input[type="range"]::-moz-range-thumb:hover {
-            transform: scale(1.2);
+        .playlist-toggle.active {
+            background: var(--border);
         }
+
+        /* 播放列表样式 */
+        .player-playlist {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .player-playlist.visible {
+            max-height: 320px;
+        }
+
+        .playlist-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            background: rgba(0,0,0,0.03);
+        }
+
+        .playlist-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .playlist-count {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .playlist-items {
+            max-height: 220px;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .playlist-items::-webkit-scrollbar {
+            display: none;
+        }
+
+        .playlist-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .playlist-item:hover {
+            background: rgba(0,0,0,0.03);
+            border-left-color: var(--text-primary);
+        }
+
+        .playlist-item.active {
+            background: rgba(0,0,0,0.05);
+            border-left-color: var(--text-primary);
+        }
+
+        .playlist-item-number {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            width: 20px;
+            text-align: center;
+        }
+
+        .playlist-item.active .playlist-item-number {
+            color: var(--text-primary);
+        }
+
+        .playlist-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .playlist-item-title {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+
+        .playlist-item.active .playlist-item-title {
+            font-weight: 500;
+        }
+
+        .playlist-item-artist {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .playlist-item-playing {
+            width: 12px;
+            height: 12px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .playlist-item-playing .wave {
+            width: 2px;
+            height: 100%;
+            background: var(--text-primary);
+            border-radius: 1px;
+            animation: wave 0.8s ease-in-out infinite;
+        }
+
+        .playlist-item-playing .wave:nth-child(1) { animation-delay: 0s; }
+        .playlist-item-playing .wave:nth-child(2) { animation-delay: 0.2s; }
+        .playlist-item-playing .wave:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes wave {
+            0%, 100% { height: 4px; }
+            50% { height: 12px; }
+        }
+
+        .author-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        
 
         .blog-section {
             padding: 120px 64px 80px;
@@ -2488,6 +2620,68 @@
                 height: 20px;
             }
 
+            .music-toggle-btn {
+                bottom: 80px;
+                right: 16px;
+                width: 48px;
+                height: 48px;
+            }
+
+            .music-toggle-btn svg {
+                width: 20px;
+                height: 20px;
+            }
+
+            .music-player {
+                width: calc(100% - 32px);
+                max-width: 380px;
+            }
+
+            .player-bar {
+                padding: 8px 12px;
+                gap: 8px;
+            }
+
+            .player-btn {
+                width: 28px;
+                height: 28px;
+            }
+
+            .player-btn svg {
+                width: 14px;
+                height: 14px;
+            }
+
+            .player-play-btn {
+                width: 34px;
+                height: 34px;
+            }
+
+            .player-play-btn svg {
+                width: 16px;
+                height: 16px;
+            }
+
+            .player-title {
+                font-size: 0.75rem;
+            }
+
+            .player-artist {
+                font-size: 0.65rem;
+            }
+
+            .player-progress {
+                max-width: 60px;
+            }
+
+            .progress-time {
+                display: none;
+            }
+
+            .volume-slider {
+                display: none;
+            }
+
             .blog-detail {
                 padding: 100px 24px 60px;
             }
@@ -2505,50 +2699,6 @@
 
             .back-link {
                 font-size: 0.8rem;
-            }
-
-            .music-player {
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                padding: 10px 14px;
-                gap: 6px;
-            }
-
-            .music-player:hover {
-                transform: translateX(-50%) translateY(-4px);
-            }
-
-            .music-btn {
-                width: 28px;
-                height: 28px;
-            }
-
-            .music-btn svg {
-                width: 14px;
-                height: 14px;
-            }
-
-            .music-toggle {
-                width: 36px;
-                height: 36px;
-            }
-
-            .music-toggle svg {
-                width: 16px;
-                height: 16px;
-            }
-
-            .music-info {
-                display: none;
-            }
-
-            .music-progress {
-                display: none;
-            }
-
-            .music-volume-slider {
-                display: none;
             }
 
             .music-volume-btn {
@@ -2606,45 +2756,16 @@
                 height: 18px;
             }
 
-            .music-player {
-                bottom: 16px;
-                padding: 8px 12px;
-                gap: 4px;
-            }
-
             .music-toggle-btn {
-                bottom: 80px;
-                width: 36px;
-                height: 36px;
+                bottom: 72px;
+                right: 12px;
+                width: 44px;
+                height: 44px;
             }
 
             .music-toggle-btn svg {
-                width: 20px;
-                height: 20px;
-            }
-
-            .music-player.collapsed + .music-toggle-btn {
-                bottom: 16px;
-            }
-
-            .music-btn {
-                width: 24px;
-                height: 24px;
-            }
-
-            .music-btn svg {
-                width: 12px;
-                height: 12px;
-            }
-
-            .music-toggle {
-                width: 32px;
-                height: 32px;
-            }
-
-            .music-toggle svg {
-                width: 14px;
-                height: 14px;
+                width: 18px;
+                height: 18px;
             }
 
             footer {
@@ -2948,6 +3069,10 @@
         </div>
     </div>
 
+    <button class="music-toggle-btn" id="musicToggleBtn" aria-label="Toggle music player" tabindex="-1">
+        <img src="icons/TiNotes.svg" alt="Music">
+    </button>
+
     <button class="theme-toggle dark" id="themeToggle" aria-label="Toggle theme" tabindex="-1">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="5"></circle>
@@ -2975,61 +3100,71 @@
         </div>
     </div>
 
+    <div class="player-overlay" id="playerOverlay"></div>
+
+    <!-- 音乐播放器 -->
     <div class="music-player" id="musicPlayer">
         <audio id="audioPlayer" preload="auto"></audio>
-        <button class="music-btn music-prev" id="musicPrev" aria-label="Previous song">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="19 20 9 12 19 4 19 20"></polygon>
-                <line x1="5" y1="19" x2="5" y2="5"></line>
-            </svg>
-        </button>
-        <button class="music-toggle" id="musicToggle" aria-label="Toggle music">
-            <svg class="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            <svg class="pause-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                <rect x="6" y="4" width="4" height="16"></rect>
-                <rect x="14" y="4" width="4" height="16"></rect>
-            </svg>
-        </button>
-        <button class="music-btn music-next" id="musicNext" aria-label="Next song">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="5 4 15 12 5 20 5 4"></polygon>
-                <line x1="19" y1="5" x2="19" y2="19"></line>
-            </svg>
-        </button>
-        <div class="music-info">
-            <div class="music-title" id="musicTitle">Almost Nothing</div>
-            <div class="music-artist" id="musicArtist">Silent Poets, Okay Kaya</div>
-        </div>
-        <div class="music-progress">
-            <div class="progress-bar" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
+        
+        <!-- 播放器控制栏 -->
+        <div class="player-bar">
+            <div class="player-left">
+                <button class="player-btn" id="playerPrev" aria-label="Previous">
+                    <img src="icons/TiMediaRewind.svg" alt="Previous">
+                </button>
+                <button class="player-play-btn" id="playerPlay" aria-label="Play">
+                    <img class="play-icon" src="icons/TiMediaPlay.svg" alt="Play">
+                    <img class="pause-icon" src="icons/TiMediaPause.svg" alt="Pause" style="display: none;">
+                </button>
+                <button class="player-btn" id="playerNext" aria-label="Next">
+                    <img src="icons/TiMediaFastForward.svg" alt="Next">
+                </button>
+            </div>
+            
+            <div class="player-info">
+                <div class="player-title" id="playerTitle">Almost Nothing</div>
+                <div class="player-artist" id="playerArtist">Silent Poets, Okay Kaya</div>
+            </div>
+            
+            <div class="player-progress">
+                <div class="progress-track" id="progressTrack">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-time" id="progressTime">0:00</span>
+            </div>
+            
+            <div class="player-right">
+                <button class="player-btn" id="playerVolume" aria-label="Toggle mute">
+                    <svg class="volume-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                    <svg class="volume-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                </button>
+                <input type="range" class="volume-slider" id="volumeSlider" min="0" max="1" step="0.01" value="0.3">
+                <button class="player-btn playlist-toggle" id="playlistToggle" aria-label="Toggle playlist">
+                    <img src="icons/TiThMenu.svg" alt="Playlist">
+                </button>
             </div>
         </div>
-        <button class="music-btn music-volume-btn" id="musicVolumeBtn" aria-label="Toggle mute">
-            <svg class="volume-on-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            </svg>
-            <svg class="volume-off-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <line x1="23" y1="9" x2="17" y2="15"></line>
-                <line x1="17" y1="9" x2="23" y2="15"></line>
-            </svg>
-        </button>
-        <div class="music-volume-slider">
-            <input type="range" id="musicVolumeSlider" min="0" max="1" step="0.01" value="0.1">
+        
+        <!-- 播放列表 -->
+        <div class="player-playlist" id="playerPlaylist">
+            <div class="playlist-header">
+                <span class="playlist-title">Playlist</span>
+                <span class="playlist-count" id="playlistCount">8 songs</span>
+            </div>
+            <div class="playlist-items" id="playlistItems">
+            </div>
         </div>
     </div>
-    <button class="music-toggle-btn" id="musicToggleBtn" aria-label="Toggle music player">
-        <svg class="toggle-arrow-up" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-            <polyline points="18 15 12 9 6 15"></polyline>
-        </svg>
-        <svg class="toggle-arrow-down" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-        </svg>
-    </button>
+
+    
+    </div>
 
     <script>
         let currentPage = 'home';
@@ -3251,6 +3386,12 @@
             
             // Update URL - 只改变哈希，不改变基础路径
             history.pushState({ page }, '', `#${page}`);
+            
+            // 重置gallery状态
+            if (page === 'home') {
+                currentGalleryData = window.homeGalleryItems || galleryData;
+                currentIndex = 0;
+            }
             
             // 控制导航栏中返回按钮的显示
             const backLink = document.getElementById('backLink');
@@ -3977,16 +4118,20 @@
         }
 
         function showPrev() {
+            if (!currentGalleryData || currentGalleryData.length === 0) return;
             currentIndex = (currentIndex - 1 + currentGalleryData.length) % currentGalleryData.length;
             const currentItem = currentGalleryData[currentIndex];
+            if (!currentItem) return;
             const activeSrc = currentItem.fullSrc || currentItem.src;
             const fullUrl = new URL(activeSrc, window.location.href);
             lightboxImg.src = fullUrl.href;
         }
 
         function showNext() {
+            if (!currentGalleryData || currentGalleryData.length === 0) return;
             currentIndex = (currentIndex + 1) % currentGalleryData.length;
             const currentItem = currentGalleryData[currentIndex];
+            if (!currentItem) return;
             const activeSrc = currentItem.fullSrc || currentItem.src;
             const fullUrl = new URL(activeSrc, window.location.href);
             lightboxImg.src = fullUrl.href;
@@ -4032,309 +4177,9 @@
             saveThemeState();
         });
 
-        const audioPlayer = document.getElementById('audioPlayer');
-        const musicToggle = document.getElementById('musicToggle');
-        const musicPrev = document.getElementById('musicPrev');
-        const musicNext = document.getElementById('musicNext');
-        const musicVolumeBtn = document.getElementById('musicVolumeBtn');
-        const musicVolumeSlider = document.getElementById('musicVolumeSlider');
-        const playIcon = musicToggle.querySelector('.play-icon');
-        const pauseIcon = musicToggle.querySelector('.pause-icon');
-        const volumeOnIcon = musicVolumeBtn.querySelector('.volume-on-icon');
-        const volumeOffIcon = musicVolumeBtn.querySelector('.volume-off-icon');
-        const progressBar = document.getElementById('progressBar');
-        const progressFill = document.getElementById('progressFill');
-        const musicTitle = document.getElementById('musicTitle');
-        const musicArtist = document.getElementById('musicArtist');
-        const musicPlayer = document.getElementById('musicPlayer');
-        const musicToggleBtn = document.getElementById('musicToggleBtn');
-        const toggleArrowUp = musicToggleBtn.querySelector('.toggle-arrow-up');
-        const toggleArrowDown = musicToggleBtn.querySelector('.toggle-arrow-down');
-
-        const playlist = [
-            { 
-                src: 'music/Almost Nothing - Silent PoetsOkay Kaya.mp3', 
-                title: 'Almost Nothing', 
-                artist: 'Silent Poets, Okay Kaya' 
-            },
-            { 
-                src: 'music/Don\'t Be So Serious - Low Roar.mp3', 
-                title: 'Don\'t Be So Serious', 
-                artist: 'Low Roar' 
-            },
-            { 
-                src: 'music/Ghost - AuRaAlan Walker.mp3', 
-                title: 'Ghost', 
-                artist: 'AuRa, Alan Walker' 
-            },
-            { 
-                src: 'music/I\'ll Keep Coming - Low Roar.mp3', 
-                title: 'I\'ll Keep Coming', 
-                artist: 'Low Roar' 
-            },
-            { 
-                src: 'music/Rolling Over - Low Roar.mp3', 
-                title: 'Rolling Over', 
-                artist: 'Low Roar' 
-            },
-            { 
-                src: 'music/I\'m Leaving - Low Roar.mp3', 
-                title: 'I\'m Leaving', 
-                artist: 'Low Roar' 
-            },
-            { 
-                src: 'music/Not Around - Low Roar.mp3', 
-                title: 'Not Around', 
-                artist: 'Low Roar' 
-            },
-            { 
-                src: 'music/Patience - Low Roar.mp3', 
-                title: 'Patience', 
-                artist: 'Low Roar' 
-            }
-        ];
-
-        let currentTrackIndex = 0;
-        let isPlaying = false;
-        let isMuted = false;
-        let previousVolume = 0.7;
-        let isPlayerCollapsed = false;
-
-        const audioElements = {};
-
-        function preloadAudios() {
-            playlist.forEach((track, index) => {
-                if (!audioElements[index]) {
-                    const audio = new Audio();
-                    audio.src = track.src;
-                    audio.preload = 'auto';
-                    audioElements[index] = audio;
-                }
-            });
-        }
-
-        preloadAudios();
-
-        function saveMusicState() {
-            const state = {
-                currentTrackIndex,
-                currentTime: audioPlayer.currentTime,
-                volume: audioPlayer.volume,
-                isPlaying,
-                isMuted,
-                previousVolume,
-                isPlayerCollapsed
-            };
-            localStorage.setItem('musicState', JSON.stringify(state));
-        }
-
-        function loadMusicState() {
-            const savedState = localStorage.getItem('musicState');
-            if (savedState) {
-                const state = JSON.parse(savedState);
-                currentTrackIndex = state.currentTrackIndex;
-                previousVolume = state.previousVolume;
-                isMuted = state.isMuted;
-                isPlayerCollapsed = state.isPlayerCollapsed || true;
-
-                if (isPlayerCollapsed) {
-                    musicPlayer.classList.add('collapsed');
-                    toggleArrowUp.style.display = 'block';
-                    toggleArrowDown.style.display = 'none';
-                }
-
-                loadTrack(currentTrackIndex);
-                audioPlayer.volume = state.volume;
-                musicVolumeSlider.value = state.volume;
-
-                if (isMuted) {
-                    volumeOnIcon.style.display = 'none';
-                    volumeOffIcon.style.display = 'block';
-                }
-
-                audioPlayer.currentTime = state.currentTime;
-
-                if (state.isPlaying) {
-                    requestAnimationFrame(() => {
-                        const playPromise = audioPlayer.play();
-                        if (playPromise !== undefined) {
-                            playPromise.then(() => {
-                                playIcon.style.display = 'none';
-                                pauseIcon.style.display = 'block';
-                                isPlaying = true;
-                            }).catch(() => {
-                                isPlaying = false;
-                            });
-                        }
-                    });
-                }
-            } else {
-                currentTrackIndex = 0;
-                isPlayerCollapsed = true;
-                isPlaying = true;
-                musicPlayer.classList.add('collapsed');
-                toggleArrowUp.style.display = 'block';
-                toggleArrowDown.style.display = 'none';
-                loadTrack(currentTrackIndex);
-                audioPlayer.volume = 0.1;
-                musicVolumeSlider.value = 0.1;
-                isMuted = false;
-                volumeOnIcon.style.display = 'block';
-                volumeOffIcon.style.display = 'none';
-                
-                requestAnimationFrame(() => {
-                    const playPromise = audioPlayer.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            playIcon.style.display = 'none';
-                            pauseIcon.style.display = 'block';
-                        }).catch(() => {
-                            isPlaying = false;
-                        });
-                    }
-                });
-            }
-        }
-
-        function loadTrack(index) {
-            const track = playlist[index];
-            audioPlayer.src = track.src;
-            audioPlayer.preload = 'auto';
-            musicTitle.textContent = track.title;
-            musicArtist.textContent = track.artist;
-            progressFill.style.width = '0%';
-        }
-
-        function playTrack() {
-            audioPlayer.play();
-            playIcon.style.display = 'none';
-            pauseIcon.style.display = 'block';
-            isPlaying = true;
-            saveMusicState();
-        }
-
-        function pauseTrack() {
-            audioPlayer.pause();
-            playIcon.style.display = 'block';
-            pauseIcon.style.display = 'none';
-            isPlaying = false;
-            saveMusicState();
-        }
-
-        function prevTrack() {
-            currentTrackIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
-            loadTrack(currentTrackIndex);
-            if (isPlaying) {
-                playTrack();
-            }
-            saveMusicState();
-        }
-
-        function nextTrack() {
-            currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
-            loadTrack(currentTrackIndex);
-            if (isPlaying) {
-                playTrack();
-            }
-            saveMusicState();
-        }
-
-        function toggleMute() {
-            if (isMuted) {
-                audioPlayer.volume = previousVolume;
-                musicVolumeSlider.value = previousVolume;
-                volumeOnIcon.style.display = 'block';
-                volumeOffIcon.style.display = 'none';
-                isMuted = false;
-            } else {
-                previousVolume = audioPlayer.volume;
-                audioPlayer.volume = 0;
-                musicVolumeSlider.value = 0;
-                volumeOnIcon.style.display = 'none';
-                volumeOffIcon.style.display = 'block';
-                isMuted = true;
-            }
-            saveMusicState();
-        }
-
-        function updateVolume(value) {
-            audioPlayer.volume = value;
-            if (value === 0) {
-                if (!isMuted) {
-                    previousVolume = 0.7;
-                }
-                volumeOnIcon.style.display = 'none';
-                volumeOffIcon.style.display = 'block';
-                isMuted = true;
-            } else {
-                previousVolume = value;
-                volumeOnIcon.style.display = 'block';
-                volumeOffIcon.style.display = 'none';
-                isMuted = false;
-            }
-            saveMusicState();
-        }
-
-        musicToggle.addEventListener('click', () => {
-            if (isPlaying) {
-                pauseTrack();
-            } else {
-                playTrack();
-            }
-        });
-
-        musicPrev.addEventListener('click', prevTrack);
-        musicNext.addEventListener('click', nextTrack);
-        musicVolumeBtn.addEventListener('click', toggleMute);
-        musicVolumeSlider.addEventListener('input', (e) => updateVolume(parseFloat(e.target.value)));
-
-        audioPlayer.addEventListener('timeupdate', () => {
-            if (audioPlayer.duration) {
-                const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-                progressFill.style.width = progress + '%';
-            }
-        });
-
-        audioPlayer.addEventListener('timeupdate', () => {
-            if (Math.floor(audioPlayer.currentTime) % 2 === 0) {
-                saveMusicState();
-            }
-        });
-
-        progressBar.addEventListener('click', (e) => {
-            const rect = progressBar.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            audioPlayer.currentTime = percent * audioPlayer.duration;
-            saveMusicState();
-        });
-
-        audioPlayer.addEventListener('ended', () => {
-            nextTrack();
-        });
-
-        musicToggleBtn.addEventListener('click', () => {
-            isPlayerCollapsed = !isPlayerCollapsed;
-            if (isPlayerCollapsed) {
-                musicPlayer.classList.add('collapsed');
-                toggleArrowUp.style.display = 'block';
-                toggleArrowDown.style.display = 'none';
-            } else {
-                musicPlayer.classList.remove('collapsed');
-                toggleArrowUp.style.display = 'none';
-                toggleArrowDown.style.display = 'block';
-            }
-            saveMusicState();
-        });
-
-        window.addEventListener('beforeunload', () => {
-            saveMusicState();
-        });
-
-        loadMusicState();
-
         // 为首页创建单独的画廊
         function createHomeGallery() {
-            const galleryItems = [
+            window.homeGalleryItems = [
                 { id: 1, src: 'home_photos/home_compressed/1.jpg', fullSrc: 'home_photos/1.jpg', tall: true },
                 { id: 2, src: 'home_photos/home_compressed/2.jpg', fullSrc: 'home_photos/2.jpg' },
                 { id: 3, src: 'home_photos/home_compressed/3.jpg', fullSrc: 'home_photos/3.jpg' },
@@ -4364,7 +4209,7 @@
                 loadImage(img);
 
                 div.addEventListener('click', () => {
-                    currentGalleryData = galleryData;
+                    currentGalleryData = galleryItems;
                     currentIndex = index;
                     openLightbox(img.dataset.fullSrc || img.dataset.src);
                 });
@@ -4376,6 +4221,236 @@
 
         createHomeGallery();
         createFloatingFriends();
+
+        // 音乐播放器初始化
+        initMusicPlayer();
+
+        function initMusicPlayer() {
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playerPlay = document.getElementById('playerPlay');
+            const playerPrev = document.getElementById('playerPrev');
+            const playerNext = document.getElementById('playerNext');
+            const playerVolume = document.getElementById('playerVolume');
+            const volumeSlider = document.getElementById('volumeSlider');
+            const playlistToggle = document.getElementById('playlistToggle');
+            const playerPlaylist = document.getElementById('playerPlaylist');
+            const playlistItems = document.getElementById('playlistItems');
+            const playlistCount = document.getElementById('playlistCount');
+            const playerTitle = document.getElementById('playerTitle');
+            const playerArtist = document.getElementById('playerArtist');
+            const progressTrack = document.getElementById('progressTrack');
+            const progressFill = document.getElementById('progressFill');
+            const progressTime = document.getElementById('progressTime');
+            const musicPlayer = document.getElementById('musicPlayer');
+            const musicToggleBtn = document.getElementById('musicToggleBtn');
+            const playerOverlay = document.getElementById('playerOverlay');
+            
+            const playIcon = playerPlay.querySelector('.play-icon');
+            const pauseIcon = playerPlay.querySelector('.pause-icon');
+            const volumeOnIcon = playerVolume.querySelector('.volume-on');
+            const volumeOffIcon = playerVolume.querySelector('.volume-off');
+
+            // 切换播放器显示
+            function togglePlayer() {
+                const isVisible = musicPlayer.classList.toggle('visible');
+                playerOverlay.classList.toggle('visible');
+                musicToggleBtn.classList.toggle('active');
+                
+                // 如果播放器显示，自动打开播放列表
+                if (isVisible) {
+                    playerPlaylist.classList.add('visible');
+                    playlistToggle.classList.add('active');
+                } else {
+                    playerPlaylist.classList.remove('visible');
+                    playlistToggle.classList.remove('active');
+                }
+            }
+
+            musicToggleBtn.addEventListener('click', togglePlayer);
+            playerOverlay.addEventListener('click', togglePlayer);
+
+            const playlist = [
+                { title: 'Almost Nothing', artist: 'Silent Poets, Okay Kaya', src: 'music/Almost%20Nothing%20-%20Silent%20PoetsOkay%20Kaya.mp3' },
+                { title: "Don't Be So Serious", artist: 'Low Roar', src: 'music/Don%27t%20Be%20So%20Serious%20-%20Low%20Roar.mp3' },
+                { title: 'Ghost', artist: 'AuRa, Alan Walker', src: 'music/Ghost%20-%20AuRaAlan%20Walker.mp3' },
+                { title: "I'll Keep Coming", artist: 'Low Roar', src: 'music/I%27ll%20Keep%20Coming%20-%20Low%20Roar.mp3' },
+                { title: "I'm Leaving", artist: 'Low Roar', src: 'music/I%27m%20Leaving%20-%20Low%20Roar.mp3' },
+                { title: 'Not Around', artist: 'Low Roar', src: 'music/Not%20Around%20-%20Low%20Roar.mp3' },
+                { title: 'Patience', artist: 'Low Roar', src: 'music/Patience%20-%20Low%20Roar.mp3' },
+                { title: 'Rolling Over', artist: 'Low Roar', src: 'music/Rolling%20Over%20Low%20Roar.mp3' }
+            ];
+
+            let currentTrackIndex = 0;
+            let isPlaying = false;
+            let isMuted = false;
+
+            // 渲染播放列表
+            function renderPlaylist() {
+                playlistCount.textContent = `${playlist.length} songs`;
+                playlistItems.innerHTML = '';
+                
+                playlist.forEach((track, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'playlist-item';
+                    item.dataset.index = index;
+                    
+                    item.innerHTML = `
+                        <span class="playlist-item-number">${index + 1}</span>
+                        <div class="playlist-item-info">
+                            <div class="playlist-item-title">${track.title}</div>
+                            <div class="playlist-item-artist">${track.artist}</div>
+                        </div>
+                        <div class="playlist-item-playing" style="display: none;">
+                            <span class="wave"></span>
+                            <span class="wave"></span>
+                            <span class="wave"></span>
+                        </div>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        currentTrackIndex = index;
+                        loadTrack();
+                        playTrack();
+                    });
+                    
+                    playlistItems.appendChild(item);
+                });
+            }
+
+            // 加载曲目
+            function loadTrack() {
+                const track = playlist[currentTrackIndex];
+                audioPlayer.src = track.src;
+                playerTitle.textContent = track.title;
+                playerArtist.textContent = track.artist;
+                updatePlaylistUI();
+            }
+
+            // 播放
+            function playTrack() {
+                audioPlayer.play();
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+                isPlaying = true;
+                updatePlaylistUI();
+            }
+
+            // 暂停
+            function pauseTrack() {
+                audioPlayer.pause();
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+                isPlaying = false;
+                updatePlaylistUI();
+            }
+
+            // 上一首
+            function prevTrack() {
+                currentTrackIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+                loadTrack();
+                if (isPlaying) playTrack();
+            }
+
+            // 下一首
+            function nextTrack() {
+                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+                loadTrack();
+                if (isPlaying) playTrack();
+            }
+
+            // 更新播放列表UI
+            function updatePlaylistUI() {
+                const items = playlistItems.querySelectorAll('.playlist-item');
+                items.forEach((item, index) => {
+                    const playingIndicator = item.querySelector('.playlist-item-playing');
+                    
+                    if (index === currentTrackIndex) {
+                        item.classList.add('active');
+                        playingIndicator.style.display = isPlaying ? 'flex' : 'none';
+                    } else {
+                        item.classList.remove('active');
+                        playingIndicator.style.display = 'none';
+                    }
+                });
+            }
+
+            // 更新进度
+            function updateProgress() {
+                if (audioPlayer.duration) {
+                    const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                    progressFill.style.width = progress + '%';
+                    
+                    const minutes = Math.floor(audioPlayer.currentTime / 60);
+                    const seconds = Math.floor(audioPlayer.currentTime % 60);
+                    progressTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+
+            // 切换播放列表显示
+            function togglePlaylist() {
+                playerPlaylist.classList.toggle('visible');
+                playlistToggle.classList.toggle('active');
+            }
+
+            // 切换静音
+            function toggleMute() {
+                isMuted = !isMuted;
+                if (isMuted) {
+                    audioPlayer.muted = true;
+                    volumeOnIcon.style.display = 'none';
+                    volumeOffIcon.style.display = 'block';
+                } else {
+                    audioPlayer.muted = false;
+                    volumeOnIcon.style.display = 'block';
+                    volumeOffIcon.style.display = 'none';
+                }
+            }
+
+            // 更新音量
+            function updateVolume(value) {
+                audioPlayer.volume = value;
+                if (value === 0) {
+                    toggleMute();
+                } else if (isMuted) {
+                    toggleMute();
+                }
+            }
+
+            // 事件监听
+            playerPlay.addEventListener('click', () => {
+                if (isPlaying) {
+                    pauseTrack();
+                } else {
+                    playTrack();
+                }
+            });
+
+            playerPrev.addEventListener('click', prevTrack);
+            playerNext.addEventListener('click', nextTrack);
+            playerVolume.addEventListener('click', toggleMute);
+            volumeSlider.addEventListener('input', (e) => updateVolume(parseFloat(e.target.value)));
+            playlistToggle.addEventListener('click', togglePlaylist);
+
+            progressTrack.addEventListener('click', (e) => {
+                const rect = progressTrack.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                audioPlayer.currentTime = percent * audioPlayer.duration;
+            });
+
+            audioPlayer.addEventListener('timeupdate', updateProgress);
+            audioPlayer.addEventListener('ended', nextTrack);
+
+            // 初始化
+            renderPlaylist();
+            loadTrack();
+            audioPlayer.volume = 0.3;
+            
+            // 自动播放（需要用户交互后才能播放，这里设置静音自动播放）
+            audioPlayer.muted = true;
+            audioPlayer.play().catch(e => {
+                // 如果自动播放失败（通常是因为浏览器策略），不做处理
+            });
+        }
     </script>
 </body>
 </html>
