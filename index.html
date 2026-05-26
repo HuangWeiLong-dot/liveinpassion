@@ -953,6 +953,18 @@
             transform: scale(1.05);
         }
 
+        .friend-card .friend-avatar .friend-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background) 100%);
+        }
+
         .friend-card .friend-info {
             flex: 1 1 100% !important;
             min-width: 0;
@@ -3289,6 +3301,7 @@
             'wangshuai': { name: 'WANG SHUAI', data: wangshuaiGalleryData },
             'xuhaonan': { name: 'XU HAONAN', data: xuhaonanGalleryData },
             'sunjiajun': { name: 'SUN JIAJUN', data: sunjiajunGalleryData },
+            'hanyong': { name: 'HAN YONG', data: [] },
             'groupphotos': { name: 'GROUP PHOTOS', data: groupPhotosGalleryData },
             'videos': { name: 'VIDEOS', data: groupPhotosGalleryData }
         };
@@ -3567,7 +3580,8 @@
             ]},
             { id: 'sunjiajun', name: 'Sun JiaJun', bio: 'To Be Determined', photos: [
                 { compressed: 'SunJiaJun/SunJiaJun_compressed/202309_0.jpg', full: 'SunJiaJun/202309_0.jpg' }
-            ]}
+            ]},
+            { id: 'hanyong', name: 'Han Yong', bio: 'To Be Determined', photos: [] }
         ];
 
         // Group Photos 数据（始终在前面）
@@ -3623,6 +3637,7 @@
 
         // 随机选择照片
         function getRandomPhoto(photos) {
+            if (!photos || photos.length === 0) return null;
             return photos[Math.floor(Math.random() * photos.length)];
         }
 
@@ -3657,12 +3672,23 @@
                 
                 // 随机选择一张照片
                 const randomPhoto = getRandomPhoto(friend.photos);
-                const img = document.createElement('img');
-                img.dataset.src = CDN_BASE + '/' + randomPhoto.compressed;
-                img.dataset.fullSrc = CDN_BASE + '/' + randomPhoto.full;
-                img.alt = friend.name;
-                img.className = 'blur-placeholder';
-                avatar.appendChild(img);
+                let img;
+                if (randomPhoto) {
+                    img = document.createElement('img');
+                    img.dataset.src = CDN_BASE + '/' + randomPhoto.compressed;
+                    img.dataset.fullSrc = CDN_BASE + '/' + randomPhoto.full;
+                    img.alt = friend.name;
+                    img.className = 'blur-placeholder';
+                    avatar.appendChild(img);
+                    loadImage(img);
+                } else {
+                    // 如果没有照片，显示问号占位符
+                    skeleton.classList.add('hidden');
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'friend-placeholder';
+                    placeholder.textContent = '?';
+                    avatar.appendChild(placeholder);
+                }
                 
                 // 创建信息区域
                 const info = document.createElement('div');
@@ -3691,9 +3717,6 @@
                 card.appendChild(avatar);
                 card.appendChild(info);
                 container.appendChild(card);
-                
-                // 加载图片
-                loadImage(img);
                 
                 // 添加点击事件
                 card.onclick = () => navigateTo(`friend-${friend.id}`);
