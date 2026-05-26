@@ -3759,14 +3759,31 @@
             // Hero image auto toggle
             let currentHeroIndex = 0;
             const heroImages = document.querySelectorAll('.hero-image .hero-img');
+            const heroLoadedFlags = new Array(heroImages.length).fill(false);
+            
+            heroImages.forEach((img, index) => {
+                const fullSrc = img.dataset.fullSrc;
+                if (fullSrc) {
+                    const preloadImg = new Image();
+                    preloadImg.onload = () => {
+                        heroLoadedFlags[index] = true;
+                    };
+                    preloadImg.src = fullSrc;
+                } else {
+                    heroLoadedFlags[index] = true;
+                }
+            });
             
             function toggleHeroImage() {
-                heroImages[currentHeroIndex].classList.remove('active');
-                currentHeroIndex = (currentHeroIndex + 1) % heroImages.length;
-                heroImages[currentHeroIndex].classList.add('active');
+                const nextIndex = (currentHeroIndex + 1) % heroImages.length;
+                if (heroLoadedFlags[nextIndex]) {
+                    heroImages[currentHeroIndex].classList.remove('active');
+                    currentHeroIndex = nextIndex;
+                    heroImages[currentHeroIndex].classList.add('active');
+                }
             }
             
-            // Switch every 5 seconds
+            // Switch every 5 seconds (only if next image is loaded)
             setInterval(toggleHeroImage, 5000);
         });
 
