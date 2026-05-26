@@ -4465,14 +4465,39 @@
 
             // 初始化
             renderPlaylist();
+            
+            // 随机选择一首歌曲
+            currentTrackIndex = Math.floor(Math.random() * playlist.length);
             loadTrack();
             audioPlayer.volume = 0.3;
             
-            // 自动播放（需要用户交互后才能播放，这里设置静音自动播放）
+            // 设置静音状态（为自动播放做准备）
             audioPlayer.muted = true;
-            audioPlayer.play().catch(e => {
-                // 如果自动播放失败（通常是因为浏览器策略），不做处理
-            });
+            isMuted = true;
+            volumeOnIcon.style.display = 'none';
+            volumeOffIcon.style.display = 'block';
+            
+            // 延迟播放：等待用户首次交互后再播放
+            let hasInteracted = false;
+            
+            function tryAutoPlay() {
+                if (hasInteracted) return;
+                hasInteracted = true;
+                
+                audioPlayer.play().catch(e => {
+                    // 如果自动播放失败，不做处理
+                });
+                
+                // 移除事件监听
+                document.removeEventListener('click', tryAutoPlay);
+                document.removeEventListener('touchstart', tryAutoPlay);
+                document.removeEventListener('keydown', tryAutoPlay);
+            }
+            
+            // 监听用户交互
+            document.addEventListener('click', tryAutoPlay);
+            document.addEventListener('touchstart', tryAutoPlay);
+            document.addEventListener('keydown', tryAutoPlay);
         }
     </script>
 </body>
