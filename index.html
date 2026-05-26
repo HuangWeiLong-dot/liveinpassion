@@ -64,11 +64,27 @@
         a {
             -webkit-tap-highlight-color: transparent;
             outline: none;
+            -webkit-focus-ring-color: transparent;
         }
 
         button:focus,
-        a:focus {
+        button:active,
+        a:focus,
+        a:active,
+        input:focus,
+        input:active,
+        select:focus,
+        select:active,
+        textarea:focus,
+        textarea:active {
             outline: none;
+            box-shadow: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-focus-ring-color: transparent;
         }
 
         header {
@@ -401,10 +417,24 @@
             text-decoration: none;
             transition: color 0.3s ease;
             cursor: pointer;
+            background: transparent;
+            border: none;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .back-link:hover {
             color: var(--text-primary);
+        }
+
+        .back-link:active {
+            background: transparent;
+            opacity: 0.7;
+        }
+
+        .back-link:focus {
+            background: transparent;
+            outline: none;
         }
 
         .back-link svg {
