@@ -1202,6 +1202,124 @@
             transform: scale(1);
         }
 
+        /* Steam Profile Styles */
+        .steam-profile-container {
+            margin-top: 48px;
+            padding: 32px;
+            background: var(--background-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .steam-profile-header {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .steam-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--text-primary);
+        }
+
+        .steam-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .steam-info {
+            flex: 1;
+        }
+
+        .steam-name {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .steam-profile-url {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .steam-profile-url:hover {
+            color: var(--text-primary);
+        }
+
+        .steam-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 0.875rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.online {
+            background: #52c41a;
+            box-shadow: 0 0 8px #52c41a;
+        }
+
+        .status-dot.offline {
+            background: #999;
+        }
+
+        .status-dot.away {
+            background: #faad14;
+            box-shadow: 0 0 8px #faad14;
+        }
+
+        .status-dot.busy {
+            background: #f5222d;
+            box-shadow: 0 0 8px #f5222d;
+        }
+
+        .steam-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 16px;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .steam-loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
         .friend-gallery-section {
             padding: 140px 64px 80px;
             text-align: center;
@@ -3209,6 +3327,10 @@
             <h1 class="groups-title">US</h1>
             <p class="groups-subtitle">Join our community</p>
             
+            <div class="steam-profile-container" id="steamProfileContainer">
+                <div class="steam-loading" id="steamLoading">Loading Steam profile...</div>
+            </div>
+            
             <div class="kook-widget-container">
                 <h2 class="widget-title">Kook Community</h2>
                 <div class="widget-wrapper">
@@ -3316,7 +3438,7 @@
             </a>
         </div>
         <div class="author-avatar">
-            <img src="avatar/1.jpg" alt="Author Avatar">
+            <img src="frontend/avatar/1.jpg" alt="Author Avatar">
         </div>
     </div>
 
@@ -3660,6 +3782,8 @@
                     skeletonHolder = skeletonHolder.parentElement;
                 }
             }
+
+            if (skeleton) skeleton.classList.remove('hidden');
 
             // 阶段1: 加载压缩图
             const compressedImg = new Image();
