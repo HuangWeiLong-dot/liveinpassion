@@ -211,16 +211,19 @@
             opacity: 0;
         }
 
-        .hero-image img.hero-img.active {
-            opacity: 1;
-        }
-
-        .hero-image img.blur-placeholder {
+        .hero-image img.hero-img {
+            opacity: 0;
             filter: blur(20px);
             transform: scale(1.1);
         }
 
-        .hero-image img.loaded {
+        .hero-image img.hero-img.active {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
+
+        .hero-image img.hero-img.loaded {
             filter: blur(0);
             transform: scale(1);
         }
@@ -265,7 +268,7 @@
             position: relative;
             overflow: hidden;
             cursor: pointer;
-            opacity: 0;
+            opacity: 1;
             transition: opacity 0.8s ease, transform 0.8s ease;
             will-change: transform, opacity;
             backface-visibility: hidden;
@@ -299,6 +302,10 @@
             display: block;
             padding-top: 120%;
             width: 100%;
+        }
+
+        .gallery-item.tall {
+            grid-row: span 2;
         }
 
         .gallery-item.tall::before {
@@ -352,7 +359,7 @@
             );
             background-size: 200% 100%;
             animation: skeleton-loading 1.5s ease-in-out infinite;
-            z-index: 1;
+            z-index: 10;
             opacity: 1;
             transition: opacity 0.3s ease-out;
             pointer-events: none;
@@ -362,6 +369,20 @@
             opacity: 0;
             pointer-events: none;
             animation: none;
+        }
+
+        .load-error-msg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            z-index: 5;
         }
 
         @keyframes skeleton-loading {
@@ -732,6 +753,354 @@
         }
 
         /* Groups页面样式 */
+        .me-section {
+            padding: 140px 64px 80px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .me-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 64px;
+            align-items: start;
+        }
+
+        .me-left {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .me-top-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .me-avatar-wrapper {
+            overflow: hidden;
+        }
+
+        .me-avatar {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+
+        .me-right-info {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .me-name-box {
+            padding: 16px;
+        }
+
+        .me-name {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+            text-align: center;
+        }
+
+        .me-bio-box {
+            padding: 16px;
+            flex: 1;
+        }
+
+        .me-bio {
+            font-size: 0.875rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .me-contact {
+            padding: 24px;
+        }
+
+        .contact-content {
+            text-align: center;
+        }
+
+        .contact-content span {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .me-interests {
+            padding: 16px;
+        }
+
+        .interests-content {
+            display: flex;
+            justify-content: center;
+        }
+
+        .github-snake {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .me-right {
+            position: sticky;
+            top: 120px;
+        }
+
+        .steam-card {
+            background: var(--background-secondary);
+            padding: 32px;
+        }
+
+        .steam-card-title {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+            letter-spacing: 0.05em;
+        }
+
+        .steam-profile {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 24px;
+            align-items: start;
+        }
+
+        .steam-avatar-wrapper {
+            position: relative;
+        }
+
+        .steam-avatar {
+            width: 160px;
+            height: 160px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+            position: relative;
+        }
+
+        .steam-avatar:hover {
+            transform: scale(1.03);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .steam-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .steam-status-indicator-wrapper {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+        }
+
+        .steam-status-indicator {
+            width: 12px;
+            height: 12px;
+            background: #10B981;
+            border: 2px solid var(--background-secondary);
+            border-radius: 50%;
+        }
+
+        .steam-status-indicator.online {
+            background: #10B981;
+        }
+
+        .steam-status-indicator.offline {
+            background: #6B7280;
+        }
+
+        .steam-status-indicator.busy {
+            background: #EF4444;
+        }
+
+        .steam-status-indicator.away {
+            background: #F59E0B;
+        }
+
+        .steam-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .steam-name {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            margin-bottom: 8px;
+        }
+
+        .steam-tagline {
+            font-family: var(--font-sans);
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-bottom: 16px;
+        }
+
+        .steam-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding-top: 16px;
+        }
+
+        .steam-recent-games {
+            margin-top: 16px;
+            padding-top: 16px;
+        }
+
+        .steam-recent-games h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .recent-games-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .recent-game-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px;
+            transition: background 0.2s;
+        }
+
+        .recent-game-item:hover {
+            background: var(--border-color);
+        }
+
+        .recent-game-icon {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+        }
+
+        .recent-game-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .recent-game-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .recent-game-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .no-recent-games {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .steam-detail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .steam-detail-item svg {
+            width: 16px;
+            height: 16px;
+            stroke: var(--text-secondary);
+        }
+
+        .steam-games {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .steam-games-title {
+            font-family: var(--font-serif);
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            letter-spacing: 0.03em;
+        }
+
+        .steam-game-widgets {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .steam-game-widget {
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .steam-game-widget iframe {
+            display: block;
+            max-width: 100%;
+        }
+
+        .me-section-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            letter-spacing: 0.05em;
+            position: relative;
+            display: inline-block;
+        }
+
+        .me-section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 40px;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .me-about {
+            text-align: left;
+        }
+
+        .me-description {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+
         .groups-section {
             padding: 140px 64px 80px;
             max-width: 1400px;
@@ -1221,7 +1590,7 @@
         .steam-avatar {
             width: 100px;
             height: 100px;
-            border-radius: 50%;
+            border-radius: 8px;
             overflow: hidden;
             border: 3px solid var(--text-primary);
         }
@@ -1318,6 +1687,123 @@
             text-align: center;
             padding: 40px;
             color: var(--text-secondary);
+        }
+
+        .steam-games-section {
+            margin-top: 24px;
+        }
+
+        .steam-games-title {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .steam-games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .steam-game-card {
+            background: var(--bg);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .steam-game-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+
+        .steam-game-img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+        }
+
+        .steam-game-info {
+            padding: 12px;
+        }
+
+        .steam-game-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .steam-game-playtime {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .steam-error {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .steam-recent-section {
+            margin-top: 32px;
+        }
+
+        .steam-recent-title {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .steam-recent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .steam-recent-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .steam-recent-img {
+            width: 60px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .steam-recent-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .steam-recent-name {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .steam-recent-playtime {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
         }
 
         .friend-gallery-section {
@@ -2685,16 +3171,38 @@
                 grid-column: span 1;
             }
 
+            .gallery-item.tall {
+                grid-row: span 1;
+            }
+
             .gallery-item.wide::before,
             .gallery-item.tall::before {
                 padding-top: 100%;
             }
 
             .blog-section,
-            .gallery-section,
+            .me-section,
             .groups-section,
             .friend-gallery-section {
                 padding: 140px 32px 80px;
+            }
+
+            .me-container {
+                grid-template-columns: 1fr;
+                gap: 48px;
+            }
+
+            .me-right {
+                position: static;
+            }
+
+            .steam-avatar {
+                width: 140px;
+                height: 140px;
+            }
+
+            .steam-name {
+                font-size: 1.25rem;
             }
 
             .gallery-featured {
@@ -2707,7 +3215,7 @@
             }
 
             .gallery-friends-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: 1fr;
                 gap: 20px;
             }
 
@@ -2779,10 +3287,6 @@
                 line-height: 1.2;
             }
 
-            .gallery-section {
-                padding: 48px 24px 64px;
-            }
-
             .groups-title {
                 font-size: 2.5rem;
             }
@@ -2796,15 +3300,42 @@
                 gap: 16px;
             }
 
+            .gallery-item.wide {
+                grid-column: span 1;
+            }
+
             .gallery-item::before {
                 padding-top: 100% !important;
             }
 
             .blog-section,
             .gallery-section,
+            .me-section,
             .groups-section,
             .friend-gallery-section {
                 padding: 120px 24px 64px;
+            }
+
+            .me-container {
+                grid-template-columns: 1fr;
+                gap: 32px;
+            }
+
+            .steam-avatar {
+                width: 120px;
+                height: 120px;
+            }
+
+            .steam-name {
+                font-size: 1.1rem;
+            }
+
+            .steam-tagline {
+                font-size: 0.875rem;
+            }
+
+            .me-description {
+                font-size: 0.95rem;
             }
 
             .gallery-featured {
@@ -2969,6 +3500,23 @@
                 gap: 12px;
             }
 
+            .me-container {
+                gap: 24px;
+            }
+
+            .steam-avatar {
+                width: 100px;
+                height: 100px;
+            }
+
+            .steam-name {
+                font-size: 1rem;
+            }
+
+            .steam-tagline {
+                font-size: 0.8rem;
+            }
+
             .hero h1 {
                 font-size: 2rem;
             }
@@ -3038,6 +3586,7 @@
             <a href="#" onclick="navigateTo('home'); return false;">HOME</a>
             <a href="#" onclick="navigateTo('blogs'); return false;">BLOGS</a>
             <a href="#" onclick="navigateTo('friends'); return false;">GALLERY</a>
+            <a href="#" onclick="navigateTo('me'); return false;">ME</a>
             <a href="#" onclick="navigateTo('groups'); return false;">US</a>
         </nav>
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
@@ -3055,9 +3604,9 @@
             <p>When that moment comes, I'll let it rest, breathe it in, and know it as a memory born. That will be enough.</p>
             <div class="hero-image" style="position: relative;">
                 <div class="skeleton-loader"></div>
-                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="blur-placeholder hero-img active">
-                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/2.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/2.jpg" alt="Hero Image" class="blur-placeholder hero-img">
-                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/3.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/3.jpg" alt="Hero Image" class="blur-placeholder hero-img">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="hero-img">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/2.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/2.jpg" alt="Hero Image" class="hero-img">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/3.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/3.jpg" alt="Hero Image" class="hero-img">
             </div>
         </section>
 
@@ -3321,15 +3870,92 @@
         </footer>
     </main>
 
-    <!-- US页面 -->
+    <main id="me-page" class="page">
+        <section class="me-section">
+            <div class="me-container">
+                <div class="me-left">
+                    <div class="me-top-section">
+                        <div class="me-avatar-wrapper">
+                            <img src="avatar/2.jpg" alt="Profile Photo" class="me-avatar">
+                        </div>
+                        <div class="me-right-info">
+                            <div class="me-name-box">
+                                <h2 class="me-name">HuangWeiLong</h2>
+                            </div>
+                            <div class="me-bio-box">
+                                <p class="me-bio">
+                                    to be determined
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="me-contact">
+                        <div class="contact-content">
+                            <span>to be determined</span>
+                        </div>
+                    </div>
+                    
+                    <div class="me-interests">
+                        <div class="interests-content">
+                            <img src="https://raw.githubusercontent.com/liveinpassion/liveinpassion/output/github-contribution-grid-snake.svg" 
+                                 alt="GitHub Contribution Snake" 
+                                 class="github-snake">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="me-right">
+                    <div class="steam-card">
+                        <h2 class="steam-card-title">Steam</h2>
+                        <div class="steam-profile">
+                            <div class="steam-info">
+                                <h3 class="steam-name" id="steamName">
+                                    <span class="skeleton-loader" style="width: 150px; height: 28px; display: inline-block;"></span>
+                                </h3>
+                                <p class="steam-tagline" id="steamTagline">
+                                    <span class="skeleton-loader" style="width: 180px; height: 20px; display: inline-block;"></span>
+                                    <span class="steam-status-indicator-wrapper" id="steamStatusIndicatorWrapper">
+                                        <span class="steam-status-indicator" id="steamStatusIndicator"></span>
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="steam-avatar-wrapper">
+                                <div class="steam-avatar" id="steamAvatar">
+                                    <div class="skeleton-loader"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="steam-details" id="steamDetails">
+                            <span class="skeleton-loader" style="width: 100%; height: 60px; display: block;"></span>
+                        </div>
+                        <div class="steam-recent-games" id="steamRecentGames">
+                            <span class="skeleton-loader" style="width: 100%; height: 100px; display: block;"></span>
+                        </div>
+                        <div class="steam-games">
+                            <h4 class="steam-games-title">Favorite Games</h4>
+                            <div class="steam-game-widgets">
+                                <div class="steam-game-widget">
+                                    <iframe src="https://store.steampowered.com/widget/3280350/" frameborder="0" width="100%" height="190"></iframe>
+                                </div>
+                                <div class="steam-game-widget">
+                                    <iframe src="https://store.steampowered.com/widget/548430/" frameborder="0" width="100%" height="190"></iframe>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
     <main id="groups-page" class="page">
         <section class="groups-section">
             <h1 class="groups-title">US</h1>
             <p class="groups-subtitle">Join our community</p>
-            
-            <div class="steam-profile-container" id="steamProfileContainer">
-                <div class="steam-loading" id="steamLoading">Loading Steam profile...</div>
-            </div>
             
             <div class="kook-widget-container">
                 <h2 class="widget-title">Kook Community</h2>
@@ -3438,7 +4064,7 @@
             </a>
         </div>
         <div class="author-avatar">
-            <img src="frontend/avatar/1.jpg" alt="Author Avatar">
+            <img src="avatar/1.jpg" alt="Author Avatar">
         </div>
     </div>
 
@@ -3724,6 +4350,10 @@
             
             currentPage = page;
             
+            if (page === 'me') {
+                loadSteamData();
+            }
+            
             // 根据页面调整header样式
             const header = document.getElementById('header');
             if (page === 'home') {
@@ -3766,12 +4396,27 @@
             }, 100);
         }
 
+        function showLoadError(parent, skeleton, img) {
+            if (skeleton) skeleton.classList.add('hidden');
+            if (img) img.style.display = 'none';
+
+            let errorMsg = parent.querySelector('.load-error-msg');
+            if (!errorMsg) {
+                errorMsg = document.createElement('div');
+                errorMsg.className = 'load-error-msg';
+                errorMsg.textContent = 'Loading Failed';
+                parent.appendChild(errorMsg);
+            }
+            errorMsg.style.display = 'flex';
+        }
+
         function loadImage(img) {
             const compressedSrc = img.dataset.src;
             const fullSrc = img.dataset.fullSrc;
 
             if (!compressedSrc) return;
-            if (img.classList.contains('loaded')) return;
+            // If already loaded and has src, skip
+            if (img.classList.contains('loaded') && img.src) return;
 
             const parent = img.parentElement;
             let skeleton = null;
@@ -3784,10 +4429,14 @@
             }
 
             if (skeleton) skeleton.classList.remove('hidden');
+            if (parent) parent.classList.add('visible');
+
+            let imageLoaded = false;
 
             // 阶段1: 加载压缩图
             const compressedImg = new Image();
             compressedImg.onload = () => {
+                imageLoaded = true;
                 img.src = compressedSrc;
                 if (skeleton) skeleton.classList.add('hidden');
 
@@ -3795,12 +4444,15 @@
                 const aspectRatio = compressedImg.width / compressedImg.height;
                 if (parent) {
                     if (aspectRatio > 1.5) {
-                        // 宽图：占据两列
                         parent.classList.add('wide');
                     } else if (aspectRatio < 0.8) {
-                        // 高图（竖屏）：增加高度
                         parent.classList.add('tall');
                     }
+                }
+
+                // 设置alt文字
+                if (img.dataset.index !== undefined) {
+                    img.alt = `Gallery Image ${parseInt(img.dataset.index) + 1}`;
                 }
 
                 // 阶段2: 加载高清图
@@ -3815,7 +4467,6 @@
                         img.src = compressedSrc;
                         img.classList.remove('blur-placeholder');
                         img.classList.add('loaded');
-                        img.style.animation = 'none';
                     };
                     fullImg.src = fullSrc;
                 } else {
@@ -3828,19 +4479,25 @@
                 if (fullSrc) {
                     const fullImg = new Image();
                     fullImg.onload = () => {
+                        imageLoaded = true;
                         if (skeleton) skeleton.classList.add('hidden');
                         img.src = fullSrc;
                         img.classList.remove('blur-placeholder');
                         img.classList.add('loaded');
+                        if (img.dataset.index !== undefined) {
+                            img.alt = `Gallery Image ${parseInt(img.dataset.index) + 1}`;
+                        }
                     };
                     fullImg.onerror = () => {
-                        img.style.visibility = 'hidden';
-                        img.alt = '';
+                        if (!imageLoaded) {
+                            showLoadError(parent, skeleton, img);
+                        }
                     };
                     fullImg.src = fullSrc;
                 } else {
-                    img.style.visibility = 'hidden';
-                    img.alt = '';
+                    if (!imageLoaded) {
+                        showLoadError(parent, skeleton, img);
+                    }
                 }
             };
 
@@ -4094,6 +4751,198 @@
         const nav = document.querySelector('nav');
         const menuToggle = document.getElementById('menuToggle');
 
+        const STEAM_API_BASE = 'https://api.liveinpassion.me';
+        let steamDataLoaded = false;
+
+        async function fetchSteamProfile() {
+            try {
+                const response = await fetch(`${STEAM_API_BASE}/api/steam/profile`);
+                if (!response.ok) throw new Error('Failed to fetch Steam profile');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching Steam profile:', error);
+                return null;
+            }
+        }
+
+        async function fetchSteamGames() {
+            try {
+                const response = await fetch(`${STEAM_API_BASE}/api/steam/games`);
+                if (!response.ok) throw new Error('Failed to fetch Steam games');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching Steam games:', error);
+                return null;
+            }
+        }
+
+        async function fetchSteamRecent() {
+            try {
+                const response = await fetch(`${STEAM_API_BASE}/api/steam/recent`);
+                if (!response.ok) throw new Error('Failed to fetch recent games');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching recent games:', error);
+                return null;
+            }
+        }
+
+        function formatPlaytime(minutes) {
+            if (minutes < 60) return `${minutes}分钟`;
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return mins > 0 ? `${hours}小时 ${mins}分钟` : `${hours}小时`;
+        }
+
+        function getPersonaStatus(statusCode) {
+            const statusMap = {
+                0: { text: 'Offline', class: 'offline' },
+                1: { text: 'Online', class: 'online' },
+                2: { text: 'Busy', class: 'busy' },
+                3: { text: 'Away', class: 'away' },
+                4: { text: 'Snooze', class: 'away' },
+                5: { text: 'Looking to Trade', class: 'online' },
+                6: { text: 'Looking to Play', class: 'online' }
+            };
+            return statusMap[statusCode] || { text: 'Offline', class: 'offline' };
+        }
+
+        async function loadSteamData() {
+            if (steamDataLoaded) return;
+
+            const avatarEl = document.getElementById('steamAvatar');
+            const nameEl = document.getElementById('steamName');
+            const taglineEl = document.getElementById('steamTagline');
+            const aboutEl = document.getElementById('steamAbout');
+            const detailsEl = document.getElementById('steamDetails');
+
+            if (!avatarEl) return;
+
+            steamDataLoaded = true;
+
+            const profile = await fetchSteamProfile();
+            const gamesData = await fetchSteamGames();
+
+            if (!profile) {
+                avatarEl.innerHTML = '<span class="load-error-msg">Loading Failed</span>';
+                nameEl.innerHTML = 'Unable to load';
+                taglineEl.innerHTML = '';
+                if (aboutEl) aboutEl.innerHTML = 'Could not load Steam profile data. Please try again later.';
+                if (detailsEl) detailsEl.innerHTML = '';
+                return;
+            }
+
+            const status = getPersonaStatus(profile.personastate);
+
+            avatarEl.innerHTML = `<img src="${profile.avatarfull}" alt="${profile.personaname}">`;
+
+            nameEl.textContent = profile.personaname;
+            taglineEl.innerHTML = `<span>${status.text}</span><span class="steam-status-indicator-wrapper"><span class="steam-status-indicator ${status.class}"></span></span>`;
+
+            const creationDate = new Date(profile.timecreated * 1000);
+            const memberSince = creationDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+            const countryNames = {
+                'CN': 'China',
+                'US': 'United States',
+                'GB': 'United Kingdom',
+                'JP': 'Japan',
+                'KR': 'South Korea',
+                'DE': 'Germany',
+                'FR': 'France',
+                'CA': 'Canada',
+                'AU': 'Australia',
+                'TW': 'Taiwan'
+            };
+
+            let country = '';
+            if (profile.loccountrycode) {
+                country = countryNames[profile.loccountrycode] || profile.loccountrycode;
+            }
+
+            let state = '';
+            if (profile.locstatecode && country) {
+                state = profile.locstatecode;
+            }
+
+            let totalPlaytime = 0;
+            let gamesCount = 0;
+            if (gamesData && gamesData.games) {
+                gamesCount = gamesData.games.length;
+                totalPlaytime = gamesData.games.reduce((sum, game) => sum + (game.playtime_forever || 0), 0);
+            }
+            const totalPlaytimeHours = Math.round(totalPlaytime / 60);
+
+            if (aboutEl) {
+                aboutEl.innerHTML = `
+                    <span>Member since ${memberSince}</span>
+                    ${country ? `<span>• ${country}${state ? ', ' + state : ''}</span>` : ''}
+                `;
+            }
+
+            if (detailsEl) {
+                detailsEl.innerHTML = `
+                    <div class="steam-detail-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        <span>Joined ${memberSince}</span>
+                    </div>
+                    ${country ? `
+                    <div class="steam-detail-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                        <span>${country}${state ? ', ' + state : ''}</span>
+                    </div>
+                    ` : ''}
+                    <div class="steam-detail-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                        </svg>
+                        <span>${gamesCount} games</span>
+                    </div>
+                    <div class="steam-detail-item">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>${totalPlaytimeHours} hours played</span>
+                    </div>
+                `;
+            }
+
+            const recentGamesEl = document.getElementById('steamRecentGames');
+            if (recentGamesEl) {
+                const isPlaying = profile.gameid && profile.gameextrainfo;
+                
+                if (isPlaying) {
+                    recentGamesEl.innerHTML = `
+                        <h4>Currently Playing</h4>
+                        <div class="recent-games-list">
+                            <div class="recent-game-item">
+                                <img src="https://media.steampowered.com/steamcommunity/public/images/apps/${profile.gameid}/header.jpg" 
+                                     alt="${profile.gameextrainfo}" 
+                                     class="recent-game-icon"
+                                     onerror="this.src='https://via.placeholder.com/48x48?text=Game'">
+                                <div class="recent-game-info">
+                                    <span class="recent-game-name">${profile.gameextrainfo}</span>
+                                    <span class="recent-game-time">Playing now</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    recentGamesEl.innerHTML = '';
+                }
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Handle browser back/forward
             window.addEventListener('popstate', (e) => {
@@ -4126,29 +4975,52 @@
 
             // Hero image auto toggle
             let currentHeroIndex = 0;
+            let heroRotationStarted = false;
             const heroImages = document.querySelectorAll('.hero-image .hero-img');
+            const heroSkeleton = document.querySelector('.hero-image .skeleton-loader');
             const heroLoadedFlags = new Array(heroImages.length).fill(false);
 
-            // 修改 loadImage 函数以支持 Hero 图片的状态更新
+            // Hero images loading - load compressed silently, then full-res, only show when full-res is ready
             heroImages.forEach((img, index) => {
-                img.dataset.heroIndex = index.toString();
-                
-                // 监听图片加载完成事件 - 当添加了 loaded 类时表示加载完成
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                            const classList = img.classList;
-                            if (classList.contains('loaded')) {
-                                heroLoadedFlags[index] = true;
-                                observer.disconnect();
-                            }
+                const compressedSrc = img.dataset.src;
+                const fullSrc = img.dataset.fullSrc;
+
+                // Hide image initially, remove blur-placeholder class
+                img.classList.remove('blur-placeholder');
+
+                // Hide skeleton loader when we start loading
+                if (heroSkeleton) heroSkeleton.classList.add('hidden');
+
+                // Load compressed version silently
+                const compressedImg = new Image();
+                compressedImg.onload = () => {
+                    // Then load full-res version
+                    const fullImg = new Image();
+                    fullImg.onload = () => {
+                        // Full-res loaded, show this image
+                        heroLoadedFlags[index] = true;
+                        img.src = fullSrc;
+                        img.classList.add('loaded');
+
+                        // If this is the first one to load, make it active
+                        if (!heroLoadedFlags.includes(true) || heroLoadedFlags.slice(0, index).every(f => !f)) {
+                            heroImages.forEach(h => h.classList.remove('active'));
+                            img.classList.add('active');
+                            currentHeroIndex = index;
                         }
-                    });
-                });
-                observer.observe(img, { attributes: true });
+
+                        // Check if all images are loaded, then start rotation
+                        if (heroLoadedFlags.every(f => f) && !heroRotationStarted) {
+                            heroRotationStarted = true;
+                        }
+                    };
+                    fullImg.src = fullSrc;
+                };
+                compressedImg.src = compressedSrc;
             });
 
             function toggleHeroImage() {
+                if (!heroRotationStarted) return;
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
                 if (heroLoadedFlags[nextIndex]) {
                     heroImages[currentHeroIndex].classList.remove('active');
@@ -4157,28 +5029,56 @@
                 }
             }
 
-            // Switch every 5 seconds (only if next image is loaded)
+            // Switch every 5 seconds (only after all images are loaded)
             setInterval(toggleHeroImage, 5000);
 
             // Group Photos featured image auto toggle
             let currentGroupFeaturedIndex = 0;
+            let groupFeaturedRotationStarted = false;
             const groupFeaturedImages = document.querySelectorAll('.gallery-featured-image .group-featured-img');
             const groupFeaturedLoadedFlags = new Array(groupFeaturedImages.length).fill(false);
+            const groupFeaturedSkeleton = document.querySelector('.gallery-featured-image .skeleton-loader');
 
             groupFeaturedImages.forEach((img, index) => {
+                const compressedSrc = img.dataset.src;
                 const fullSrc = img.dataset.fullSrc;
-                if (fullSrc) {
-                    const preloadImg = new Image();
-                    preloadImg.onload = () => {
+
+                img.classList.remove('blur-placeholder');
+
+                // Load compressed version silently first
+                const compressedImg = new Image();
+                compressedImg.onload = () => {
+                    // Then load full-res version
+                    const fullImg = new Image();
+                    fullImg.onload = () => {
                         groupFeaturedLoadedFlags[index] = true;
+                        img.src = fullSrc;
+                        img.classList.add('loaded');
+
+                        // If first image, make it active
+                        if (index === 0) {
+                            img.classList.add('active');
+                            groupFeaturedRotationStarted = true;
+                            if (groupFeaturedSkeleton) groupFeaturedSkeleton.classList.add('hidden');
+                        }
                     };
-                    preloadImg.src = fullSrc;
-                } else {
-                    groupFeaturedLoadedFlags[index] = true;
-                }
+                    fullImg.onerror = () => {
+                        groupFeaturedLoadedFlags[index] = true;
+                        img.src = compressedSrc;
+                        img.classList.add('loaded');
+                        if (index === 0) {
+                            img.classList.add('active');
+                            groupFeaturedRotationStarted = true;
+                            if (groupFeaturedSkeleton) groupFeaturedSkeleton.classList.add('hidden');
+                        }
+                    };
+                    fullImg.src = fullSrc;
+                };
+                compressedImg.src = compressedSrc;
             });
 
             function toggleGroupFeaturedImage() {
+                if (!groupFeaturedRotationStarted) return;
                 const nextIndex = (currentGroupFeaturedIndex + 1) % groupFeaturedImages.length;
                 if (groupFeaturedLoadedFlags[nextIndex]) {
                     groupFeaturedImages[currentGroupFeaturedIndex].classList.remove('active');
@@ -4187,7 +5087,7 @@
                 }
             }
 
-            // Switch every 5 seconds (only if next image is loaded)
+            // Switch every 5 seconds (only after first image is loaded and rotation started)
             setInterval(toggleGroupFeaturedImage, 5000);
         });
 
@@ -4283,8 +5183,9 @@
                     const img = document.createElement('img');
                     img.dataset.src = item.src;
                     img.dataset.fullSrc = item.fullSrc;
-                    img.alt = `Gallery Image ${startIndex + index + 1}`;
+                    img.alt = '';
                     img.className = 'blur-placeholder';
+                    img.dataset.index = startIndex + index;
 
                     div.appendChild(img);
                     
@@ -4402,8 +5303,9 @@
                         const img = document.createElement('img');
                         img.dataset.src = item.src;
                         img.dataset.fullSrc = item.fullSrc;
-                        img.alt = `Gallery Image ${globalIndex + 1}`;
+                        img.alt = '';
                         img.className = 'blur-placeholder';
+                        img.dataset.index = globalIndex;
 
                         photoItem.appendChild(img);
 
@@ -4484,8 +5386,9 @@
                     const img = document.createElement('img');
                     img.dataset.src = item.src;
                     img.dataset.fullSrc = item.fullSrc;
-                    img.alt = `Gallery Image ${globalIndex + 1}`;
+                    img.alt = '';
                     img.className = 'blur-placeholder';
+                    img.dataset.index = globalIndex;
                     
                     // 根据宽高比动态调整样式
                     img.onload = function() {
@@ -4673,8 +5576,9 @@
                 const img = document.createElement('img');
                 img.dataset.src = CDN_BASE + '/' + item.src;
                 img.dataset.fullSrc = CDN_BASE + '/' + item.fullSrc;
-                img.alt = 'Gallery Image ' + (index + 1);
+                img.alt = '';
                 img.className = 'blur-placeholder';
+                img.dataset.index = index;
 
                 div.appendChild(img);
                 loadImage(img);
