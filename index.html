@@ -6,18 +6,18 @@
     <title>LIVEINPASSION</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --bg: #FAFAFA;
             --text-primary: #1A1A1A;
             --text-secondary: #6B7280;
-            --accent: #2C2C2C;
-            --border: #E5E5E5;
-            --font-serif: 'DM Serif Display', serif;
-            --font-sans: 'Space Grotesk', sans-serif;
-            --font-body: 'Inter', sans-serif;
+            --border-color: #E5E7EB;
+            --background-secondary: #F3F4F6;
+            --font-serif: 'Poppins', sans-serif;
+            --font-sans: 'Poppins', sans-serif;
+            --font-body: 'Poppins', sans-serif;
             --invert: 0;
         }
 
@@ -27,6 +27,8 @@
             --text-secondary: #888888;
             --accent: #E5E5E5;
             --border: #333333;
+            --border-color: #333333;
+            --background-secondary: #2D2D2D;
             --invert: 1;
         }
 
@@ -729,6 +731,61 @@
             font-weight: 300;
         }
 
+        /* Groups页面样式 */
+        .groups-section {
+            padding: 140px 64px 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .groups-title {
+            font-family: var(--font-serif);
+            font-size: 3.5rem;
+            text-align: center;
+            margin-bottom: 12px;
+            letter-spacing: 0.15em;
+        }
+
+        .groups-subtitle {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+            letter-spacing: 0.05em;
+            font-weight: 300;
+        }
+
+        .kook-widget-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .widget-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            letter-spacing: 0.1em;
+        }
+
+        .widget-wrapper {
+            display: flex;
+            justify-content: center;
+            padding: 24px;
+            background: var(--background-secondary);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .widget-wrapper iframe {
+            width: 100%;
+            max-width: 350px;
+            border-radius: 8px;
+        }
+
         /* 特色内容区域 */
         .gallery-featured {
             display: block;
@@ -764,6 +821,14 @@
             height: 100%;
             object-fit: cover;
             transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+
+        .gallery-featured-image img.active {
+            opacity: 1;
         }
 
         .gallery-featured-large:hover img {
@@ -2509,6 +2574,7 @@
 
             .blog-section,
             .gallery-section,
+            .groups-section,
             .friend-gallery-section {
                 padding: 140px 32px 80px;
             }
@@ -2549,6 +2615,12 @@
         @media (max-width: 800px) {
             header {
                 padding: 20px 24px;
+            }
+
+            header.centered .logo {
+                position: absolute;
+                left: 50%;
+                transform: translateX(-50%);
             }
 
             nav {
@@ -2593,6 +2665,14 @@
                 padding: 48px 24px 64px;
             }
 
+            .groups-title {
+                font-size: 2.5rem;
+            }
+
+            .widget-wrapper {
+                padding: 16px;
+            }
+
             .gallery-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 16px;
@@ -2604,6 +2684,7 @@
 
             .blog-section,
             .gallery-section,
+            .groups-section,
             .friend-gallery-section {
                 padding: 120px 24px 64px;
             }
@@ -2839,6 +2920,7 @@
             <a href="#" onclick="navigateTo('home'); return false;">HOME</a>
             <a href="#" onclick="navigateTo('blogs'); return false;">BLOGS</a>
             <a href="#" onclick="navigateTo('friends'); return false;">GALLERY</a>
+            <a href="#" onclick="navigateTo('groups'); return false;">US</a>
         </nav>
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2857,6 +2939,7 @@
                 <div class="skeleton-loader"></div>
                 <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="blur-placeholder hero-img active">
                 <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/2.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/2.jpg" alt="Hero Image" class="blur-placeholder hero-img">
+                <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/3.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/3.jpg" alt="Hero Image" class="blur-placeholder hero-img">
             </div>
         </section>
 
@@ -2880,6 +2963,18 @@
             <p class="gallery-subtitle">Stories and reflections from the journey</p>
             
             <div class="blog-grid">
+                <article class="blog-card" onclick="navigateTo('blog-detail-4')">
+                    <div class="blog-card-image">
+                        <div class="skeleton-loader"></div>
+                        <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/4.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/4.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">JUNE 1, 2026</span>
+                        <h3 class="blog-card-title">DON'T BE A DICK</h3>
+                        <span class="blog-card-read">READ</span>
+                    </div>
+                </article>
+                
                 <article class="blog-card" onclick="navigateTo('blog-detail-3')">
                     <div class="blog-card-image">
                         <div class="skeleton-loader"></div>
@@ -3025,6 +3120,53 @@
         </footer>
     </main>
 
+    <main id="blog-detail-4-page" class="page">
+        <section class="blog-detail">
+            <div class="blog-meta">
+                <span class="blog-date">June 1, 2026</span>
+                <span>·</span>
+                <span>10 min read</span>
+            </div>
+            <h1 class="blog-detail-title">Don't Be a Dick</h1>
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
+                <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/4.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/4.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>We were playing basketball. 5 on 5 full-court basketball. We were playing, we were having a lot of fun, you know.</p>
+                <p>And you know basketball, right? There is always a mood like players to players. We may have body contact which is common in a basketball match. You may be cursing someone. That's acceptable.</p>
+                <p>And all of a sudden, a bunch of people popped up. I didn't notice them before. A guy with a bear tattooed torso started talking with one of my friends.</p>
+                <p>And he was saying, in an extremely contemptuous and condescending way, that they want to play this half of the court.</p>
+                <p>And I was thinking, we were playing, right? We were in the middle of a match. And now you're telling us to stop. To get off this half.</p>
+                <p>I mean, normally when you see a bunch of people playing a full-court match, would you interrupt them? You can interrupt them, right? Because you wanna play it. But why are you being such a dick?</p>
+                <p>And not just the normal dick. It's like he wanted to provoke someone. Telling us that we are young, we are a bunch of kids, so they deserve this half.</p>
+                <p>And one of my friends started to fight back, saying why they should take this half, and the reason for that is because we're young so we should be humble with the elders, hold them in awe and veneration.</p>
+                <p>You know what kind of person I am. Do you know what you're doing right now? And you want us to respect you.</p>
+                <p>So somehow this triggered me. So I was saying, why do you talk to him like that? Why do you talk to my friends like that?</p>
+                <p>And because this person is drunk, he started to spill out some nonsense. And his wife started to do that as well, and one of his so-called brothers obviously.</p>
+                <p>They were saying something really inappropriate—extremely inappropriate, really dirty. I really shouldn't talk about that. So let's just skip this part.</p>
+                <p>And he started to push me. Again and again and again. The fact is that none of us pushed them back and none of us used those dirty words to attack them. We conducted ourselves.</p>
+                <p>And then we called the police. And it's all their fault. Well, I really don't want to talk about the conversation I had with the policemen. And he was fined 200 bucks.</p>
+                <p>Actually, this isn't about money. This isn't about apologizing. This is about who you are.</p>
+                <p>And I really feel sad sometimes. The saddest part is why this person exists in the first place. But that's why the good ones are so valuable.</p>
+                <blockquote>Be genuine, be humble, and be brave. Don't be a dick.</blockquote>
+                <p>It's really a messy world. You know, I tried to be a dick. Tried again and again, and later I found out that's not really who I am.</p>
+                <p>And now I think that's not an excuse for not doing good things. Because I know what kind of person I am. And that's one of the most valuable things in the world.</p>
+                <p>So I guess I would not let any words interfere with me. I do take it seriously sometimes. But I will try not to let it get to me.</p>
+                <p>Maybe it is. Maybe it's not. It is. It is not what it is, but it is what it is.</p>
+                <p>SUCH A LIFE.</p>
+                <p>But there are a bunch of good things waiting to be explored. You know, all those good things and good people out there. The person you love, the things you love to do—that's what you fight for.</p>
+                <p>So don't be that sad. Get on with it.</p>
+                <p>But can I forget it? The answer is always no. It will become a part of me. And let me realize how valuable I am. How valuable the people around me are.</p>
+                <p>Anyone who sees this, take it seriously. Even though you've known that.</p>
+                <p>Really.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
     <main id="friends-page" class="page">
         <section class="gallery-section">
             <h1 class="gallery-title">GALLERY</h1>
@@ -3033,9 +3175,13 @@
             <!-- 特色内容区域 -->
             <div class="gallery-featured">
                 <div class="gallery-featured-large" onclick="navigateTo('friend-groupphotos')">
-                    <div class="gallery-featured-image">
+                    <div class="gallery-featured-image" style="position: relative;">
                         <div class="skeleton-loader"></div>
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_4.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_4.jpg" alt="Group Photos" class="blur-placeholder">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_0.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_0.jpg" alt="Group Photos" class="blur-placeholder group-featured-img active">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_4.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_4.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_8.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_8.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_12.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_12.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_16.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_16.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
                     </div>
                     <div class="gallery-featured-overlay">
                         <h3>GROUP PHOTOS</h3>
@@ -3049,6 +3195,24 @@
                 <h2 class="gallery-section-title">PERSONAL GALLERIES</h2>
                 <div class="gallery-friends-grid" id="friendsGridContainer">
                     <!-- 朋友头像将通过 JavaScript 动态生成 -->
+                </div>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <!-- US页面 -->
+    <main id="groups-page" class="page">
+        <section class="groups-section">
+            <h1 class="groups-title">US</h1>
+            <p class="groups-subtitle">Join our community</p>
+            
+            <div class="kook-widget-container">
+                <h2 class="widget-title">Kook Community</h2>
+                <div class="widget-wrapper">
+                    <iframe src="https://kookapp.cn/widget?id=3503044378289750&theme=light" width="350" height="500" allowtransparency="true" frameborder="0"></iframe>
                 </div>
             </div>
         </section>
@@ -3278,14 +3442,14 @@
         const lijiazuGalleryData = generateGalleryData('LiJiaZu', 'LiJiaZu/LiJiaZu_compressed', [
             '202202_0.jpg', '202203_0.jpg', '202211_0.jpg', '202308_0.jpg',
             '202409_0.jpg', '202501_0.jpg', '202505_0.jpg', '202505_1.jpg',
-            '202505_2.jpg', '202604_0.jpg', '202605_0.jpg'
+            '202505_2.jpg', '202604_0.jpg', '202605_0.jpg', '202605_1.jpg'
         ]);
 
         // Jiang HaiPeng 画廊
         const jianghaipengGalleryData = generateGalleryData('JiangHaiPeng', 'JiangHaiPeng/JiangHaiPeng_compressed', [
             '202109_0.jpg', '202302_0.jpg', '202302_1.jpg', '202302_2.jpg',
             '202302_3.jpg', '202302_4.jpg', '202308_0.jpg', '202409_0.jpg',
-            '202511_0.jpg', '202604_0.jpg'
+            '202511_0.jpg', '202604_0.jpg', '202605_0.jpg'
         ]);
 
         // Li XinYu 画廊
@@ -3297,7 +3461,7 @@
             '202111_5.jpg', '202204_0.jpg', '202211_0.jpg', '202212_0.jpg',
             '202302_0.jpg', '202302_1.jpg', '202302_2.jpg', '202307_0.jpg',
             '202308_0.jpg', '202308_1.jpg', '202308_2.jpg', '202308_3.jpg',
-            '202309_0.jpg', '202511_0.png', '202604_0.jpg', '202605_0.jpg'
+            '202309_0.jpg', '202511_0.png', '202604_0.jpg', '202605_0.jpg', '202605_1.jpg'
         ]);
 
         // Wang Shuai 画廊
@@ -3325,7 +3489,8 @@
             '202511_1.jpg', '202511_2.jpg', '202605_0.jpg', '202605_1.jpg',
             '202605_2.jpg', '202605_3.jpg', '202605_4.jpg', '202605_5.jpg',
             '202605_6.jpg', '202605_7.jpg', '202605_8.jpg', '202605_9.jpg',
-            '202605_10.jpg', '202605_11.jpg'
+            '202605_10.jpg', '202605_11.jpg', '202605_12.jpg', '202605_13.jpg',
+            '202605_14.jpg', '202605_15.jpg', '202605_16.jpg', '202605_17.jpg'
         ]);
 
         // 朋友画廊数据映射
@@ -3436,6 +3601,15 @@
             }
             
             currentPage = page;
+            
+            // 根据页面调整header样式
+            const header = document.getElementById('header');
+            if (page === 'home') {
+                header.classList.remove('centered');
+            } else {
+                header.classList.add('centered');
+            }
+            
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
             // Close menu when navigating
@@ -3539,6 +3713,7 @@
         // 朋友数据 - 每个人有多个头像选项
         const friendsData = [
             { id: 'lijiazu', name: 'Li Jiazu', bio: 'To Be Determined', photos: [
+                { compressed: 'LiJiaZu/LiJiaZu_compressed/202605_1.jpg', full: 'LiJiaZu/202605_1.jpg' },
                 { compressed: 'LiJiaZu/LiJiaZu_compressed/202605_0.jpg', full: 'LiJiaZu/202605_0.jpg' },
                 { compressed: 'LiJiaZu/LiJiaZu_compressed/202604_0.jpg', full: 'LiJiaZu/202604_0.jpg' },
                 { compressed: 'LiJiaZu/LiJiaZu_compressed/202505_2.jpg', full: 'LiJiaZu/202505_2.jpg' },
@@ -3552,6 +3727,7 @@
                 { compressed: 'LiJiaZu/LiJiaZu_compressed/202202_0.jpg', full: 'LiJiaZu/202202_0.jpg' }
             ]},
             { id: 'jianghaipeng', name: 'Jiang HaiPeng', bio: 'To Be Determined', photos: [
+                { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202605_0.jpg', full: 'JiangHaiPeng/202605_0.jpg' },
                 { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202604_0.jpg', full: 'JiangHaiPeng/202604_0.jpg' },
                 { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202511_0.jpg', full: 'JiangHaiPeng/202511_0.jpg' },
                 { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202409_0.jpg', full: 'JiangHaiPeng/202409_0.jpg' },
@@ -3564,6 +3740,7 @@
                 { compressed: 'JiangHaiPeng/JiangHaiPeng_compressed/202109_0.jpg', full: 'JiangHaiPeng/202109_0.jpg' }
             ]},
             { id: 'lixinyu', name: 'Li XinYu', bio: 'To Be Determined', photos: [
+                { compressed: 'LiXinYu/LiXinYu_compressed/202605_1.jpg', full: 'LiXinYu/202605_1.jpg' },
                 { compressed: 'LiXinYu/LiXinYu_compressed/202605_0.jpg', full: 'LiXinYu/202605_0.jpg' },
                 { compressed: 'LiXinYu/LiXinYu_compressed/202604_0.jpg', full: 'LiXinYu/202604_0.jpg' },
                 { compressed: 'LiXinYu/LiXinYu_compressed/202511_0.png', full: 'LiXinYu/202511_0.png' },
@@ -3786,29 +3963,38 @@
             
             // Load initial images
             document.querySelectorAll('.hero-image img').forEach(loadImage);
+            document.querySelectorAll('.gallery-featured-image img').forEach(loadImage);
             document.querySelectorAll('#blogs-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#blog-detail-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#blog-detail-2-page .blur-placeholder').forEach(loadImage);
+            document.querySelectorAll('#blog-detail-3-page .blur-placeholder').forEach(loadImage);
+            document.querySelectorAll('#blog-detail-4-page .blur-placeholder').forEach(loadImage);
             document.querySelectorAll('#friends-page .blur-placeholder').forEach(loadImage);
-            
+
             // Hero image auto toggle
             let currentHeroIndex = 0;
             const heroImages = document.querySelectorAll('.hero-image .hero-img');
             const heroLoadedFlags = new Array(heroImages.length).fill(false);
-            
+
+            // 修改 loadImage 函数以支持 Hero 图片的状态更新
             heroImages.forEach((img, index) => {
-                const fullSrc = img.dataset.fullSrc;
-                if (fullSrc) {
-                    const preloadImg = new Image();
-                    preloadImg.onload = () => {
-                        heroLoadedFlags[index] = true;
-                    };
-                    preloadImg.src = fullSrc;
-                } else {
-                    heroLoadedFlags[index] = true;
-                }
+                img.dataset.heroIndex = index.toString();
+                
+                // 监听图片加载完成事件 - 当添加了 loaded 类时表示加载完成
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                            const classList = img.classList;
+                            if (classList.contains('loaded')) {
+                                heroLoadedFlags[index] = true;
+                                observer.disconnect();
+                            }
+                        }
+                    });
+                });
+                observer.observe(img, { attributes: true });
             });
-            
+
             function toggleHeroImage() {
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
                 if (heroLoadedFlags[nextIndex]) {
@@ -3817,9 +4003,39 @@
                     heroImages[currentHeroIndex].classList.add('active');
                 }
             }
-            
+
             // Switch every 5 seconds (only if next image is loaded)
             setInterval(toggleHeroImage, 5000);
+
+            // Group Photos featured image auto toggle
+            let currentGroupFeaturedIndex = 0;
+            const groupFeaturedImages = document.querySelectorAll('.gallery-featured-image .group-featured-img');
+            const groupFeaturedLoadedFlags = new Array(groupFeaturedImages.length).fill(false);
+
+            groupFeaturedImages.forEach((img, index) => {
+                const fullSrc = img.dataset.fullSrc;
+                if (fullSrc) {
+                    const preloadImg = new Image();
+                    preloadImg.onload = () => {
+                        groupFeaturedLoadedFlags[index] = true;
+                    };
+                    preloadImg.src = fullSrc;
+                } else {
+                    groupFeaturedLoadedFlags[index] = true;
+                }
+            });
+
+            function toggleGroupFeaturedImage() {
+                const nextIndex = (currentGroupFeaturedIndex + 1) % groupFeaturedImages.length;
+                if (groupFeaturedLoadedFlags[nextIndex]) {
+                    groupFeaturedImages[currentGroupFeaturedIndex].classList.remove('active');
+                    currentGroupFeaturedIndex = nextIndex;
+                    groupFeaturedImages[currentGroupFeaturedIndex].classList.add('active');
+                }
+            }
+
+            // Switch every 5 seconds (only if next image is loaded)
+            setInterval(toggleGroupFeaturedImage, 5000);
         });
 
 
