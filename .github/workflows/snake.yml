@@ -12,19 +12,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create output directory
-        run: mkdir -p output
-
       - name: Generate Snake
         uses: Platane/snk@v3
         with:
           github_user_name: HuangWeiLong-dot
-          output_file: output/github-contribution-grid-snake.svg
+          outputs: |
+            output/github-contribution-grid-snake.svg
+            output/github-contribution-grid-snake-dark.svg?palette=github-dark
+            output/github-contribution-grid-snake.gif?color_snake=orange&color_dots=#006aff,#0059cc,#004799,#003366,#002133
           svg_out: true
 
-      - name: Commit and Push
-        uses: EndBug/add-and-commit@v9
+      - name: Push to output branch
+        uses: crazy-max/ghaction-github-pages@v4
         with:
-          message: "Update snake animation"
-          add: "output/"
-          default_author: github_actions
+          target_branch: output
+          build_dir: output
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
