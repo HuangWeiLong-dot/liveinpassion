@@ -3647,19 +3647,26 @@
         function loadImage(img) {
             const compressedSrc = img.dataset.src;
             const fullSrc = img.dataset.fullSrc;
-            
+
             if (!compressedSrc) return;
             if (img.classList.contains('loaded')) return;
-            
+
             const parent = img.parentElement;
-            const skeleton = parent?.querySelector('.skeleton-loader');
-            
+            let skeleton = null;
+            let skeletonHolder = parent;
+            while (skeletonHolder && !skeleton) {
+                skeleton = skeletonHolder.querySelector('.skeleton-loader');
+                if (!skeleton) {
+                    skeletonHolder = skeletonHolder.parentElement;
+                }
+            }
+
             // 阶段1: 加载压缩图
             const compressedImg = new Image();
             compressedImg.onload = () => {
                 img.src = compressedSrc;
                 if (skeleton) skeleton.classList.add('hidden');
-                
+
                 // 根据宽高比动态调整样式
                 const aspectRatio = compressedImg.width / compressedImg.height;
                 if (parent) {
@@ -3671,7 +3678,7 @@
                         parent.classList.add('tall');
                     }
                 }
-                
+
                 // 阶段2: 加载高清图
                 if (fullSrc) {
                     const fullImg = new Image();
@@ -3681,8 +3688,10 @@
                         img.classList.add('loaded');
                     };
                     fullImg.onerror = () => {
+                        img.src = compressedSrc;
                         img.classList.remove('blur-placeholder');
                         img.classList.add('loaded');
+                        img.style.animation = 'none';
                     };
                     fullImg.src = fullSrc;
                 } else {
@@ -3690,16 +3699,27 @@
                     img.classList.add('loaded');
                 }
             };
-            
+
             compressedImg.onerror = () => {
                 if (fullSrc) {
-                    if (skeleton) skeleton.classList.add('hidden');
-                    img.src = fullSrc;
-                    img.classList.remove('blur-placeholder');
-                    img.classList.add('loaded');
+                    const fullImg = new Image();
+                    fullImg.onload = () => {
+                        if (skeleton) skeleton.classList.add('hidden');
+                        img.src = fullSrc;
+                        img.classList.remove('blur-placeholder');
+                        img.classList.add('loaded');
+                    };
+                    fullImg.onerror = () => {
+                        img.style.visibility = 'hidden';
+                        img.alt = '';
+                    };
+                    fullImg.src = fullSrc;
+                } else {
+                    img.style.visibility = 'hidden';
+                    img.alt = '';
                 }
             };
-            
+
             compressedImg.src = compressedSrc;
         }
 
@@ -3709,6 +3729,15 @@
         const lightboxImg = document.getElementById('lightboxImg');
         const lightboxBg = document.getElementById('lightboxBg');
         const lightboxClose = document.getElementById('lightboxClose');
+        let lightboxImageLoading = false;
+
+        lightboxImg.addEventListener('load', () => {
+            lightboxImageLoading = false;
+        });
+
+        lightboxImg.addEventListener('error', () => {
+            lightboxImageLoading = false;
+        });
 
         // 朋友数据 - 每个人有多个头像选项
         const friendsData = [
@@ -4418,8 +4447,8 @@
         }
 
         function openLightbox(src) {
-            // 使用 new URL 确保路径正确解析
             const fullUrl = new URL(src, window.location.href);
+            lightboxImageLoading = true;
             lightboxImg.src = fullUrl.href;
             lightbox.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -4432,21 +4461,25 @@
 
         function showPrev() {
             if (!currentGalleryData || currentGalleryData.length === 0) return;
+            if (lightboxImageLoading) return;
             currentIndex = (currentIndex - 1 + currentGalleryData.length) % currentGalleryData.length;
             const currentItem = currentGalleryData[currentIndex];
             if (!currentItem) return;
             const activeSrc = currentItem.fullSrc || currentItem.src;
             const fullUrl = new URL(activeSrc, window.location.href);
+            lightboxImageLoading = true;
             lightboxImg.src = fullUrl.href;
         }
 
         function showNext() {
             if (!currentGalleryData || currentGalleryData.length === 0) return;
+            if (lightboxImageLoading) return;
             currentIndex = (currentIndex + 1) % currentGalleryData.length;
             const currentItem = currentGalleryData[currentIndex];
             if (!currentItem) return;
             const activeSrc = currentItem.fullSrc || currentItem.src;
             const fullUrl = new URL(activeSrc, window.location.href);
+            lightboxImageLoading = true;
             lightboxImg.src = fullUrl.href;
         }
 
