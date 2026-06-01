@@ -20,10 +20,8 @@ jobs:
         with:
           github_user_name: HuangWeiLong-dot
           outputs: |
-            output/github-contribution-grid-snake.svg
-            output/github-contribution-grid-snake-dark.svg?palette=github-dark
-            output/github-contribution-grid-snake.gif?color_snake=orange&color_dots=#006aff,#0059cc,#004799,#003366,#002133
-          svg_out: true
+            output/github-contribution-grid-snake.gif
+          gif_out: true
 
       - name: Push to output branch
         uses: crazy-max/ghaction-github-pages@v4
