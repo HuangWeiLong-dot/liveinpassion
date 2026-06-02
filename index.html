@@ -15,6 +15,7 @@
             --text-secondary: #6B7280;
             --border-color: #E5E7EB;
             --background-secondary: #F3F4F6;
+            --accent-color: #3B82F6;
             --font-serif: 'Poppins', sans-serif;
             --font-sans: 'Poppins', sans-serif;
             --font-body: 'Poppins', sans-serif;
@@ -29,7 +30,13 @@
             --border: #333333;
             --border-color: #333333;
             --background-secondary: #2D2D2D;
+            --accent-color: #60A5FA;
             --invert: 1;
+        }
+
+        :root.dark .skeleton-rect {
+            background: linear-gradient(90deg, #2d2d2d 20%, #3d3d3d 50%, #2d2d2d 80%);
+            border-color: #3d3d3d;
         }
 
         * {
@@ -752,51 +759,73 @@
             font-weight: 300;
         }
 
-        /* Groups页面样式 */
+        /* ME页面样式 */
         .me-section {
-            padding: 140px 64px 80px;
-            max-width: 1200px;
+            padding: 120px 48px 100px;
+            max-width: 1400px;
             margin: 0 auto;
+        }
+
+        .page-title {
+            font-family: var(--font-serif);
+            font-size: 3.5rem;
+            text-align: center;
+            margin-bottom: 12px;
+            letter-spacing: 0.15em;
+            color: var(--text-primary);
+        }
+
+        .page-description {
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 60px;
+            letter-spacing: 0.05em;
+            font-weight: 300;
         }
 
         .me-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 64px;
-            align-items: start;
+            gap: 48px;
+            align-items: stretch;
         }
 
         .me-left {
             display: flex;
             flex-direction: column;
-            gap: 24px;
-        }
-
-        .me-top-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
             gap: 16px;
         }
 
+        /* 个人信息卡片 */
+        .me-profile-card {
+            display: flex;
+            gap: 20px;
+            padding: 0;
+            background: transparent;
+            align-items: stretch;
+        }
+
         .me-avatar-wrapper {
+            flex: 0 0 160px;
+            height: 160px;
             overflow: hidden;
         }
 
         .me-avatar {
             width: 100%;
-            height: auto;
-            aspect-ratio: 1;
+            height: 100%;
             object-fit: cover;
         }
 
-        .me-right-info {
+        .me-info-box {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-        }
-
-        .me-name-box {
-            padding: 16px;
+            gap: 8px;
+            min-width: 0;
+            justify-content: space-between;
         }
 
         .me-name {
@@ -805,44 +834,119 @@
             font-weight: 600;
             color: var(--text-primary);
             margin: 0;
-            text-align: center;
+            letter-spacing: 0.1em;
         }
 
-        .me-bio-box {
-            padding: 16px;
-            flex: 1;
-        }
-
-        .me-bio {
-            font-size: 0.875rem;
-            line-height: 1.6;
+        .me-title {
+            font-family: var(--font-sans);
+            font-size: 0.75rem;
             color: var(--text-secondary);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
             margin: 0;
         }
 
-        .me-contact {
-            padding: 24px;
+        .me-description {
+            font-family: var(--font-sans);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin: 0;
+            opacity: 0.7;
         }
 
-        .contact-content {
+        .me-social-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .social-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .social-item:hover {
+            background: var(--text-primary);
+            color: var(--bg);
+            border-color: var(--text-primary);
+        }
+
+        .social-item svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        /* 四个按钮行 */
+        .me-buttons-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .me-btn {
+            padding: 14px 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .me-btn:hover {
+            background: var(--text-primary);
+            color: var(--bg);
+            border-color: var(--text-primary);
+        }
+
+        /* RANDOM区域 */
+        .me-random-section {
+            padding: 20px;
+            background: transparent;
             text-align: center;
         }
 
-        .contact-content span {
+        .random-joke {
             font-size: 0.875rem;
-            font-weight: 500;
+            line-height: 1.7;
             color: var(--text-secondary);
+            margin-bottom: 16px;
+            min-height: 48px;
+            text-align: center;
+        }
+
+        .me-random-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--text-primary);
+            border: none;
+            color: var(--bg);
+            font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .me-interests {
-            padding: 16px;
-        }
-
-        .interests-content {
-            display: flex;
-            justify-content: center;
+        /* GITHUB SNAKE */
+        .me-github-snake {
+            border: 1px solid var(--border-color);
+            padding: 0;
+            overflow: hidden;
         }
 
         .github-snake {
@@ -851,129 +955,536 @@
             display: block;
         }
 
+        /* 右侧栏 */
         .me-right {
-            position: sticky;
-            top: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 100%;
         }
 
-        .steam-card {
-            background: var(--background-secondary);
-            padding: 32px;
+        .me-section-box {
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
+
+        .me-section-box:hover {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+        }
+
+        .me-section-box:hover span {
+            color: var(--bg);
+        }
+
+        .me-section-box span {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            transition: color 0.2s ease;
+        }
+
+        /* 电影海报按钮 */
+        .me-movie-box {
+            background: url('movie-posters/1.jpg') center/cover no-repeat;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .me-movie-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1;
+        }
+
+        .me-movie-box::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('movie-posters/1.jpg') center/cover no-repeat;
+            transform: scale(1);
+            transition: transform 0.3s ease;
+        }
+
+        .me-movie-box span {
+            position: relative;
+            z-index: 2;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .me-movie-box:hover::before {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .me-movie-box:hover::after {
+            transform: scale(1.08);
+        }
+
+        /* 电影弹窗样式 */
+        .movie-modal-content {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            border: none;
+        }
+
+        .movie-poster-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 24px;
+            background: transparent;
+        }
+
+        .movie-poster {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .movie-info {
+            padding: 32px;
+            text-align: center;
+            background: transparent;
+        }
+
+        .movie-title {
+            font-family: var(--font-serif);
+            font-size: 1.75rem;
+            color: #fff;
+            margin: 0 0 16px;
+            letter-spacing: 0.15em;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .movie-year,
+        .movie-director,
+        .movie-genre {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin: 6px 0;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .movie-description {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.85);
+            margin-top: 20px;
+            line-height: 1.6;
+            text-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        /* ME页面响应式设计 */
+        @media (max-width: 1024px) {
+            .me-section {
+                padding: 100px 32px 80px;
+            }
+            
+            .me-container {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .me-section {
+                padding: 80px 24px 60px;
+            }
+            
+            .me-profile-card {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            
+            .me-avatar-wrapper {
+                flex: none;
+                width: 140px;
+                height: 140px;
+                margin-bottom: 16px;
+            }
+            
+            .me-avatar {
+                height: 100%;
+            }
+            
+            .me-info-box {
+                align-items: center;
+                justify-content: center;
+                height: auto;
+            }
+            
+            .me-social-box {
+                flex-direction: row;
+                margin-top: 16px;
+                align-items: center;
+            }
+            
+            .me-buttons-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .page-title {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .me-section {
+                padding: 70px 16px 50px;
+            }
+            
+            .me-avatar-wrapper {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .me-name {
+                font-size: 1.125rem;
+            }
+            
+            .me-btn {
+                padding: 12px 8px;
+                font-size: 0.65rem;
+            }
+            
+            .page-title {
+                font-size: 2rem;
+            }
+        }
+
+        /* 弹窗样式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--background-primary);
+            padding: 32px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-content h3 {
+            font-family: var(--font-serif);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 24px 0;
+            text-align: center;
+        }
+
+
+
+        .modal-steam-profile {
+            background: var(--background-secondary);
+            padding: 16px;
+        }
+
+        .steam-profile-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .steam-profile-avatar {
+            width: 60px;
+            height: 60px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .steam-profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .steam-profile-info {
+            flex: 1;
+        }
+
+        .steam-profile-info h4 {
+            font-family: var(--font-serif);
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 6px 0;
+        }
+
+        .steam-profile-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .steam-profile-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 12px 0;
+        }
+
+        .steam-profile-stats {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+
+        .steam-profile-stat {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .steam-profile-stat strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .steam-profile-actions {
+            margin-top: 8px;
+        }
+
+        .steam-profile-btn {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #1b2838 0%, #2a475e 100%);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .steam-profile-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Skeleton Loader */
+        .skeleton-rect {
+            background: linear-gradient(90deg, #e5e7eb 20%, #d1d5db 50%, #e5e7eb 80%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border: 1px solid #e5e7eb;
+        }
+
+        @keyframes skeleton-loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .status-indicator.online {
+            background: #238636;
+        }
+
+        .status-indicator.offline {
+            background: #8b949e;
+        }
+
+        .status-indicator.busy {
+            background: #f85149;
+        }
+
+        .status-indicator.away {
+            background: #d29922;
+        }
+
+
 
         .steam-card-title {
             font-family: var(--font-serif);
-            font-size: 1.25rem;
-            font-weight: 500;
-            margin-bottom: 24px;
-            letter-spacing: 0.05em;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .steam-profile {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 24px;
-            align-items: start;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
         .steam-avatar-wrapper {
             position: relative;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
         }
 
         .steam-avatar {
-            width: 160px;
-            height: 160px;
-            overflow: hidden;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            transition: transform 0.4s ease, box-shadow 0.4s ease;
-            position: relative;
-        }
-
-        .steam-avatar:hover {
-            transform: scale(1.03);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1;
+            display: block;
         }
 
         .steam-avatar img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+
+        .steam-status-badge {
             position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        .steam-status-indicator-wrapper {
-            display: inline-flex;
+            bottom: 8px;
+            right: 8px;
+            display: flex;
             align-items: center;
-            margin-left: 8px;
+            gap: 6px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.7);
+            font-size: 0.65rem;
+            font-weight: 500;
         }
 
-        .steam-status-indicator {
-            width: 12px;
-            height: 12px;
+        .steam-status-dot {
+            width: 8px;
+            height: 8px;
+        }
+
+        .steam-status-dot.online {
             background: #10B981;
-            border: 2px solid var(--background-secondary);
-            border-radius: 50%;
         }
 
-        .steam-status-indicator.online {
-            background: #10B981;
-        }
-
-        .steam-status-indicator.offline {
+        .steam-status-dot.offline {
             background: #6B7280;
         }
 
-        .steam-status-indicator.busy {
+        .steam-status-dot.busy {
             background: #EF4444;
         }
 
-        .steam-status-indicator.away {
+        .steam-status-dot.away {
             background: #F59E0B;
         }
 
         .steam-info {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
 
         .steam-name {
             font-family: var(--font-serif);
-            font-size: 1.5rem;
+            font-size: 1.125rem;
             font-weight: 600;
             letter-spacing: 0.03em;
-            margin-bottom: 8px;
+            margin: 0;
         }
 
         .steam-tagline {
             font-family: var(--font-sans);
-            font-size: 0.95rem;
+            font-size: 0.825rem;
             color: var(--text-secondary);
             font-weight: 400;
-            margin-bottom: 16px;
+            margin: 0;
         }
 
         .steam-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            padding-top: 16px;
+            display: flex;
+            gap: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            margin-top: 8px;
         }
 
-        .steam-recent-games {
-            margin-top: 16px;
-            padding-top: 16px;
+        .steam-detail-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px 0;
         }
 
-        .steam-recent-games h4 {
-            font-size: 14px;
+        .steam-detail-value {
+            font-size: 1.125rem;
             font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .steam-detail-label {
+            font-size: 0.65rem;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 12px;
+            letter-spacing: 0.08em;
         }
 
         .recent-games-list {
@@ -3872,81 +4383,135 @@
 
     <main id="me-page" class="page">
         <section class="me-section">
+            <h1 class="page-title">ME</h1>
+            <p class="page-description">THIS IS ME</p>
+            
             <div class="me-container">
                 <div class="me-left">
-                    <div class="me-top-section">
+                    <!-- 个人信息卡片 -->
+                    <div class="me-profile-card">
                         <div class="me-avatar-wrapper">
                             <img src="avatar/2.jpg" alt="Profile Photo" class="me-avatar">
                         </div>
-                        <div class="me-right-info">
-                            <div class="me-name-box">
-                                <h2 class="me-name">HuangWeiLong</h2>
-                            </div>
-                            <div class="me-bio-box">
-                                <p class="me-bio">
-                                    to be determined
-                                </p>
-                            </div>
+                        <div class="me-info-box">
+                            <h2 class="me-name">HUANG WEI LONG</h2>
+                            <p class="me-title">DREAMER & IDEALIST</p>
+                            <p class="me-description">I'm kidding you</p>
+                            <p class="me-description">Actually, I'm a pragmatist</p>
+                        </div>
+                        <div class="me-social-box">
+                            <a href="#" class="social-item" title="Message">
+                                <svg xmlns="http://www.w3.org/2000/svg" stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                                    <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894m-.493 3.905a22 22 0 0 1-.713.129c-.2.032-.352-.176-.273-.362a10 10 0 0 0 .244-.637l.003-.01c.248-.72.45-1.548.524-2.319C.743 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7-3.582 7-8 7a9 9 0 0 1-2.347-.306c-.52.263-1.639.742-3.468 1.105"/>
+                                </svg>
+                            </a>
+                            <a href="https://github.com/HuangWeiLong-dot" target="_blank" class="social-item" title="GitHub">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.7-2.782.604-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.026A9.578 9.578 0 0112 6.844c.85.004 1.705.114 2.504.336 1.909-1.295 2.747-1.026 2.747-1.026.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.482A10.02 10.02 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/>
+                                </svg>
+                            </a>
+                            <a href="#" class="social-item" title="X (Twitter)">
+                                <svg viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                                </svg>
+                            </a>
+                            <a href="mailto:huangweilong2000@gmail.com" class="social-item" title="Email">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                            </a>
                         </div>
                     </div>
                     
-                    <div class="me-contact">
-                        <div class="contact-content">
-                            <span>to be determined</span>
-                        </div>
+                    <!-- 四个按钮：GAME | MOVIE | RUNNING | MUSIC -->
+                    <div class="me-buttons-row">
+                        <button class="me-btn" id="gameBtn">GAME</button>
+                        <button class="me-btn" id="movieBtn">MOVIE</button>
+                        <button class="me-btn" id="runningBtn">RUNNING</button>
+                        <button class="me-btn" id="musicBtn">MUSIC</button>
                     </div>
                     
-                    <div class="me-interests">
-                        <div class="interests-content">
-                            <img src="https://raw.githubusercontent.com/HuangWeiLong-dot/liveinpassion/output/github-contribution-grid-snake.gif" 
-                                  alt="GitHub Contribution Snake" 
-                                  class="github-snake">
-                        </div>
+                    <!-- RANDOM按钮 -->
+                    <div class="me-random-section">
+                        <div class="random-joke" id="randomJoke"></div>
+                        <button class="me-random-btn" id="randomBtn">CLICK ME</button>
+                    </div>
+                    
+                    <!-- GITHUB SNAKE -->
+                    <div class="me-github-snake">
+                        <img src="https://raw.githubusercontent.com/HuangWeiLong-dot/liveinpassion/output/github-contribution-grid-snake.gif" 
+                              alt="GitHub Contribution Snake" 
+                              class="github-snake">
                     </div>
                 </div>
                 
                 <div class="me-right">
-                    <div class="steam-card">
-                        <h2 class="steam-card-title">Steam</h2>
-                        <div class="steam-profile">
-                            <div class="steam-info">
-                                <h3 class="steam-name" id="steamName">
-                                    <span class="skeleton-loader" style="width: 150px; height: 28px; display: inline-block;"></span>
-                                </h3>
-                                <p class="steam-tagline" id="steamTagline">
-                                    <span class="skeleton-loader" style="width: 180px; height: 20px; display: inline-block;"></span>
-                                    <span class="steam-status-indicator-wrapper" id="steamStatusIndicatorWrapper">
-                                        <span class="steam-status-indicator" id="steamStatusIndicator"></span>
-                                    </span>
-                                </p>
-                            </div>
-                            <div class="steam-avatar-wrapper">
-                                <div class="steam-avatar" id="steamAvatar">
-                                    <div class="skeleton-loader"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="steam-details" id="steamDetails">
-                            <span class="skeleton-loader" style="width: 100%; height: 60px; display: block;"></span>
-                        </div>
-                        <div class="steam-recent-games" id="steamRecentGames">
-                            <span class="skeleton-loader" style="width: 100%; height: 100px; display: block;"></span>
-                        </div>
-                        <div class="steam-games">
-                            <h4 class="steam-games-title">Favorite Games</h4>
-                            <div class="steam-game-widgets">
-                                <div class="steam-game-widget">
-                                    <iframe src="https://store.steampowered.com/widget/3280350/" frameborder="0" width="100%" height="190"></iframe>
-                                </div>
-                                <div class="steam-game-widget">
-                                    <iframe src="https://store.steampowered.com/widget/548430/" frameborder="0" width="100%" height="190"></iframe>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- FAVOURITE MOVIE -->
+                    <div class="me-section-box me-movie-box" id="favouriteMovie">
+                        <span>FAVOURITE MOVIE</span>
+                    </div>
+                    
+                    <!-- FAVOURITE MUSIC -->
+                    <div class="me-section-box" id="favouriteMusic">
+                        <span>FAVOURITE MUSIC</span>
+                    </div>
+                    
+                    <!-- MORE -->
+                    <div class="me-section-box" id="moreSection">
+                        <span>MORE</span>
                     </div>
                 </div>
             </div>
         </section>
+        
+        <!-- GAME弹窗 -->
+        <!-- 电影详情弹窗 -->
+        <div class="modal-overlay" id="movieModal">
+            <div class="movie-modal-content">
+                <span class="modal-close" id="movieModalClose">&times;</span>
+                <div class="movie-poster-container">
+                    <img src="movie-posters/1.jpg" alt="Dead Poets Society" class="movie-poster">
+                </div>
+                <div class="movie-info">
+                    <h3 class="movie-title">DEAD POETS SOCIETY</h3>
+                    <p class="movie-year">1989</p>
+                    <p class="movie-director">Director: Peter Weir</p>
+                    <p class="movie-genre">Drama</p>
+                    <p class="movie-description">A group of boys at Welton Academy discover the transformative power of poetry through their enigmatic English teacher.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="gameModal">
+            <div class="modal-content">
+                <span class="modal-close" id="gameModalClose">&times;</span>
+                <h3>Steam Profile</h3>
+                
+                <!-- Steam信息 -->
+                <div class="modal-steam-profile" id="modalSteamProfile">
+                    <div class="steam-profile-row">
+                        <div class="steam-profile-avatar">
+                            <div class="skeleton-rect" style="width: 60px; height: 60px;"></div>
+                        </div>
+                        <div class="steam-profile-info">
+                            <div class="skeleton-rect" style="width: 120px; height: 20px; margin-bottom: 8px;"></div>
+                            <div class="skeleton-rect" style="width: 80px; height: 16px;"></div>
+                        </div>
+                    </div>
+                    <div class="steam-profile-divider"></div>
+                    <div class="steam-profile-stats">
+                        <div class="skeleton-rect" style="width: 100px; height: 16px;"></div>
+                        <div class="skeleton-rect" style="width: 100px; height: 16px;"></div>
+                    </div>
+                    <div class="steam-profile-actions">
+                        <div class="skeleton-rect" style="width: 100%; height: 36px;"></div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
         <footer>
             <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
         </footer>
@@ -3955,7 +4520,7 @@
     <main id="groups-page" class="page">
         <section class="groups-section">
             <h1 class="groups-title">US</h1>
-            <p class="groups-subtitle">Join our community</p>
+            <p class="groups-subtitle">THIS IS US</p>
             
             <div class="kook-widget-container">
                 <h2 class="widget-title">Kook Community</h2>
@@ -4352,6 +4917,7 @@
             
             if (page === 'me') {
                 loadSteamData();
+                setupMePageEvents();
             }
             
             // 根据页面调整header样式
@@ -4384,6 +4950,151 @@
                 } else {
                     backLink.style.display = 'flex';
                 }
+            }
+        }
+
+        // ME页面按钮事件处理
+        function setupMePageEvents() {
+            // GAME按钮 - 打开弹窗
+            const gameBtn = document.getElementById('gameBtn');
+            const gameModal = document.getElementById('gameModal');
+            const gameModalClose = document.getElementById('gameModalClose');
+
+            if (gameBtn && gameModal) {
+                gameBtn.addEventListener('click', async () => {
+                    gameModal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                    
+                    // 加载Steam信息到弹窗
+                    const modalSteamProfile = document.getElementById('modalSteamProfile');
+                    if (modalSteamProfile) {
+                        modalSteamProfile.innerHTML = '<div class="skeleton-loader" style="width: 100%; height: 200px; display: block;"></div>';
+                        
+                        try {
+                            const profile = await fetchSteamProfile();
+                            const gamesData = await fetchSteamGames();
+                            
+                            if (profile) {
+                                const status = getPersonaStatus(profile.personastate);
+                                const creationDate = new Date(profile.timecreated * 1000);
+                                const memberSince = creationDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                
+                                let totalPlaytime = 0;
+                                let gamesCount = 0;
+                                if (gamesData && gamesData.games) {
+                                    gamesCount = gamesData.games.length;
+                                    totalPlaytime = gamesData.games.reduce((sum, game) => sum + (game.playtime_forever || 0), 0);
+                                }
+                                const totalPlaytimeHours = Math.round(totalPlaytime / 60);
+                                
+                                const profileUrl = profile.profileurl || '#';
+                                
+                                modalSteamProfile.innerHTML = `
+                                    <div class="steam-profile-row">
+                                        <div class="steam-profile-avatar">
+                                            <img src="${profile.avatarfull}" alt="${profile.personaname}">
+                                        </div>
+                                        <div class="steam-profile-info">
+                                            <h4>${profile.personaname}</h4>
+                                            <div class="steam-profile-status">
+                                                <span class="status-indicator ${status.class}"></span>
+                                                ${status.text}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="steam-profile-divider"></div>
+                                    <div class="steam-profile-stats">
+                                        <div class="steam-profile-stat">
+                                            <strong>${gamesCount}</strong> Games Owned
+                                        </div>
+                                        <div class="steam-profile-stat">
+                                            <strong>${totalPlaytimeHours}</strong> Hours Played
+                                        </div>
+                                    </div>
+                                    <div class="steam-profile-divider"></div>
+                                    <div class="steam-profile-stat">
+                                        Member since ${memberSince}
+                                    </div>
+                                    <div class="steam-profile-actions">
+                                        <a href="${profileUrl}" target="_blank" class="steam-profile-btn">
+                                            View Steam Profile
+                                        </a>
+                                    </div>
+                                `;
+                            } else {
+                                modalSteamProfile.innerHTML = '<p style="text-align: center; color: var(--text-secondary); margin: 16px 0;">Failed to load Steam profile</p>';
+                            }
+                        } catch (error) {
+                            modalSteamProfile.innerHTML = '<p>Failed to load Steam profile</p>';
+                        }
+                    }
+                });
+            }
+
+            if (gameModalClose && gameModal) {
+                gameModalClose.addEventListener('click', () => {
+                    gameModal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            }
+
+            // 点击弹窗外部关闭
+            if (gameModal) {
+                gameModal.addEventListener('click', (e) => {
+                    if (e.target === gameModal) {
+                        gameModal.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+
+            // FAVOURITE MOVIE按钮 - 打开电影弹窗
+            const favouriteMovieBtn = document.getElementById('favouriteMovie');
+            const movieModal = document.getElementById('movieModal');
+            const movieModalClose = document.getElementById('movieModalClose');
+
+            if (favouriteMovieBtn && movieModal) {
+                favouriteMovieBtn.addEventListener('click', () => {
+                    movieModal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
+            }
+
+            if (movieModalClose && movieModal) {
+                movieModalClose.addEventListener('click', () => {
+                    movieModal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            }
+
+            // 点击电影弹窗外部关闭
+            if (movieModal) {
+                movieModal.addEventListener('click', (e) => {
+                    if (e.target === movieModal) {
+                        movieModal.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+
+            // RANDOM按钮 - 获取随机笑话
+            const randomBtn = document.getElementById('randomBtn');
+            const randomJoke = document.getElementById('randomJoke');
+
+            if (randomBtn && randomJoke) {
+                randomBtn.addEventListener('click', async () => {
+                    try {
+                        const response = await fetch('https://icanhazdadjoke.com/', {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        const data = await response.json();
+                        randomJoke.textContent = data.joke;
+                    } catch (error) {
+                        randomJoke.textContent = 'Failed to fetch joke. Please try again.';
+                    }
+                });
             }
         }
 
@@ -4880,8 +5591,10 @@
                 `;
             }
 
-            if (detailsEl) {
-                detailsEl.innerHTML = `
+
+
+        if (detailsEl) {
+            detailsEl.innerHTML = `
                     <div class="steam-detail-item">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
