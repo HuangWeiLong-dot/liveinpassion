@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LIVEINPASSION</title>
+    <link rel="icon" type="image/png" href="favicon.png" sizes="192x192">
+    <link rel="apple-touch-icon" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -263,17 +265,20 @@
 
         .hero-image img.hero-img {
             opacity: 0;
-            filter: blur(20px);
-            transform: scale(1.1);
+            z-index: 1;
         }
 
         .hero-image img.hero-img.active {
             opacity: 1;
-            filter: blur(0);
-            transform: scale(1);
+            z-index: 2;
         }
 
-        .hero-image img.hero-img.loaded {
+        .hero-image img.hero-img.active.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .hero-image img.hero-img.active.loaded {
             filter: blur(0);
             transform: scale(1);
         }
@@ -5862,24 +5867,28 @@
                 const compressedSrc = img.dataset.src;
                 const fullSrc = img.dataset.fullSrc;
 
-                img.classList.remove('blur-placeholder');
-
                 const compressedImg = new Image();
                 compressedImg.onload = () => {
+                    requestAnimationFrame(() => {
+                        img.src = compressedSrc;
+                        img.classList.add('blur-placeholder');
+                        if (heroSkeleton) heroSkeleton.classList.add('hidden');
+                        
+                        const hasActive = document.querySelector('.hero-image .hero-img.active');
+                        if (!hasActive) {
+                            img.classList.add('active');
+                            currentHeroIndex = index;
+                        }
+                    });
+
                     const fullImg = new Image();
                     fullImg.onload = () => {
                         heroLoadedFlags[index] = true;
                         
                         requestAnimationFrame(() => {
                             img.src = fullSrc;
+                            img.classList.remove('blur-placeholder');
                             img.classList.add('loaded');
-
-                            if (!heroLoadedFlags.includes(true) || heroLoadedFlags.slice(0, index).every(f => !f)) {
-                                if (heroSkeleton) heroSkeleton.classList.add('hidden');
-                                heroImages.forEach(h => h.classList.remove('active'));
-                                img.classList.add('active');
-                                currentHeroIndex = index;
-                            }
 
                             if (heroLoadedFlags.every(f => f) && !heroRotationStarted) {
                                 heroRotationStarted = true;
@@ -5895,11 +5904,19 @@
                 if (!heroRotationStarted) return;
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
                 if (heroLoadedFlags[nextIndex]) {
+                    const currentImg = heroImages[currentHeroIndex];
+                    const nextImg = heroImages[nextIndex];
+                    
                     requestAnimationFrame(() => {
-                        heroImages[currentHeroIndex].classList.remove('active');
-                        currentHeroIndex = nextIndex;
-                        heroImages[currentHeroIndex].classList.add('active');
+                        currentImg.classList.remove('active');
                     });
+                    
+                    setTimeout(() => {
+                        requestAnimationFrame(() => {
+                            currentHeroIndex = nextIndex;
+                            nextImg.classList.add('active');
+                        });
+                    }, 400);
                 }
             }
 

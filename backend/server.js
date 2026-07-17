@@ -2,13 +2,25 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const https = require('https');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const ALIST_URL = process.env.ALIST_URL || 'http://localhost:5244';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Alist reverse proxy
+app.use('/movies', createProxyMiddleware({
+    target: ALIST_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/movies': '' },
+    onProxyRes: function (proxyRes, req, res) {
+        proxyRes.headers['X-Proxy-By'] = 'liveinpassion-backend';
+    }
+}));
 
 // Steam API endpoint
 app.get('/api/steam/profile', (req, res) => {

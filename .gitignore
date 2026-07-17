@@ -1,0 +1,8 @@
+backend/.env
+backend/node_modules/
+
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*.tmp
