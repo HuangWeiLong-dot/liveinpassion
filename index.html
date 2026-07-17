@@ -266,11 +266,13 @@
         .hero-image img.hero-img {
             opacity: 0;
             z-index: 1;
+            transition: none;
         }
 
         .hero-image img.hero-img.active {
             opacity: 1;
             z-index: 2;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.8s ease;
         }
 
         .hero-image img.hero-img.active.blur-placeholder {
@@ -283,7 +285,7 @@
             transform: scale(1);
         }
 
-        .hero-image:hover img {
+        .hero-image:hover img.hero-img.active {
             transform: scale(1.02);
         }
 
@@ -5904,19 +5906,11 @@
                 if (!heroRotationStarted) return;
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
                 if (heroLoadedFlags[nextIndex]) {
-                    const currentImg = heroImages[currentHeroIndex];
-                    const nextImg = heroImages[nextIndex];
-                    
                     requestAnimationFrame(() => {
-                        currentImg.classList.remove('active');
+                        heroImages[currentHeroIndex].classList.remove('active');
+                        currentHeroIndex = nextIndex;
+                        heroImages[currentHeroIndex].classList.add('active');
                     });
-                    
-                    setTimeout(() => {
-                        requestAnimationFrame(() => {
-                            currentHeroIndex = nextIndex;
-                            nextImg.classList.add('active');
-                        });
-                    }, 400);
                 }
             }
 
