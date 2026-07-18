@@ -244,9 +244,12 @@
             min-height: 300px;
             aspect-ratio: 16/10;
             overflow: hidden;
-            opacity: 0;
-            animation: fadeInUp 1s ease 0.4s forwards;
-            will-change: transform, opacity;
+            position: relative;
+        }
+
+        .hero-image .skeleton-loader {
+            opacity: 1;
+            animation: skeleton-loading 1.5s ease-in-out infinite;
         }
 
         .hero-image img {
@@ -325,12 +328,22 @@
             position: relative;
             overflow: hidden;
             cursor: pointer;
-            opacity: 1;
+            transform: translateX(-100px);
+            opacity: 0;
             transition: opacity 0.8s ease, transform 0.8s ease;
             will-change: transform, opacity;
             backface-visibility: hidden;
             width: 100%;
             aspect-ratio: 1;
+        }
+
+        .gallery-item:nth-child(even) {
+            transform: translateX(100px);
+        }
+
+        .gallery-item.visible {
+            opacity: 1;
+            transform: translateX(0);
         }
 
         .gallery-item-image {
@@ -341,17 +354,39 @@
             overflow: hidden;
         }
 
-        .gallery-item:nth-child(odd) {
-            transform: translateX(-100px);
-        }
-
-        .gallery-item:nth-child(even) {
-            transform: translateX(100px);
-        }
-
-        .gallery-item.visible {
+        .gallery-item .skeleton-loader {
             opacity: 1;
-            transform: translateX(0);
+            animation: skeleton-loading 1.5s ease-in-out infinite;
+            z-index: 10;
+        }
+
+        .gallery-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.8s ease, transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease;
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            z-index: 2;
+            will-change: transform, opacity, filter;
+        }
+
+        .gallery-item.has-image img {
+            opacity: 1;
+        }
+
+        .gallery-item img.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .gallery-item img.loaded {
+            filter: blur(0);
+            transform: scale(1);
         }
 
         .gallery-item::before {
@@ -375,30 +410,6 @@
 
         .gallery-item.wide::before {
             padding-top: 75%;
-        }
-
-        .gallery-item img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.5s ease;
-            backface-visibility: hidden;
-            transform: translateZ(0);
-            z-index: 2;
-            will-change: transform, opacity, filter;
-        }
-
-        .gallery-item img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .gallery-item img.loaded {
-            filter: blur(0);
-            transform: scale(1);
         }
 
         /* Skeleton Loader */
@@ -5307,12 +5318,12 @@
                              parent?.parentElement?.querySelector('.skeleton-loader');
 
             if (skeleton) skeleton.classList.remove('hidden');
-            if (parent) parent.classList.add('visible');
 
             const completeLoad = (src, isCompressed = false) => {
                 requestAnimationFrame(() => {
                     img.src = src;
                     if (skeleton) skeleton.classList.add('hidden');
+                    if (parent) parent.classList.add('has-image');
 
                     if (!isCompressed) {
                         img.classList.remove('blur-placeholder');
@@ -5874,7 +5885,10 @@
                     requestAnimationFrame(() => {
                         img.src = compressedSrc;
                         img.classList.add('blur-placeholder');
-                        if (heroSkeleton) heroSkeleton.classList.add('hidden');
+                        
+                        if (heroSkeleton && !heroSkeleton.classList.contains('hidden')) {
+                            heroSkeleton.classList.add('hidden');
+                        }
                         
                         const hasActive = document.querySelector('.hero-image .hero-img.active');
                         if (!hasActive) {
@@ -5897,7 +5911,19 @@
                             }
                         });
                     };
+                    fullImg.onerror = () => {
+                        heroLoadedFlags[index] = true;
+                        if (heroLoadedFlags.every(f => f) && !heroRotationStarted) {
+                            heroRotationStarted = true;
+                        }
+                    };
                     fullImg.src = fullSrc;
+                };
+                compressedImg.onerror = () => {
+                    const hasActive = document.querySelector('.hero-image .hero-img.active');
+                    if (!hasActive && index < heroImages.length - 1) {
+                        heroImages[index + 1]?.click();
+                    }
                 };
                 compressedImg.src = compressedSrc;
             });
