@@ -250,31 +250,29 @@
         .hero-image .skeleton-loader {
             opacity: 1;
             animation: skeleton-loading 1.5s ease-in-out infinite;
+            z-index: 1;
         }
 
-        .hero-image img {
+        .hero-image img.hero-img {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.8s ease;
-            backface-visibility: hidden;
-            transform: translateZ(0);
             position: absolute;
             top: 0;
             left: 0;
             opacity: 0;
-            will-change: transform, opacity, filter;
-        }
-
-        .hero-image img.hero-img {
-            opacity: 0;
             z-index: 1;
+            visibility: hidden;
             transition: none;
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            will-change: transform, opacity, filter;
         }
 
         .hero-image img.hero-img.active {
             opacity: 1;
             z-index: 2;
+            visibility: visible;
             transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.8s ease;
         }
 
@@ -357,7 +355,7 @@
         .gallery-item .skeleton-loader {
             opacity: 1;
             animation: skeleton-loading 1.5s ease-in-out infinite;
-            z-index: 10;
+            z-index: 1;
         }
 
         .gallery-item img {
@@ -375,7 +373,7 @@
             will-change: transform, opacity, filter;
         }
 
-        .gallery-item.has-image img {
+        .gallery-item.has-image img:not(.toggle-img) {
             opacity: 1;
         }
 
@@ -640,25 +638,23 @@
             height: 100%;
             object-fit: cover;
             opacity: 0;
-            transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: none;
             transform: scale(1.02);
             backface-visibility: hidden;
             will-change: opacity, transform;
         }
 
-        .toggle-img.active {
+        .toggle-img.active.blur-placeholder {
             opacity: 1;
-            transform: scale(1);
-        }
-
-        .toggle-img.blur-placeholder {
             filter: blur(20px);
             transform: scale(1.1);
+            transition: filter 0.5s ease, transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
-        .toggle-img.loaded {
-            filter: blur(0);
+        .toggle-img.active.loaded {
+            opacity: 1;
             transform: scale(1);
+            transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease;
         }
 
         .lightbox {
@@ -4196,7 +4192,7 @@
         }
     </style>
 </head>
-<body>
+<body class="no-scroll">
     <header id="header">
         <div class="header-left">
             <span class="back-link" style="display: none;" id="backLink">
@@ -5833,18 +5829,22 @@
             body.classList.add('no-scroll');
             
             const hideLoader = () => {
-                if (loader) {
+                if (loader && !loader.classList.contains('hidden')) {
                     loader.classList.add('hidden');
-                    body.classList.remove('no-scroll');
+                    
+                    const onTransitionEnd = () => {
+                        loader.removeEventListener('transitionend', onTransitionEnd);
+                        body.classList.remove('no-scroll');
+                    };
+                    
+                    loader.addEventListener('transitionend', onTransitionEnd);
                 }
             };
             
             setTimeout(hideLoader, 2500);
 
             window.addEventListener('load', () => {
-                if (loader && !loader.classList.contains('hidden')) {
-                    hideLoader();
-                }
+                hideLoader();
             });
 
             // Handle browser back/forward
@@ -5872,6 +5872,7 @@
             // Hero image auto toggle
             let currentHeroIndex = 0;
             let heroRotationStarted = false;
+            let isHeroTransitioning = false;
             const heroImages = document.querySelectorAll('.hero-image .hero-img');
             const heroSkeleton = document.querySelector('.hero-image .skeleton-loader');
             const heroLoadedFlags = new Array(heroImages.length).fill(false);
@@ -5930,14 +5931,13 @@
 
             function toggleHeroImage() {
                 if (!heroRotationStarted) return;
+                
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
-                if (heroLoadedFlags[nextIndex]) {
-                    requestAnimationFrame(() => {
-                        heroImages[currentHeroIndex].classList.remove('active');
-                        currentHeroIndex = nextIndex;
-                        heroImages[currentHeroIndex].classList.add('active');
-                    });
-                }
+                if (!heroLoadedFlags[nextIndex]) return;
+                
+                heroImages[currentHeroIndex].classList.remove('active');
+                currentHeroIndex = nextIndex;
+                heroImages[currentHeroIndex].classList.add('active');
             }
 
             const heroIntervalId = setInterval(toggleHeroImage, 5000);
@@ -6012,7 +6012,10 @@
                     toggleItems.forEach(item => {
                         const imgs = item.querySelectorAll('.toggle-img');
                         if (imgs.length === 2 && imgs[0].classList.contains('loaded') && imgs[1].classList.contains('loaded')) {
-                            imgs.forEach(img => img.classList.toggle('active'));
+                            const currentActive = item.querySelector('.toggle-img.active');
+                            const nextImg = currentActive === imgs[0] ? imgs[1] : imgs[0];
+                            currentActive.classList.remove('active');
+                            nextImg.classList.add('active');
                         }
                     });
                 }, 3000);
