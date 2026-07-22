@@ -235,11 +235,8 @@
         }
 
         .hero-image {
-            margin-top: 48px;
             width: 100%;
-            max-width: 900px;
-            min-height: 300px;
-            aspect-ratio: 16/10;
+            height: 100%;
             overflow: hidden;
             position: relative;
         }
@@ -3920,12 +3917,20 @@
                 gap: 32px;
             }
 
-            .me-center {
+            .me-right {
                 grid-column: span 2;
+                flex-direction: row;
+                position: static;
+                min-height: 240px;
             }
 
-            .me-right {
-                position: static;
+            .me-right .me-section-box {
+                border-bottom: none;
+                border-right: 1px solid var(--border-color);
+            }
+
+            .me-right .me-section-box:last-child {
+                border-right: none;
             }
 
             .steam-avatar {
@@ -4097,6 +4102,21 @@
             .me-container {
                 grid-template-columns: 1fr;
                 gap: 32px;
+            }
+
+            .me-right {
+                grid-column: auto;
+                flex-direction: column;
+                min-height: 100%;
+            }
+
+            .me-right .me-section-box {
+                border-bottom: 1px solid var(--border-color);
+                border-right: none;
+            }
+
+            .me-right .me-section-box:last-child {
+                border-bottom: none;
             }
 
             .steam-avatar {
@@ -4767,7 +4787,7 @@
                         <div class="widget-wrapper">
                             <iframe src="https://kookapp.cn/widget?id=3503044378289750&theme=light" width="350" height="500" allowtransparency="true" frameborder="0"></iframe>
                         </div>
-                        <div class="version-number">13</div>
+                        <div class="version-number">13.1</div>
                     </div>
                 </div>
                 
