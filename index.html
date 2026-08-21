@@ -6,9 +6,22 @@
     <title>LIVEINPASSION</title>
     <link rel="icon" type="image/png" href="favicon.png" sizes="192x192">
     <link rel="apple-touch-icon" href="favicon.png">
+
+    <!-- DNS 预解析：为所有 CDN 域名提前完成 DNS 查询（兼容旧浏览器） -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://img.liveinpassion.me">
+
+    <!-- 预连接：提前完成 DNS + TCP + TLS 握手，使后续请求立即发起 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://img.liveinpassion.me">
+
+    <!-- 字体 CSS 非阻塞加载：preload 高优先级拉取，加载完成后转为 stylesheet 应用 -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" onload="this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap">
+    </noscript>
 
     <style>
         :root {
@@ -78,6 +91,14 @@
             letter-spacing: 0.2em;
             text-transform: uppercase;
             color: var(--text-primary);
+        }
+
+        @media (max-width: 768px) {
+            .loader-text {
+                font-size: clamp(1.4rem, 6.5vw, 2.6rem);
+                letter-spacing: 0.14em;
+                padding: 0 5vw;
+            }
         }
 
         * {
@@ -212,7 +233,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 80px 64px 0 64px;
+            padding: 180px 64px 0 64px;
             text-align: center;
         }
 
@@ -310,7 +331,6 @@
             width: 100%;
             height: 100%;
             backface-visibility: hidden;
-            border-radius: 8px;
             overflow: hidden;
         }
 
@@ -347,6 +367,21 @@
         .hero-flip-text p:nth-child(2) { animation-delay: 0.2s; }
         .hero-flip-text p:nth-child(3) { animation-delay: 0.3s; }
         .hero-flip-text p:nth-child(4) { animation-delay: 0.4s; }
+
+        /* 1080p 分辨率视口下缩小 Hero 内容，防止溢出产生右侧滚动条 */
+        /* 估算：默认 Hero 内容约 977px，1080p 最大化浏览器视口约 937px → 溢出约 40px */
+        /* 基础 .hero 已设 overflow:hidden 作为结构性防御，此处进一步缩减内容确保无裁剪 */
+        @media (max-height: 1080px) and (min-width: 801px) {
+            .hero {
+                padding: 120px 64px 0 64px;
+                overflow: hidden;
+            }
+
+            .hero-flip-card {
+                margin-top: 24px;
+                max-width: 750px;
+            }
+        }
 
         .gallery-section {
             padding: 80px 64px 120px;
@@ -868,7 +903,7 @@
 
         .me-container {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: 2fr 1fr;
             gap: 32px;
             align-items: stretch;
         }
@@ -877,13 +912,6 @@
             display: flex;
             flex-direction: column;
             gap: 16px;
-        }
-
-        .me-center {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
         }
 
         /* 个人信息卡片 */
@@ -939,6 +967,17 @@
             letter-spacing: 0.25em;
             text-transform: uppercase;
             margin: 0;
+            font-weight: 500;
+        }
+
+        .me-last-update {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin: 0;
+            opacity: 0.55;
             font-weight: 500;
         }
 
@@ -1202,6 +1241,57 @@
             transform: scale(1.08);
         }
 
+        /* MORE / GALLERY 按钮：随机背景图（JS 动态切换 gallery 图片） */
+        .me-more-box, .me-gallery-box {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .me-more-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transform: scale(1);
+            transition: transform 0.6s ease, opacity 0.6s ease;
+            z-index: 0;
+            opacity: 0;
+        }
+
+        .me-more-bg.loaded {
+            opacity: 1;
+        }
+
+        .me-more-box::before, .me-gallery-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1;
+        }
+
+        .me-more-box span, .me-gallery-box span {
+            position: relative;
+            z-index: 2;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .me-more-box:hover::before, .me-gallery-box:hover::before {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .me-more-box:hover .me-more-bg, .me-gallery-box:hover .me-more-bg {
+            transform: scale(1.08);
+        }
+
         /* 电影弹窗样式 */
         .movie-modal-content {
             background: transparent;
@@ -1277,14 +1367,10 @@
             .me-section {
                 padding: 100px 32px 80px;
             }
-            
+
             .me-container {
                 grid-template-columns: 1fr;
                 gap: 24px;
-            }
-
-            .me-center {
-                grid-column: span 1;
             }
         }
 
@@ -1382,6 +1468,255 @@
             max-width: 500px;
             width: 90%;
             position: relative;
+        }
+
+        /* ME GALLERY 月份选择器 */
+        .me-gallery-months {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-bottom: 12px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .me-gallery-months::-webkit-scrollbar {
+            display: none;
+        }
+
+        .me-gallery-month-btn {
+            flex-shrink: 0;
+            padding: 6px 0;
+            border: none;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            opacity: 0.5;
+        }
+
+        .me-gallery-month-btn:hover {
+            opacity: 1;
+        }
+
+        .me-gallery-month-btn.active {
+            opacity: 1;
+            border-bottom-color: var(--text-primary);
+        }
+
+        .me-gallery-month-btn .month-count {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-left: 4px;
+        }
+
+        /* ME GALLERY 网格：展示个人照片 */
+        .me-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .me-gallery-item {
+            position: relative;
+            aspect-ratio: 1;
+            overflow: hidden;
+            background: var(--background-secondary);
+        }
+
+        .me-gallery-item .skeleton-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: 0;
+            border-radius: 0;
+            z-index: 2;
+            animation: none;
+            background: var(--border);
+            opacity: 1;
+            transition: opacity 0.3s ease-out;
+        }
+
+        /* loadImage 通过 .hidden 隐藏骨架屏，需更高特异性覆盖上面的 opacity:1 */
+        .me-gallery-item .skeleton-loader.hidden {
+            opacity: 0;
+        }
+
+        .me-gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+            opacity: 0;
+            position: relative;
+            z-index: 1;
+            transition: opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease;
+        }
+
+        /* 压缩图加载完成后显示（与 loadImage 的 has-image 一致） */
+        .me-gallery-item.has-image img {
+            opacity: 1;
+        }
+
+        .me-gallery-item img.blur-placeholder {
+            filter: blur(20px);
+            transform: scale(1.1);
+        }
+
+        .me-gallery-item img.loaded {
+            opacity: 1;
+            filter: blur(0);
+            transform: scale(1);
+        }
+
+        .me-gallery-date {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            color: #fff;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            z-index: 2;
+            text-align: center;
+        }
+
+        @media (max-width: 800px) {
+            .me-gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 6px;
+            }
+        }
+
+        /* 照片灯箱 */
+        .me-photo-lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.92);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+        }
+
+        .me-photo-lightbox.active {
+            display: flex;
+        }
+
+        .me-photo-lightbox-thumb {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1.04);
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            filter: blur(20px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 0;
+        }
+
+        .me-photo-lightbox-thumb.active {
+            opacity: 1;
+        }
+
+        .me-photo-lightbox-full {
+            position: relative;
+            z-index: 1;
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+            cursor: default;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .me-photo-lightbox-full.loaded {
+            opacity: 1;
+        }
+
+        .me-photo-lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: #fff;
+            cursor: pointer;
+            z-index: 10001;
+            line-height: 1;
+        }
+
+        /* KOOK 弹窗：承载 iframe widget */
+        .modal-content.kook-modal-content {
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 48px 32px 32px;
+            text-align: center;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .modal-content.kook-modal-content::-webkit-scrollbar {
+            width: 0;
+            display: none;
+        }
+
+        .kook-modal-title {
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            margin: 0 0 24px 0;
+            color: var(--text-primary);
+        }
+
+        .kook-widget-wrapper {
+            display: flex;
+            justify-content: center;
+            padding: 16px;
+            background: var(--background-secondary);
+            margin: 0 auto 16px;
+            max-width: 400px;
+        }
+
+        .kook-widget-wrapper iframe {
+            width: 100%;
+            max-width: 350px;
+            border-radius: 0;
+        }
+
+        /* GALLERY 弹窗：覆盖默认 modal-content 的窄宽度，承载完整画廊内容 */
+        .gallery-page-body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 48px 48px 32px;
+        }
+
+        .gallery-page-body .gallery-title {
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .gallery-page-body .gallery-subtitle {
+            text-align: center;
+            margin-bottom: 32px;
         }
 
         .modal-close {
@@ -1971,6 +2306,7 @@
             padding: 32px;
             background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
             color: white;
+            z-index: 20;
         }
 
         .blog-card-date {
@@ -2101,9 +2437,7 @@
         }
 
         .scroll-arrow.hidden {
-            opacity: 0;
-            pointer-events: none;
-            visibility: hidden;
+            display: none;
         }
 
         .friend-card {
@@ -3892,7 +4226,7 @@
             }
 
             .hero {
-                padding: 80px 32px 0 32px;
+                padding: 140px 32px 0 32px;
             }
 
             .gallery-section {
@@ -3913,12 +4247,11 @@
             }
 
             .me-container {
-                grid-template-columns: 1fr 1fr;
-                gap: 32px;
+                grid-template-columns: 1fr;
+                gap: 24px;
             }
 
             .me-right {
-                grid-column: span 2;
                 flex-direction: row;
                 position: static;
                 min-height: 240px;
@@ -4177,6 +4510,11 @@
                 font-size: 2.5rem;
             }
 
+            /* 移动端 GALLERY 页面：内边距适配 */
+            .gallery-page-body {
+                padding: 32px 16px 24px;
+            }
+
             .blog-post {
                 padding: 20px;
             }
@@ -4402,12 +4740,11 @@
                 </svg>
                 Back
             </span>
-            <a href="#" class="logo" onclick="navigateTo('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); return false;">LIVEINPASSION</a>
+            <a href="#" class="logo" onclick="navigateTo('home'); return false;">LIVEINPASSION</a>
         </div>
         <nav>
             <a href="#" onclick="navigateTo('home'); return false;">HOME</a>
             <a href="#" onclick="navigateTo('blogs'); return false;">BLOGS</a>
-            <a href="#" onclick="navigateTo('friends'); return false;">GALLERY</a>
             <a href="#" onclick="navigateTo('me'); return false;" id="meNavLink">ME</a>
         </nav>
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
@@ -4432,9 +4769,7 @@
                     <div class="hero-flip-front">
                         <div class="hero-image">
                             <div class="skeleton-loader"></div>
-                            <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="hero-img">
-                            <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/2.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/2.jpg" alt="Hero Image" class="hero-img">
-                            <img src="" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/3.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/3.jpg" alt="Hero Image" class="hero-img">
+                            <img src="" decoding="async" data-src="https://img.liveinpassion.me/hero_photos/hero_photos_compressed/1.jpg" data-full-src="https://img.liveinpassion.me/hero_photos/1.jpg" alt="Hero Image" class="hero-img">
                         </div>
                     </div>
                     <div class="hero-flip-back">
@@ -4469,6 +4804,18 @@
             <p class="gallery-subtitle">Stories and reflections from the journey</p>
             
             <div class="blog-grid">
+                <article class="blog-card" onclick="navigateTo('blog-detail-5')">
+                    <div class="blog-card-image">
+                        <div class="skeleton-loader"></div>
+                        <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/5.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">AUGUST 21, 2026</span>
+                        <h3 class="blog-card-title">BEFORE HEADING OUT</h3>
+                        <span class="blog-card-read">READ</span>
+                    </div>
+                </article>
+
                 <article class="blog-card" onclick="navigateTo('blog-detail-4')">
                     <div class="blog-card-image">
                         <div class="skeleton-loader"></div>
@@ -4673,43 +5020,44 @@
         </footer>
     </main>
 
-    <main id="friends-page" class="page">
-        <section class="gallery-section">
-            <h1 class="gallery-title">GALLERY</h1>
-            <p class="gallery-subtitle">A collection of moments captured through time</p>
-            
-            <!-- 特色内容区域 -->
-            <div class="gallery-featured">
-                <div class="gallery-featured-large" onclick="navigateTo('friend-groupphotos')">
-                    <div class="gallery-featured-image" style="position: relative;">
-                        <div class="skeleton-loader"></div>
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_0.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_0.jpg" alt="Group Photos" class="blur-placeholder group-featured-img active">
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_4.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_4.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_8.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_8.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_12.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_12.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
-                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_16.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_16.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
-                    </div>
-                    <div class="gallery-featured-overlay">
-                        <h3>GROUP PHOTOS</h3>
-                        <span class="gallery-featured-count">26 photos</span>
-                    </div>
-                </div>
+    <main id="blog-detail-5-page" class="page">
+        <section class="blog-detail">
+            <div class="blog-meta">
+                <span class="blog-date">August 21, 2026</span>
+                <span>·</span>
+                <span>4 min read</span>
             </div>
-            
-            <!-- 朋友画廊区域 -->
-            <div class="gallery-friends-section">
-                <h2 class="gallery-section-title">PERSONAL GALLERIES</h2>
-                <div class="gallery-friends-container">
-                    <button class="scroll-arrow left" id="friendsScrollLeft" onclick="scrollFriends(-300)">‹</button>
-                    <div class="gallery-friends-scroll" id="friendsScrollContainer">
-                        <div class="gallery-friends-grid" id="friendsGridContainer">
-                            <!-- 朋友头像将通过 JavaScript 动态生成 -->
-                        </div>
-                    </div>
-                    <button class="scroll-arrow right" id="friendsScrollRight" onclick="scrollFriends(300)">›</button>
-                </div>
+            <h1 class="blog-detail-title">Before Heading Out</h1>
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
+                <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/5.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>A year. That's how long I've been away from school. People kept asking when I'd go back, like it was only about a date. It wasn't — it was about whether the version of me that left could still fit into the desk I left behind.</p>
+                <h2>What school never taught me</h2>
+                <p>A year away will teach you more than four years in. Some lessons only land when you're alone with them — no syllabus, no grade. Nobody teaches you how to sit with yourself when the noise stops, what to do at 3 a.m. when you're the only one awake in your own head. The hardest classes aren't the ones you register for — they're the ones life enrolls you in, and there's no dropping them.</p>
+                <blockquote>The things that change you the most are the things no one thought to warn you about.</blockquote>
+                <h2>Loneliness</h2>
+                <p>It's not the movie version — no rain on the window. It's quieter: eating alone because everyone's busy, not wanting to ask because you don't want to be the one who always asks. Having things to say and no one to interrupt. The long stretch of evening that should've been shared.</p>
+                <p>And here's something I'm not embarrassed to say out loud: I want a girlfriend. Not as a fix — I learned that the hard way. Someone to be quiet with. Someone to be known by. I spent a long time pretending wanting closeness was a weakness. It's not. But the loneliness taught me I had to learn to be okay alone first — otherwise you don't find a person, you find a place to put the empty.</p>
+                <h2>The mind, and how to keep it</h2>
+                <p>This is the part nobody warned me about either — how thin the line gets between "I'm fine" and "I'm not." How a bad month quietly becomes a bad year. I didn't know I was carrying psychological weight until it started leaking into everything: sleep, appetite, the way I answered my own name. The mind doesn't announce its problems — it normalizes them, until "off" feels like your baseline.</p>
+                <p>What helped wasn't dramatic. Sleep. Sunlight. Honest conversations with people who don't flinch. Knowing the difference between a bad day and a bad season, and the nerve to ask for help when it's the second one. Therapy isn't weakness. Medication isn't failure. Saying "I'm not okay" is the first chapter of getting okay.</p>
+                <blockquote>You can't think your way out of a mind that's unwell. Sometimes you have to let other people hold the flashlight.</blockquote>
+                <h2>Before heading out</h2>
+                <p>So this is the last update before I go back. I'm bringing the year with me — the loneliness, the wanting, the bad weeks, the slow climb back. The things nobody taught me and nobody warned me about. They're the only curriculum that ever stuck.</p>
+                <p>Be brave. Be genuine. Be humble. Take care of your mind — it's the only one you get. And don't be a dick, especially not to yourself.</p>
             </div>
         </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="friends-page" class="page">
+        <!-- 此页面已废弃：GALLERY 现为独立页面 gallery-page（点击 MORE 触发） -->
+        <!-- main 元素保留以兼容 navigateTo 函数的页面查找逻辑 -->
+        <section class="gallery-section"></section>
         <footer>
             <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
         </footer>
@@ -4725,9 +5073,10 @@
                     <!-- 个人信息卡片 -->
                     <div class="me-profile-card">
                         <div class="me-avatar-wrapper">
-                            <img src="avatar/2.jpg" alt="Profile Photo" class="me-avatar">
+                            <img src="avatar/2.jpg" alt="Profile Photo" class="me-avatar" id="meAvatar">
                         </div>
                         <div class="me-info-box">
+                            <p class="me-last-update">LAST UPDATED · <span id="meLastUpdate">AUGUST 21, 2026</span></p>
                             <div class="me-info-top">
                                 <h2 class="me-name">HUANG WEI LONG</h2>
                                 <p class="me-title">DREAMER & IDEALIST</p>
@@ -4757,6 +5106,11 @@
                                         <polyline points="22,6 12,13 2,6"/>
                                     </svg>
                                 </a>
+                                <a href="#" class="social-item" id="kookSocialBtn" title="Kook Community">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C6.486 2 2 6.486 2 12c0 1.8.478 3.487 1.31 4.953L2 22l5.047-1.31A9.96 9.96 0 0012 22c5.514 0 10-4.486 10-10S17.514 2 12 2zm0 18a8 8 0 01-4.072-1.116l-.292-.175-3.008.783.783-3.008-.175-.292A8 8 0 1112 20zm4.4-5.4c-.243-.121-1.434-.708-1.654-.787-.221-.08-.382-.121-.543.121-.161.243-.625.787-.767.95-.141.161-.282.181-.524.060-.243-.121-1.024-.377-1.95-1.204-.721-.643-1.208-1.437-1.349-1.679-.141-.243-.015-.374.106-.495.109-.109.243-.282.364-.423.121-.141.161-.243.243-.404.080-.161.040-.302-.020-.423-.060-.121-.543-1.31-.744-1.793-.196-.470-.395-.406-.543-.413l-.464-.008c-.161 0-.423.060-.645.302-.222.243-.847.828-.847 2.018 0 1.19.868 2.341.989 2.502.121.161 1.706 2.604 4.135 3.65.578.249 1.029.398 1.379.509.579.184 1.104.158 1.52.096.464-.069 1.434-.585 1.635-1.15.201-.565.201-1.05.141-1.15-.060-.099-.221-.16-.464-.281z"/>
+                                    </svg>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -4775,22 +5129,12 @@
                     <!-- GITHUB SNAKE -->
                     <div class="me-github-snake">
                         <div class="snake-title">GITHUB ACTIVITY</div>
-                        <img src="https://raw.githubusercontent.com/HuangWeiLong-dot/liveinpassion/output/github-contribution-grid-snake.gif" 
-                              alt="GitHub Contribution Snake" 
+                        <img src="https://raw.githubusercontent.com/HuangWeiLong-dot/liveinpassion/output/github-contribution-grid-snake.gif"
+                              alt="GitHub Contribution Snake"
                               class="github-snake">
                     </div>
                 </div>
-                
-                <div class="me-center">
-                    <div class="kook-widget-container">
-                        <h2 class="widget-title">Kook Community</h2>
-                        <div class="widget-wrapper">
-                            <iframe src="https://kookapp.cn/widget?id=3503044378289750&theme=light" width="350" height="500" allowtransparency="true" frameborder="0"></iframe>
-                        </div>
-                        <div class="version-number">13.1</div>
-                    </div>
-                </div>
-                
+
                 <div class="me-right">
                     <!-- FAVOURITE MOVIE -->
                     <div class="me-section-box me-movie-box" id="favouriteMovie">
@@ -4803,8 +5147,13 @@
                     </div>
                     
                     <!-- MORE -->
-                    <div class="me-section-box" id="moreSection">
+                    <div class="me-section-box me-more-box" id="moreSection">
+                        <div class="me-more-bg" id="moreSectionBg"></div>
                         <span>MORE</span>
+                    </div>
+                    <div class="me-section-box me-gallery-box" id="meGalleryBtn">
+                        <div class="me-more-bg" id="meGalleryCover"></div>
+                        <span>GALLERY</span>
                     </div>
                 </div>
             </div>
@@ -4868,13 +5217,71 @@
                         <div class="skeleton-rect" style="width: 100%; height: 36px;"></div>
                     </div>
                 </div>
-                
+
             </div>
         </div>
-        
+
+        <!-- KOOK 弹窗（点击 social-item 触发） -->
+        <div class="modal-overlay" id="kookModal">
+            <div class="modal-content kook-modal-content">
+                <span class="modal-close" id="kookModalClose">&times;</span>
+                <h3 class="kook-modal-title">Kook Community</h3>
+                <div class="kook-widget-wrapper">
+                    <iframe src="https://kookapp.cn/widget?id=3503044378289750&theme=light" width="350" height="500" allowtransparency="true" frameborder="0"></iframe>
+                </div>
+                <div class="version-number">13.1</div>
+            </div>
+        </div>
+
         <footer>
             <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
         </footer>
+    </main>
+
+    <!-- GALLERY 独立页面（点击 MORE 触发） -->
+    <main id="gallery-page" class="page">
+        <div class="gallery-page-body">
+            <h1 class="gallery-title">GALLERY</h1>
+            <p class="gallery-subtitle">A collection of moments captured through time</p>
+            <div class="gallery-featured">
+                <div class="gallery-featured-large" onclick="navigateTo('friend-groupphotos');">
+                    <div class="gallery-featured-image" style="position: relative;">
+                        <div class="skeleton-loader"></div>
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_0.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_0.jpg" alt="Group Photos" class="blur-placeholder group-featured-img active">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_4.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_4.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_8.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_8.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_12.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_12.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                        <img src="" data-src="https://img.liveinpassion.me/group_photos/group_photos_compressed/202605_16.jpg" data-full-src="https://img.liveinpassion.me/group_photos/202605_16.jpg" alt="Group Photos" class="blur-placeholder group-featured-img">
+                    </div>
+                    <div class="gallery-featured-overlay">
+                        <h3>GROUP PHOTOS</h3>
+                        <span class="gallery-featured-count">26 photos</span>
+                    </div>
+                </div>
+            </div>
+            <div class="gallery-friends-section">
+                <h2 class="gallery-section-title">PERSONAL GALLERIES</h2>
+                <div class="gallery-friends-container">
+                    <button class="scroll-arrow left" id="friendsScrollLeft" onclick="scrollFriends(-300)">‹</button>
+                    <div class="gallery-friends-scroll" id="friendsScrollContainer">
+                        <div class="gallery-friends-grid" id="friendsGridContainer">
+                            <!-- 朋友头像将通过 JavaScript 动态生成 -->
+                        </div>
+                    </div>
+                    <button class="scroll-arrow right" id="friendsScrollRight" onclick="scrollFriends(300)">›</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MY GALLERY 独立页面（点击 GALLERY 按钮触发） -->
+    <main id="me-gallery-page" class="page">
+        <div class="gallery-page-body">
+            <h1 class="gallery-title">MY GALLERY</h1>
+            <p class="gallery-subtitle">A collection of personal moments</p>
+            <div class="me-gallery-months" id="meGalleryMonths"></div>
+            <div class="me-gallery-grid" id="meGalleryGrid"></div>
+        </div>
     </main>
 
     <!-- 统一的朋友详情页模板 -->
@@ -5045,6 +5452,40 @@
     <script>
         let currentPage = 'home';
         const CDN_BASE = 'https://img.liveinpassion.me';
+        const LOCAL_BASE = 'photos'; // 本地源文件路径前缀
+
+        // 两阶段图片加载：本地秒加载 → CDN 预加载完成后无缝替换
+        // imgEl: <img> 元素, localPath: 本地相对路径, cdnPath: CDN 路径, onReady: 回调
+        function loadImageTwoStage(imgEl, localPath, cdnPath, onReady) {
+            let ready = false;
+            const callReady = () => {
+                if (!ready) { ready = true; if (onReady) onReady(); }
+            };
+            // 阶段1：本地秒加载 → 立即 callReady
+            imgEl.onload = callReady;
+            imgEl.onerror = () => {
+                imgEl.onerror = null;
+                imgEl.onload = callReady;
+                imgEl.src = cdnPath;
+            };
+            imgEl.src = localPath;
+            // 阶段2：后台预加载 CDN，完成后无缝替换（不触发 onReady）
+            const probe = new Image();
+            probe.onload = () => { imgEl.src = cdnPath; };
+            probe.src = cdnPath;
+        }
+
+        // 两阶段背景图加载（用于头像/MORE按钮/GALLERY封面等 background-image）
+        function loadBgTwoStage(el, localPath, cdnPath) {
+            el.style.backgroundImage = "url('" + localPath + "')";
+            el.classList.add('loaded');
+            const probe = new Image();
+            probe.onload = () => {
+                el.style.backgroundImage = "url('" + cdnPath + "')";
+            };
+            probe.onerror = () => {};
+            probe.src = cdnPath;
+        }
         const pageHistory = [];
 
         // 辅助函数：按年份月份排序
@@ -5271,7 +5712,8 @@
                 header.classList.add('centered');
             }
             
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // 瞬时回顶（平滑滚动会拖长导航后的绘制，影响 INP）
+            window.scrollTo({ top: 0 });
             
             // Close menu when navigating
             nav.classList.remove('active');
@@ -5297,7 +5739,11 @@
             
             // 控制朋友滚动箭头的显示
             if (typeof showFriendsScrollArrows === 'function') {
-                showFriendsScrollArrows(page === 'friends');
+                const show = page === 'friends' || page === 'gallery';
+                showFriendsScrollArrows(show);
+                if (show) {
+                    requestAnimationFrame(() => showFriendsScrollArrows(true));
+                }
             }
         }
 
@@ -5447,12 +5893,54 @@
                 });
             }
 
+            // KOOK 按钮（社交栏内）- 打开 Kook 弹窗
+            const kookSocialBtn = document.getElementById('kookSocialBtn');
+            const kookModal = document.getElementById('kookModal');
+            const kookModalClose = document.getElementById('kookModalClose');
+
+            if (kookSocialBtn && kookModal) {
+                kookSocialBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    kookModal.classList.add('active');
+                    document.body.style.overflow = 'hidden';
+                });
+            }
+
+            if (kookModalClose && kookModal) {
+                kookModalClose.addEventListener('click', () => {
+                    kookModal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
+            }
+
+            if (kookModal) {
+                kookModal.addEventListener('click', (e) => {
+                    if (e.target === kookModal) {
+                        kookModal.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+
             // MUSIC按钮 - 打开专辑弹窗
             const musicBtn = document.getElementById('musicBtn');
             if (musicBtn && albumModal) {
                 musicBtn.addEventListener('click', () => {
                     albumModal.classList.add('active');
                     document.body.style.overflow = 'hidden';
+                });
+            }
+
+            // MORE按钮 - 打开 GALLERY 独立页面
+            const moreSectionBtn = document.getElementById('moreSection');
+
+            if (moreSectionBtn) {
+                moreSectionBtn.addEventListener('click', () => {
+                    navigateTo('gallery');
+                    // 等页面渲染后再评估 Personal Gallery 滚动箭头显隐
+                    requestAnimationFrame(() => {
+                        showFriendsScrollArrows(true);
+                    });
                 });
             }
 
@@ -5467,10 +5955,316 @@
                 'The way to get started is to quit talking and begin doing.',
                 'Your time is limited, so don\'t waste it living someone else\'s life.'
             ];
-            
+
             if (quoteText) {
                 quoteText.textContent = quotes[Math.floor(Math.random() * quotes.length)];
             }
+
+            // MORE 按钮随机背景图：从 gallery 图片池随机切换
+            initMoreRandomBackground();
+
+            // GALLERY 按钮：初始化随机封面 + 弹窗事件
+            initMeGallery();
+
+            // 头像：从 Me 照片中随机切换
+            initMeAvatarRotation();
+
+            // GALLERY 按钮 - 打开 Me Gallery 独立页面
+            const meGalleryBtn = document.getElementById('meGalleryBtn');
+
+            if (meGalleryBtn) {
+                meGalleryBtn.addEventListener('click', () => {
+                    navigateTo('me-gallery');
+                    // rAF 保证先绘制出导航后的页面，再用 setTimeout(0) 在下一任务构建网格，
+                    // 避免构建任务抢在点击绘制前执行（降低 Presentation delay / INP）
+                    requestAnimationFrame(() => setTimeout(populateMeGalleryGrid, 0));
+                });
+            }
+        }
+
+        // 头像：从 Me 照片中随机切换
+        let meAvatarLastIndex = -1;
+        function initMeAvatarRotation() {
+            const avatar = document.getElementById('meAvatar');
+            if (!avatar || !mePhotosData || mePhotosData.length === 0) return;
+
+            const pickRandom = () => {
+                let idx;
+                do {
+                    idx = Math.floor(Math.random() * mePhotosData.length);
+                } while (idx === meAvatarLastIndex && mePhotosData.length > 1);
+                meAvatarLastIndex = idx;
+
+                const filename = mePhotosData[idx];
+                const localPath = LOCAL_BASE + '/Me/compressed_me/' + filename;
+                const cdnPath = CDN_BASE + '/Me/compressed_me/' + filename;
+                loadImageTwoStage(avatar, localPath, cdnPath);
+            };
+            pickRandom();
+            setInterval(pickRandom, 5000);
+        }
+
+        // GALLERY 按钮：随机封面 + 网格填充
+        function initMeGallery() {
+            const coverEl = document.getElementById('meGalleryCover');
+            if (!coverEl || !mePhotosData || mePhotosData.length === 0) return;
+
+            const pickRandom = () => {
+                const filename = mePhotosData[Math.floor(Math.random() * mePhotosData.length)];
+                const localPath = LOCAL_BASE + '/Me/compressed_me/' + filename;
+                const cdnPath = CDN_BASE + '/Me/compressed_me/' + filename;
+                loadBgTwoStage(coverEl, localPath, cdnPath);
+            };
+            pickRandom();
+            // 延迟 7s 启动，与头像(5s)/MORE(14s) 错开，避免同时切换
+            setTimeout(() => setInterval(pickRandom, 20000), 7000);
+        }
+
+        // 从文件名提取年月：IMG_20260508_024939.jpg → "2026-05"，202212_0.jpg → "2022-12"
+        function extractYearMonthFromFilename(filename) {
+            const match = filename.match(/(\d{6})/);
+            if (!match) return 'unknown';
+            const d = match[1];
+            return d.substring(0, 4) + '-' + d.substring(4, 6);
+        }
+
+        // 从文件名提取日期：IMG_20260508_024939.jpg → "2026-05-08"
+        function extractDateFromFilename(filename) {
+            const match = filename.match(/(\d{8})/);
+            if (match) {
+                const d = match[1];
+                return d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8);
+            }
+            const match2 = filename.match(/(\d{6})/);
+            if (match2) {
+                const d = match2[1];
+                return d.substring(0, 4) + '-' + d.substring(4, 6);
+            }
+            return '';
+        }
+
+        // 按月份分组照片，返回 { "2026-05": [filename, ...], ... } 降序排列
+        function groupPhotosByMonth(photos) {
+            const groups = {};
+            photos.forEach(filename => {
+                const ym = extractYearMonthFromFilename(filename);
+                if (!groups[ym]) groups[ym] = [];
+                groups[ym].push(filename);
+            });
+            return Object.keys(groups).sort().reverse().reduce((obj, key) => {
+                obj[key] = groups[key];
+                return obj;
+            }, {});
+        }
+
+        let meGalleryMonthGroups = null;
+        let meGalleryMonthCache = {}; // { ym: [itemDomNodes...] }，月份切换时复用，避免重新加载
+
+        function populateMeGalleryGrid() {
+            const monthsContainer = document.getElementById('meGalleryMonths');
+            const grid = document.getElementById('meGalleryGrid');
+            if (!monthsContainer || !grid || !mePhotosData) return;
+
+            // 首次进入：分组 + 渲染月份标签
+            if (!meGalleryMonthGroups) {
+                meGalleryMonthGroups = groupPhotosByMonth(mePhotosData);
+                monthsContainer.innerHTML = '';
+                Object.keys(meGalleryMonthGroups).forEach((ym, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'me-gallery-month-btn' + (index === 0 ? ' active' : '');
+                    btn.dataset.month = ym;
+                    btn.innerHTML = ym + '<span class="month-count">(' + meGalleryMonthGroups[ym].length + ')</span>';
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.me-gallery-month-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        loadMonthPhotos(ym);
+                    });
+                    monthsContainer.appendChild(btn);
+                });
+            }
+
+            // 默认加载最新月份
+            const firstMonth = Object.keys(meGalleryMonthGroups)[0];
+            loadMonthPhotos(firstMonth);
+        }
+
+        // 加载某个月份的照片到网格：分批直接调用 loadImage（与 more/首页一致的直接调用，
+        // 不依赖 IntersectionObserver，避免 observer 未触发导致永久黑块；分批避免一次性请求过多卡顿）
+        function loadMonthPhotos(ym) {
+            const grid = document.getElementById('meGalleryGrid');
+            if (!grid || !meGalleryMonthGroups || !meGalleryMonthGroups[ym]) return;
+
+            // 缓存复用：已显示压缩图（has-image）的项直接显示，未加载的重新分批加载
+            if (meGalleryMonthCache[ym]) {
+                grid.innerHTML = '';
+                const cached = meGalleryMonthCache[ym];
+                const frag = document.createDocumentFragment();
+                cached.forEach(item => frag.appendChild(item));
+                grid.appendChild(frag);
+                const toLoad = cached
+                    .filter(item => {
+                        const img = item.querySelector('img');
+                        return img && !item.classList.contains('has-image');
+                    })
+                    .map(item => item.querySelector('img'));
+                toLoad.forEach(img => { img.dataset.loading = 'false'; });
+                batchLoadMeGallery(toLoad);
+                return;
+            }
+
+            const photos = [...meGalleryMonthGroups[ym]].sort((a, b) => b.localeCompare(a));
+            const items = photos.map((filename) => {
+                const item = document.createElement('div');
+                item.className = 'me-gallery-item';
+
+                const skeleton = document.createElement('div');
+                skeleton.className = 'skeleton-loader';
+                item.appendChild(skeleton);
+
+                const dateLabel = document.createElement('div');
+                dateLabel.className = 'me-gallery-date';
+                dateLabel.textContent = extractDateFromFilename(filename);
+                item.appendChild(dateLabel);
+
+                // data-src=CDN压缩图，data-full-src=CDN原图，与 more 页面一致的两阶段结构
+                const img = document.createElement('img');
+                img.alt = filename;
+                img.className = 'blur-placeholder';
+                img.dataset.src = CDN_BASE + '/Me/compressed_me/' + filename;
+                img.dataset.fullSrc = CDN_BASE + '/Me/' + filename;
+                img.onclick = () => openMePhotoLightbox(img.dataset.fullSrc, img.currentSrc || img.src || img.dataset.src);
+                item.appendChild(img);
+
+                return item;
+            });
+
+            meGalleryMonthCache[ym] = items;
+            grid.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            items.forEach(item => frag.appendChild(item));
+            grid.appendChild(frag);
+
+            // 分批直接调用 loadImage：每批 4 张，间隔 300ms
+            const imgs = items.map(item => item.querySelector('img')).filter(Boolean);
+            batchLoadMeGallery(imgs);
+        }
+
+        // me-gallery 分批加载器：避免一次性发起过多请求导致卡顿
+        function batchLoadMeGallery(imgs) {
+            const BATCH = 4;
+            let cursor = 0;
+            function next() {
+                const batch = imgs.slice(cursor, cursor + BATCH);
+                if (batch.length === 0) return;
+                batch.forEach(img => loadImage(img));
+                cursor += BATCH;
+                setTimeout(next, 300);
+            }
+            next();
+        }
+
+        // 轻量灯箱：点击照片查看原图，加载期间显示缩略图模糊虚拟态
+        function openMePhotoLightbox(url, thumbUrl) {
+            let lightbox = document.getElementById('mePhotoLightbox');
+            if (!lightbox) {
+                lightbox = document.createElement('div');
+                lightbox.id = 'mePhotoLightbox';
+                lightbox.className = 'me-photo-lightbox';
+                lightbox.innerHTML = '<span class="me-photo-lightbox-close">&times;</span><img class="me-photo-lightbox-thumb" alt=""><img class="me-photo-lightbox-full" src="" alt="Full size">';
+                document.body.appendChild(lightbox);
+                lightbox.addEventListener('click', (e) => {
+                    if (e.target === lightbox || e.target.classList.contains('me-photo-lightbox-close')) {
+                        lightbox.classList.remove('active');
+                    }
+                });
+            }
+            const thumb = lightbox.querySelector('.me-photo-lightbox-thumb');
+            const img = lightbox.querySelector('.me-photo-lightbox-full');
+
+            // 模糊虚拟态：用已加载的缩略图居中占位（不占满全屏），原图加载完成前先显示
+            if (thumbUrl) {
+                thumb.src = thumbUrl;
+                thumb.classList.add('active');
+            } else {
+                thumb.removeAttribute('src');
+                thumb.classList.remove('active');
+            }
+
+            img.classList.remove('loaded');
+            img.decoding = 'async';
+            img.onload = () => {
+                // 用 decode() 把大图解码移出主线程，避免点击→绘制被原图同步解码阻塞（INP）
+                const show = () => {
+                    img.classList.add('loaded');
+                    thumb.classList.remove('active');
+                };
+                if (typeof img.decode === 'function') {
+                    img.decode().then(show).catch(show);
+                } else {
+                    show();
+                }
+            };
+            img.onerror = () => {
+                // 原图加载失败时保留模糊虚拟态作为兜底显示
+                img.onerror = null;
+            };
+            img.src = url;
+            lightbox.classList.add('active');
+        }
+
+        // MORE 按钮随机背景图：从 group + personal 图片池随机选并定时切换
+        function initMoreRandomBackground() {
+            const bgEl = document.getElementById('moreSectionBg');
+            if (!bgEl) return;
+
+            // 收集所有 gallery 图片：本地 + CDN 路径
+            const pool = [];
+            if (typeof groupPhotosData !== 'undefined' && groupPhotosData.photos) {
+                groupPhotosData.photos.forEach(p => {
+                    if (p && p.compressed) {
+                        pool.push({
+                            local: LOCAL_BASE + '/' + p.compressed,
+                            cdn: CDN_BASE + '/' + p.compressed
+                        });
+                    }
+                });
+            }
+            if (typeof friendsData !== 'undefined') {
+                friendsData.forEach(f => {
+                    if (f && f.photos) {
+                        f.photos.forEach(p => {
+                            if (p && p.compressed) {
+                                pool.push({
+                                    local: LOCAL_BASE + '/' + p.compressed,
+                                    cdn: CDN_BASE + '/' + p.compressed
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+            if (pool.length === 0) return;
+
+            let currentIndex = -1;
+
+            const pickRandomIndex = () => {
+                if (pool.length === 1) return 0;
+                let next;
+                do {
+                    next = Math.floor(Math.random() * pool.length);
+                } while (next === currentIndex);
+                return next;
+            };
+
+            const applyBackground = () => {
+                const nextIndex = pickRandomIndex();
+                currentIndex = nextIndex;
+                loadBgTwoStage(bgEl, pool[nextIndex].local, pool[nextIndex].cdn);
+            };
+
+            applyBackground();
+            // 延迟 14s 启动，与头像(5s)/GALLERY cover(7s) 错开，避免同时切换
+            setTimeout(() => setInterval(applyBackground, 20000), 14000);
         }
 
         function scrollToSection(sectionId) {
@@ -5505,6 +6299,8 @@
             if (img.classList.contains('loaded') && img.src) return;
 
             img.dataset.loading = 'true';
+            // 解码移出主线程，避免画廊缩略图同步解码阻塞交互（INP）
+            img.decoding = 'async';
 
             const parent = img.parentElement;
             const skeleton = parent?.querySelector('.skeleton-loader') || 
@@ -5714,6 +6510,63 @@
             ]
         };
 
+        // Me 个人照片数据（文件名与 CDN/本地一致，路径前缀 Me/compressed_me 和 Me）
+        const mePhotosData = [
+            '202212_0.jpg', '202605_0.jpg', '202605_1.jpg', '202605_2.jpg',
+            'IMG_20260508_024939.jpg', 'IMG_20260509_000830.jpg', 'IMG_20260510_145157.jpg', 'IMG_20260510_233511.jpg',
+            'IMG_20260524_192732.jpg', 'IMG_20260525_111632_1780235188879edit.jpg', 'IMG_20260528_101324.jpg', 'IMG_20260529_122037.jpg',
+            'IMG_20260529_142133.jpg', 'IMG_20260531_131522.jpg', 'IMG_20260531_232343.jpg', 'IMG_20260602_143416.jpg',
+            'IMG_20260604_000216_1781526387512edit.jpg', 'IMG_20260605_002310.jpg', 'IMG_20260608_073919.jpg', 'IMG_20260608_074147.jpg',
+            'IMG_20260609_211901.jpg', 'IMG_20260609_212745.jpg', 'IMG_20260610_205142.jpg', 'IMG_20260610_205251.jpg',
+            'IMG_20260611_084721_1781246421867edit.jpg', 'IMG_20260612_125119.jpg', 'IMG_20260612_142543.jpg', 'IMG_20260612_143633.jpg',
+            'IMG_20260612_143649.jpg', 'IMG_20260612_155540.jpg', 'IMG_20260613_183112.jpg', 'IMG_20260613_183413.jpg',
+            'IMG_20260614_202742.jpg', 'IMG_20260614_203336.jpg', 'IMG_20260615_194154.jpg', 'IMG_20260616_194549_1781611431447edit.jpg',
+            'IMG_20260616_194610.jpg', 'IMG_20260616_195553.jpg', 'IMG_20260617_202134.jpg', 'IMG_20260617_203446.jpg',
+            'IMG_20260617_203506.jpg', 'IMG_20260618_205308.jpg', 'IMG_20260618_205333.jpg', 'IMG_20260619_195237.jpg',
+            'IMG_20260620_210449.jpg', 'IMG_20260620_210558.jpg', 'IMG_20260620_210807.jpg', 'IMG_20260620_210819.jpg',
+            'IMG_20260620_210831.jpg', 'IMG_20260621_223118.jpg', 'IMG_20260622_221610_1782137860769edit.jpg', 'IMG_20260622_221708.jpg',
+            'IMG_20260623_202159.jpg', 'IMG_20260623_202353.jpg', 'IMG_20260623_202518.jpg', 'IMG_20260623_202536.jpg',
+            'IMG_20260623_202604.jpg', 'IMG_20260623_202622.jpg', 'IMG_20260623_202733.jpg', 'IMG_20260624_213731_1782308408565edit.jpg',
+            'IMG_20260624_213747.jpg', 'IMG_20260625_210456.jpg', 'IMG_20260625_211039.jpg', 'IMG_20260625_211139.jpg',
+            'IMG_20260625_211346.jpg', 'IMG_20260625_211418.jpg', 'IMG_20260626_225610.jpg', 'IMG_20260626_225850.jpg',
+            'IMG_20260627_215507.jpg', 'IMG_20260627_215558.jpg', 'IMG_20260627_215610.jpg', 'IMG_20260627_215622.jpg',
+            'IMG_20260628_215210.jpg', 'IMG_20260628_215238.jpg', 'IMG_20260628_215308.jpg', 'IMG_20260628_215328.jpg',
+            'IMG_20260628_215435.jpg', 'IMG_20260628_215540.jpg', 'IMG_20260628_215621.jpg', 'IMG_20260628_215836.jpg',
+            'IMG_20260628_215848.jpg', 'IMG_20260629_195804.jpg', 'IMG_20260629_195821.jpg', 'IMG_20260629_195844.jpg',
+            'IMG_20260630_201606.jpg', 'IMG_20260701_204933.jpg', 'IMG_20260701_205025.jpg', 'IMG_20260702_192916.jpg',
+            'IMG_20260703_202615.jpg', 'IMG_20260704_225322.jpg', 'IMG_20260704_225414.jpg', 'IMG_20260705_234003.jpg',
+            'IMG_20260706_213228.jpg', 'IMG_20260706_213250.jpg', 'IMG_20260707_210734.jpg', 'IMG_20260708_233558.jpg',
+            'IMG_20260709_225331.jpg', 'IMG_20260709_225343.jpg', 'IMG_20260709_225437.jpg', 'IMG_20260710_212228.jpg',
+            'IMG_20260710_212331.jpg', 'IMG_20260710_212346.jpg', 'IMG_20260711_202944.jpg', 'IMG_20260711_203232.jpg',
+            'IMG_20260711_203335.jpg', 'IMG_20260712_203043.jpg', 'IMG_20260713_205205.jpg', 'IMG_20260714_213921.jpg',
+            'IMG_20260714_221315.jpg', 'IMG_20260715_202454.jpg', 'IMG_20260715_202628.jpg', 'IMG_20260715_202700.jpg',
+            'IMG_20260715_202714.jpg', 'IMG_20260715_202742.jpg', 'IMG_20260716_202225.jpg', 'IMG_20260716_202425.jpg',
+            'IMG_20260717_144259.jpg', 'IMG_20260717_202706.jpg', 'IMG_20260717_230314_1784300604339edit.jpg', 'IMG_20260718_225737_1784388567065edit.jpg',
+            'IMG_20260718_230159.jpg', 'IMG_20260719_201138.jpg', 'IMG_20260719_201416.jpg', 'IMG_20260719_202817.jpg',
+            'IMG_20260719_202835.jpg', 'IMG_20260720_210710.jpg', 'IMG_20260721_184805.jpg', 'IMG_20260721_205503.jpg',
+            'IMG_20260722_205003.jpg', 'IMG_20260722_205956.jpg', 'IMG_20260722_210054.jpg', 'IMG_20260723_202716.jpg',
+            'IMG_20260723_233920.jpg', 'IMG_20260723_233930.jpg', 'IMG_20260724_214835.jpg', 'IMG_20260724_214857.jpg',
+            'IMG_20260724_214917.jpg', 'IMG_20260724_214945.jpg', 'IMG_20260724_215030.jpg', 'IMG_20260724_215819.jpg',
+            'IMG_20260725_204942.jpg', 'IMG_20260725_205022.jpg', 'IMG_20260725_205109.jpg', 'IMG_20260726_203621.jpg',
+            'IMG_20260726_203630.jpg', 'IMG_20260726_203657.jpg', 'IMG_20260726_222022.jpg', 'IMG_20260726_222110.jpg',
+            'IMG_20260726_222134.jpg', 'IMG_20260726_222236.jpg', 'IMG_20260726_222303.jpg', 'IMG_20260726_222349.jpg',
+            'IMG_20260726_222409.jpg', 'IMG_20260726_222447.jpg', 'IMG_20260726_222503.jpg', 'IMG_20260726_222539.jpg',
+            'IMG_20260726_222628.jpg', 'IMG_20260727_205852.jpg', 'IMG_20260728_205836.jpg', 'IMG_20260728_210430.jpg',
+            'IMG_20260728_210714.jpg', 'IMG_20260729_212941.jpg', 'IMG_20260729_213755.jpg', 'IMG_20260729_213930.jpg',
+            'IMG_20260729_214004.jpg', 'IMG_20260729_214102.jpg', 'IMG_20260730_212055.jpg', 'IMG_20260731_203459.jpg',
+            'IMG_20260731_203541.jpg', 'IMG_20260801_212540.jpg', 'IMG_20260801_212609.jpg', 'IMG_20260802_224402.jpg',
+            'IMG_20260802_224956.jpg', 'IMG_20260802_225059.jpg', 'IMG_20260802_225349.jpg', 'IMG_20260802_225409.jpg',
+            'IMG_20260803_210221.jpg', 'IMG_20260803_210336.jpg', 'IMG_20260803_210444.jpg', 'IMG_20260804_125835.jpg',
+            'IMG_20260805_203419.jpg', 'IMG_20260805_204523.jpg', 'IMG_20260806_214257.jpg', 'IMG_20260807_232905.jpg',
+            'IMG_20260807_232921.jpg', 'IMG_20260808_200659.jpg', 'IMG_20260808_200739.jpg', 'IMG_20260809_133245.jpg',
+            'IMG_20260809_223426.jpg', 'IMG_20260809_223451.jpg', 'IMG_20260811_202406.jpg', 'IMG_20260812_233056.jpg',
+            'IMG_20260812_233247.jpg', 'IMG_20260812_233335.jpg', 'IMG_20260813_201403.jpg', 'IMG_20260813_201633.jpg',
+            'IMG_20260813_201724.jpg', 'IMG_20260813_201805.jpg', 'IMG_20260813_201834.jpg', 'IMG_20260813_202133.jpg',
+            'IMG_20260814_202954.jpg', 'IMG_20260814_203039.jpg', 'IMG_20260815_201605.jpg', 'IMG_20260816_204643.jpg',
+            'IMG_20260817_210426.jpg', 'IMG_20260817_210450.jpg', 'IMG_20260817_210600.jpg', 'IMG_20260818_191152.jpg',
+            'IMG_20260819_201100.jpg', 'IMG_20260819_201209.jpg', 'IMG_20260819_201243.jpg', 'IMG_20260819_201308.jpg'
+        ];
+
         // Videos 数据（在 Group Photos 下面）
         const videosData = { 
             id: 'videos', 
@@ -5807,8 +6660,10 @@
                 card.appendChild(info);
                 container.appendChild(card);
                 
-                // 添加点击事件
-                card.onclick = () => navigateTo(`friend-${friend.id}`);
+                // 点击卡片导航到对应朋友画廊页（GALLERY 现为独立页面，无需关闭弹窗）
+                card.onclick = () => {
+                    navigateTo(`friend-${friend.id}`);
+                };
             });
 
             initFriendsScroll();
@@ -5859,15 +6714,18 @@
         function showFriendsScrollArrows(show) {
             const leftArrow = document.getElementById('friendsScrollLeft');
             const rightArrow = document.getElementById('friendsScrollRight');
-            
+
             if (leftArrow && rightArrow) {
                 if (show) {
-                    leftArrow.style.display = 'flex';
-                    rightArrow.style.display = 'flex';
-                    setTimeout(initFriendsScroll, 200);
+                    // 让 initFriendsScroll 的 updateArrows 根据滚动位置自动决定显隐
+                    leftArrow.classList.remove('hidden');
+                    rightArrow.classList.remove('hidden');
+                    // 触发一次滚动事件以重新评估箭头状态
+                    const scrollContainer = document.getElementById('friendsScrollContainer');
+                    if (scrollContainer) scrollContainer.dispatchEvent(new Event('scroll'));
                 } else {
-                    leftArrow.style.display = 'none';
-                    rightArrow.style.display = 'none';
+                    leftArrow.classList.add('hidden');
+                    rightArrow.classList.add('hidden');
                 }
             }
         }
@@ -6095,6 +6953,13 @@
             if (mePageDescription) {
                 mePageDescription.textContent = `BE ${randomVirtue}`;
             }
+
+            // 最后更新日期：自动取最新博客卡片的日期
+            const newestBlogDate = document.querySelector('.blog-grid .blog-card-date');
+            const meLastUpdateEl = document.getElementById('meLastUpdate');
+            if (newestBlogDate && meLastUpdateEl) {
+                meLastUpdateEl.textContent = newestBlogDate.textContent.trim();
+            }
             
             const hideLoader = () => {
                 if (loader && !loader.classList.contains('hidden')) {
@@ -6135,7 +7000,14 @@
             }
             
             // Load initial images - skip hero images as they have separate loading logic
-            document.querySelectorAll('.gallery-featured-image img, .blur-placeholder').forEach(loadImage);
+            // 分批加载（每帧 4 张），避免一次性发起 30+ 并发探针请求
+            const initImgs = Array.from(document.querySelectorAll('.gallery-featured-image img, .blur-placeholder'));
+            let initCursor = 0;
+            (function loadInitBatch() {
+                initImgs.slice(initCursor, initCursor + 4).forEach(img => loadImage(img));
+                initCursor += 4;
+                if (initCursor < initImgs.length) requestAnimationFrame(loadInitBatch);
+            })();
 
             // Initialize friends scroll arrows
             showFriendsScrollArrows(false);
@@ -6192,20 +7064,47 @@
                     fullImg.src = fullSrc;
                 };
                 compressedImg.onerror = () => {
-                    const hasActive = document.querySelector('.hero-image .hero-img.active');
-                    if (!hasActive && index < heroImages.length - 1) {
-                        heroImages[index + 1]?.click();
-                    }
+                    // 压缩图失败：回退原图；原图加载后隐藏骨架屏并显示，避免永久黑块
+                    const fullImg = new Image();
+                    fullImg.onload = () => {
+                        requestAnimationFrame(() => {
+                            img.src = fullSrc;
+                            img.classList.add('loaded');
+                            if (heroSkeleton && !heroSkeleton.classList.contains('hidden')) {
+                                heroSkeleton.classList.add('hidden');
+                            }
+                            const hasActive = document.querySelector('.hero-image .hero-img.active');
+                            if (!hasActive) {
+                                img.classList.add('active');
+                                currentHeroIndex = index;
+                            }
+                            heroLoadedFlags[index] = true;
+                            if (heroLoadedFlags.every(f => f) && !heroRotationStarted) {
+                                heroRotationStarted = true;
+                            }
+                        });
+                    };
+                    fullImg.onerror = () => {
+                        // 原图也失败：隐藏骨架屏，不再永久占位
+                        if (heroSkeleton) heroSkeleton.classList.add('hidden');
+                        heroLoadedFlags[index] = true;
+                        if (heroLoadedFlags.every(f => f) && !heroRotationStarted) {
+                            heroRotationStarted = true;
+                        }
+                    };
+                    fullImg.src = fullSrc;
                 };
                 compressedImg.src = compressedSrc;
             });
 
             function toggleHeroImage() {
+                // 仅保留 1 张 Hero 图，不再轮播
+                if (heroImages.length <= 1) return;
                 if (!heroRotationStarted) return;
-                
+
                 const nextIndex = (currentHeroIndex + 1) % heroImages.length;
                 if (!heroLoadedFlags[nextIndex]) return;
-                
+
                 heroImages[currentHeroIndex].classList.remove('active');
                 currentHeroIndex = nextIndex;
                 heroImages[currentHeroIndex].classList.add('active');
@@ -6731,19 +7630,22 @@
             saveThemeState();
         });
 
-        // 为首页创建单独的画廊（随机选择所有图片）
+        // 为首页创建单独的画廊（10 张 Me + 5 张 more 群组照片，共 15 张）
         function createHomeGallery() {
-            const allPhotos = [
-                ...galleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...lijiazuGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...jianghaipengGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...lixinyuGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...wangshuaiGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...xuhaonanGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...sunjiajunGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc })),
-                ...groupPhotosGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc }))
-            ];
-            
+            // Me 照片：CDN 压缩图 + 原图
+            const mePool = mePhotosData.map(name => ({
+                id: 'me-' + name,
+                src: CDN_BASE + '/Me/compressed_me/' + name,
+                fullSrc: CDN_BASE + '/Me/' + name
+            }));
+            // more 页面的群组照片
+            const groupPool = groupPhotosGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc }));
+
+            // 各自随机后取 10 + 5，再混合打乱，保证 Me 与 more 交错分布
+            const mePicked = [...mePool].sort(() => Math.random() - 0.5).slice(0, 10);
+            const groupPicked = [...groupPool].sort(() => Math.random() - 0.5).slice(0, 5);
+            const allPhotos = [...mePicked, ...groupPicked];
+
             const shuffled = allPhotos.sort(() => Math.random() - 0.5);
             
             const fullLayouts = [
@@ -6833,6 +7735,7 @@
                 sectionCount.textContent = `${count} Images`;
             }
 
+            const homeGalleryImgs = [];
             galleryItems.forEach((item, index) => {
                 const div = document.createElement('div');
                 div.className = 'gallery-item';
@@ -6857,7 +7760,7 @@
                 img.dataset.index = index;
 
                 div.appendChild(img);
-                loadImage(img);
+                homeGalleryImgs.push(img);
 
                 div.addEventListener('click', () => {
                     currentGalleryData = galleryItems;
@@ -6868,6 +7771,14 @@
             });
 
             observeGalleryItems();
+
+            // 分批加载（每帧 4 张），避免 14 张并发请求卡顿首屏
+            let hgCursor = 0;
+            (function loadHomeGalleryBatch() {
+                homeGalleryImgs.slice(hgCursor, hgCursor + 4).forEach(img => loadImage(img));
+                hgCursor += 4;
+                if (hgCursor < homeGalleryImgs.length) requestAnimationFrame(loadHomeGalleryBatch);
+            })();
         }
 
         createHomeGallery();
