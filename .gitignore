@@ -1,5 +1,6 @@
 backend/.env
 backend/node_modules/
+photos/
 
 .DS_Store
 Thumbs.db
