@@ -5229,7 +5229,6 @@
                 <div class="kook-widget-wrapper">
                     <iframe src="https://kookapp.cn/widget?id=3503044378289750&theme=light" width="350" height="500" allowtransparency="true" frameborder="0"></iframe>
                 </div>
-                <div class="version-number">13.1</div>
             </div>
         </div>
 
@@ -7642,8 +7641,8 @@
             const groupPool = groupPhotosGalleryData.map(p => ({ id: p.id, src: p.src, fullSrc: p.fullSrc }));
 
             // 各自随机后取 10 + 5，再混合打乱，保证 Me 与 more 交错分布
-            const mePicked = [...mePool].sort(() => Math.random() - 0.5).slice(0, 10);
-            const groupPicked = [...groupPool].sort(() => Math.random() - 0.5).slice(0, 5);
+            const mePicked = [...mePool].sort(() => Math.random() - 0.5).slice(0, 12);
+            const groupPicked = [...groupPool].sort(() => Math.random() - 0.5).slice(0, 2);
             const allPhotos = [...mePicked, ...groupPicked];
 
             const shuffled = allPhotos.sort(() => Math.random() - 0.5);
