@@ -1,0 +1,66 @@
+name: Deploy site to GitHub Pages
+
+# 迁移后的发布方式：构建 app/ 并把 dist/ 发布到 Pages。
+# 切换生效需要**在仓库 Settings → Pages 把 Source 改成 "GitHub Actions"**（一次性手动操作）。
+# 在此之前，本工作流即使跑成功也不会改变线上站点（deploy-pages 会因为 Pages 源不是 Actions 而失败）。
+#
+# 回滚：把 Settings → Pages 的 Source 改回 "Deploy from a branch"（main / root），
+# 仓库根的旧 index.html 仍在，线上会立刻回到旧版。
+
+# 触发方式：推送到 main，或手动触发。
+# 注意：如果仓库 Settings → Pages 的 Source 还是 "Deploy from a branch"，
+# deploy 步骤会失败（不是代码问题，是 Pages 源没切成 Actions）。
+# 想避免这次失败，就先把 Source 改成 "GitHub Actions"，再推送；
+# 否则推送后到 Actions 页面点一次 Re-run 也可以。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一个 Pages 部署；不取消进行中的部署，避免发布到一半被中断
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      # 构建脚本里包含 scripts/copy-static.mjs：把仓库根的 icons/avatar/me/logo/music、
+      # favicon.png、CNAME 复制进 dist，并由 index.html 生成 404.html（SPA 回退）
+      - name: Build
+        working-directory: app
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

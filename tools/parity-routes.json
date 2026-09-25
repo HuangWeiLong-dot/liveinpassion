@@ -1,0 +1,16 @@
+[
+  { "appPath": "/", "legacyPage": "home" },
+  { "appPath": "/blogs", "legacyPage": "blogs" },
+  { "appPath": "/blogs/in-the-middle-of-the-world", "legacyPage": "blog-detail-6" },
+  { "appPath": "/blogs/before-heading-out", "legacyPage": "blog-detail-5" },
+  { "appPath": "/blogs/dont-be-a-dick", "legacyPage": "blog-detail-4" },
+  { "appPath": "/blogs/just-another-timeline-no", "legacyPage": "blog-detail-3" },
+  { "appPath": "/blogs/the-two-halves-of-a-heart", "legacyPage": "blog-detail-2" },
+  { "appPath": "/blogs/life-is-a-fantasy", "legacyPage": "blog-detail" },
+  { "appPath": "/me", "legacyPage": "me" },
+  { "appPath": "/me/gallery", "legacyPage": "me-gallery" },
+  { "appPath": "/gallery", "legacyPage": "gallery" },
+  { "appPath": "/friends/lijiazu", "legacyPage": "friend-lijiazu" },
+  { "appPath": "/friends/xuhaonan", "legacyPage": "friend-xuhaonan" },
+  { "appPath": "/group-photos", "legacyPage": "friend-groupphotos" }
+]

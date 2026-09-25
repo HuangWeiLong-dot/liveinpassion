@@ -2,8 +2,17 @@ backend/.env
 backend/node_modules/
 photos/
 
+# Vue 应用（app/）：依赖与构建产物都不入库
+node_modules/
+app/dist/
+dist/
+
 .DS_Store
 Thumbs.db
 *.swp
 *.bak
 *.tmp
+# 对比工具产物
+tools/parity-out/
+
+CLAUDE.md

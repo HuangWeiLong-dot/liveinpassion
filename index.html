@@ -4804,6 +4804,18 @@
             <p class="gallery-subtitle">Stories and reflections from the journey</p>
             
             <div class="blog-grid">
+                <article class="blog-card" onclick="navigateTo('blog-detail-6')">
+                    <div class="blog-card-image">
+                        <div class="skeleton-loader"></div>
+                        <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/6.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/6.jpg" alt="Blog Featured Image" class="blur-placeholder">
+                    </div>
+                    <div class="blog-card-overlay">
+                        <span class="blog-card-date">SEPTEMBER 25, 2026</span>
+                        <h3 class="blog-card-title">IN THE MIDDLE OF THE WORLD</h3>
+                        <span class="blog-card-read">READ</span>
+                    </div>
+                </article>
+
                 <article class="blog-card" onclick="navigateTo('blog-detail-5')">
                     <div class="blog-card-image">
                         <div class="skeleton-loader"></div>
@@ -5047,6 +5059,36 @@
                 <h2>Before heading out</h2>
                 <p>So this is the last update before I go back. I'm bringing the year with me — the loneliness, the wanting, the bad weeks, the slow climb back. The things nobody taught me and nobody warned me about. They're the only curriculum that ever stuck.</p>
                 <p>Be brave. Be genuine. Be humble. Take care of your mind — it's the only one you get. And don't be a dick, especially not to yourself.</p>
+            </div>
+        </section>
+        <footer>
+            <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
+        </footer>
+    </main>
+
+    <main id="blog-detail-6-page" class="page">
+        <section class="blog-detail">
+            <div class="blog-meta">
+                <span class="blog-date">September 25, 2026</span>
+                <span>·</span>
+                <span>5 min read</span>
+            </div>
+            <h1 class="blog-detail-title">In the Middle of the World</h1>
+            <div class="blog-featured-image" style="position: relative;">
+                <div class="skeleton-loader"></div>
+                <img src="" data-src="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/6.jpg" data-full-src="https://img.liveinpassion.me/blog_photos/6.jpg" alt="Featured Image" class="blur-placeholder">
+            </div>
+            <div class="blog-detail-content">
+                <p>I watched Moonlight on a laptop at two in the morning, alone, which is probably not how it should be seen. It is a film about skin and water and light, and my screen made all of it smaller. It still got through. Two weeks on, I was still thinking about a boy floating in the sea with a grown man's hand under his back.</p>
+                <p>Juan is a drug dealer. He is also the only adult in the film who asks Chiron a real question and then waits for the answer. He teaches him to swim, tells him that in moonlight black boys look blue, and a few scenes later you find out he sells to Chiron's mother. The film does not balance those two facts or explain them away. It lets them sit in the same body, the way they do in actual people.</p>
+                <blockquote>In moonlight, black boys look blue.</blockquote>
+                <h2>Three names</h2>
+                <p>Little, Chiron, Black. The chapter titles give the whole thing away before it starts. The first is what the neighbourhood calls him, the second is what his mother shouts when she is not really shouting at him, the third is what he builds after deciding that soft is not survivable. By the last chapter he is wearing gold and driving with the windows down, and it mostly looks like a costume he never got around to taking off.</p>
+                <p>What got me was how little anybody says. His mother loves him and cannot say it without screaming. Kevin cannot say it at all until twenty minutes before the end. Chiron spends most of three chapters looking at the ground. Everything is shot blue, and somewhere around the beach scene the blue stops being a colour and turns into the temperature of the room.</p>
+                <h2>The diner</h2>
+                <p>At the end Kevin cooks him a meal, and Chiron says: you're the only man who's ever touched me. Then he says it happened in the middle of the world. It is not a good sentence. He says it badly, with a pause in the wrong place, and that is the part I keep replaying, because it is how the true things come out when you have spent a whole life not saying them.</p>
+                <p>I have been trying to say the important things sooner than I am comfortable with. That goes against most of what I taught myself about keeping a straight face. Watching a man mumble the truest sentence of his life into a plate of food made me want to be less impressive and more honest.</p>
+                <p>Two hours of people not saying it, then one minute of someone saying it. That is the whole film, and it is enough.</p>
             </div>
         </section>
         <footer>
@@ -5747,7 +5789,35 @@
         }
 
         // ME页面按钮事件处理
+        // 引用区域 - 随机引用（每次进入 ME 页刷新一条）
+        const meQuotes = [
+            'The only limit to our realization of tomorrow is our doubts of today.',
+            'In the middle of difficulty lies opportunity.',
+            'The future belongs to those who believe in the beauty of their dreams.',
+            'Be yourself; everyone else is already taken.',
+            'Life is what happens when you are busy making other plans.',
+            'The way to get started is to quit talking and begin doing.',
+            'Your time is limited, so don\'t waste it living someone else\'s life.'
+        ];
+
+        function refreshMeQuote() {
+            const quoteText = document.getElementById('quoteText');
+            if (quoteText) {
+                quoteText.textContent = meQuotes[Math.floor(Math.random() * meQuotes.length)];
+            }
+        }
+
+        // 每次 navigateTo('me') 都会调用 setupMePageEvents()，因此监听器和定时器只能注册一次：
+        // 重复注册会让头像轮播的 setInterval 叠加（越进越快），并让一次点击发起多次请求
+        let mePageEventsInitialized = false;
+
         function setupMePageEvents() {
+            // 随机引用属于每次进入都要刷新的内容，放在只注册一次的守卫之前
+            refreshMeQuote();
+
+            if (mePageEventsInitialized) return;
+            mePageEventsInitialized = true;
+
             // GAME按钮 - 打开弹窗
             const gameBtn = document.getElementById('gameBtn');
             const gameModal = document.getElementById('gameModal');
@@ -5943,21 +6013,7 @@
                 });
             }
 
-            // 引用区域 - 显示随机引用
-            const quoteText = document.getElementById('quoteText');
-            const quotes = [
-                'The only limit to our realization of tomorrow is our doubts of today.',
-                'In the middle of difficulty lies opportunity.',
-                'The future belongs to those who believe in the beauty of their dreams.',
-                'Be yourself; everyone else is already taken.',
-                'Life is what happens when you are busy making other plans.',
-                'The way to get started is to quit talking and begin doing.',
-                'Your time is limited, so don\'t waste it living someone else\'s life.'
-            ];
-
-            if (quoteText) {
-                quoteText.textContent = quotes[Math.floor(Math.random() * quotes.length)];
-            }
+            // 引用区域已在 refreshMeQuote() 中处理（见 setupMePageEvents 顶部）
 
             // MORE 按钮随机背景图：从 gallery 图片池随机切换
             initMoreRandomBackground();
@@ -6736,7 +6792,8 @@
         const menuToggle = document.getElementById('menuToggle');
 
         const STEAM_API_BASE = 'https://api.liveinpassion.me';
-        let steamDataLoaded = false;
+        let steamDataLoaded = false;   // 已成功加载，本会话内不再请求
+        let steamDataLoading = false;  // 请求进行中，避免并发重复请求
 
         async function fetchSteamProfile() {
             try {
@@ -6792,7 +6849,7 @@
         }
 
         async function loadSteamData() {
-            if (steamDataLoaded) return;
+            if (steamDataLoaded || steamDataLoading) return;
 
             const avatarEl = document.getElementById('steamAvatar');
             const nameEl = document.getElementById('steamName');
@@ -6802,10 +6859,12 @@
 
             if (!avatarEl) return;
 
-            steamDataLoaded = true;
+            steamDataLoading = true;
 
             const profile = await fetchSteamProfile();
             const gamesData = await fetchSteamGames();
+
+            steamDataLoading = false;
 
             if (!profile) {
                 avatarEl.innerHTML = '<span class="load-error-msg">Loading Failed</span>';
@@ -6815,6 +6874,9 @@
                 if (detailsEl) detailsEl.innerHTML = '';
                 return;
             }
+
+            // 数据到手才置位：失败时保持“未加载”，下次进入 ME 页仍会重试
+            steamDataLoaded = true;
 
             const status = getPersonaStatus(profile.personastate);
 

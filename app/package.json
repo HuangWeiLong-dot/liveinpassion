@@ -1,0 +1,20 @@
+{
+  "name": "liveinpassion-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Vue 3 + Vite 版本的 LIVE IN PASSION 站点（迁移自仓库根的 index.html）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-static.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "vite": "^8.3.1"
+  }
+}

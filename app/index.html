@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIVEINPASSION</title>
+
+    <meta name="description" content="Personal site of Huang Wei Long — photos, stories and friends. When that moment comes, I'll let it rest, breathe it in, and know it as a memory born.">
+    <link rel="canonical" href="https://liveinpassion.me/">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="LIVEINPASSION">
+    <meta property="og:title" content="LIVEINPASSION">
+    <meta property="og:description" content="Personal site of Huang Wei Long — photos, stories and friends.">
+    <meta property="og:url" content="https://liveinpassion.me/">
+    <meta property="og:image" content="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@HuangWeiLong525">
+    <meta name="twitter:image" content="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg">
+
+    <link rel="icon" type="image/png" href="/favicon.png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/favicon.png">
+
+    <!-- DNS 预解析：为所有 CDN 域名提前完成 DNS 查询（兼容旧浏览器） -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://img.liveinpassion.me">
+
+    <!-- 预连接：提前完成 DNS + TCP + TLS 握手，使后续请求立即发起 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://img.liveinpassion.me">
+
+    <!-- 字体 CSS 非阻塞加载：preload 高优先级拉取，加载完成后转为 stylesheet 应用 -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" onload="this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap">
+    </noscript>
+
+    <script>
+        // 主题必须在首次绘制前落到 <html> 上。
+        // 迁移前这段逻辑在页面底部脚本的解析期执行，首帧可能先渲染浅色再被改回去；
+        // 放到 head 里内联执行可以消除这个闪变。无存储时默认暗色。
+        (function () {
+            try {
+                var saved = localStorage.getItem('themeState');
+                var isDark = saved ? JSON.parse(saved).isDark : true;
+                document.documentElement.classList.toggle('dark', !!isDark);
+            } catch (e) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body class="no-scroll">
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
