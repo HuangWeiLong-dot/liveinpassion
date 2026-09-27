@@ -9,7 +9,7 @@
 //     做法是只从 useLightbox() 取函数、不消费其响应式状态，并且 items 用普通数组。
 //  2. 图片仍是 data-src / data-full-src 驱动，交给 loadImage()，不改成响应式绑定。
 import { onMounted, ref } from 'vue';
-import { mePhotos } from '../data/mePhotos.js';
+import { mePhotos, mePhotoByName } from '../data/mePhotos.js';
 import { groupPhotosGalleryData } from '../data/galleries.js';
 import { homeLayouts } from '../data/homeLayouts.js';
 import { CDN_BASE } from '../data/cdn.js';
@@ -20,11 +20,15 @@ import { observeGalleryItems } from '../composables/useGalleryObserver.js';
 const { open } = useLightbox();
 
 function buildItems() {
-  const mePool = mePhotos.map((name) => ({
-    id: 'me-' + name,
-    src: `${CDN_BASE}/Me/compressed_me/${name}`,
-    fullSrc: `${CDN_BASE}/Me/${name}`,
-  }));
+  const mePool = mePhotos.map((name) => {
+    // URL 优先取 API 的 hash 路径（新上传照片），旧拼法兜底
+    const urls = mePhotoByName(name) || {};
+    return {
+      id: 'me-' + name,
+      src: urls.src || `${CDN_BASE}/Me/compressed_me/${name}`,
+      fullSrc: urls.fullSrc || `${CDN_BASE}/Me/${name}`,
+    };
+  });
   const groupPool = groupPhotosGalleryData.map((p) => ({ id: p.id, src: p.src, fullSrc: p.fullSrc }));
 
   // 各自随机后取 12 + 2，再混合打乱，保证 ME 与群组交错分布

@@ -266,18 +266,11 @@
             opacity: 1;
             z-index: 2;
             visibility: visible;
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.8s ease;
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.8s ease;
         }
 
-        .hero-image img.hero-img.active.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .hero-image img.hero-img.active.loaded {
-            filter: blur(0);
-            transform: scale(1);
-        }
+        /* blur 占位动画已移除：active+loaded 同帧切换，blur(20px) 态从未被渲染，
+           却让 Hero 大图加载时白跑一轮 GPU 滤镜插值。hover 缩放仍走 transform 过渡。 */
 
         .hero-image:hover img.hero-img.active {
             transform: scale(1.02);
@@ -435,25 +428,17 @@
             height: 100%;
             object-fit: cover;
             opacity: 0;
-            transition: opacity 0.8s ease, transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease;
+            /* blur 占位动画已移除（同帧切换从未渲染），filter 从过渡与 will-change 中剔除；
+               transform 过渡保留供 hover 缩放 */
+            transition: opacity 0.8s ease, transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
             backface-visibility: hidden;
             transform: translateZ(0);
             z-index: 2;
-            will-change: transform, opacity, filter;
+            will-change: transform, opacity;
         }
 
         .gallery-item.has-image img:not(.toggle-img) {
             opacity: 1;
-        }
-
-        .gallery-item img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .gallery-item img.loaded {
-            filter: blur(0);
-            transform: scale(1);
         }
 
         .gallery-item.wide {
@@ -636,17 +621,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: filter 0.5s ease, opacity 0.5s ease;
-        }
-
-        .blog-featured-image img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .blog-featured-image img.loaded {
-            filter: blur(0);
-            transform: scale(1);
+            /* blur 占位动画已移除（同帧切换从未渲染） */
+            transition: opacity 0.5s ease;
         }
 
         .blog-detail-content {
@@ -711,15 +687,13 @@
 
         .toggle-img.active.blur-placeholder {
             opacity: 1;
-            filter: blur(20px);
-            transform: scale(1.1);
-            transition: filter 0.5s ease, transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
         .toggle-img.active.loaded {
             opacity: 1;
             transform: scale(1);
-            transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease;
+            transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1), transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
         .lightbox {
@@ -1539,7 +1513,10 @@
             opacity: 0;
             position: relative;
             z-index: 1;
-            transition: opacity 0.4s ease, filter 0.4s ease, transform 0.4s ease;
+            /* 只保留 opacity 过渡：图片在骨架屏下本来就不可见，
+               旧的 blur(20px)→blur(0) + scale 滤镜动画从未被看到，却让整月几十张
+               1920px 大图在滚动加载时同时跑 GPU 滤镜插值——本页卡顿主因 */
+            transition: opacity 0.4s ease;
         }
 
         /* 压缩图加载完成后显示（与 loadImage 的 has-image 一致） */
@@ -1547,15 +1524,8 @@
             opacity: 1;
         }
 
-        .me-gallery-item img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
         .me-gallery-item img.loaded {
             opacity: 1;
-            filter: blur(0);
-            transform: scale(1);
         }
 
         .me-gallery-date {
@@ -2593,17 +2563,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: filter 0.5s ease, opacity 0.5s ease;
-        }
-
-        .friend-avatar img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .friend-avatar img.loaded {
-            filter: blur(0);
-            transform: scale(1);
+            /* blur 占位动画已移除（同帧切换从未渲染） */
+            transition: opacity 0.5s ease;
         }
 
         /* Steam Profile Styles */
@@ -4104,17 +4065,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), filter 0.5s ease, opacity 0.5s ease;
-        }
-
-        .blog-image img.blur-placeholder {
-            filter: blur(20px);
-            transform: scale(1.1);
-        }
-
-        .blog-image img.loaded {
-            filter: blur(0);
-            transform: scale(1);
+            /* blur 占位动画已移除（同帧切换从未渲染）；transform 过渡保留供 hover 缩放 */
+            transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease;
         }
 
         .blog-post:hover .blog-image img {

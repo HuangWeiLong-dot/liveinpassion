@@ -10,19 +10,23 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { CDN_BASE } from '../data/cdn.js';
 import { observeLazyImages } from '../composables/useLazyImages.js';
 import { extractDateFromFilename, useMeGallery } from '../composables/useMeGallery.js';
+import { mePhotoByName } from '../data/mePhotos.js';
 import MeGalleryMonths from '../components/MeGalleryMonths.vue';
 import MePhotoLightbox from '../components/MePhotoLightbox.vue';
 
 const { monthGroups, monthKeys, activeMonth, photosOfMonth } = useMeGallery();
 
 const items = computed(() =>
-  photosOfMonth(activeMonth.value).map((filename) => ({
-    filename,
-    date: extractDateFromFilename(filename),
-    // 网格用压缩图（compressed_me 前缀，与 RandomGallery 的 mePool 同一约定）
-    thumb: `${CDN_BASE}/Me/compressed_me/${filename}`,
-    full: `${CDN_BASE}/Me/${filename}`,
-  }))
+  photosOfMonth(activeMonth.value).map((filename) => {
+    // URL 优先取 API 的 hash 路径（新上传照片 key 不再是扁平原名），旧拼法兜底
+    const urls = mePhotoByName(filename) || {};
+    return {
+      filename,
+      date: extractDateFromFilename(filename),
+      thumb: urls.src || `${CDN_BASE}/Me/compressed_me/${filename}`,
+      full: urls.fullSrc || `${CDN_BASE}/Me/${filename}`,
+    };
+  })
 );
 
 let observer = null;
@@ -37,11 +41,13 @@ function observeItems() {
 onMounted(observeItems);
 watch(activeMonth, observeItems);
 
-// 单图灯箱
+// 单图灯箱：先显示压缩图（与网格同源，通常已在缓存），原图加载完由组件无缝替换
 const lightboxOpen = ref(false);
 const lightboxSrc = ref('');
+const lightboxThumb = ref('');
 function openPhoto(item) {
   lightboxSrc.value = item.full;
+  lightboxThumb.value = item.thumb;
   lightboxOpen.value = true;
 }
 </script>
@@ -72,7 +78,7 @@ function openPhoto(item) {
     <MePhotoLightbox
       :visible="lightboxOpen"
       :src="lightboxSrc"
-      :thumb="lightboxSrc"
+      :thumb="lightboxThumb"
       @close="lightboxOpen = false"
     />
   </main>

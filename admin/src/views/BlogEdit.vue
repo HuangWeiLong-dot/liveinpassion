@@ -97,7 +97,9 @@ async function onEditorUploadImg(files) {
   for (const file of files) {
     const compressed = await compressImage(file);
     const result = await uploadApi.upload(file, compressed, 'blog');
-    urls.push(result.original.url);
+    // 正文插入压缩版（1920px，正文栏宽下足够清晰），原图只留 R2 存档；
+    // 压缩失败时回退原图
+    urls.push(result.compressed?.url || result.original.url);
   }
   return urls;
 }

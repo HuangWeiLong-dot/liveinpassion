@@ -5,12 +5,14 @@
 //
 // 与旧版的差异：旧版这几处走 loadBgTwoStage（本地 photos/ → CDN 兜底），
 // 本地优先那层已按决定移除，现在统一用 CDN 上的压缩小图（磁贴/头像本来就是小图）。
-import { mePhotos } from '../data/mePhotos.js';
+import { mePhotos, mePhotoByName } from '../data/mePhotos.js';
 import { groupMorePhotos } from '../data/groupPhotos.js';
 import { friends } from '../data/friends.js';
 import { CDN_BASE } from '../data/cdn.js';
 
-const meCompressed = (name) => `${CDN_BASE}/Me/compressed_me/${name}`;
+// 磁贴/头像用压缩图：优先 API 的 hash 路径，旧拼法兜底
+const meCompressed = (name) =>
+  mePhotoByName(name)?.src || `${CDN_BASE}/Me/compressed_me/${name}`;
 
 // MORE 磁贴背景池 = 群组照片(26) + 所有好友照片(69)，都用压缩图
 const morePool = [
