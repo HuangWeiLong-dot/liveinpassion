@@ -7,6 +7,13 @@ node_modules/
 app/dist/
 dist/
 
+# CMS Worker & Admin
+worker/node_modules/
+worker/.wrangler/
+worker/admin-dist/
+worker/dev.vars
+admin/node_modules/
+
 .DS_Store
 Thumbs.db
 *.swp
