@@ -27,6 +27,11 @@ app.route('/api/admin/uploads', uploadsRoutes);
 app.route('/api', publicRoutes);
 
 // 临时诊断端点：逐步执行 Access JWT 验证，定位失败环节（验证完成后删除）
+function b64url(str) {
+  const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
+  return atob((str + pad).replace(/-/g, '+').replace(/_/g, '/'));
+}
+
 app.get('/api/admin/auth-debug', async (c) => {
   const steps = [];
   const token = c.req.header('Cf-Access-Jwt-Assertion');
@@ -35,15 +40,14 @@ app.get('/api/admin/auth-debug', async (c) => {
   }
   steps.push('jwt-header-present');
 
-  let parts;
-  try {
-    parts = token.split('.');
-    if (parts.length !== 3) return c.json({ failed_at: 'jwt-format', parts: parts.length, steps });
-    steps.push('jwt-format-ok');
-  } catch (e) { return c.json({ failed_at: 'jwt-split', error: String(e), steps }); }
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return c.json({ failed_at: 'jwt-format', parts: parts.length, steps });
+  }
+  steps.push(`jwt-format-ok lens=${parts[0].length}/${parts[1].length}/${parts[2].length}`);
 
   try {
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/') + '=='));
+    const payload = JSON.parse(b64url(parts[1]));
     steps.push(`payload-decoded aud=${payload.aud} exp=${payload.exp} email=${payload.email}`);
     if (payload.exp * 1000 < Date.now()) {
       return c.json({ failed_at: 'jwt-expired', exp: payload.exp, now: Date.now(), steps });
@@ -62,7 +66,7 @@ app.get('/api/admin/auth-debug', async (c) => {
 
   let header;
   try {
-    header = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/') + '=='));
+    header = JSON.parse(b64url(parts[0]));
     steps.push(`header-decoded kid=${header.kid} alg=${header.alg}`);
   } catch (e) { return c.json({ failed_at: 'header-decode', error: String(e), steps }); }
 
@@ -81,11 +85,11 @@ app.get('/api/admin/auth-debug', async (c) => {
     const cryptoKey = await crypto.subtle.importKey('jwk', key, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
     steps.push('import-key-ok');
     const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-    const sigBytes = atob(parts[2].replace(/-/g, '+').replace(/_/g, '/') + '==');
+    const sigBytes = b64url(parts[2]);
     const signature = new Uint8Array(Array.from(sigBytes).map((ch) => ch.charCodeAt(0)));
     const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, signature, data);
     steps.push(`verify-result=${valid}`);
-    return c.json({ result: valid ? 'ALL-OK' : 'signature-invalid', audMatch: null, steps });
+    return c.json({ result: valid ? 'ALL-OK' : 'signature-invalid', steps });
   } catch (e) {
     return c.json({ failed_at: 'crypto', error: String(e), steps });
   }
