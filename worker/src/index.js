@@ -26,6 +26,71 @@ app.route('/api/admin/albums', albumsRoutes);
 app.route('/api/admin/uploads', uploadsRoutes);
 app.route('/api', publicRoutes);
 
+// 临时诊断端点：逐步执行 Access JWT 验证，定位失败环节（验证完成后删除）
+app.get('/api/admin/auth-debug', async (c) => {
+  const steps = [];
+  const token = c.req.header('Cf-Access-Jwt-Assertion');
+  if (!token) {
+    return c.json({ failed_at: 'edge-header', note: 'Edge did not inject Cf-Access-Jwt-Assertion', steps });
+  }
+  steps.push('jwt-header-present');
+
+  let parts;
+  try {
+    parts = token.split('.');
+    if (parts.length !== 3) return c.json({ failed_at: 'jwt-format', parts: parts.length, steps });
+    steps.push('jwt-format-ok');
+  } catch (e) { return c.json({ failed_at: 'jwt-split', error: String(e), steps }); }
+
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/') + '=='));
+    steps.push(`payload-decoded aud=${payload.aud} exp=${payload.exp} email=${payload.email}`);
+    if (payload.exp * 1000 < Date.now()) {
+      return c.json({ failed_at: 'jwt-expired', exp: payload.exp, now: Date.now(), steps });
+    }
+    steps.push('not-expired');
+  } catch (e) { return c.json({ failed_at: 'payload-decode', error: String(e), steps }); }
+
+  let certs;
+  try {
+    const res = await fetch(`https://${c.env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
+    steps.push(`certs-fetch status=${res.status}`);
+    if (!res.ok) return c.json({ failed_at: 'certs-fetch', status: res.status, steps });
+    certs = await res.json();
+    steps.push(`certs-parsed count=${certs.keys?.length}`);
+  } catch (e) { return c.json({ failed_at: 'certs-fetch-throw', error: String(e), teamDomain: c.env.ACCESS_TEAM_DOMAIN, steps }); }
+
+  let header;
+  try {
+    header = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/') + '=='));
+    steps.push(`header-decoded kid=${header.kid} alg=${header.alg}`);
+  } catch (e) { return c.json({ failed_at: 'header-decode', error: String(e), steps }); }
+
+  const key = certs.keys.find((k) => k.kid === header.kid);
+  if (!key) {
+    return c.json({
+      failed_at: 'kid-match',
+      tokenKid: header.kid,
+      certKids: certs.keys.map((k) => k.kid),
+      steps,
+    });
+  }
+  steps.push('kid-matched');
+
+  try {
+    const cryptoKey = await crypto.subtle.importKey('jwk', key, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    steps.push('import-key-ok');
+    const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+    const sigBytes = atob(parts[2].replace(/-/g, '+').replace(/_/g, '/') + '==');
+    const signature = new Uint8Array(Array.from(sigBytes).map((ch) => ch.charCodeAt(0)));
+    const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, signature, data);
+    steps.push(`verify-result=${valid}`);
+    return c.json({ result: valid ? 'ALL-OK' : 'signature-invalid', audMatch: null, steps });
+  } catch (e) {
+    return c.json({ failed_at: 'crypto', error: String(e), steps });
+  }
+});
+
 // 管理后台静态资源（Workers Assets）
 // admin 构建时 base='/admin/'，产物在 admin-dist/ 下
 async function serveAdmin(c) {
