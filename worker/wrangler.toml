@@ -1,0 +1,28 @@
+name = "liveinpassion-cms"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# 自定义域（Cloudflare 自动创建 DNS 记录与证书）
+routes = [
+  { pattern = "cms.liveinpassion.me", custom_domain = true }
+]
+
+# D1 数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "liveinpassion-db"
+database_id = "563adbe4-a001-477c-8ee6-710e25ced297"
+
+# R2 存储桶绑定（沿用现有 bucket）
+[[r2_buckets]]
+binding = "IMG_BUCKET"
+bucket_name = "liveinpassion"
+
+# 管理后台静态资源（Workers Assets）
+[assets]
+directory = "./admin-dist"
+binding = "ASSETS"
+
+# 环境变量（通过 wrangler secret 设置，不写在仓库）
+# GITHUB_TOKEN - 用于触发 repository_dispatch
+# ACCESS_AUD - Cloudflare Access JWT audience tag

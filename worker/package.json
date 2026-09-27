@@ -1,0 +1,21 @@
+{
+  "name": "liveinpassion-cms-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker CMS backend for liveinpassion.me",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply liveinpassion-db",
+    "db:migrate:remote": "wrangler d1 migrations apply liveinpassion-db --remote"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "marked": "^14.1.0",
+    "sanitize-html": "^2.13.0"
+  },
+  "devDependencies": {
+    "wrangler": "^3.80.0"
+  }
+}
