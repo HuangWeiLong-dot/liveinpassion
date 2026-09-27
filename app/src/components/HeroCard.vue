@@ -30,6 +30,7 @@ onMounted(() => loadHeroImage(imgRef.value, skeletonRef.value));
             <img
               ref="imgRef"
               decoding="async"
+              fetchpriority="high"
               :data-full-src="HERO_FULL"
               alt="Hero Image"
               class="hero-img"

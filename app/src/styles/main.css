@@ -243,8 +243,6 @@
         }
 
         .hero-image .skeleton-loader {
-            opacity: 1;
-            animation: skeleton-loading 1.5s ease-in-out infinite;
             z-index: 1;
         }
 
@@ -426,8 +424,6 @@
         }
 
         .gallery-item .skeleton-loader {
-            opacity: 1;
-            animation: skeleton-loading 1.5s ease-in-out infinite;
             z-index: 1;
         }
 
@@ -481,23 +477,40 @@
             width: 100%;
             height: 100%;
             min-height: 200px;
-            background: linear-gradient(
-                90deg,
-                var(--border) 25%,
-                var(--text-secondary) 50%,
-                var(--border) 75%
-            );
-            background-size: 200% 100%;
-            animation: skeleton-loading 1.5s ease-in-out infinite;
+            background: var(--border);
+            overflow: hidden;
             z-index: 10;
             opacity: 1;
             transition: opacity 0.3s ease-out;
             pointer-events: none;
         }
 
+        /* 流光走 ::after 的 transform（GPU 合成，零重绘），
+           不再动画 background-position（旧写法每帧重绘整块渐变，长画廊里几十个骨架屏同闪是掉帧大户） */
+        .skeleton-loader::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: translateX(-100%);
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.55) 50%,
+                transparent 100%
+            );
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        }
+
         .skeleton-loader.hidden {
             opacity: 0;
             pointer-events: none;
+            animation: none;
+        }
+
+        .skeleton-loader.hidden::after {
             animation: none;
         }
 
@@ -515,27 +528,16 @@
             z-index: 5;
         }
 
-        @keyframes skeleton-loading {
-            0% {
-                background-position: 200% 0;
-            }
+        @keyframes skeleton-shimmer {
             100% {
-                background-position: -200% 0;
+                transform: translateX(100%);
             }
         }
 
-        /* 模糊图片的闪烁效果 */
+        /* 模糊占位动画已移除：未加载的 img 本就被父级 opacity 门控隐藏，
+           旧 blur-pulse 反而会让动画覆盖可见性声明，白跑几十个合成层。
+           类名保留，加载完成后 JS 仍会摘除它。 */
         img.blur-placeholder {
-            animation: blur-pulse 1.5s ease-in-out infinite;
-        }
-
-        @keyframes blur-pulse {
-            0%, 100% {
-                opacity: 0.7;
-            }
-            50% {
-                opacity: 1;
-            }
         }
 
         .lazy-image {
@@ -1822,23 +1824,6 @@
             opacity: 0.9;
         }
 
-        /* Skeleton Loader */
-        .skeleton-rect {
-            background: linear-gradient(90deg, var(--border) 20%, var(--text-secondary) 50%, var(--border) 80%);
-            background-size: 200% 100%;
-            animation: skeleton-loading 1.5s infinite;
-            border: 1px solid var(--border);
-        }
-
-        @keyframes skeleton-loading {
-            0% {
-                background-position: 200% 0;
-            }
-            100% {
-                background-position: -200% 0;
-            }
-        }
-
         .status-indicator.online {
             background: #238636;
         }
@@ -2940,6 +2925,9 @@
         /* Timeline Year Section */
         .timeline-year {
             margin-bottom: 80px;
+            /* 视口外的年份区块跳过渲染与图片解码，长页滚动更顺滑 */
+            content-visibility: auto;
+            contain-intrinsic-size: auto 1200px;
         }
 
         .timeline-year:last-child {
@@ -4707,5 +4695,19 @@
 
             footer {
                 padding: 32px 24px 90px;
+            }
+        }
+
+        /* 降低动画偏好：用户系统开启"减少动态效果"时关闭全部过渡与动画，
+           避免大图淡入/scale 在低端设备上掉帧 */
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
             }
         }

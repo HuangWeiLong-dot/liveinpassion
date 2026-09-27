@@ -93,8 +93,8 @@ function openPhoto(item) {
           <div class="timeline-photo-grid">
             <div v-for="photo in month.photos" :key="photo.filename" class="timeline-photo-item" @click="openPhoto(photo)">
               <div class="skeleton-loader"></div>
-              <!-- 单级加载：只给原图；data-index 会被 loadImage 用来生成 alt -->
-              <img :data-full-src="photo.fullSrc" :data-index="photo.globalIndex" alt="" class="blur-placeholder">
+              <!-- 两级加载：网格只拉压缩图，原图留给灯箱按需请求；data-index 会被 loadImage 用来生成 alt -->
+              <img :data-src="photo.src" :data-full-src="photo.fullSrc" :data-index="photo.globalIndex" alt="" class="blur-placeholder">
             </div>
           </div>
         </div>

@@ -1,10 +1,11 @@
-// 图片加载管线（单级版：直接加载原图，不再做"压缩图先出"的两级加载）。
+// 图片加载管线（网格用压缩图，原图只在灯箱按需加载）。
 //
-// 与旧版（index.html L6419-L6515）的**有意差异**：
-//   旧版：探压缩图 → 出模糊占位 → 再探原图 → 静默替换成清晰图（每张 2 个请求）
-//   新版：直接加载原图，骨架屏一直显示到原图就绪再淡入（每张 1 个请求）
-// 好处：请求数与总字节都更少（旧逻辑无论如何都会把原图下下来，等于每张多下一个压缩图）。
-// 代价：失去模糊预览，慢网下等骨架屏的时间更长。
+// 加载策略（2026-09 性能优化）：
+//   - 网格/列表缩略图：优先加载 data-src（1920px 压缩图，约 200-500KB），
+//     原图动辄 3-8MB，之前网格直接拉原图是卡顿的最大来源；
+//   - 灯箱：点开时才请求 fullSrc 原图（useLightbox 已按 fullSrc 优先解析）；
+//   - 只写了 data-full-src 的调用方仍然可用（回退链 data-src → data-full-src）。
+// 好处：单张字节量降 90%+，解码压力骤减；坏处：失去模糊预览（骨架屏顶上）。
 //
 // 类名契约保持不变（.skeleton-loader / .has-image / .loaded / .wide / .tall），
 // 所以样式表不用改，图片层"只能挂静态 class"的约束也不变。
@@ -27,8 +28,8 @@ export function showLoadError(parent, skeleton, img) {
 }
 
 export function loadImage(img) {
-  // 新版只有一个来源：原图。data-src 仅作兜底（万一某处只写了压缩图地址）
-  const src = img.dataset.fullSrc || img.dataset.src;
+  // 网格加载压缩图优先（data-src），没写压缩图地址的调用方回退原图
+  const src = img.dataset.src || img.dataset.fullSrc;
 
   if (!src) return;
   if (img.dataset.loading === 'true') return;

@@ -82,7 +82,7 @@ async function save(status) {
     if (status) {
       await blogApi.setStatus(id, status);
     }
-    alert(status === 'published' ? '已发布，Pages 将在 1-2 分钟内更新' : '已保存为草稿');
+    alert(status === 'published' ? 'Published. Pages will rebuild in 1-2 minutes.' : 'Saved as draft.');
     router.push('/');
   } catch (e) {
     error.value = e.message;
@@ -105,53 +105,81 @@ async function onEditorUploadImg(files) {
 
 <template>
   <div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-      <h1 style="font-size:24px;">{{ isNew ? '新建文章' : '编辑文章' }}</h1>
-      <button class="btn btn-secondary" @click="router.push('/')">返回</button>
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">{{ isNew ? 'Content Management — Writing' : 'Content Management — Editing' }}</div>
+        <h1>{{ isNew ? 'New Post' : 'Edit Post' }}</h1>
+      </div>
+      <button class="btn btn-secondary" @click="router.push('/')">← Back</button>
     </div>
 
-    <div v-if="error" class="card" style="color:#ff3b30; margin-bottom:16px;">{{ error }}</div>
+    <div v-if="error" class="error-box">{{ error }}</div>
 
-    <div class="card" style="margin-bottom:16px;">
-      <div style="display:grid; gap:16px;">
+    <div class="panel" style="margin-bottom:20px;">
+      <div class="form-grid">
         <div>
-          <label style="display:block; font-size:13px; color:#6e6e73; margin-bottom:6px;">卡片标题（大写）</label>
+          <label class="field-label">Card Title</label>
           <input v-model="form.cardTitle" placeholder="IN THE MIDDLE OF THE WORLD" />
+          <div class="field-hint">Shown on the blog list card, usually uppercase</div>
         </div>
         <div>
-          <label style="display:block; font-size:13px; color:#6e6e73; margin-bottom:6px;">详情标题</label>
+          <label class="field-label">Title</label>
           <input v-model="form.title" placeholder="In the Middle of the World" />
+          <div class="field-hint">Full title shown on the post page</div>
         </div>
         <div>
-          <label style="display:block; font-size:13px; color:#6e6e73; margin-bottom:6px;">Slug（URL，仅小写字母数字连字符）</label>
+          <label class="field-label">Slug</label>
           <input v-model="form.slug" placeholder="in-the-middle-of-the-world" />
+          <div class="field-hint">URL path, lowercase letters, numbers and hyphens only</div>
         </div>
         <div>
-          <label style="display:block; font-size:13px; color:#6e6e73; margin-bottom:6px;">封面图</label>
-          <div style="display:flex; gap:16px; align-items:center;">
-            <input type="file" accept="image/*" @change="onCoverUpload" :disabled="uploading" />
-            <span v-if="uploading" style="color:#6e6e73; font-size:13px;">上传中...</span>
-          </div>
-          <div v-if="coverPreview" style="margin-top:12px;">
-            <img :src="coverPreview" style="max-width:240px; border-radius:8px;" />
+          <label class="field-label">Cover</label>
+          <div class="cover-row">
+            <label class="btn btn-secondary cover-btn" :class="{ 'is-uploading': uploading }">
+              {{ uploading ? 'Uploading ———' : 'Select Image' }}
+              <input type="file" accept="image/*" hidden @change="onCoverUpload" :disabled="uploading" />
+            </label>
+            <div v-if="coverPreview" class="cover-preview">
+              <img :src="coverPreview" alt="cover preview" />
+            </div>
+            <span v-if="!coverPreview && !uploading" class="field-hint">Not set, a default cover will be shown</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
+    <div class="panel" style="padding:0; margin-bottom:20px; overflow:hidden;">
+      <div class="editor-head">Markdown Editor</div>
       <MdEditor
         v-model="form.contentMd"
         :upload-img="onEditorUploadImg"
+        language="en-US"
         preview
         :toolbars="['bold', 'underline', 'italic', '-', 'title', 'strikeThrough', 'quote', 'unorderedList', 'orderedList', '-', 'link', 'image', 'code', 'codeBlock', '-', 'revoke', 'next', 'save', '=', 'pageFullscreen']"
         style="height:60vh;"
       />
     </div>
 
-    <div style="display:flex; gap:12px;">
-      <button class="btn btn-secondary" :disabled="saving" @click="save()">存草稿</button>
-      <button class="btn btn-primary" :disabled="saving" @click="save('published')">发布</button>
+    <div class="action-bar">
+      <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
+      <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.form-grid { display: grid; gap: 20px; }
+.cover-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.cover-btn { position: relative; overflow: hidden; }
+.cover-btn input { display: none; }
+.cover-preview {
+  width: 128px; height: 80px; border: 1px solid var(--border); overflow: hidden;
+}
+.cover-preview img { width: 100%; height: 100%; object-fit: cover; display: block; filter: invert(var(--invert, 0)); }
+.editor-head {
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  font-family: var(--font-display); font-weight: 500; font-size: 0.6rem;
+  letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-secondary);
+}
+.action-bar { display: flex; gap: 12px; justify-content: flex-end; }
+</style>

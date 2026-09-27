@@ -19,6 +19,8 @@ const items = computed(() =>
   photosOfMonth(activeMonth.value).map((filename) => ({
     filename,
     date: extractDateFromFilename(filename),
+    // 网格用压缩图（compressed_me 前缀，与 RandomGallery 的 mePool 同一约定）
+    thumb: `${CDN_BASE}/Me/compressed_me/${filename}`,
     full: `${CDN_BASE}/Me/${filename}`,
   }))
 );
@@ -61,8 +63,8 @@ function openPhoto(item) {
         <div v-for="item in items" :key="item.filename" class="me-gallery-item" @click="openPhoto(item)">
           <div class="skeleton-loader"></div>
           <div class="me-gallery-date">{{ item.date }}</div>
-          <!-- 单级加载：只给原图；日期角标与文件名 alt 与旧版一致 -->
-          <img :data-full-src="item.full" :alt="item.filename" class="blur-placeholder">
+          <!-- 两级加载：网格拉压缩图，原图留给灯箱；日期角标与文件名 alt 与旧版一致 -->
+          <img :data-src="item.thumb" :data-full-src="item.full" :alt="item.filename" class="blur-placeholder">
         </div>
       </div>
     </div>

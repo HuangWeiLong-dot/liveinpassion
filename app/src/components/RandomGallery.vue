@@ -79,8 +79,8 @@ function onItemClick(index) {
         @click="onItemClick(index)"
       >
         <div class="skeleton-loader"></div>
-        <!-- 单级加载：只给原图地址，不再挂压缩图 -->
-        <img :data-full-src="item.fullSrc" :data-index="index" alt="" class="blur-placeholder">
+        <!-- 网格拉压缩图，原图留给灯箱 -->
+        <img :data-src="item.src" :data-full-src="item.fullSrc" :data-index="index" alt="" class="blur-placeholder">
       </div>
     </div>
   </section>

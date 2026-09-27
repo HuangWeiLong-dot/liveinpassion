@@ -24,7 +24,7 @@ function open() {
   <article class="blog-card" @click="open">
     <div class="blog-card-image">
       <div class="skeleton-loader"></div>
-      <img ref="imgRef" :data-full-src="post.image.fullSrc" alt="Blog Featured Image" class="blur-placeholder">
+      <img ref="imgRef" :data-src="post.image.src" :data-full-src="post.image.fullSrc" alt="Blog Featured Image" class="blur-placeholder">
     </div>
     <div class="blog-card-overlay">
       <span class="blog-card-date">{{ post.cardDate }}</span>
