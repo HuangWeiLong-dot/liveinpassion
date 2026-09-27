@@ -12,6 +12,8 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
+export { base64UrlDecode };
+
 function decodeJwtPayload(token) {
   const parts = token.split('.');
   if (parts.length !== 3) return null;
