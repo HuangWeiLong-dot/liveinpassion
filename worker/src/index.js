@@ -20,6 +20,15 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 临时：全局错误处理器，返回异常栈以定位 500（定位完成后移除）
+app.onError((err, c) => {
+  return c.json({
+    error: String(err?.message || err),
+    stack: String(err?.stack || '').split('\n').slice(0, 5),
+    path: c.req.path,
+  }, 500);
+});
+
 // 路由：admin 写操作在 /api/admin/*，public 只读在 /api/*
 app.route('/api/admin/posts', postsRoutes);
 app.route('/api/admin/albums', albumsRoutes);
