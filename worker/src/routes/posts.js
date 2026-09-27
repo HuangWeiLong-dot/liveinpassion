@@ -109,8 +109,8 @@ app.patch('/:id/status', requireAccessAuth, async (c) => {
     : `UPDATE posts SET status='draft', published_at=NULL, updated_at=datetime('now') WHERE id=?`;
   const result = await db.prepare(sql).bind(id).run();
   if (result.meta.changes === 0) return c.json({ error: 'Post not found' }, 404);
-  // 触发前台重建（异步，不阻塞响应）
-  triggerRebuild(c.env, `post ${id} ${status}`).catch(() => {});
+  // 触发前台重建（waitUntil 注册：响应返回后 Worker 仍会执行完 GitHub 调用）
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `post ${id} ${status}`).catch(() => {}));
   return c.json({ ok: true });
 });
 
@@ -120,7 +120,7 @@ app.delete('/:id', requireAccessAuth, async (c) => {
   const id = Number(c.req.param('id'));
   const result = await db.prepare('DELETE FROM posts WHERE id=?').bind(id).run();
   if (result.meta.changes === 0) return c.json({ error: 'Post not found' }, 404);
-  triggerRebuild(c.env, `post ${id} deleted`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `post ${id} deleted`).catch(() => {}));
   return c.json({ ok: true });
 });
 

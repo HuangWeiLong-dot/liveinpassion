@@ -31,7 +31,7 @@ app.post('/', requireAccessAuth, async (c) => {
     const result = await db.prepare(
       `INSERT INTO albums (r2_prefix, name, kind, sort_order) VALUES (?, ?, ?, ?)`
     ).bind(r2Prefix, name, kind, sortOrder || 0).run();
-    triggerRebuild(c.env, `album ${r2Prefix} created`).catch(() => {});
+    c.executionCtx.waitUntil(triggerRebuild(c.env, `album ${r2Prefix} created`).catch(() => {}));
     return c.json({ id: result.meta.last_row_id }, 201);
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
@@ -59,7 +59,7 @@ app.put('/:id', requireAccessAuth, async (c) => {
     body.sortOrder !== undefined ? body.sortOrder : existing.sort_order,
     id
   ).run();
-  triggerRebuild(c.env, `album ${id} updated`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `album ${id} updated`).catch(() => {}));
   return c.json({ ok: true });
 });
 
@@ -70,7 +70,7 @@ app.delete('/:id', requireAccessAuth, async (c) => {
   await db.prepare('DELETE FROM photos WHERE album_id=?').bind(id).run();
   const result = await db.prepare('DELETE FROM albums WHERE id=?').bind(id).run();
   if (result.meta.changes === 0) return c.json({ error: 'Album not found' }, 404);
-  triggerRebuild(c.env, `album ${id} deleted`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `album ${id} deleted`).catch(() => {}));
   return c.json({ ok: true });
 });
 
@@ -107,7 +107,7 @@ app.post('/:id/photos', requireAccessAuth, async (c) => {
     p.width || null, p.height || null, p.sizeBytes || null, p.sortOrder ?? idx
   ));
   await db.batch(batch);
-  triggerRebuild(c.env, `photos added to album ${albumId}`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `photos added to album ${albumId}`).catch(() => {}));
   return c.json({ ok: true, count: photos.length }, 201);
 });
 
@@ -128,7 +128,7 @@ app.put('/photos/:photoId', requireAccessAuth, async (c) => {
     body.sortOrder !== undefined ? body.sortOrder : existing.sort_order,
     photoId
   ).run();
-  triggerRebuild(c.env, `photo ${photoId} updated`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `photo ${photoId} updated`).catch(() => {}));
   return c.json({ ok: true });
 });
 
@@ -143,7 +143,7 @@ app.put('/:id/photos/reorder', requireAccessAuth, async (c) => {
     db.prepare('UPDATE photos SET sort_order=? WHERE id=? AND album_id=?').bind(o.sortOrder, o.id, albumId)
   );
   await db.batch(batch);
-  triggerRebuild(c.env, `album ${albumId} photos reordered`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `album ${albumId} photos reordered`).catch(() => {}));
   return c.json({ ok: true });
 });
 
@@ -153,7 +153,7 @@ app.delete('/photos/:photoId', requireAccessAuth, async (c) => {
   const photoId = Number(c.req.param('photoId'));
   const result = await db.prepare('DELETE FROM photos WHERE id=?').bind(photoId).run();
   if (result.meta.changes === 0) return c.json({ error: 'Photo not found' }, 404);
-  triggerRebuild(c.env, `photo ${photoId} removed`).catch(() => {});
+  c.executionCtx.waitUntil(triggerRebuild(c.env, `photo ${photoId} removed`).catch(() => {}));
   return c.json({ ok: true });
 });
 
