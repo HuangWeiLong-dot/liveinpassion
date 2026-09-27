@@ -29,7 +29,11 @@ async function fetchAccessCerts(teamDomain) {
   if (certsCache && now - certsCacheTime < CERTS_CACHE_TTL) {
     return certsCache;
   }
-  const url = `https://${teamDomain}.cloudflareaccess.com/cdn-cgi/access/certs`;
+  // 兼容两种配置：完整域名（xxx.cloudflareaccess.com）或纯团队名（xxx）
+  const host = teamDomain.endsWith('.cloudflareaccess.com')
+    ? teamDomain
+    : `${teamDomain}.cloudflareaccess.com`;
+  const url = `https://${host}/cdn-cgi/access/certs`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch Access certs: ${res.status}`);
   const data = await res.json();
