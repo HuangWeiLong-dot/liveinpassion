@@ -4,6 +4,7 @@ import { postsRoutes } from './routes/posts.js';
 import { albumsRoutes } from './routes/albums.js';
 import { uploadsRoutes } from './routes/uploads.js';
 import { publicRoutes } from './routes/public.js';
+import { statsRoutes } from './routes/stats.js';
 
 const app = new Hono();
 
@@ -24,6 +25,7 @@ app.get('/api/health', (c) => {
 app.route('/api/admin/posts', postsRoutes);
 app.route('/api/admin/albums', albumsRoutes);
 app.route('/api/admin/uploads', uploadsRoutes);
+app.route('/api', statsRoutes);
 app.route('/api', publicRoutes);
 
 // 管理后台静态资源（Workers Assets）

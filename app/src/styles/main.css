@@ -4700,3 +4700,366 @@
                 scroll-behavior: auto !important;
             }
         }
+
+        /* ==================== 访问统计页 ==================== */
+        .stats-section {
+            padding: 140px 64px 80px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .stats-loading {
+            margin-top: 48px;
+        }
+
+        .stats-empty {
+            margin-top: 80px;
+            text-align: center;
+        }
+
+        .stats-empty p {
+            font-weight: 300;
+            opacity: 0.7;
+            margin-bottom: 24px;
+        }
+
+        .stats-retry {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.15em;
+            padding: 12px 32px;
+            background: var(--text-primary);
+            color: var(--bg);
+            border: 1px solid var(--text-primary);
+            cursor: pointer;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .stats-retry:hover {
+            background: transparent;
+            color: var(--text-primary);
+        }
+
+        /* 大数字卡片 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            margin-top: 56px;
+        }
+
+        .stat-card {
+            position: relative;
+            background: var(--bg);
+            padding: 36px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .stat-eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            color: var(--text-secondary);
+        }
+
+        .stat-number {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2.2rem, 4vw, 3.2rem);
+            font-weight: 600;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .stat-note {
+            font-size: 0.75rem;
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+        }
+
+        /* ONLINE NOW 的呼吸方块 */
+        .stat-pulse {
+            position: absolute;
+            top: 32px;
+            right: 32px;
+            width: 10px;
+            height: 10px;
+            background: var(--text-primary);
+            animation: stat-pulse 1.8s ease-in-out infinite;
+        }
+
+        @keyframes stat-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.25; }
+        }
+
+        /* 面板 */
+        .stats-panel {
+            margin-top: 48px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .stats-panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 24px 32px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-panel-head h2 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            color: var(--text-primary);
+        }
+
+        .stats-panel-head span {
+            font-size: 0.75rem;
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+        }
+
+        /* 近 30 天柱图 */
+        .stats-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            padding: 32px;
+            height: 280px;
+        }
+
+        .stats-bar-col {
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .stats-bar-track {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .stats-bar {
+            width: 100%;
+            background: var(--text-primary);
+            transition: opacity 0.25s ease;
+        }
+
+        .stats-bar-col:hover .stats-bar {
+            opacity: 0.55;
+        }
+
+        .stats-bar-label {
+            font-size: 0.6rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 10px;
+            white-space: nowrap;
+        }
+
+        .stats-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        .stats-two-col .stats-panel {
+            margin-top: 32px;
+        }
+
+        /* 月度表格 */
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stats-table td {
+            padding: 16px 32px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+            font-weight: 300;
+        }
+
+        .stats-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .stats-table-label {
+            font-family: 'Oswald', sans-serif;
+            letter-spacing: 0.12em;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+        }
+
+        .stats-table-num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
+            width: 80px;
+        }
+
+        .stats-table-muted {
+            color: var(--text-secondary);
+        }
+
+        .stats-table-empty {
+            padding: 32px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 300;
+            color: var(--text-secondary);
+        }
+
+        /* 热门页面 */
+        .stats-paths {
+            list-style: none;
+            padding: 24px 32px 32px;
+            margin: 0;
+        }
+
+        .stats-paths li {
+            margin-bottom: 20px;
+        }
+
+        .stats-paths li:last-child {
+            margin-bottom: 0;
+        }
+
+        .stats-path-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        .stats-path-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.75rem;
+            letter-spacing: 0.12em;
+            color: var(--text-primary);
+        }
+
+        .stats-path-num {
+            font-size: 0.8rem;
+            font-weight: 300;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-secondary);
+        }
+
+        .stats-path-track {
+            height: 3px;
+            background: var(--border);
+        }
+
+        .stats-path-fill {
+            height: 100%;
+            background: var(--text-primary);
+        }
+
+        .stats-foot {
+            margin-top: 32px;
+            font-size: 0.72rem;
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+        }
+
+        /* ---- 平板 ---- */
+        @media (max-width: 1024px) {
+            .stats-section {
+                padding: 120px 32px 80px;
+            }
+
+            .stats-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stats-two-col {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .stats-bars {
+                height: 240px;
+                padding: 24px;
+            }
+        }
+
+        /* ---- 手机 ---- */
+        @media (max-width: 768px) {
+            .stats-section {
+                padding: 100px 20px 64px;
+            }
+
+            .stat-card {
+                padding: 28px 24px;
+            }
+
+            .stat-pulse {
+                top: 26px;
+                right: 24px;
+            }
+
+            .stats-panel-head {
+                flex-direction: column;
+                gap: 6px;
+                padding: 20px 24px;
+            }
+
+            .stats-bars {
+                height: 200px;
+                padding: 20px;
+                gap: 3px;
+            }
+
+            .stats-bar-label {
+                font-size: 0.5rem;
+            }
+
+            .stats-table td {
+                padding: 14px 24px;
+            }
+
+            .stats-paths {
+                padding: 20px 24px 28px;
+            }
+
+            .stats-foot {
+                padding: 0 4px;
+            }
+        }
+
+        /* ---- 小屏手机 ---- */
+        @media (max-width: 480px) {
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-bars {
+                height: 160px;
+            }
+
+            /* 30 根柱在窄屏过密：只保留间距，横向滚动查看 */
+            .stats-bar-col {
+                min-width: 12px;
+            }
+
+            .stats-bars {
+                overflow-x: auto;
+            }
+        }
