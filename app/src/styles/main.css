@@ -2261,6 +2261,16 @@
             line-height: 1.3;
         }
 
+        /* overlay 内标题限制最多 3 行，防止长标题把日期顶出卡片被裁 */
+        .blog-card-overlay .blog-card-title {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            overflow-wrap: break-word;
+        }
+
         .blog-card-excerpt {
             font-family: var(--font-sans);
             font-size: 0.9rem;
@@ -4248,6 +4258,15 @@
                 gap: 20px;
             }
 
+            .blog-card-overlay {
+                padding: 24px;
+            }
+
+            .blog-card-overlay .blog-card-title {
+                font-size: clamp(1.1rem, 4.5vw, 1.4rem);
+                margin-bottom: 10px;
+            }
+
             .blog-card.featured {
                 aspect-ratio: 4/3;
             }
@@ -4582,6 +4601,24 @@
 
             .me-container {
                 gap: 24px;
+            }
+
+            .blog-card-overlay {
+                padding: 18px 20px;
+            }
+
+            .blog-card-overlay .blog-card-date {
+                margin-bottom: 8px;
+            }
+
+            .blog-card-overlay .blog-card-title {
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+                margin-bottom: 8px;
+            }
+
+            .blog-card-read {
+                padding: 6px 16px;
             }
 
             .steam-avatar {
