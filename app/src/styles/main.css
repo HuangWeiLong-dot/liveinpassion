@@ -4709,6 +4709,8 @@
         }
 
         .stats-loading {
+            position: relative;
+            height: 120px;
             margin-top: 48px;
         }
 
