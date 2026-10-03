@@ -98,24 +98,46 @@ const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
 const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
+// D1 存的是 SQLite datetime('now')（UTC，无时区后缀），展示统一按北京时间（UTC+8）
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
+
 function parseDate(iso) {
   if (!iso) return null;
-  const d = new Date(iso);
+  const s = String(iso).trim();
+  // "YYYY-MM-DD HH:MM:SS" 无时区后缀 → 显式按 UTC 解析；自带时区的 ISO 字符串直接解析
+  const d = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(s)
+    ? new Date(s.replace(' ', 'T') + 'Z')
+    : new Date(s);
   return isNaN(d) ? null : d;
 }
 
-// "SEPTEMBER 25, 2026"
+// 转为北京时间后用 UTC getter 读取墙钟值
+function toBeijing(d) {
+  return new Date(d.getTime() + BEIJING_OFFSET_MS);
+}
+
+// "6:05 AM"
+function formatTime(bj) {
+  const m = String(bj.getUTCMinutes()).padStart(2, '0');
+  const ampm = bj.getUTCHours() >= 12 ? 'PM' : 'AM';
+  const h = bj.getUTCHours() % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+// "SEPTEMBER 25, 2026 · 6:05 AM"
 function formatCardDate(iso) {
   const d = parseDate(iso);
   if (!d) return '';
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  const bj = toBeijing(d);
+  return `${MONTHS[bj.getUTCMonth()]} ${bj.getUTCDate()}, ${bj.getUTCFullYear()} · ${formatTime(bj)}`;
 }
 
-// "September 25, 2026"
+// "September 25, 2026 · 6:05 AM"
 function formatDate(iso) {
   const d = parseDate(iso);
   if (!d) return '';
-  return `${MONTHS_FULL[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  const bj = toBeijing(d);
+  return `${MONTHS_FULL[bj.getUTCMonth()]} ${bj.getUTCDate()}, ${bj.getUTCFullYear()} · ${formatTime(bj)}`;
 }
 
 export const publicRoutes = app;
