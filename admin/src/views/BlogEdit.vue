@@ -22,6 +22,42 @@ const uploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
 
+// Title / Slug 是否已被手动编辑过；手动改过的不再自动填充
+const titleDirty = ref(false);
+const slugDirty = ref(false);
+
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'nor', 'for', 'on', 'in', 'at', 'to', 'by', 'of', 'with', 'vs', 'via']);
+
+function toTitleCase(s) {
+  const words = s.toLowerCase().split(/\s+/);
+  return words
+    .map((w, i) => {
+      if (!w) return w;
+      if (i !== 0 && i !== words.length - 1 && SMALL_WORDS.has(w)) return w;
+      return w[0].toUpperCase() + w.slice(1);
+    })
+    .join(' ');
+}
+
+function toSlug(s) {
+  return s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// Card Title 变化时自动填充 Title / Slug（仅空字段或未手动编辑时）
+function onCardTitleInput() {
+  const raw = form.value.cardTitle.trim();
+  if (!raw) return;
+  if (!titleDirty.value) form.value.title = toTitleCase(raw);
+  if (!slugDirty.value) form.value.slug = toSlug(raw);
+}
+
 // 正文图片暂存：blobUrl -> File。保存时才真正上传 R2
 const pendingImages = reactive(new Map());
 const imgProgress = ref('');
@@ -36,6 +72,9 @@ onMounted(async () => {
       form.value.contentMd = data.contentMd || '';
       form.value.coverKey = data.coverKey || '';
       form.value.coverFullKey = data.coverFullKey || '';
+      // 已有内容不参与自动填充
+      if (data.title) titleDirty.value = true;
+      if (data.slug) slugDirty.value = true;
       if (data.coverFullKey) {
         coverPreview.value = `https://img.liveinpassion.me/${data.coverFullKey}`;
       }
@@ -682,17 +721,17 @@ onUnmounted(() => {
       <div class="form-grid">
         <div>
           <label class="field-label">Card Title</label>
-          <input v-model="form.cardTitle" placeholder="IN THE MIDDLE OF THE WORLD" />
-          <div class="field-hint">Shown on the blog list card, usually uppercase</div>
+          <input v-model="form.cardTitle" placeholder="IN THE MIDDLE OF THE WORLD" @input="onCardTitleInput" />
+          <div class="field-hint">Shown on the blog list card, usually uppercase · auto-fills Title & Slug</div>
         </div>
         <div>
           <label class="field-label">Title</label>
-          <input v-model="form.title" placeholder="In the Middle of the World" />
+          <input v-model="form.title" placeholder="In the Middle of the World" @input="titleDirty = true" />
           <div class="field-hint">Full title shown on the post page</div>
         </div>
         <div>
           <label class="field-label">Slug</label>
-          <input v-model="form.slug" placeholder="in-the-middle-of-the-world" />
+          <input v-model="form.slug" placeholder="in-the-middle-of-the-world" @input="slugDirty = true" />
           <div class="field-hint">URL path, lowercase letters, numbers and hyphens only</div>
         </div>
         <div>
