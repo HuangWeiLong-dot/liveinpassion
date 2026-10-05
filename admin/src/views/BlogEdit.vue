@@ -19,6 +19,7 @@ const form = ref({
 });
 const saving = ref(false);
 const uploading = ref(false);
+const imgUploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
 
@@ -60,6 +61,10 @@ async function onCoverUpload(e) {
 }
 
 async function save(status) {
+  if (imgUploading.value) {
+    error.value = 'Image is still uploading, please wait.';
+    return;
+  }
   saving.value = true;
   error.value = '';
   try {
@@ -91,17 +96,30 @@ async function save(status) {
   }
 }
 
-// Markdown 编辑器图片上传：调用上传接口并插入
-async function onEditorUploadImg(files) {
+// Markdown 编辑器图片上传：调用上传接口，通过回调把图片 URL 插入光标处
+// md-editor-v3 约定：onUploadImg(files, callBack)，完成后必须调用 callBack(urls)
+async function onEditorUploadImg(files, callBack) {
   const urls = [];
-  for (const file of files) {
-    const compressed = await compressImage(file);
-    const result = await uploadApi.upload(file, compressed, 'blog');
-    // 正文插入压缩版（1920px，正文栏宽下足够清晰），原图只留 R2 存档；
-    // 压缩失败时回退原图
-    urls.push(result.compressed?.url || result.original.url);
+  imgUploading.value = true;
+  try {
+    for (const file of files) {
+      const compressed = await compressImage(file);
+      const result = await uploadApi.upload(file, compressed, 'blog');
+      // 正文插入压缩版（1920px，正文栏宽下足够清晰），原图只留 R2 存档；
+      // 压缩失败时回退原图
+      urls.push(result.compressed?.url || result.original.url);
+    }
+    callBack(urls);
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    imgUploading.value = false;
   }
-  return urls;
+}
+
+// 编辑器内 Ctrl+S / 工具栏保存按钮：存为草稿
+function onEditorSave() {
+  save();
 }
 </script>
 
@@ -151,20 +169,38 @@ async function onEditorUploadImg(files) {
     </div>
 
     <div class="panel" style="padding:0; margin-bottom:20px; overflow:hidden;">
-      <div class="editor-head">Markdown Editor</div>
+      <div class="editor-head">
+        <span>Markdown Editor</span>
+        <span class="editor-tip">
+          <template v-if="imgUploading">Uploading image…</template>
+          <template v-else>Ctrl+S save draft · paste / drop image to upload</template>
+        </span>
+      </div>
       <MdEditor
         v-model="form.contentMd"
-        :upload-img="onEditorUploadImg"
+        :on-upload-img="onEditorUploadImg"
+        :on-save="onEditorSave"
         language="en-US"
         preview
-        :toolbars="['bold', 'underline', 'italic', '-', 'title', 'strikeThrough', 'quote', 'unorderedList', 'orderedList', '-', 'link', 'image', 'code', 'codeBlock', '-', 'revoke', 'next', 'save', '=', 'pageFullscreen']"
+        :show-code-row-number="true"
+        :auto-detect-code="true"
+        :table-shape="[6, 4]"
+        placeholder="Start writing in Markdown…"
+        :toolbars="[
+          'bold', 'underline', 'italic', 'strikeThrough', 'sub', 'sup', '-',
+          'title', 'quote', 'unorderedList', 'orderedList', 'task', '-',
+          'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-',
+          'revoke', 'next', '-',
+          'save', 'prettier', '=',
+          'preview', 'previewOnly', 'htmlPreview', 'catalog', 'pageFullscreen', 'fullscreen',
+        ]"
         style="height:60vh;"
       />
     </div>
 
     <div class="action-bar">
-      <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
-      <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
+      <button class="btn btn-secondary" :disabled="saving || imgUploading" @click="save()">Save Draft</button>
+      <button class="btn btn-primary" :disabled="saving || imgUploading" @click="save('published')">Publish</button>
     </div>
   </div>
 </template>
@@ -182,6 +218,8 @@ async function onEditorUploadImg(files) {
   padding: 10px 16px; border-bottom: 1px solid var(--border);
   font-family: var(--font-display); font-weight: 500; font-size: 0.6rem;
   letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-secondary);
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
 }
+.editor-tip { text-transform: none; letter-spacing: 0.05em; font-size: 0.7rem; }
 .action-bar { display: flex; gap: 12px; justify-content: flex-end; }
 </style>
