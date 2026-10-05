@@ -710,9 +710,12 @@
         .media-text--40 { grid-template-columns: 2fr 3fr; }
         .media-text--60 { grid-template-columns: 3fr 2fr; }
         .media-text--right .media-text__media { order: 2; }
-        .media-text__media { margin: 0; }
+        .media-text__media { margin: 0; min-width: 0; }
         .media-text__media img { display: block; width: 100%; }
+        .media-text__body { min-width: 0; }
         .media-text__body p:last-child { margin-bottom: 0; }
+        /* 容错：marked 标签错位会在块末尾留下孤立空 <p>，它会成为 grid 第三项打乱排版；正文段落都在 body 内 */
+        .blog-detail-content .media-text > p { display: none; }
 
         @media (max-width: 720px) {
             .gallery-justified img { height: 130px; }

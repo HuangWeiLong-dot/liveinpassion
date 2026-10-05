@@ -290,12 +290,15 @@ function buildGalleryBlock(type, urls, caption, gid) {
   return `\n<figure class="gallery ${galleryClass(type, urls.length)}"${gidAttr}>\n${imgs}${cap}\n</figure>\n`;
 }
 
-function buildMediaBlock(url, gid) {
+// side: 照片在左/右；ratio: 照片占比 40/50/60。
+// 正文不手写 <p>：marked 会把 HTML 块内的字面 <p> 与后续 markdown 段落解析错位，
+// 产出孤立 </p>，浏览器再补成空 <p> 成为 grid 第三项。用空行让 marked 自行生成段落。
+function buildMediaBlock(url, gid, side = 'left', ratio = '50') {
   const gidAttr = gid ? ` data-gid="${gid}"` : '';
   return (
-    `\n<div class="media-text media-text--left media-text--50"${gidAttr}>\n` +
+    `\n<div class="media-text media-text--${side} media-text--${ratio}"${gidAttr}>\n` +
     `<figure class="media-text__media"><img src="${url}" alt=""></figure>\n` +
-    '<div class="media-text__body"><p>Write your text here…</p></div>\n</div>\n'
+    '<div class="media-text__body">\n\nWrite your text here…\n\n</div>\n</div>\n'
   );
 }
 
@@ -363,7 +366,7 @@ function insertLayout() {
     block = buildGalleryBlock(type, [...existing, ...urls], node ? captionOf(node) : '', appendTarget.value);
     form.value.contentMd = replaceBlock(form.value.contentMd, appendTarget.value, block);
   } else if (layoutType.value === 'media') {
-    block = buildMediaBlock(urls[0], newGid());
+    block = buildMediaBlock(urls[0], newGid(), layoutSide.value, layoutRatio.value);
     if (doInsert) {
       doInsert(() => ({ targetValue: block }));
     } else {
@@ -1019,7 +1022,10 @@ onUnmounted(() => {
 .md-editor-preview .media-text--40 { grid-template-columns: 2fr 3fr; }
 .md-editor-preview .media-text--60 { grid-template-columns: 3fr 2fr; }
 .md-editor-preview .media-text--right .media-text__media { order: 2; }
-.md-editor-preview .media-text__media { margin: 0; }
+.md-editor-preview .media-text__media { margin: 0; min-width: 0; }
 .md-editor-preview .media-text__media img { display: block; width: 100%; }
+.md-editor-preview .media-text__body { min-width: 0; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
+/* 容错：孤立空 <p> 不得成为 grid 第三项 */
+.md-editor-preview .media-text > p { display: none; }
 </style>
