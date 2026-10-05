@@ -999,7 +999,6 @@ onUnmounted(() => {
 .md-editor-preview .gallery-collage--6 img:nth-child(6) { grid-column: 3 / -1; }
 
 .md-editor-preview .gallery-bento { display: grid; gap: 10px; grid-auto-flow: dense; }
-.md-editor-preview .gallery-bento img { border-radius: 12px; }
 .md-editor-preview .gallery-bento--2 { grid-template-columns: 2fr 1fr; grid-auto-rows: 230px; }
 .md-editor-preview .gallery-bento--3 { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 160px; }
 .md-editor-preview .gallery-bento--3 img:nth-child(1) { grid-column: span 2; grid-row: span 2; }
@@ -1021,6 +1020,6 @@ onUnmounted(() => {
 .md-editor-preview .media-text--60 { grid-template-columns: 3fr 2fr; }
 .md-editor-preview .media-text--right .media-text__media { order: 2; }
 .md-editor-preview .media-text__media { margin: 0; }
-.md-editor-preview .media-text__media img { display: block; width: 100%; border-radius: 12px; }
+.md-editor-preview .media-text__media img { display: block; width: 100%; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
 </style>

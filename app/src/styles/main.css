@@ -686,9 +686,8 @@
         .gallery-collage--6 img:nth-child(1) { grid-column: span 2; grid-row: span 2; }
         .gallery-collage--6 img:nth-child(6) { grid-column: 3 / -1; }
 
-        /* Bento Box：圆角瓦片 + 焦点大图 */
+        /* Bento Box：瓦片 + 焦点大图 */
         .gallery-bento { display: grid; gap: 10px; grid-auto-flow: dense; }
-        .gallery-bento img { border-radius: 12px; }
         .gallery-bento--2 { grid-template-columns: 2fr 1fr; grid-auto-rows: 230px; }
         .gallery-bento--3 { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 160px; }
         .gallery-bento--3 img:nth-child(1) { grid-column: span 2; grid-row: span 2; }
@@ -712,7 +711,7 @@
         .media-text--60 { grid-template-columns: 3fr 2fr; }
         .media-text--right .media-text__media { order: 2; }
         .media-text__media { margin: 0; }
-        .media-text__media img { display: block; width: 100%; border-radius: 12px; }
+        .media-text__media img { display: block; width: 100%; }
         .media-text__body p:last-child { margin-bottom: 0; }
 
         @media (max-width: 720px) {
