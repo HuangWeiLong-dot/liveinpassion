@@ -18,7 +18,7 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTRS = {
   a: ['href', 'title', 'target', 'rel'],
   img: ['src', 'alt', 'title', 'width', 'height'],
-  '*': ['class'],
+  '*': ['class', 'data-gid'],
 };
 
 const ALLOWED_SCHEMES = ['http', 'https', 'mailto'];
