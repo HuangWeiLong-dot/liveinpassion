@@ -1,7 +1,7 @@
 <script setup>
-import { ref, reactive, h, onMounted, onUnmounted, computed } from 'vue';
+import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MdEditor, NormalToolbar } from 'md-editor-v3';
+import { MdEditor } from 'md-editor-v3';
 import { blogApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 
@@ -146,7 +146,6 @@ function onEditorSave() {
 }
 
 // ===== 照片排版（masonry / justified / collage / bento / text+photo）=====
-const editorRef = ref(null);
 const layoutModal = ref(false);
 const layoutType = ref('masonry');
 const layoutSide = ref('left');
@@ -164,16 +163,36 @@ const layoutOptions = [
 
 // 错落方块图标，暗示多图排版
 const PHOTO_LAYOUT_SVG =
-  '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
   'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
   '<rect x="3" y="3" width="8" height="11" rx="1.5"/><rect x="13" y="3" width="8" height="6" rx="1.5"/>' +
   '<rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="16" width="8" height="5" rx="1.5"/></svg>';
 
-const photoLayoutToolbar = h(
-  NormalToolbar,
-  { title: 'Photo Layout', onClick: () => { layoutModal.value = true; } },
-  { trigger: () => h('span', { class: 'md-photo-layout-btn', innerHTML: PHOTO_LAYOUT_SVG }) }
-);
+// 自定义工具栏组件：编辑器克隆 defToolbars 项时会注入 insert(generate)，
+// 点击时暂存它，插入排版块时在光标处插入
+let doInsert = null;
+const PhotoLayoutTrigger = defineComponent({
+  name: 'PhotoLayoutTrigger',
+  props: {
+    insert: { type: Function, default: undefined },
+  },
+  setup(props) {
+    return () =>
+      h(
+        'div',
+        {
+          class: 'md-editor-toolbar-item',
+          title: 'Photo Layout',
+          onClick: () => {
+            doInsert = props.insert;
+            layoutModal.value = true;
+          },
+        },
+        [h('span', { class: 'md-photo-layout-btn', innerHTML: PHOTO_LAYOUT_SVG })]
+      );
+  },
+});
+const photoLayoutToolbar = h(PhotoLayoutTrigger);
 
 // 选择多张照片：仍是本地暂存（保存时才上传），与普通插图共用 pendingImages
 function onLayoutFiles(e) {
@@ -235,7 +254,11 @@ function insertLayout() {
       : `gallery-${layoutType.value}`;
     block = buildGalleryBlock(cls, urls, layoutCaption.value.trim());
   }
-  editorRef.value?.insert(() => ({ targetValue: block }));
+  if (doInsert) {
+    doInsert(() => ({ targetValue: block }));
+  } else {
+    form.value.contentMd += block; // 极端兜底：注入丢失时追加到文末
+  }
   layoutModal.value = false;
   layoutPicked.value = [];
   resetLayoutForm();
@@ -297,11 +320,10 @@ function insertLayout() {
         </span>
       </div>
       <MdEditor
-        ref="editorRef"
         v-model="form.contentMd"
         :on-upload-img="onEditorUploadImg"
         :on-save="onEditorSave"
-        :def-toolbars="photoLayoutToolbar"
+        :def-toolbars="[photoLayoutToolbar]"
         language="en-US"
         preview
         :show-code-row-number="true"
@@ -413,9 +435,6 @@ function insertLayout() {
 .editor-tip { text-transform: none; letter-spacing: 0.05em; font-size: 0.7rem; }
 .action-bar { display: flex; gap: 12px; justify-content: flex-end; }
 
-/* 自定义工具栏图标 */
-.md-photo-layout-btn { display: inline-flex; align-items: center; justify-content: center; }
-
 /* 排版弹窗 */
 .layout-overlay {
   position: fixed; inset: 0; z-index: 1000;
@@ -462,9 +481,15 @@ function insertLayout() {
 .layout-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; }
 </style>
 
-<!-- 编辑器预览区内的排版样式（非 scoped；所有规则限定在 .md-editor-preview 内）
+<!-- 编辑器工具栏自定义图标 + 预览区内的排版样式（非 scoped；scoped 样式无法作用到 h() 创建的元素）
      与 app/src/styles/main.css 中的 .blog-detail-content 排版规则保持一致 -->
 <style>
+.md-editor-toolbar-wrapper .md-photo-layout-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+}
+.md-editor-toolbar-wrapper .md-photo-layout-btn svg { width: 20px; height: 20px; display: block; }
+
 .md-editor-preview .gallery { margin: 32px 0; }
 .md-editor-preview .gallery img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .md-editor-preview .gallery-caption { font-size: 0.85rem; opacity: 0.7; text-align: center; margin-top: 10px; }
