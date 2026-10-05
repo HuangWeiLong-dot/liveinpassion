@@ -11,6 +11,8 @@ const ALLOWED_TAGS = [
   'code', 'pre',
   'hr',
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  // 照片排版容器：gallery / media-text
+  'figure', 'figcaption', 'div', 'section', 'span',
 ];
 
 const ALLOWED_ATTRS = {
