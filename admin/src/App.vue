@@ -274,4 +274,14 @@ select { cursor: pointer; }
   .action-bar { flex-wrap: wrap; }
   .action-bar .btn { flex: 1; }
 }
+
+/* 触摸设备：把点按目标抬到 44px。原来 .btn 只有 35-38px 高，
+   .brand 27px，手指按下去常常差一两像素就点不中。 */
+@media (hover: none) {
+  .btn { min-height: 44px; padding: 12px 18px; }
+  .brand { min-height: 44px; justify-content: center; }
+  .nav-item { min-width: 44px; }
+  /* iOS Safari 聚焦 <16px 的输入框会放大整页 */
+  input, textarea, select { font-size: 16px; }
+}
 </style>

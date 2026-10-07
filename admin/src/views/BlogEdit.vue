@@ -4,10 +4,19 @@ import { useRoute, useRouter } from 'vue-router';
 import { MdEditor } from 'md-editor-v3';
 import { blogApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
+import { startPressDrag } from '../utils/pressDrag.js';
 
 const route = useRoute();
 const router = useRouter();
 const isNew = computed(() => !route.params.id);
+
+// 粗指针 = 没有 hover 的触摸设备。这个判断决定三件事：
+//   1) 排版块工具条是 hover 才现身还是常显（CSS 侧用 @media (hover: none) 同一条件）
+//   2) 单图删除钮靠 mouseover 还是靠点按唤出
+//   3) 手机上编辑器要不要默认收起预览（分栏后输入区只剩 155px 宽）
+const coarsePointer = window.matchMedia('(hover: none)');
+const narrowScreen = window.matchMedia('(max-width: 768px)');
+const isNarrow = ref(narrowScreen.matches);
 
 const form = ref({
   slug: '',
@@ -61,6 +70,11 @@ function onCardTitleInput() {
 // 正文图片暂存：blobUrl -> File。保存时才真正上传 R2
 const pendingImages = reactive(new Map());
 const imgProgress = ref('');
+
+// 手机上默认只显示编辑区，预览交给工具栏的预览按钮切；旋屏/改窗宽时跟上
+function syncNarrow(e) { isNarrow.value = e.matches; }
+onMounted(() => narrowScreen.addEventListener('change', syncNarrow));
+onUnmounted(() => narrowScreen.removeEventListener('change', syncNarrow));
 
 onMounted(async () => {
   if (!isNew.value) {
@@ -290,15 +304,12 @@ function buildGalleryBlock(type, urls, caption, gid) {
   return `\n<figure class="gallery ${galleryClass(type, urls.length)}"${gidAttr}>\n${imgs}${cap}\n</figure>\n`;
 }
 
-// side: 照片在左/右；ratio: 照片占比 40/50/60。
-// 正文不手写 <p>：marked 会把 HTML 块内的字面 <p> 与后续 markdown 段落解析错位，
-// 产出孤立 </p>，浏览器再补成空 <p> 成为 grid 第三项。用空行让 marked 自行生成段落。
-function buildMediaBlock(url, gid, side = 'left', ratio = '50') {
+function buildMediaBlock(url, gid) {
   const gidAttr = gid ? ` data-gid="${gid}"` : '';
   return (
-    `\n<div class="media-text media-text--${side} media-text--${ratio}"${gidAttr}>\n` +
+    `\n<div class="media-text media-text--left media-text--50"${gidAttr}>\n` +
     `<figure class="media-text__media"><img src="${url}" alt=""></figure>\n` +
-    '<div class="media-text__body">\n\nWrite your text here…\n\n</div>\n</div>\n'
+    '<div class="media-text__body"><p>Write your text here…</p></div>\n</div>\n'
   );
 }
 
@@ -366,7 +377,7 @@ function insertLayout() {
     block = buildGalleryBlock(type, [...existing, ...urls], node ? captionOf(node) : '', appendTarget.value);
     form.value.contentMd = replaceBlock(form.value.contentMd, appendTarget.value, block);
   } else if (layoutType.value === 'media') {
-    block = buildMediaBlock(urls[0], newGid(), layoutSide.value, layoutRatio.value);
+    block = buildMediaBlock(urls[0], newGid());
     if (doInsert) {
       doInsert(() => ({ targetValue: block }));
     } else {
@@ -386,21 +397,36 @@ function insertLayout() {
   resetLayoutForm();
 }
 
-// 弹窗内已选缩略图也可拖拽排序
-let thumbDrag = null;
-function onThumbDragStart(idx, e) {
-  thumbDrag = idx;
-  e.dataTransfer.effectAllowed = 'move';
-}
-function onThumbDragOver(e) {
-  if (thumbDrag !== null) e.dataTransfer.dropEffect = 'move';
-}
-function onThumbDrop(idx) {
-  if (thumbDrag === null || thumbDrag === idx) return;
-  const arr = layoutPicked.value;
-  const [moved] = arr.splice(thumbDrag, 1);
-  arr.splice(idx, 0, moved);
-  thumbDrag = idx;
+// 弹窗内已选缩略图也可拖拽排序（同样走 pointer，触屏长按起拖）
+const thumbDragIdx = ref(null);
+const thumbDragOver = ref(null);
+function onThumbPointerDown(idx, e) {
+  if (e.pointerType === 'mouse') e.preventDefault();
+  startPressDrag(e, {
+    onEngage: () => {
+      thumbDragIdx.value = idx;
+      thumbDragOver.value = idx;
+    },
+    onMove: (x, y) => {
+      const thumb = document.elementFromPoint(x, y)?.closest?.('.layout-thumb');
+      const over = thumb ? Number(thumb.dataset.idx) : NaN;
+      if (!Number.isNaN(over)) thumbDragOver.value = over;
+    },
+    onDrop: () => {
+      const from = thumbDragIdx.value;
+      const to = thumbDragOver.value;
+      thumbDragIdx.value = null;
+      thumbDragOver.value = null;
+      if (from === null || to === null || from === to) return;
+      const arr = layoutPicked.value;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+    },
+    onCancel: () => {
+      thumbDragIdx.value = null;
+      thumbDragOver.value = null;
+    },
+  });
 }
 
 // ===== 预览区直接拖拽编辑（仅 admin；前台无此逻辑）=====
@@ -466,7 +492,8 @@ function enhanceBlocks() {
     fig.classList.add('block-editable');
     const gid = ensureGid(fig, 'gallery');
     blockNodes.set(gid, fig);
-    fig.querySelectorAll('img').forEach((im) => { im.draggable = true; });
+    // 排序走 pointer 事件，关掉浏览器自带的图片拖拽，免得两条拖拽打架
+    fig.querySelectorAll('img').forEach((im) => { im.draggable = false; });
     fig.appendChild(buildEditbar());
   });
   previewEl.querySelectorAll('.media-text').forEach((el) => {
@@ -480,50 +507,48 @@ function enhanceBlocks() {
 }
 
 // ---- 拖拽重排 / 跨块移动 ----
-function onDragStart(e) {
+// 走 pointer 事件：HTML5 拖放（draggable + dragstart/dragover/drop）在触屏上根本不触发，
+// 手机上拖不动任何一张图。鼠标按下即拖、触摸长按起拖的差异封在 pressDrag 里。
+function onPreviewPointerDown(e) {
   const img = e.target;
   if (!(img instanceof HTMLImageElement)) return;
   const fig = img.closest('figure.gallery');
   if (!fig || !previewEl.contains(fig)) return;
-  dragState = { fromGid: fig.dataset.gid, src: img.getAttribute('src'), img };
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', dragState.src);
-  img.classList.add('is-dragging');
+  e.preventDefault(); // 挡掉选中与原生图片拖拽
+  dragState = { fromGid: fig.dataset.gid, src: img.getAttribute('src'), img, toGid: null, targetSrc: null, after: false };
+  if (coarsePointer.matches) hideFly(); // 触摸下拖拽与"点图唤出删除钮"别同时进行
+  startPressDrag(e, {
+    onEngage: () => { dragState?.img.classList.add('is-dragging'); },
+    onMove: (x, y) => updateDropTarget(x, y),
+    onDrop: () => {
+      const to = dragState?.toGid ? blockNodes.get(dragState.toGid) : null;
+      if (to) commitMove(to);
+      endDrag();
+    },
+    onCancel: endDrag,
+  });
 }
 
 function clearHint() {
   previewEl?.querySelectorAll('.drop-hint').forEach((n) => n.classList.remove('drop-hint'));
 }
 
-function onDragOver(e) {
+function updateDropTarget(x, y) {
   if (!dragState) return;
-  const fig = e.target.closest?.('figure.gallery');
+  const el = document.elementFromPoint(x, y);
+  const fig = el?.closest?.('figure.gallery');
   if (!fig || !previewEl.contains(fig)) return;
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  const imgs = [...fig.querySelectorAll('img')];
-  const target = imgs.find((im) => im === e.target || im.contains(e.target));
   clearHint();
   dragState.toGid = fig.dataset.gid;
   dragState.targetSrc = null;
   dragState.after = false;
+  const target = [...fig.querySelectorAll('img')].find((im) => im === el || im.contains(el));
   if (target && target !== dragState.img) {
     target.classList.add('drop-hint');
     dragState.targetSrc = target.getAttribute('src');
     const r = target.getBoundingClientRect();
-    dragState.after = e.clientX - r.left > r.width / 2 || e.clientY - r.top > r.height / 2;
+    dragState.after = x - r.left > r.width / 2 || y - r.top > r.height / 2;
   }
-}
-
-function onDrop(e) {
-  if (!dragState) return;
-  const fig = e.target.closest?.('figure.gallery');
-  if (fig && previewEl.contains(fig)) {
-    e.preventDefault();
-    e.stopPropagation();
-    commitMove(fig);
-  }
-  endDrag();
 }
 
 function endDrag() {
@@ -615,9 +640,9 @@ let flyHideTimer = null;
 
 function positionFly(img) {
   const r = img.getBoundingClientRect();
+  removeFly.hidden = false; // 先显示再量：触屏下按钮更宽，偏移要按实际宽度算
   removeFly.style.top = `${r.top + 6}px`;
-  removeFly.style.left = `${r.right - 28}px`;
-  removeFly.hidden = false;
+  removeFly.style.left = `${r.right - removeFly.offsetWidth - 6}px`;
 }
 
 function onPreviewMouseOver(e) {
@@ -629,6 +654,34 @@ function onPreviewMouseOver(e) {
   flySrc = img.getAttribute('src');
   flyGid = fig.dataset.gid;
   positionFly(img);
+}
+
+// 触屏没有 hover，mouseover 唤不出删除钮 —— 点一下图，把删除钮定到那张图上。
+//
+// 这一步必须在**捕获阶段**拦住：md-editor 预览给每张图挂了 medium-zoom，
+// 点击会弹一个盖满全屏的放大遮罩，正好压住删除钮（实测 elementFromPoint 命中的就是
+// .medium-zoom-overlay）。捕获监听挂在 previewEl 上，先于 img 自身的监听执行，
+// stopPropagation() 后图片的 click 就不会再到达 medium-zoom。
+// 代价是触摸下点排版块里的图不再放大 —— 编辑台上"选中这张图"比放大更有用，
+// 桌面端不受影响（hover 出删除钮，点击仍然放大）。
+function onPreviewClickCapture(e) {
+  if (!coarsePointer.matches) return;
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const fig = img.closest('figure.gallery');
+  if (!fig || !previewEl.contains(fig)) return;
+  e.stopPropagation();
+  flySrc = img.getAttribute('src');
+  flyGid = fig.dataset.gid;
+  positionFly(img);
+}
+
+// 点空白处收起删除钮
+function onPreviewClick(e) {
+  if (!coarsePointer.matches) return;
+  const img = e.target;
+  const fig = img instanceof HTMLImageElement ? img.closest('figure.gallery') : null;
+  if (!fig || !previewEl.contains(fig)) hideFly();
 }
 
 function scheduleHideFly() {
@@ -674,11 +727,10 @@ function initPreviewEditing() {
   removeFly.addEventListener('mouseleave', scheduleHideFly);
   document.body.appendChild(removeFly);
 
-  previewEl.addEventListener('dragstart', onDragStart);
-  previewEl.addEventListener('dragover', onDragOver);
-  previewEl.addEventListener('drop', onDrop);
-  previewEl.addEventListener('dragend', endDrag);
+  previewEl.addEventListener('pointerdown', onPreviewPointerDown);
+  previewEl.addEventListener('click', onPreviewClickCapture, true);
   previewEl.addEventListener('click', onBarClick);
+  previewEl.addEventListener('click', onPreviewClick);
   previewEl.addEventListener('mouseover', onPreviewMouseOver);
   previewEl.addEventListener('mouseout', onPreviewMouseOut);
   window.addEventListener('scroll', hideFly, true);
@@ -694,11 +746,10 @@ onMounted(initPreviewEditing);
 onUnmounted(() => {
   previewObs?.disconnect();
   if (previewEl) {
-    previewEl.removeEventListener('dragstart', onDragStart);
-    previewEl.removeEventListener('dragover', onDragOver);
-    previewEl.removeEventListener('drop', onDrop);
-    previewEl.removeEventListener('dragend', endDrag);
+    previewEl.removeEventListener('pointerdown', onPreviewPointerDown);
+    previewEl.removeEventListener('click', onPreviewClickCapture, true);
     previewEl.removeEventListener('click', onBarClick);
+    previewEl.removeEventListener('click', onPreviewClick);
     previewEl.removeEventListener('mouseover', onPreviewMouseOver);
     previewEl.removeEventListener('mouseout', onPreviewMouseOut);
   }
@@ -759,7 +810,10 @@ onUnmounted(() => {
         <span class="editor-tip">
           <template v-if="imgProgress">{{ imgProgress }}</template>
           <template v-else-if="pendingImages.size">{{ pendingImages.size }} image(s) pending · upload on save</template>
-          <template v-else>Ctrl+S save draft · paste / drop image to insert</template>
+          <template v-else>
+            <span class="tip-fine">Ctrl+S save draft · paste / drop image to insert</span>
+            <span class="tip-coarse">Tap the save icon to draft · tap a photo to edit it</span>
+          </template>
         </span>
       </div>
       <MdEditor
@@ -768,7 +822,7 @@ onUnmounted(() => {
         :on-save="onEditorSave"
         :def-toolbars="[photoLayoutToolbar]"
         language="en-US"
-        preview
+        :preview="!isNarrow"
         :show-code-row-number="true"
         :auto-detect-code="true"
         :table-shape="[6, 4]"
@@ -809,13 +863,12 @@ onUnmounted(() => {
               v-for="(item, idx) in layoutPicked"
               :key="item.blobUrl"
               class="layout-thumb"
-              draggable="true"
-              @dragstart="onThumbDragStart(idx, $event)"
-              @dragover="onThumbDragOver($event)"
-              @drop.prevent="onThumbDrop(idx)"
+              :class="{ 'is-dragging': thumbDragIdx === idx, 'is-drop-target': thumbDragIdx !== null && thumbDragOver === idx && thumbDragIdx !== idx }"
+              :data-idx="idx"
+              @pointerdown="onThumbPointerDown(idx, $event)"
             >
-              <img :src="item.blobUrl" alt="">
-              <button class="layout-thumb-x" @click="removeLayoutFile(idx)">×</button>
+              <img :src="item.blobUrl" alt="" draggable="false">
+              <button class="layout-thumb-x" aria-label="Remove photo" @click="removeLayoutFile(idx)">×</button>
             </div>
           </div>
           <div class="field-hint">Photos stay on this device until you save the post.</div>
@@ -886,6 +939,13 @@ onUnmounted(() => {
 .editor-tip { text-transform: none; letter-spacing: 0.05em; font-size: 0.7rem; }
 .action-bar { display: flex; gap: 12px; justify-content: flex-end; }
 
+/* 触屏上没有 Ctrl+S，"paste / drop" 也不成立，换成触摸版的提示 */
+.tip-coarse { display: none; }
+@media (hover: none) {
+  .tip-fine { display: none; }
+  .tip-coarse { display: inline; }
+}
+
 /* 排版弹窗 */
 .layout-overlay {
   position: fixed; inset: 0; z-index: 1000;
@@ -894,7 +954,8 @@ onUnmounted(() => {
 }
 .layout-dialog {
   background: var(--bg); border: 1px solid var(--border); width: 640px; max-width: 100%;
-  max-height: 86vh; overflow-y: auto;
+  /* dvh：手机浏览器收起地址栏后 vh 仍按最大视口算，弹窗底部会被推出屏幕 */
+  max-height: 86vh; max-height: 86dvh; overflow-y: auto;
 }
 .layout-dialog-head {
   position: sticky; top: 0; z-index: 1;
@@ -911,12 +972,26 @@ onUnmounted(() => {
 .layout-thumbs {
   display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: 8px; margin-bottom: 10px;
 }
-.layout-thumb { position: relative; width: 84px; height: 84px; cursor: grab; }
+.layout-thumb {
+  position: relative; width: 84px; height: 84px; cursor: grab;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .layout-thumb:active { cursor: grabbing; }
 .layout-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.layout-thumb.is-dragging { opacity: 0.5; }
+.layout-thumb.is-drop-target { outline: 2px solid var(--text-primary); outline-offset: -2px; }
 .layout-thumb-x {
   position: absolute; top: 2px; right: 2px; width: 20px; height: 20px;
   background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.9rem;
+}
+@media (hover: none) {
+  .layout-thumb-x {
+    width: 44px; height: 44px; font-size: 1.15rem;
+    background: rgba(0, 0, 0, 0.45); border-radius: 0 0 0 44px;
+  }
+  .layout-x { width: 44px; height: 44px; }
+  /* 分段控件（照片左右 / 宽度）在手机上也要点得中 */
+  .seg button { min-height: 44px; padding: 10px 16px; font-size: 0.85rem; }
 }
 .layout-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
 .layout-type {
@@ -954,6 +1029,10 @@ onUnmounted(() => {
 .md-editor-preview figure.gallery.block-editable img.drop-hint {
   outline: 2px solid var(--text-primary); outline-offset: -3px;
 }
+/* 长按拖拽时别弹出系统的图片菜单/选词 */
+.md-editor-preview figure.gallery.block-editable img {
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .gallery-editbar {
   position: absolute; top: 6px; right: 6px; z-index: 6;
   display: flex; gap: 2px; padding: 2px;
@@ -974,14 +1053,35 @@ onUnmounted(() => {
   font-size: 0.9rem; line-height: 1; cursor: pointer;
 }
 
-.md-editor-preview .gallery-masonry { columns: 2; column-gap: 12px; }
+/* ============ 触屏（hover: none） ============
+   这里的控件原先全靠 :hover 现身：排版块工具条 opacity 0 → hover 1；
+   单图删除钮靠 mouseover 定位。触屏没有 hover，等于整块功能不存在。
+   触摸下改成常显 + 移到块底部当一条操作带，按钮放大到可点尺寸。*/
+@media (hover: none) {
+  .gallery-editbar {
+    opacity: 1;
+    top: auto; bottom: 0; left: 0; right: 0;
+    justify-content: center; flex-wrap: wrap; gap: 4px;
+    padding: 4px; border-radius: 0;
+  }
+  .gallery-editbtn { width: 44px; height: 44px; font-size: 0.9rem; line-height: 44px; }
+  .gallery-editbtn[data-cmd='delete'] { background: rgba(192, 57, 43, 0.75); }
+  .gallery-img-remove { width: 44px; height: 44px; font-size: 1.3rem; }
+}
+
+/* md-editor-v3 预览自带 `figure { display: inline-flex }`（收缩到内容宽度）。
+   不加显式 display 的话，排版块在编辑器里会被压成一条 —— masonry 实测只剩 33px 宽，
+   columns 也被 inline-flex 吃掉。所以每种排版块都写全 display，
+   选择器一并写成 figure.gallery.xxx，压过库里的 .md-editor-preview figure。 */
+.md-editor-preview figure.gallery { display: block; }
+.md-editor-preview figure.gallery.gallery-masonry { columns: 2; column-gap: 12px; }
 .md-editor-preview .gallery-masonry img { margin-bottom: 12px; break-inside: avoid; }
 
-.md-editor-preview .gallery-justified { display: flex; flex-wrap: wrap; gap: 8px; }
+.md-editor-preview figure.gallery.gallery-justified { display: flex; flex-wrap: wrap; gap: 8px; }
 .md-editor-preview .gallery-justified img { height: 190px; flex-grow: 1; min-width: 0; }
 .md-editor-preview .gallery-justified::after { content: ''; flex-grow: 999; height: 0; }
 
-.md-editor-preview .gallery-collage { display: grid; gap: 8px; }
+.md-editor-preview figure.gallery.gallery-collage { display: grid; gap: 8px; }
 .md-editor-preview .gallery-collage--2 { grid-template-columns: 2fr 1fr; }
 .md-editor-preview .gallery-collage--2 img { min-height: 240px; }
 .md-editor-preview .gallery-collage--3 { grid-template-columns: repeat(3, 1fr); grid-auto-rows: 170px; }
@@ -1001,7 +1101,7 @@ onUnmounted(() => {
 .md-editor-preview .gallery-collage--6 img:nth-child(1) { grid-column: span 2; grid-row: span 2; }
 .md-editor-preview .gallery-collage--6 img:nth-child(6) { grid-column: 3 / -1; }
 
-.md-editor-preview .gallery-bento { display: grid; gap: 10px; grid-auto-flow: dense; }
+.md-editor-preview figure.gallery.gallery-bento { display: grid; gap: 10px; grid-auto-flow: dense; }
 .md-editor-preview .gallery-bento--2 { grid-template-columns: 2fr 1fr; grid-auto-rows: 230px; }
 .md-editor-preview .gallery-bento--3 { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 160px; }
 .md-editor-preview .gallery-bento--3 img:nth-child(1) { grid-column: span 2; grid-row: span 2; }
@@ -1022,10 +1122,8 @@ onUnmounted(() => {
 .md-editor-preview .media-text--40 { grid-template-columns: 2fr 3fr; }
 .md-editor-preview .media-text--60 { grid-template-columns: 3fr 2fr; }
 .md-editor-preview .media-text--right .media-text__media { order: 2; }
-.md-editor-preview .media-text__media { margin: 0; min-width: 0; }
+/* 同上：单图媒体块里的 <figure> 也会被库规则压成 inline-flex */
+.md-editor-preview figure.media-text__media { display: block; margin: 0; }
 .md-editor-preview .media-text__media img { display: block; width: 100%; }
-.md-editor-preview .media-text__body { min-width: 0; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
-/* 容错：孤立空 <p> 不得成为 grid 第三项 */
-.md-editor-preview .media-text > p { display: none; }
 </style>

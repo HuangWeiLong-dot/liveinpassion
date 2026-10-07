@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { albumApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
+import { startPressDrag } from '../utils/pressDrag.js';
 
 const albums = ref([]);
 const activeAlbumId = ref(null);
@@ -127,19 +128,44 @@ async function removePhoto(photo) {
   }
 }
 
-// 拖拽排序
+// 拖拽排序：见 utils/pressDrag.js —— 鼠标按下即拖，触摸长按 300ms 起拖。
+// 落地前只高亮目标、不重排列表：拖动中重排 DOM 会让 Pointer Events 的隐式捕获失效，
+// 手指还没松指针就不再上报了。
 const dragIndex = ref(null);
-function onDragStart(idx) { dragIndex.value = idx; }
-function onDrop(targetIdx) {
-  if (dragIndex.value === null || dragIndex.value === targetIdx) return;
-  const list = [...photos.value];
-  const [moved] = list.splice(dragIndex.value, 1);
-  list.splice(targetIdx, 0, moved);
-  photos.value = list;
-  // 保存排序
-  const orders = list.map((p, idx) => ({ id: p.id, sortOrder: idx }));
-  albumApi.reorder(activeAlbumId.value, orders).catch((e) => alert(`Failed to save order: ${e.message}`));
-  dragIndex.value = null;
+const dragOverIndex = ref(null);
+
+function onCellPointerDown(idx, e) {
+  if (dragIndex.value !== null) return;
+  if (e.pointerType === 'mouse') e.preventDefault(); // 挡掉选中与原生图片拖拽
+  startPressDrag(e, {
+    onEngage: () => {
+      dragIndex.value = idx;
+      dragOverIndex.value = idx;
+    },
+    onMove: (x, y) => {
+      const cell = document.elementFromPoint(x, y)?.closest?.('.photo-cell');
+      const i = cell ? Number(cell.dataset.idx) : NaN;
+      if (!Number.isNaN(i)) dragOverIndex.value = i;
+    },
+    onDrop: () => {
+      const from = dragIndex.value;
+      const to = dragOverIndex.value;
+      dragIndex.value = null;
+      dragOverIndex.value = null;
+      if (from === null || to === null || from === to) return;
+      const list = [...photos.value];
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      photos.value = list;
+      // 保存排序
+      const orders = list.map((p, i) => ({ id: p.id, sortOrder: i }));
+      albumApi.reorder(activeAlbumId.value, orders).catch((err) => alert(`Failed to save order: ${err.message}`));
+    },
+    onCancel: () => {
+      dragIndex.value = null;
+      dragOverIndex.value = null;
+    },
+  });
 }
 
 onMounted(loadAlbums);
@@ -238,20 +264,19 @@ onMounted(loadAlbums);
           <span class="empty-cn">Click "Upload Photos" to add (batch supported)</span>
         </div>
 
-        <div v-else class="photo-grid">
+        <div v-else class="photo-grid" @contextmenu.prevent>
           <div v-for="(p, idx) in photos" :key="p.id"
                class="photo-cell"
-               draggable="true"
-               @dragstart="onDragStart(idx)"
-               @dragover.prevent
-               @drop="onDrop(idx)">
+               :class="{ 'is-dragging': dragIndex === idx, 'is-drop-target': dragIndex !== null && dragOverIndex === idx && dragIndex !== idx }"
+               :data-idx="idx"
+               @pointerdown="onCellPointerDown(idx, $event)">
             <img :src="p.compressedUrl || p.originalUrl" :alt="p.fileName" draggable="false" />
             <span class="photo-index">{{ String(idx + 1).padStart(2, '0') }}</span>
-            <button class="photo-remove" title="Remove from album" @click="removePhoto(p)">×</button>
+            <button class="photo-remove" title="Remove from album" aria-label="Remove from album" @click="removePhoto(p)">×</button>
           </div>
         </div>
 
-        <div v-if="photos.length" class="drag-hint">Drag photos to reorder — order is saved automatically</div>
+        <div v-if="photos.length" class="drag-hint">Drag to reorder (long-press on touch) — order is saved automatically</div>
       </section>
     </div>
   </div>
@@ -327,10 +352,14 @@ onMounted(loadAlbums);
 .photo-cell {
   position: relative; aspect-ratio: 1; overflow: hidden;
   border: 1px solid var(--border); cursor: grab; background: var(--bg-secondary);
+  /* 长按拖拽时不要弹出系统的图片菜单/选词 */
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .photo-cell:active { cursor: grabbing; }
 .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
 .photo-cell:hover img { transform: scale(1.04); }
+.photo-cell.is-dragging { opacity: 0.5; }
+.photo-cell.is-drop-target { outline: 2px solid var(--text-primary); outline-offset: -2px; }
 .photo-index {
   position: absolute; left: 0; bottom: 0;
   padding: 1px 8px; background: var(--bg);
@@ -346,7 +375,17 @@ onMounted(loadAlbums);
   opacity: 0; transition: all 0.2s ease;
 }
 .photo-cell:hover .photo-remove { opacity: 1; }
+.photo-remove:focus-visible { opacity: 1; }
 .photo-remove:hover { background: var(--danger); color: #fff; }
+
+/* 触屏：没有 hover，24px 隐形按钮既点不到也会误触 —— 常显并放大到可点尺寸 */
+@media (hover: none) {
+  .photo-remove {
+    opacity: 1; width: 44px; height: 44px; font-size: 22px;
+    background: rgba(0, 0, 0, 0.45); color: #fff; border-radius: 0 0 0 44px;
+  }
+  .photo-cell:hover img { transform: none; }
+}
 
 .drag-hint {
   margin-top: 16px; font-size: 0.62rem; color: var(--text-secondary);
