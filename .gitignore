@@ -12,6 +12,7 @@ worker/node_modules/
 worker/.wrangler/
 worker/admin-dist/
 worker/dev.vars
+worker/.dev.vars
 admin/node_modules/
 
 .DS_Store

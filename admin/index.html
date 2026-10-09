@@ -13,6 +13,38 @@
 </head>
 <body>
   <div id="app"></div>
+  <!-- 白屏兜底：模块在弱网/老内核下加载失败时给出提示，而不是一片空白（ES5 写法） -->
+  <div id="boot" style="position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#FAFAFA;color:#6B7280;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;z-index:9999;">
+    <div style="text-align:center;padding:24px;">
+      <div id="boot-text" style="font-size:0.72rem;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;">Loading ———</div>
+      <a id="boot-retry" href="javascript:location.reload()" style="display:none;margin-top:18px;padding:12px 28px;min-height:44px;line-height:20px;border:1px solid #1A1A1A;color:#1A1A1A;text-decoration:none;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase;">重新加载</a>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var timer = setInterval(function () {
+      var app = document.getElementById('app');
+      if (app && app.hasChildNodes()) {
+        clearInterval(timer);
+        document.getElementById('boot').style.display = 'none';
+      }
+    }, 200);
+    function fail() {
+      clearInterval(timer);
+      document.getElementById('boot-text').innerHTML = '加载失败，请检查网络后重试';
+      document.getElementById('boot-retry').style.display = 'inline-block';
+    }
+    window.addEventListener('error', function (e) {
+      var t = e && e.target;
+      if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) fail();
+    }, true);
+    // 8 秒后 #app 仍是空壳：入口脚本没跑起来（老内核语法错误或网络中断）
+    setTimeout(function () {
+      var app = document.getElementById('app');
+      if (!app || !app.hasChildNodes()) fail();
+    }, 8000);
+  })();
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -15,6 +15,9 @@ const year = new Date().getFullYear();
         <RouterLink to="/" class="nav-item">Posts <span class="nav-en">01</span></RouterLink>
         <RouterLink to="/albums" class="nav-item">Albums <span class="nav-en">02</span></RouterLink>
         <a href="https://liveinpassion.me" target="_blank" rel="noopener" class="nav-item nav-item--ghost">Site <span class="nav-en">↗</span></a>
+        <form method="POST" action="/api/logout" class="nav-logout-form">
+          <button type="submit" class="nav-item nav-item--logout">Logout <span class="nav-en">×</span></button>
+        </form>
       </div>
     </nav>
     <main class="admin-main">
@@ -95,6 +98,12 @@ body {
 .nav-item.router-link-exact-active { color: var(--text-primary); border-bottom-color: var(--text-primary); }
 .nav-item.router-link-exact-active .nav-en { color: var(--text-primary); opacity: 0.55; }
 .nav-item--ghost { border-left: 1px solid var(--border); }
+.nav-logout-form { display: flex; margin: 0; }
+.nav-item--logout {
+  background: transparent; border-top: none; border-right: none;
+  border-bottom: 1px solid transparent; border-left: 1px solid var(--border);
+  width: 100%;
+}
 
 .admin-main { flex: 1; padding: 40px 32px; max-width: 1100px; width: 100%; margin: 0 auto; }
 

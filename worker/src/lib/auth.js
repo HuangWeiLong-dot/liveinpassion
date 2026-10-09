@@ -1,10 +1,16 @@
-// Cloudflare Access JWT 鉴权中间件
-// 验证 Cf-Access-Jwt-Assertion header，校验签名与 audience。
-// 本地开发（ACCESS_AUD 未设置）时放行所有 admin 请求。
+// 鉴权中间件：双模式
+//   1) Cloudflare Access JWT（Cf-Access-Jwt-Assertion 头）——边缘还挂着 Access 策略时使用
+//   2) 自有会话 Cookie（cms_session，HMAC-SHA256 签名）——边缘 Access 关闭后使用
+// 这样部署新 Worker 后可以先验证再关 Access，桌面端不中断。
+// 本地开发（ACCESS_AUD 与 CMS_PASSWORD 都未配置）时放行所有 admin 请求。
 
 const CERTS_CACHE_TTL = 60 * 60 * 1000; // 1 小时
 let certsCache = null;
 let certsCacheTime = 0;
+
+const SESSION_COOKIE = 'cms_session';
+const SESSION_TTL_SEC = 30 * 24 * 60 * 60; // 30 天
+const SIGNING_NAMESPACE = 'cms-session-v1';
 
 function base64UrlDecode(str) {
   const pad = str.length % 4 === 0 ? '' : '='.repeat(4 - (str.length % 4));
@@ -12,7 +18,26 @@ function base64UrlDecode(str) {
   return atob(base64);
 }
 
-export { base64UrlDecode };
+function base64UrlEncode(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function utf8(str) {
+  return new TextEncoder().encode(str);
+}
+
+export { base64UrlDecode, SESSION_COOKIE, SESSION_TTL_SEC };
+
+function bytesEqual(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+// ---------- Cloudflare Access JWT ----------
 
 function decodeJwtPayload(token) {
   const parts = token.split('.');
@@ -80,33 +105,120 @@ async function verifyAccessJwt(token, audience, teamDomain) {
   return valid ? payload : null;
 }
 
-export async function requireAccessAuth(c, next) {
-  // 本地开发：未配置 ACCESS_AUD 时放行
+// ---------- 自有会话 Cookie ----------
+
+// HMAC 密钥由 CMS_PASSWORD 派生；密码轮换会使旧会话失效（重新登录即可）
+let signingKeyCache = null;
+let signingKeySecret = null;
+async function getSigningKey(secret) {
+  if (signingKeyCache && signingKeySecret === secret) return signingKeyCache;
+  const digest = await crypto.subtle.digest('SHA-256', utf8(`${SIGNING_NAMESPACE}:${secret}`));
+  const key = await crypto.subtle.importKey(
+    'raw',
+    digest,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+  signingKeyCache = key;
+  signingKeySecret = secret;
+  return key;
+}
+
+function parseCookies(c) {
+  const header = c.req.header('Cookie') || '';
+  const out = {};
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const name = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (name) out[name] = decodeURIComponent(value);
+  }
+  return out;
+}
+
+export async function createSessionCookie(c, secret) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = base64UrlEncode(utf8(JSON.stringify({ iat: now, exp: now + SESSION_TTL_SEC })));
+  const key = await getSigningKey(secret);
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, utf8(payload)));
+  return `${payload}.${base64UrlEncode(sig)}`;
+}
+
+export function buildSessionSetCookie(value) {
+  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SEC}`;
+}
+
+export function buildClearCookie() {
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+}
+
+async function verifySessionCookie(c, secret) {
+  if (!secret) return null;
+  const raw = parseCookies(c)[SESSION_COOKIE];
+  if (!raw || raw.indexOf('.') === -1) return null;
+  const [payloadB64, sigB64] = raw.split('.');
+  if (!payloadB64 || !sigB64) return null;
+
+  let payload;
+  try {
+    payload = JSON.parse(base64UrlDecode(payloadB64));
+  } catch {
+    return null;
+  }
+  if (!payload || !payload.exp || payload.exp * 1000 < Date.now()) return null;
+
+  const key = await getSigningKey(secret);
+  const expected = new Uint8Array(await crypto.subtle.sign('HMAC', key, utf8(payloadB64)));
+  let given;
+  try {
+    given = new Uint8Array(Array.from(base64UrlDecode(sigB64)).map((ch) => ch.charCodeAt(0)));
+  } catch {
+    return null;
+  }
+  return bytesEqual(expected, given) ? payload : null;
+}
+
+// 密码校验：哈希后定长比较，避免时序侧信道
+export async function checkPassword(secret, input) {
+  if (!secret || typeof input !== 'string' || !input) return false;
+  const a = new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(secret)));
+  const b = new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(input)));
+  return bytesEqual(a, b);
+}
+
+// 返回当前登录主体；未登录返回 null
+export async function getAuthUser(c) {
   const audience = c.env.ACCESS_AUD;
-  if (!audience) {
-    c.set('user', { email: 'dev@local', name: 'Local Dev' });
-    return next();
+  const secret = c.env.CMS_PASSWORD;
+
+  // 本地开发：两个都没配 → 放行
+  if (!audience && !secret) return { email: 'dev@local', name: 'Local Dev' };
+
+  // 1) Access JWT（边缘策略仍开启时，CF 会注入这个头）
+  const accessToken = c.req.header('Cf-Access-Jwt-Assertion');
+  if (audience && accessToken && c.env.ACCESS_TEAM_DOMAIN) {
+    try {
+      const payload = await verifyAccessJwt(accessToken, audience, c.env.ACCESS_TEAM_DOMAIN);
+      if (payload) return { email: payload.email, name: payload.name };
+    } catch (err) {
+      console.error('Access JWT verification failed:', err);
+    }
   }
 
-  const token = c.req.header('Cf-Access-Jwt-Assertion');
-  if (!token) {
+  // 2) 自有会话 Cookie
+  const session = await verifySessionCookie(c, secret);
+  if (session) return { email: 'admin', name: 'Admin' };
+
+  return null;
+}
+
+export async function requireAccessAuth(c, next) {
+  const user = await getAuthUser(c);
+  if (!user) {
     return c.json({ error: 'Authentication required' }, 401);
   }
-
-  const teamDomain = c.env.ACCESS_TEAM_DOMAIN;
-  if (!teamDomain) {
-    return c.json({ error: 'Access misconfigured' }, 500);
-  }
-
-  try {
-    const payload = await verifyAccessJwt(token, audience, teamDomain);
-    if (!payload) {
-      return c.json({ error: 'Invalid or expired token' }, 403);
-    }
-    c.set('user', { email: payload.email, name: payload.name });
-    return next();
-  } catch (err) {
-    console.error('Access JWT verification failed:', err);
-    return c.json({ error: 'Authentication failed' }, 500);
-  }
+  c.set('user', user);
+  return next();
 }

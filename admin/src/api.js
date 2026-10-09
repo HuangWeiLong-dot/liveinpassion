@@ -1,13 +1,20 @@
 // API 客户端：admin 接口走 /api/admin/*
 const BASE = '';
 
+// 会话失效（密码登录 cookie 过期/缺失）→ 回到本域登录页，登录后跳回当前页
+function redirectToLogin() {
+  const next = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+}
+
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
   });
   if (res.status === 401 || res.status === 403) {
-    throw new Error('未授权，请确认 Cloudflare Access 登录状态');
+    redirectToLogin();
+    throw new Error('登录已失效，正在跳转登录页…');
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -46,6 +53,10 @@ export const uploadApi = {
     if (compressedFile) form.append('compressed', compressedFile);
     form.append('type', type);
     const res = await fetch(`${BASE}/api/admin/uploads`, { method: 'POST', body: form });
+    if (res.status === 401 || res.status === 403) {
+      redirectToLogin();
+      throw new Error('登录已失效，正在跳转登录页…');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || `HTTP ${res.status}`);
