@@ -5225,3 +5225,20 @@ html.is-edge-hover.is-edge-right .music-toggle-btn,
 html.is-edge-hover.is-edge-right .wall-toggle {
     translate: 0 0;
 }
+
+/*
+ * 方块光标（components/BlockCursor.vue）：把系统光标彻底压掉，只留那个方块。
+ *
+ * ⚠ 两条都必须到位：
+ *   1. !important + 通配 —— UA 样式表给 <a> 的 cursor:pointer 比"继承来的
+ *      cursor:none"更具体；站内还有一大批作者规则各自写着 cursor:pointer|grab
+ *      （.jb-card / .bd-handle / .gallery-item / .lightbox-nav …）。只靠一个父级
+ *      的 cursor:none 压不住，压在那些元素上就会冒出手型 / 抓手光标，和方块叠着。
+ *   2. 这个类由 JS 在**方块真的画出来之后**才挂上（BlockCursor.vue 的 onMove），
+ *      指针离开文档、窗口失焦时立刻摘掉 —— 反过来先挂类的话，从页面加载到第一次
+ *      挪鼠标之间（首屏那几秒最明显）会是一个光标都没有的状态。
+ */
+html.is-block-cursor,
+html.is-block-cursor * {
+    cursor: none !important;
+}

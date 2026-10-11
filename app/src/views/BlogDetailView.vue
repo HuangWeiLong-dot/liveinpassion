@@ -85,6 +85,70 @@ let enterFallback = 0; // 题图解码兜底（见 scheduleEnter）：退场时�
 const switching = ref(false);
 const outgoing = ref(null);   // { post, scrollTop } —— 换篇期间旧正文的替身（两段才能真的交叉淡）
 
+// ── 墙角视图 ────────────────────────────────────────────────────────────
+// 列表里卡片右下角那颗按钮会带 `?view=corner` 过来：同一份内容、同一个组件，
+// 只是把"正文 / 封面"两块绕着中间那条共用的竖边折起来 —— 整个画面因此是 3D 的，
+// 像站在墙角里。夹角可自定（见下面的控件），180° 就是原来的平铺。
+const CORNER_KEY = 'lip:corner-angle';
+// 房间整体缩放 / 俯视角度（同样是可调的，控件在下面那条栏里）
+const ROOM_ZOOM_KEY = 'lip:corner-zoom';
+const ROOM_PITCH_KEY = 'lip:corner-pitch';
+// 视角上下：把整个"墙组"在垂直方向挪一挪（等于把机位抬高/放低）。
+// 单位是**房间高度的百分比**，所以窗口一变也跟着等比走。
+const ROOM_SHIFT_KEY = 'lip:corner-shift';
+// 封面视图里"标题"的位置（水平用 vw、垂直用 vh，窗口变了也跟着走）
+const CV_X_KEY = 'lip:cover-title-x';
+const CV_Y_KEY = 'lip:cover-title-y';
+const isCorner = computed(() => route.query.view === 'corner');
+// 「封面视图」：只把封面放大到屏幕中间、标题错位压在它斜上方（见下面那段样式）。
+// 和墙角是并列的两种模式，靠同一个 query 切换。
+const isCoverView = computed(() => route.query.view === 'cover');
+const anyView = computed(() => isCorner.value || isCoverView.value);
+function goView(v) {
+  router.replace({ name: 'blog-detail', params: route.params, query: v ? { view: v } : {} });
+}
+const cornerAngle = ref(153); // 默认每堵墙折起 13.5°（用户要的 13~14 那一档）
+const roomZoom = ref(0.78);   // 整个房间的缩放：调小 → 两堵墙都进画面，看到全貌
+const roomPitch = ref(7);     // 俯视角度（deg）：越大越像从上方看进一个房间
+const roomShift = ref(0);     // 视角上下（%）：正 = 画面整体下移（机位抬高）
+const cvTitleX = ref(6);      // 封面视图：标题的水平位置（vw）
+const cvTitleY = ref(15);     // 封面视图：标题的垂直位置（vh）
+if (typeof window !== 'undefined') {
+  try {
+    const l = window.localStorage;
+    // ⚠ 必须先判"键在不在"：`Number(null)` 是 0，而 0 正好落在俯仰的合法区间里 ——
+    //   首次进来会把默认的 7° 直接冲成 0°（实测就是这么变成"俯视 0°"的）。
+    const read = (k, min, max, into) => {
+      const raw = l.getItem(k);
+      if (raw === null) return;
+      const v = Number(raw);
+      if (Number.isFinite(v) && v >= min && v <= max) into(v);
+    };
+    read(CORNER_KEY, 60, 180, (v) => { cornerAngle.value = v; });
+    read(ROOM_ZOOM_KEY, 0.4, 1.2, (v) => { roomZoom.value = v; });
+    read(ROOM_PITCH_KEY, 0, 24, (v) => { roomPitch.value = v; });
+    read(ROOM_SHIFT_KEY, -40, 40, (v) => { roomShift.value = v; });
+    read(CV_X_KEY, -10, 70, (v) => { cvTitleX.value = v; });
+    read(CV_Y_KEY, 2, 80, (v) => { cvTitleY.value = v; });
+  } catch { /* 隐私模式 */ }
+}
+// 三个数一起存：只存其中一个的话，下次进来另外两个会退回默认值（看起来就是"设置没生效"）
+watch([cornerAngle, roomZoom, roomPitch, roomShift, cvTitleX, cvTitleY], ([a, z, p, s2, tx, ty]) => {
+  try {
+    const l = window.localStorage;
+    l.setItem(CORNER_KEY, String(a));
+    l.setItem(ROOM_ZOOM_KEY, String(z));
+    l.setItem(ROOM_PITCH_KEY, String(p));
+    l.setItem(ROOM_SHIFT_KEY, String(s2));
+    l.setItem(CV_X_KEY, String(tx));
+    l.setItem(CV_Y_KEY, String(ty));
+  } catch { /* 同上 */ }
+});
+// 摊平 = 回到普通详情（replace，别往历史里堆）
+function exitCorner() {
+  router.replace({ name: 'blog-detail', params: route.params });
+}
+
 const reducedMotion = typeof window !== 'undefined'
   && typeof window.matchMedia === 'function'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -501,6 +565,27 @@ function playEnter() {
   const panel = panelRef.value;
   if (!inner || !panel) return;
 
+  // 墙角模式：**不做 FLIP**。那两块各自带着 rotateY，父级有 transform 之后
+  // position: fixed 的飞行内层会改以它当包含块（这份文件开头就记过这个坑），
+  // 封面会飞得又偏又扁。这里直接把结果摆上去，进场交给面板自己的淡入。
+  if (isCorner.value || isCoverView.value) {
+    timeline?.kill();
+    disableTilt();
+    // 把 FLIP 那套行内样式彻底还回去（万一有残留），封面就老老实实待在封面格里
+    inner.classList.remove('is-measuring', 'is-flipping');
+    gsap.set(inner, {
+      clearProps: 'position,left,top,right,bottom,margin,width,height,transform', opacity: 1,
+    });
+    const covImg = inner.querySelector('img');
+    if (covImg) gsap.set(covImg, { clearProps: 'width,height,maxWidth,maxHeight' });
+    gsap.set(inner, { opacity: 1 });
+    gsap.set(panel, { opacity: 1 });
+    document.documentElement.classList.remove('bd-taking-cover');
+    document.querySelector('.jb-card.is-flying')?.classList.remove('is-flying');
+    startTyping();
+    return;
+  }
+
   // 窄屏：封面在左侧抽屉里（屏幕外），没有"飞到右列"这回事。
   // 按用户定的顺序 —— 先把正文给全，封面在抽屉里待命，由手势去拉。
   if (isNarrow.value) {
@@ -779,8 +864,10 @@ function scheduleEnter() {
   //   而终点（媒体盒）要等解码后才量得准，那一部分仍然留在 playEnter 里。
   handoff = readCoverHandoff(route.params.slug);
   pinStageBg(); // 覆盖层的第一帧底色 = 列表那一页的底色（理由见 pageBg 那段）
-  // 窄屏不摆"起点那一格"：封面在左侧抽屉里，不参与入场（见 playEnter 的窄屏分支）
-  if (!isNarrow.value) stageCover();
+  // 窄屏不摆"起点那一格"：封面在左侧抽屉里，不参与入场（见 playEnter 的窄屏分支）。
+  // 墙角模式同理不摆 —— 它不做 FLIP，而"起点那一格"会把内层钉成 position: fixed，
+  // 在带 rotateY 的父级里连包含块都变了，封面会整块跑到面板外面（那一面全黑）。
+  if (!isNarrow.value && !isCorner.value) stageCover();
   // 正文先藏起来：出场顺序是"卡先过去、字再落"。放在这里而不是 playEnter 里，
   // 是为了兜住"题图没加载出来、playEnter 提前 return"那种情况 —— 否则会变成
   // 正文先出现、封面再飞过去（实测出现过）。
@@ -901,6 +988,10 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
   narrowMql?.removeEventListener('change', syncNarrow);
+  // ⚠ 抽屉开着时直接离开（浏览器返回 / 路由跳走）不会走 close()，
+  //   <html> 上那个 bd-cover-open 得在这里摘掉 —— 留着的话它会一直把底部 Dock
+  //   压成 opacity: 0（那条规则是全局的），到了别的页面 Dock 就不见了。
+  document.documentElement.classList.remove('bd-cover-open');
   document.documentElement.style.overflow = '';
   solidifyHeader(false);
   timeline?.kill();
@@ -953,12 +1044,112 @@ if (typeof window !== 'undefined') {
       v-if="post"
       ref="detailRef"
       class="blog-detail"
-      :class="{ 'is-cover-open': open }"
+      :class="{ 'is-cover-open': open, 'is-corner': isCorner, 'is-coverview': isCoverView }"
+      :style="{
+        '--corner': `${cornerAngle}deg`,
+        '--room-zoom': `${roomZoom}`,
+        '--room-pitch': `${roomPitch}deg`,
+        '--room-shift': `${roomShift}%`,
+        '--cv-title-x': `${cvTitleX}vw`,
+        '--cv-title-y': `${cvTitleY}vh`,
+      }"
       @touchstart.passive="onTouchStart"
       @touchend.passive="onTouchEnd"
       @pointermove="onTiltMove"
       @pointerleave="onTiltLeave"
     >
+      <!-- 墙角视图的控件：夹角 + 摊平。只在墙角模式下出现，压在最下面一行。 -->
+      <div v-if="anyView" class="bd-corner-ctl">
+        <button
+          class="bd-corner-flat"
+          type="button"
+          :disabled="!isCorner"
+          @click="goView('cover')"
+        >COVER</button>
+
+        <!-- 封面视图：这里是"标题位置"的两根；墙角那四根（夹角/缩放/上下/俯仰）只在墙角模式下有意义 -->
+        <template v-if="isCoverView">
+          <span class="bd-corner-lbl">TEXT X</span>
+          <input
+            v-model.number="cvTitleX"
+            class="bd-corner-range is-cv"
+            type="range"
+            min="-10"
+            max="70"
+            step="0.5"
+            aria-label="标题水平位置"
+          >
+          <span class="bd-corner-val">{{ cvTitleX }}vw</span>
+          <span class="bd-corner-lbl">TEXT Y</span>
+          <input
+            v-model.number="cvTitleY"
+            class="bd-corner-range is-cv"
+            type="range"
+            min="2"
+            max="80"
+            step="0.5"
+            aria-label="标题垂直位置"
+          >
+          <span class="bd-corner-val">{{ cvTitleY }}vh</span>
+        </template>
+
+        <template v-if="!isCoverView">
+        <span class="bd-corner-lbl">CORNER</span>
+        <input
+          v-model.number="cornerAngle"
+          class="bd-corner-range"
+          type="range"
+          min="60"
+          max="180"
+          step="1"
+          aria-label="夹角"
+        >
+        <span class="bd-corner-val">{{ cornerAngle }}°</span>
+
+        <span class="bd-corner-lbl">ROOM</span>
+        <input
+          v-model.number="roomZoom"
+          class="bd-corner-range is-room"
+          type="range"
+          min="0.4"
+          max="1.2"
+          step="0.01"
+          aria-label="整体缩放"
+        >
+        <span class="bd-corner-val">{{ Math.round(roomZoom * 100) }}%</span>
+
+        <span class="bd-corner-lbl">SHIFT</span>
+        <input
+          v-model.number="roomShift"
+          class="bd-corner-range is-shift"
+          type="range"
+          min="-40"
+          max="40"
+          step="1"
+          aria-label="视角上下"
+        >
+        <span class="bd-corner-val">{{ roomShift }}%</span>
+
+        <span class="bd-corner-lbl">PITCH</span>
+        <input
+          v-model.number="roomPitch"
+          class="bd-corner-range is-pitch"
+          type="range"
+          min="0"
+          max="24"
+          step="1"
+          aria-label="俯视角度"
+        >
+        <span class="bd-corner-val">{{ roomPitch }}°</span>
+        </template>
+
+        <button class="bd-corner-flat" type="button" @click="goView(null)">FLAT</button>
+      </div>
+
+      <!-- 墙组：房间（.blog-detail）铺满视口、不动；**缩放与俯仰作用在这一层**，
+           所以调小的是"里面的两堵墙"，房间那个空间本身一直是满的。
+           平铺模式下它就是一层普通容器（网格布局挂在它身上，和原来一模一样）。 -->
+      <div class="bd-room">
       <!-- ── 左：正文面板（换篇时它整块交叉淡，位置不动）────────────────── -->
       <div ref="panelRef" class="bd-panel">
         <div ref="scrollRef" class="bd-panel-inner">
@@ -1046,6 +1237,7 @@ if (typeof window !== 'undefined') {
           <path d="M4 17.5 9.5 12l4 4 3-2.5 3.5 3" />
         </svg>
       </button>
+      </div><!-- /.bd-room -->
     </section>
 
     <section v-else class="blog-detail blog-detail--missing">
@@ -1116,13 +1308,360 @@ if (typeof window !== 'undefined') {
   position: fixed;
   inset: 0;
   z-index: 60; /* 头部是 100，面板从它下面滑过 */
-  display: grid;
-  grid-template-columns: minmax(0, 59fr) minmax(0, 41fr);
-  align-items: stretch;
+  display: block;
   padding: 0;
   max-width: none;
   margin: 0;
   background: transparent;
+}
+
+/* ══ 墙角视图 ══════════════════════════════════════════════════════════
+   同一份内容换个摆法：正文与封面各绕**中间那条共用的竖边**折起来，
+   夹角由 --corner 控制（180° = 原来的平铺，越小越"墙"）。
+   ⚠ 方向：两块都朝**远处**折 —— 共用那条边离观众最近、两侧往外退开，
+     就是"站在房间里看墙角"（凹）。反过来折是站在墙角**外面**看（凸），那不是要的效果。
+   · transform-origin 必须取那条共用的边（正文取右缘、封面取左缘），两块才拼得上、不留缝；
+   · 折起来之后整个画面就是 3D 的（perspective 挂在容器上）；
+   · ⚠ 生效期间父级有 transform —— 所以这一模式下不做封面的 FLIP（见 playEnter）。
+   夹角的可调范围 60°～180°，默认 120°。 */
+.blog-detail.is-corner {
+  /* 「房间」：底色跟着主题走 —— 暗色是黑、亮色是白，空间里只剩那两块墙。
+     （不是新颜色，就是站点的 --bg，所以主题一换它跟着换。） */
+  background: var(--bg);
+  perspective: 1900px;
+  perspective-origin: 50% 44%;
+  /* 两堵墙折起来之后会越过视口边界，一是顶出屏幕、二是撑出滚动条 —— 直接裁掉。
+     ⚠ 房间本身**不缩放**：它是那个"空间"，铺满视口一直不动。 */
+  overflow: hidden;
+  /* 当前夹角就是滑杆给的那个（不再叠鼠标偏移） */
+  --corner-now: var(--corner, 153deg);
+}
+
+/* 封面那一列/它的盒子也不许出现滚动条（有些环境里"列比图宽"会把内容撑出滚动条）。
+   ⚠ 宁可裁掉也不要滚动条：这一列是展示用的，不是滚动区。 */
+.blog-detail.is-corner .bd-right,
+.blog-detail.is-corner .bd-cover {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow: hidden;
+}
+
+.blog-detail.is-corner .bd-right::-webkit-scrollbar,
+.blog-detail.is-corner .bd-cover::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 右侧封面那一列（以及它里面的盒子）**任何模式下都不许有滚动条**：
+   它是展示用的，不是滚动区；一旦被撑出滚动溢出，那条滚动条会直接压在封面上。
+   宁可裁掉，也不要它。 */
+.bd-right,
+.bd-cover {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow: hidden;
+}
+
+.bd-right::-webkit-scrollbar,
+.bd-cover::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 墙角模式下**不许有滚动条**：正文那一列自己滚，滚动条藏起来（和普通详情同一套），
+   另外整个房间 overflow: hidden（上面），所以页面上不会冒出任何一条。
+   （`html`/`body` 的 overflow 在进入详情时就锁成 hidden 了，这里是双保险。） */
+.blog-detail.is-corner .bd-panel-inner {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.blog-detail.is-corner .bd-panel-inner::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 缩放 / 俯视都作用在**墙组**上：调小看到的是"里面的两块墙变小了"，
+   房间那个空间本身不变。preserve-3d 是为了让两堵墙各自的 rotateY
+   仍然在房间的透视里（否则会被这一层压平、看起来就不立体了）。 */
+.blog-detail.is-corner .bd-room {
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  /* 顺序：先把机位挪到位（上下 + 左右），再俯仰、再缩放。
+     ⚠ 左右那一档不是凑数：两堵墙**布局上**是居中的，但"可见内容"并不居中 ——
+     正文那列内容填满（左侧只留 56px 内边距），封面那列里图比列窄、两侧还有余量，
+     于是实测左边距 60px、右边距 175px（差近三倍），看着就是"右边空一大块"。
+     默认 4% ≈ 把差值的一半补回来，两边各落到 ~117px。 */
+  transform: translate(var(--room-shift-x, 3%), var(--room-shift, 0%))
+             rotateX(var(--room-pitch, 7deg)) scale(var(--room-zoom, 0.78));
+
+  /* ── 两块墙各自按**内容**高低，不再硬撑满高 ──────────────────────────
+     正文短的时候，撑满高就是一大片留白；封面那一侧同理（列很高、图只占中间一段）。
+     做法：墙组高度 auto（上限 100%），网格行按内容、两块垂直居中；
+     正文太长时由 max-height 封顶，滚动交给面板内部（和普通详情一样）。 */
+  /* ── 两堵墙的**宽度也按内容来** ──────────────────────────────────────
+   正文有它自己的版心（约 41em），而网格给这一列的是视口的 59% —— 比版心宽出一百多
+   像素，右侧就空着一条。墙角模式下改成"列宽 = 版心 + 这一列自己的内边距"，
+   封面那一列同理收一档，于是墙角是两块贴着内容的板，空间留在房间四周（那是故意的）。 */
+.blog-detail.is-corner .bd-room {
+  /* 两列都按内容：正文是"收缩到最多 46rem"，封面是"恰好包住图" */
+  grid-template-columns: fit-content(46rem) max-content;
+  justify-content: center;
+}
+
+/* ⚠ 宽度必须把**这一列自己的内边距**算进去：`.bd-panel-inner` 是 `… 56px …`，
+   正文版心约 737px —— 只写 46rem(736px) 的话内容比墙还宽，两侧会被裁掉
+   （实测：面板 725 / 内容 733，左右都被切，看起来就是"文字跑到屏幕外、左右不持平"）。
+   53rem ≈ 版心 737 + 左右各 56。 */
+.blog-detail.is-corner .bd-panel {
+  width: var(--corner-text-w, 53rem);
+}
+
+.blog-detail.is-corner .bd-right {
+  /* 列宽**由内容决定**（见下面的 .bd-media）：这样封面四周不会留出"列比图宽"的空档 */
+  width: max-content;
+  max-width: var(--corner-cover-w, 34rem);
+}
+
+/* ⚠ 封面在墙角模式下改成**按高度定尺寸**：`height` 给定、宽高比反推宽度。
+   原来写的是"宽度吃满这一列 + 高度上限"，图一被上限压住，宽度就收窄，
+   列里剩下的那一圈就成了右侧那块空白（顺带还会撑出滚动条）。 */
+.blog-detail.is-corner .bd-media {
+  height: min(66vh, 30rem);
+  width: auto;
+  max-height: 100%;
+}
+
+.blog-detail.is-corner .bd-media__inner img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* ⚠ 高度必须**确定**（100%），不能写 auto：子级的 `max-height: 100%` 是相对
+     父级高度算的，父级 auto 时那个百分比直接失效 —— 正文会长到几千像素被房间裁掉
+     （实测 3671px），反而看不全。这里给满高 + align-items:center，
+     两块墙各自按内容高度、在房间里垂直居中；太长的那块由 max-height 封顶、内部滚动。 */
+  height: 100%;
+  align-items: center;
+}
+
+.blog-detail.is-corner .bd-panel,
+.blog-detail.is-corner .bd-right {
+  height: auto;
+  max-height: 100%;
+}
+
+/* ⚠ inner 才是滚动容器，而这堵墙的高度是"按内容"的（auto）——
+   百分比上限对着 auto 父级会**直接失效**（基类那句 height:100% 也一起失效），
+   结果就是 inner 长到内容那么高、被面板裁掉且滚不动（实测面板 896 / inner 3671）。
+   所以这里给它一个**确定**的上限：视口高 − 面板的上下内边距（--bd-top + 96）＝
+   这堵墙真正能用的高度。短正文还是按内容（不封顶就不会有留白感）。 */
+.blog-detail.is-corner .bd-panel-inner {
+  max-height: calc(100vh - var(--bd-top, 88px) - 96px);
+}
+
+/* 封面列不再占满高：高度由图片自己的比例定（图的宽度仍吃满这一列） */
+.blog-detail.is-corner .bd-cover {
+  height: auto;
+  max-height: 100%;
+}
+
+/* 角度只由滑杆改：给一点阻尼，拖滑杆时两堵墙是"转过去"而不是跳过去 */
+.blog-detail.is-corner .bd-panel,
+.blog-detail.is-corner .bd-right {
+  transition: transform 0.18s ease-out;
+}
+
+.blog-detail.is-corner .bd-panel {
+  transform-origin: 100% 50%;
+  transform: rotateY(calc((180deg - var(--corner-now)) / 2));
+}
+
+.blog-detail.is-corner .bd-right {
+  transform-origin: 0% 50%;
+  transform: rotateY(calc((180deg - var(--corner-now)) / -2));
+}
+
+/* ══ 封面视图 ══════════════════════════════════════════════════════════
+   只留封面：放大到屏幕中间（高度占八成视口，宽度按图自身的比例），
+   标题**错位**压在它的斜上方（不是正中）—— 标题偏左、封面略偏右下，
+   再给封面一点倾角与投影，读起来就是"照片浮在标题前面"，立体感来自这个错位。
+   ⚠ 倾角同样是父级 transform：这一模式下不做 FLIP（见 playEnter 里的判断）。 */
+.blog-detail.is-coverview {
+  display: block;
+  background: var(--bg);
+  overflow: hidden;
+  perspective: 2000px;
+}
+
+.blog-detail.is-coverview .bd-right {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 封面整体往右下让一点，和标题错开 */
+.blog-detail.is-coverview .bd-cover {
+  width: auto;
+  height: auto;
+  max-height: none;
+  transform: translate(4%, 3%);
+}
+
+.blog-detail.is-coverview .bd-media {
+  height: 82vh;
+  width: auto;
+  max-width: 78vw;
+  max-height: none;
+  /* 一点倾角 + 投影：照片"立"起来一点，和标题形成前后关系 */
+  transform: rotateY(-7deg) rotateX(2.5deg);
+  transform-origin: 50% 50%;
+  box-shadow: 0 4rem 6rem color-mix(in srgb, var(--jb-shadow, #000) 45%, transparent);
+  border-radius: 2px;
+}
+
+/* 标题层：只留标题，压在封面斜上方 */
+.blog-detail.is-coverview .bd-panel {
+  position: absolute;
+  inset: auto;
+  /* 位置由下面那两根滑杆驱动（见控件条） */
+  left: var(--cv-title-x, 6vw);
+  top: var(--cv-title-y, 15vh);
+  z-index: 2;
+  width: auto;
+  height: auto;
+  background: none;
+  border: 0;
+  pointer-events: none;
+}
+
+.blog-detail.is-coverview .bd-panel-inner {
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+}
+
+/* 标题以外的正文/日期先收掉（这一模式只讲"标题 + 封面"） */
+.blog-detail.is-coverview .bd-panel .blog-meta,
+.blog-detail.is-coverview .bd-panel .blog-detail-content {
+  display: none;
+}
+
+.blog-detail.is-coverview .blog-detail-title {
+  font-size: clamp(2.2rem, 4.6vw, 4.6rem);
+  line-height: 1.05;
+  max-width: 46vw;
+}
+
+/* ── 墙角视图的控件：一条极简的滑杆 + 摊平 ────────────────────────────── */
+/* 打字机光标是 position: fixed 的：墙角模式下父级带 transform，它会跑到奇怪的
+   位置（实测在封面那一侧冒出一个小方块）。这一模式下直接不显示 —— 字还在照常敲。 */
+.blog-detail.is-corner .tw-caret {
+  display: none;
+}
+
+.bd-corner-ctl {
+  position: fixed;
+  left: 50%;
+  bottom: 1.4rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.5rem 0.9rem;
+  /* 直角 + 一条 hairline：和站内其余 mono 小标签同一套语言 */
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.bd-corner-range {
+  width: 6.5rem;
+  accent-color: var(--text-primary);
+}
+
+.bd-corner-range.is-room {
+  width: 4.5rem;
+}
+
+.bd-corner-range.is-pitch {
+  width: 3.5rem;
+}
+
+.bd-corner-range.is-shift {
+  width: 4rem;
+}
+
+.bd-corner-range.is-cv {
+  width: 5rem;
+}
+
+.bd-corner-ctl .bd-corner-lbl + .bd-corner-val {
+  min-width: 2.9rem;
+}
+
+/* 窄屏：这一排会太长，让它能换行 */
+@media (max-width: 900px) {
+  .bd-corner-ctl {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: min(92vw, 30rem);
+  }
+}
+
+.bd-corner-val {
+  min-width: 2.6rem;
+  text-align: right;
+  color: var(--text-primary);
+}
+
+.bd-corner-flat {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.bd-corner-flat:hover {
+  color: var(--text-primary);
+}
+
+/* 墙组：平铺模式下它就是原来的那个网格；墙角模式下它是被缩放/俯仰的那一层。
+   ⚠ 左右这一道内收边距是**两种模式共用**的：正文与封面都从这里往里收，
+   于是"内容距左边缘"和"内容距右边缘"天然相等（这是用户要的"左右持平"）。 */
+.bd-room {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding-inline: var(--bd-side, 3vw);
+  display: grid;
+  /* ⚠ 正文列用 `fit-content(46rem)` 而不是固定 59%：
+     它是"按内容收缩"的 —— 硬换行的短句（诗那种）会把这一列收到最长那一行；
+     长散文的 max-content 远超 46rem，于是照旧停在版心宽度。固定比例会让短内容
+     背后空出一大片（实测 2379 宽屏上能空出 700+px，就是用户说的"右侧一片空白"）。 */
+  grid-template-columns: fit-content(46rem) minmax(0, 1fr);
+  align-items: stretch;
 }
 
 /* ── 左：正文面板 ───────────────────────────────────────────────────── */
@@ -1388,7 +1927,11 @@ if (typeof window !== 'undefined') {
     padding: 88px 20px 84px;
     background: var(--bg);
     border-right: 1px solid var(--border);
-    box-shadow: 12px 0 44px rgba(0, 0, 0, 0.28);
+    /* 投影的位移和模糊半径都乘 --cover-open：抽屉收起时它整个归零。
+       写死 12px/44px 的话，抽屉虽然已经滑到屏幕外（translateX(-100%)），
+       它的投影尾巴还留在屏幕左边 —— 实测收起状态下最左 56px 比别处暗 2~3 个
+       灰阶，就是一条没有抽屉的"左侧阴影"。 */
+    box-shadow: calc(var(--cover-open) * 12px) 0 calc(var(--cover-open) * 44px) rgba(0, 0, 0, 0.28);
     transform: translateX(calc(-100% + var(--cover-open) * 100%));
     transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform;

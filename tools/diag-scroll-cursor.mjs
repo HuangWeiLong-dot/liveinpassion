@@ -1,4 +1,4 @@
-// 诊断：指针停住不动，只滚动页面 —— 看 .hero-cursor 是否跟着滚走（视觉与指针错位）。
+// 诊断：指针停住不动，只滚动页面 —— 看 .block-cursor 是否跟着滚走（视觉与指针错位）。
 //
 //   node tools/diag-scroll-cursor.mjs http://localhost:4174
 
@@ -28,7 +28,7 @@ const evaluate = async (expression) => {
 };
 
 const PROBE = `(() => {
-  const el = document.querySelector('.hero-cursor');
+  const el = document.querySelector('.block-cursor');
   const r = el ? el.getBoundingClientRect() : null;
   return {
     scrollY: window.scrollY,

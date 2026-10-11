@@ -25,10 +25,12 @@ const DEG = Math.PI / 180;
 // three 走**动态 import**，不进首屏包（和 useRippleEffect 同一个理由）。
 const FOV = 30;         // 与 useFilmPose 的 FILM.fov 一致（那边管投影，这边管相机）
 const TEX_SIZES = { near: 1024, far: 384 }; // 正面清楚、背面小一号（整圈一起驻留时的分水岭）
-// ⚠ 上限必须**大于同时在画的 mesh 数**（整圈 24 张 + 换档时的余量）：
-//   小于它的话，LRU 会把**正在用**的那张 dispose 掉，而 mesh 还指着它 ——
-//   表现就是几张卡片直接变黑（实测：24 个 mesh、上限 22，正面那几张先建先被淘汰）。
-const TEX_KEEP = 36;
+// ⚠ 上限必须容纳**整圈所有卡片的两档贴图**：24 张 × (near/far) = 最多 48 条。
+//   给少了会出两种毛病，都是"卡片突然变回占位色/变黑"：
+//     · 把**正在用**的那张 dispose 掉（mesh 还指着它）→ 采样纯黑；
+//     · 把刚建好的另一档挤掉 → 那张卡下一次进视野要重建，中间这段就是占位色。
+//   实测：上限 22 时正面几张变黑；36 时滚动中仍会被挤掉（24×2 > 36）。
+const TEX_KEEP = 48;
 // ── 画面自身的弧度 ──────────────────────────────────────────────────────
 // ⚠ 弧度**不是每张一样大**：按"这张卡离屏幕中线多远"给 —— 正中间几乎平的，
 //   越往边上越弯（边上的卡片等于歪在鼓面上，画面跟着鼓起来）。
@@ -126,13 +128,12 @@ export async function createFilmStrip(canvas) {
   // 而另一张还在用它的 mesh 就采样到纯黑（用户报的"照片加载出来了却黑屏"）。
   // Map 保持插入序，顺手当 LRU 用。
   let texCache = new Map();
-  const imgIds = new WeakMap();
-  let imgSeq = 0;
-  const idOf = (img) => {
-    let v = imgIds.get(img);
-    if (!v) { v = ++imgSeq; imgIds.set(img, v); }
-    return v;
-  };
+  // ⚠ 缓存键是**图片地址**，不是 <img> 元素：无限循环把每篇文章铺了三份，
+  //   三份各有自己的 <img>（同一个 URL）—— 按元素缓存等于**同一张照片存三张贴图**，
+  //   显存 ×3、LRU 被挤爆、回卷换到另一份时还要重建（就是"滚着滚着变回色块"的来源）。
+  //   按 URL 缓存后：一张照片一张贴图，三份副本共享，回卷时直接命中。
+  const urlOf = (img) => (img && (img.dataset?.src || img.currentSrc || img.src)) || '';
+  const noTexUrls = new Set(); // 跨域拿不到干净像素的图（按 URL 记，三份一起跳过）
   const pool = [];
   const live = new Map();   // key → mesh
   const op = { v: 1 };      // 全局不透明度（调用方直接补间它）
@@ -166,12 +167,20 @@ export async function createFilmStrip(canvas) {
   // 先缩到目标档位再上传：把 1920px 的原图直接传到显存是纯浪费。
   function textureFor(img, bucket) {
     if (texBlocked) return null;
-    if (!img || !img.naturalWidth) return null;
+    // ⚠ 必须等它**真的下完**再画：`naturalWidth` 在元数据到齐时就有了，像素却还在路上，
+    //   这时 drawImage 会**静默画出一张空画布** —— 拿到贴图上就是纯黑，
+    //   正是"照片加载出来了却黑屏"和"有的卡一直是占位色"的来源。
+    //   `img.complete` + naturalWidth 才是"加载成功且可以画"。
+    //   还没下完就返回 null，下一帧再看（图 load 完会喊一帧，见 BlogsView 里的 filmDirty）。
+    if (!img || !img.complete || !img.naturalWidth) return null;
     // CORS 被拒过的图（BlogsView.loadCoverImage 会打上这个标记）：像素是"污染"的，
     // 画进 canvas 再传 WebGL 会每帧抛 SecurityError。这一张索性不做贴图。
-    if (img.dataset && img.dataset.noTex === '1') return null;
+    if (img.dataset && img.dataset.noTex === '1') noTexUrls.add(urlOf(img));
+    if (noTexUrls.has(urlOf(img))) return null;
     const size = TEX_SIZES[bucket] || TEX_SIZES.near;
-    const key = `${size}#${idOf(img)}`;
+    const url = urlOf(img);
+    if (!url) return null;
+    const key = `${size}#${url}`;
     const hit = texCache.get(key);
     if (hit) {
       texCache.delete(key); // 命中就挪到队尾（LRU）
@@ -180,6 +189,10 @@ export async function createFilmStrip(canvas) {
     }
     const sw = img.naturalWidth;
     const sh = img.naturalHeight;
+    // 超大图**不做贴图**：5782×4869 / 4895×6528 这种（11MB / 27.9MB）画进 canvas 会
+    // 吃掉一大块内存、还会拖住主线程。这类图交给 DOM 那张 <img> 显示（不弯，但看得见）。
+    // （和上面"没下完"那条是不同的两件事：这里是图本身太大，不是还没到。）
+    if (!(sw > 0 && sh > 0) || sw * sh > 20e6) return null;
     const k = Math.min(1, size / Math.max(sw, sh));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(sw * k));
@@ -224,6 +237,18 @@ export async function createFilmStrip(canvas) {
     const m = pool.pop();
     if (m) {
       m.visible = true;
+      // ⚠ 从池子里复用时**必须把"这张卡是谁"的那几项清干净**：材质是跟着 mesh 走的，
+      //   留着上一张卡的 uTex/uHasTex，新卡一进窗口就直接顶着**上一张卡的封面**显示
+      //   —— 表现就是"图片跟文章对不上"（滚动、或从详情返回时卡片刚进出过窗口，
+      //   正是最容易撞上这个的时刻）。uPlaneAspect 同理，不清会沿用上一张的长宽比、
+      //   裁切也跟着错。
+      const u = m.material.uniforms;
+      u.uTex.value = null;
+      u.uHasTex.value = 0;
+      u.uPlaneAspect.value = 1;
+      u.uTextureAspect.value = 1;
+      m.userData.texKey = null;
+      m.userData.el = null;
       return m;
     }
     const material = new ShaderMaterial({
@@ -278,10 +303,11 @@ export async function createFilmStrip(canvas) {
       let mesh = live.get(it.key);
       if (!mesh) {
         mesh = acquire();
-        mesh.material.uniforms.uPlaneAspect.value = it.media.width / it.media.height;
-        mesh.material.uniforms.uTone.value.set(it.tone || '#c8cdd2');
         live.set(it.key, mesh);
       }
+      // 这两项是"这张卡自己的"：每帧按当前卡写，复用的 mesh 就不会带着上一位的信息
+      mesh.material.uniforms.uPlaneAspect.value = it.media.width / it.media.height;
+      mesh.material.uniforms.uTone.value.set(it.tone || '#c8cdd2');
       mesh.userData.el = it.el; // 出事时要照着它把 DOM 那张 <img> 放回来
       const u = mesh.material.uniforms;
       // 图是懒加载来的，加载完不通知我们：每帧顺手看一眼，能建就建。
@@ -309,7 +335,13 @@ export async function createFilmStrip(canvas) {
       mesh.scale.set(it.media.width * p.scale, it.media.height * p.scale, 1);
       // 弧度按"离屏幕中线多远"给：中间平、边上鼓（见 BOW 那一段注释）
       const edge = Math.min(1, Math.max(0, it.edge || 0));
-      u.uBow.value = BOW * (BOW_BASE + (1 - BOW_BASE) * Math.pow(edge, BOW_GAMMA));
+      const bow = BOW * (BOW_BASE + (1 - BOW_BASE) * Math.pow(edge, BOW_GAMMA));
+      // ⚠ 背面那半圈要**取反**，否则它的弧也是朝外鼓的。
+      //   edge 只回答"离屏幕中线多远"，而圆柱背面那一圈在屏幕上同样落在两侧 ——
+      //   同一个 edge 值，正面和背面拿到的是同一个弧度，方向也就跟着一样。
+      //   背面是圆柱的后壁，从观众这侧看过去必须是**向里凹**（正面才是朝外鼓）。
+      //   标志由 BlogsView 按转角给（和收标签用的 is-back 同一条件）。
+      u.uBow.value = it.back ? -bow : bow;
       u.uOpacity.value = (it.key === state.flyingKey) ? 1 : op.v;
       u.uHover.value = it.hover ? 1 : 0;
       u.uPhase.value = state.phase;
@@ -366,8 +398,19 @@ export async function createFilmStrip(canvas) {
     op,
     render,
     resize,
-    stats: () => ({ meshes: live.size, textures: texCache.size, dead,
-      dpr: renderer.getPixelRatio() }),
+    stats: () => {
+      // dupTex：几对 mesh 用的是同一张贴图 —— 池子复用没清干净时这个数会 > 0，
+      // 表现就是"卡片顶着别人的封面"（见 acquire 里那段）。
+      const seen = new Map();
+      let dup = 0;
+      for (const [, m] of live) {
+        const t = m.material.uniforms.uTex.value;
+        if (!t) continue;
+        if (seen.has(t)) dup += 1; else seen.set(t, true);
+      }
+      return { meshes: live.size, textures: texCache.size, dead, dupTex: dup,
+        dpr: renderer.getPixelRatio() };
+    },
     dispose() {
       disposed = true;
       for (const [, m] of live) m.userData.el?.classList.remove('is-film-live');

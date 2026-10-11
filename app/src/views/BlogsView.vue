@@ -128,13 +128,15 @@ const TAKEOVER_MS = 420;
 // （CSS 管 DOM 卡片、这里管 canvas 上的封面，两边差一拍就看得出来）。
 const TAKEOVER_FADE = 0.4;
 
-function openPost(post, el = null) {
+function openPost(post, el = null, query = null, instant = false) {
   if (opening.value || !post) return;
   opening.value = true;
   // 过渡的第一拍：**除这张卡片之外全部渐隐**（header、字标、页脚条、悬浮件，
   // 以及轨道上其余卡片）。视觉规则写在 BlogDetailView 的 scoped :global 里 ——
   // 那边才是这条过渡的归属；这里只负责在点击的这一刻把类挂上。
   document.documentElement.classList.add('bd-taking-cover');
+  // 离开之前落一次盘：主循环每帧也在记，但那只是内存里的
+  if (scroller.value) saveScroll(scroller.value.scrollLeft);
   // ⚠ 元素必须是**被点的那个**：无限循环把每篇文章铺了三份，只用下标去找会拿到
   //   另一份（可能在屏幕外），起点矩形就错了。
   const i = blogPosts.indexOf(post);
@@ -187,7 +189,7 @@ function openPost(post, el = null) {
     recordHandoff(); // 重新记一次（见上）
     skipNextPageTransition();
     router
-      .push({ name: 'blog-detail', params: { slug: post.slug } })
+      .push({ name: 'blog-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
       .catch(() => {})
       .finally(() => { opening.value = false; });
   }, TAKEOVER_MS);
@@ -198,6 +200,40 @@ function openPost(post, el = null) {
 function onCardActivate(post, e) {
   if (cardNavLock) return; // 这一轮交互已经由 PointerEvent 处理过了
   openPost(post, e?.currentTarget || null);
+}
+
+// 触屏那一路的"墙角"按钮（鼠标那一路在 onPointerUp 里单独判，见那里的注释）。
+function onCornerActivate(post, e) {
+  if (cardNavLock) return;
+  openCorner(post, e?.currentTarget?.closest?.('.jb-card') || null);
+}
+
+/** 指针（或按键）落点在哪颗入口按钮上（两颗共用一套判定） */
+function hitBtn(card, sel, x, y) {
+  const b = card?.querySelector?.(sel);
+  if (!b) return false;
+  const r = b.getBoundingClientRect();
+  return x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4;
+}
+
+/** 只看封面：和点卡片同一条交接（封面照样从这一格飞过去），只是路由多带 view=cover */
+function onCoverActivate(post, e) {
+  if (cardNavLock) return;
+  openCover(post, e?.currentTarget?.closest?.('.jb-card') || null);
+}
+function openCover(post, el = null) {
+  if (opening.value || !post) return;
+  openPost(post, el, { view: 'cover' }, true);
+}
+
+/**
+ * 打开"墙角"视图：**同一篇、同一个详情组件**，只是路由上多带一个
+ * `?view=corner`，详情页据此把正文与封面折成一个 3D 夹角（见 BlogDetailView）。
+ * 开场那一拍（周围元素渐隐 + 封面交接）和点卡片完全一样，所以封面照样从这一格飞过去。
+ */
+function openCorner(post, el = null) {
+  if (opening.value || !post) return;
+  openPost(post, el, { view: 'corner' }, true);
 }
 
 // ── 图片：只加载轨道可视范围内（含预留）的卡片 ─────────────────────────────
@@ -309,6 +345,11 @@ function observeCovers() {
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) return;
+        // ⚠ 正在被扭曲层画的那一圈**绝不释放**：环绕回卷那一帧 scrollLeft 会整体平移
+        //   一个周期，卡片位置骤跳 —— 释放观察器会看到"全都不相交"，于是一次性把所有图
+        //   都放掉，表现就是"滚到某个读数之后所有图片一起变回占位色 + 骨架屏"（实测）。
+        //   这一圈的图必须常驻；只放掉另外两份（真正在屏幕外的那 48 张）。
+        if (entry.target.dataset.filmActive === '1') return;
         const img = entry.target.querySelector('img');
         if (!img || !img.classList.contains('loaded')) return;
         img.removeAttribute('src');
@@ -405,6 +446,25 @@ let sampleLeft = -1;
 let sampleAt = 0;
 let warp = 0;      // px/帧；正 = scrollLeft 在变大（轨道往左走）
 let warpPhase = 0;
+// 轨道位置的落盘键。**为什么要落盘**：模块级变量会被重新实例化 ——
+// 实测（诊断打点）离开时 savedScroll=17235，返回时同一个变量读到 0，于是
+// 位置/进度条/计数器/封面落点一起被重置。dev 的 HMR、以及换一次构建，
+// 都会让模块被重新求值；只存内存里就会跟着一起丢。
+const SCROLL_KEY = 'lip:blogs-scroll';
+function saveScroll(v) {
+  if (!(v > 0)) return; // 0 一律当作"没量到/已被摘出文档"，不覆盖记住的位置
+  savedScroll = v;
+  try { window.sessionStorage.setItem(SCROLL_KEY, String(Math.round(v))); } catch { /* 隐私模式 */ }
+}
+function readSavedScroll() {
+  if (savedScroll > 0) return savedScroll;
+  try {
+    const v = Number(window.sessionStorage.getItem(SCROLL_KEY) || 0);
+    if (v > 0) return v;
+  } catch { /* 同上 */ }
+  return 0;
+}
+
 // 量卡片几何时的 scrollLeft（那些视口坐标是那一刻的，之后按差值换算）
 let readScroll = 0;
 // 扭曲层（three 拉下来了才非 null）。null = 退回"纯 DOM"：卡片照常，
@@ -652,7 +712,11 @@ function frame(now) {
   // 顺手把位置记在模块变量里：**离开这一页时读不到它了**（keep-alive 先把 DOM
   // 摘出文档，那一刻 scrollLeft 读回来是 0），只能趁每帧还在的时候记着。
   // 返回时靠它恢复 —— 也正是封面飞回去要落的那一格（见 activate / deactivate）。
-  savedScroll = left;
+  // ⚠ 只在**正数**时才记：keep-alive 把 DOM 摘出文档时浏览器会把 scrollLeft 归 0，
+  //   而主循环可能还赶上了一帧 —— 那一帧会把 0 存进去、把刚记下的位置盖掉
+  //   （实测日志：`save 17235` 之后紧跟一条 `save 0`，于是返回时恢复到起点）。
+  //   轨道活着的时候永远不是 0（回卷把它圈在中间那一份里），所以这个判断是安全的。
+  if (left > 0 && left !== savedScroll) saveScroll(left);
 
   // ── 胶片姿态 ────────────────────────────────────────────────────────────
   // 以轨道中线为基准：**中间那张正面朝前、最近**，越靠边越绕 Y 转开、越往后退、
@@ -683,6 +747,7 @@ function frame(now) {
         delete m.el.dataset.filmMatrix;
         m.tilted = false;
       }
+      if (m.filmActive) { m.filmActive = false; delete m.el.dataset.filmActive; }
       continue;
     }
     // 媒体盒中心的**视口**坐标：量的时候记了基准，之后只有横向滚动会改它
@@ -703,14 +768,22 @@ function frame(now) {
     //    ⚠ 支点取**媒体盒中心**（旋转/缩放都绕它走），不能沿用 CSS 里的 50% 50%。
     //    只在真的变了才写：写一次 transform 要走一遍样式重算 + 合成器改层，
     //    连续量四舍五入之后很多相邻帧是同一个值，白写的那几帧就是滚动里的毛刺。
-    const origin = `${m.mediaOx}px ${m.mediaOy}px`;
-    if (m.el.style.transformOrigin !== origin) m.el.style.transformOrigin = origin;
-    const next = cssMatrix(pose, D);
-    if (m.el.dataset.filmMatrix !== next) {
-      m.el.style.transform = next;
-      m.el.dataset.filmMatrix = next;
+    // ⚠ 只给**屏幕内（含一张卡的余量）**的卡片写 DOM 变换：围绕整圈有二十来张，
+    //   其中十来张在屏幕外 —— 屏幕外的卡片只有"标签"用得到这个矩阵，而标签本就看不见，
+    //   白写一次要走一遍样式重算。留一张卡的余量，卡片进视口前就已经写好，不会看到跳。
+    const onScreen = Math.abs(cx - view.w / 2) < view.w / 2 + m.w;
+    if (onScreen) {
+      const origin = `${m.mediaOx}px ${m.mediaOy}px`;
+      if (m.el.style.transformOrigin !== origin) m.el.style.transformOrigin = origin;
+      const next = cssMatrix(pose, D);
+      if (m.el.dataset.filmMatrix !== next) {
+        m.el.style.transform = next;
+        m.el.dataset.filmMatrix = next;
+      }
+      m.tilted = true;
+    } else if (m.tilted) {
+      m.tilted = false; // 出了视口就不必再维护它
     }
-    m.tilted = true;
 
     // 交给扭曲层画封面（正反面都给：背面也走 WebGL，才有正确的深度排序）。
     // 远近分两档贴图：正面清楚、背面小一号，整圈一起驻留才扛得住显存。
@@ -726,6 +799,10 @@ function frame(now) {
         texSize: Math.abs(theta) < 0.75 ? 'near' : 'far',
         // 这张卡离屏幕中线多远（0 = 正中间，1 = 屏幕边缘）——扭曲层按它给弧度
         edge: Math.min(1, Math.abs(cx - view.w / 2) / (view.w / 2)),
+        // 它在圆柱的哪一半。扭曲层要拿它把**背面那半圈**的弧度取反（见 useFilmStrip
+        // 里 uBow 那一段）：只按"离中线多远"给的话，正背面同一侧拿到的是同一个值，
+        // 背面那半圈的弧就朝外鼓了 —— 那边应该是向里凹的。
+        back: Math.abs(theta) > FILM.labelArc,
       });
     }
 
@@ -741,6 +818,25 @@ function frame(now) {
 
     // 背面那一圈（转过 labelArc）：文字标签收起来。标签是 DOM 文本，永远画在
     // canvas **之上**，留着的话会浮在前面那些封面上（实测就是"糊成一团"）。
+    // 环上的图**提前拉起来**：懒加载只按"视口 ±120%"走，而环跨了整整一个周期 ——
+    // 回卷之后露出来的那一份副本可能从没进过那个范围、图根本没下过，于是整圈变占位符。
+    // 这里让扭曲层把"这一圈要用的图"一并要下来（loadImage 自带去重，同 URL 只下一次）。
+    if (m.img && m.img.dataset.filmWant !== '1') {
+      m.img.dataset.filmWant = '1';
+      // **先看眼前的**：视口 ± 一屏之内的立刻发请求；环上其余（背面那十几张）延迟一拍再预热。
+      // 不这么分的话 24 张会一起抢带宽，你正在看的那几张反而排在最后（实测：可见的 4 张里
+      // 有 3 张还卡在"图没下完"，那三张就是占位色 + 骨架屏）。
+      if (Math.abs(cx - view.w / 2) < view.w) {
+        loadImage(m.img);
+      } else {
+        m.img.dataset.filmWantLater = '1';
+        window.setTimeout(() => loadImage(m.img), 1500);
+      }
+    }
+
+    // 标记"这张卡此刻正由扭曲层画"：释放观察器据此跳过它（见下面那段）。
+    // 只在该变化时写，避免每帧改属性触发样式重算。
+    if (m.filmActive !== true) { m.filmActive = true; m.el.dataset.filmActive = '1'; }
     const back = Math.abs(theta) > FILM.labelArc;
     if (m.isBack !== back) {
       m.isBack = back;
@@ -813,6 +909,15 @@ let drag = null;
 let lastMoved = false;   // 上一次按下→抬起期间有没有真的拖动过（给 click 用）
 let cardNavLock = false; // 这一轮交互已经由 PointerEvent 处理过导航了，别再重复一次
 
+// 触屏的"轻点"候选。触屏不走上面那条拖拽（要让浏览器原生惯性滚动），
+// 于是点击只能等浏览器补一个合成 click —— 而这条路**不可靠**：
+// 手指但凡有一点位移、或者轨道当时还在惯性滑行，浏览器就把它判成滚动、
+// 把 click 吞掉，表现就是"点了卡片没反应"。
+// 所以这里和鼠标那条一样自己判：按下记一笔，抬起时位移没超阈值就当点击。
+// scroll 一旦被浏览器接管，它会派发 pointercancel —— 那是最干净的"这不是点击"信号。
+let touchTap = null;
+const TAP_SLOP = 10; // 超过这个位移（px）就不算点击了
+
 // 速度采样：只留最近 V_WINDOW 毫秒里的 (时间, 指针 x) 几个点，松手时用窗口**两端**
 // 的位移算速度 —— 和 Android/iOS 的 velocity tracker 同一个路子。
 // 为什么不能拿「本次位移 ÷ 本次间隔」：单个 pointermove 的 dt 可能只有 1–2ms，
@@ -828,7 +933,18 @@ let samples = [];
 let lastFling = null; // 联调探针用（见文件末尾的 window.__jb）
 
 function onPointerDown(e) {
-  if (e.pointerType === 'touch') return;
+  if (e.pointerType === 'touch') {
+    // 只记一笔，**不捕获、不 preventDefault** —— 横向原生滚动要照常能用
+    cardNavLock = false; // 新一轮交互开始（和下面鼠标那条一样）
+    touchTap = {
+      x: e.clientX,
+      y: e.clientY,
+      t: performance.now(),
+      card: e.target?.closest?.('.jb-card') || null,
+      moved: false,
+    };
+    return;
+  }
   const root = scroller.value;
   if (!root) return;
   syncTarget();
@@ -857,6 +973,10 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   trackPointer(e); // 鼠标跟随倾斜：和拖拽无关，先记下来（触屏会自己跳过）
+  if (touchTap && !touchTap.moved
+    && Math.hypot(e.clientX - touchTap.x, e.clientY - touchTap.y) > TAP_SLOP) {
+    touchTap.moved = true; // 手指划走了 —— 这是滚动，不是点击
+  }
   if (!drag) return;
   const dx = e.clientX - drag.x;
   const dy = e.clientY - drag.y;
@@ -880,7 +1000,26 @@ function onPointerMove(e) {
   lastWrote = root.scrollLeft;
 }
 
+// 浏览器接管了这次触摸（判成滚动）→ 这是滚动，不是点击。最干净的否定信号。
+function onPointerCancel(e) {
+  touchTap = null;
+  onPointerUp(e);
+}
+
 function onPointerUp() {
+  // 触屏：自己判点击，不再等那个会被吞掉的合成 click（见 touchTap 的注释）
+  if (touchTap) {
+    const tap = touchTap;
+    touchTap = null;
+    if (!tap.moved && tap.card) {
+      const idx = metrics.findIndex((m) => m.el === tap.card);
+      if (idx >= 0) {
+        cardNavLock = true; // 浏览器随后补的那个 click 别再跳一次
+        openPost(blogPosts[metrics[idx].pi], tap.card);
+        return;
+      }
+    }
+  }
   const current = drag;
   drag = null;
   if (!current) return;
@@ -907,7 +1046,11 @@ function onPointerUp() {
     if (idx >= 0) {
       cardNavLock = true; // 这一轮已经处理过，模板那路的 click 别再跳一次
       // ⚠ 用 metrics[idx].pi（原始序号）：idx 是**三份铺开之后**的 DOM 下标
-      openPost(blogPosts[metrics[idx].pi], current.card);
+      const post = blogPosts[metrics[idx].pi];
+      // 落在右下角那个按钮上就切"墙角视图"，不是打开普通详情
+      if (hitBtn(current.card, '.jb-coverbtn', current.lastX, current.y)) openCover(post, current.card);
+      else if (hitBtn(current.card, '.jb-corner', current.lastX, current.y)) openCorner(post, current.card);
+      else openPost(post, current.card);
     }
     return;
   }
@@ -953,6 +1096,7 @@ function onClickCapture(e) {
   if (lastMoved || cardNavLock) return;
   const card = e.target?.closest?.('.jb-card');
   if (!card) return;
+  if (e.target?.closest?.('.jb-corner, .jb-coverbtn')) return; // 入口按钮自己那一路处理
   const idx = metrics.findIndex((m) => m.el === card);
   if (idx >= 0) openPost(blogPosts[metrics[idx].pi], card);
 }
@@ -1027,6 +1171,25 @@ function onResize() {
   }, 120);
 }
 
+// 把轨道放回"离开时的位置"（首次进入则放到第 01 篇那一格）。
+//
+// ⚠ **必须允许被调用两次**：keep-alive 在 onActivated 触发的那一刻还没把列表插回
+//   文档，`readCards()` 会量到空列表 → `cycleWidth` 还是 0 → 这里只能当场跳过，
+//   于是 scrollLeft 停在 0。而后面 onActivated 的 `nextTick → readCards()` 只补了
+//   尺寸、不会补位置 —— 结果就是**位置、进度条、计数器、以及封面飞回来的落点
+//   一起被重置**（用户报的就是这一串，而且在快慢不同的机器上是偶发的）。
+//   所以：activate() 里先试一次，等 DOM 真的挂回去（nextTick + readCards）之后再补一次。
+function restoreScroll() {
+  const root = scroller.value;
+  if (!root || !cycleWidth) return false; // 还没量到卡片：调用方稍后补一次
+  const want = readSavedScroll();
+  root.scrollLeft = want > 0 ? want : cycleWidth;
+  wrapLoop(root); // 圈回中间那一份（内容逐像素相同，看不出接缝）
+  syncTarget();
+  startLoop();
+  return true;
+}
+
 function activate() {
   document.documentElement.classList.add('blogs-lookback');
   // 兜底：详情那条过渡会挂 .bd-taking-cover（除卡片外全部隐去），正常由详情在卡片
@@ -1052,11 +1215,7 @@ function activate() {
   //   **浏览器会把 scrollLeft 丢掉**（实测：滚到第 8 篇 = 12700，返回后变成 0），
   //   而 0 正好和首次进入撞车 —— 于是每次返回都被当成"刚进来"甩回第 01 篇。
   //   所以位置由我们自己记（deactivate 时存），回来照原样恢复。
-  if (cycleWidth && scroller.value) {
-    scroller.value.scrollLeft = savedScroll > 0 ? savedScroll : cycleWidth;
-    wrapLoop(scroller.value); // 圈回中间那一份（内容逐像素相同，看不出接缝）
-  }
-  syncTarget();
+  restoreScroll();
   if (film) {
     film.op.v = 1; // 交接那一趟淡完就复位（正常退出时已经是 1，这里是兜底）
     film.resize();
@@ -1087,7 +1246,7 @@ function deactivate() {
   // 位置平时就由主循环每帧记着（见 frame 里的 savedScroll）。这里再补一次，
   // 只在**读得到**的时候覆盖 —— 实测 keep-alive 调 onDeactivated 的那一刻，
   // 这棵 DOM 已经被移出文档了，scrollLeft 读回来是 0，照单全收就把位置抹平了。
-  if (scroller.value?.scrollLeft) savedScroll = scroller.value.scrollLeft;
+  if (scroller.value?.scrollLeft) saveScroll(scroller.value.scrollLeft);
   document.documentElement.classList.remove('blogs-lookback');
   document.documentElement.style.overflow = '';
   // ⚠ 这里**不要**去摘 bd-return-fade：实测这一跳里 deactivate 也会跑，
@@ -1169,7 +1328,15 @@ onMounted(async () => {
     }
     film = f;
     film.resize();
-    filmOn.value = true; // 到这一刻才开始把有贴图的 <img> 藏起来
+    // ⚠ 交接而不是硬切：在这之前卡片显示的是 DOM 那层**平面**的占位色（--ph），
+    //   扭曲层一上来占位就变成**弯的** —— 直接切过去会"跳"一下（就是用户说的
+    //   "弯曲卡片跟实际占位符不一样"）。这里让它从 0 淡到 1，两层的边界互相盖着过去。
+    filmOn.value = true;
+    if (!reduceMotion) {
+      gsap.fromTo(film.op, { v: 0 }, { v: 1, duration: 0.5, ease: 'power2.out' });
+    } else {
+      film.op.v = 1;
+    }
     startLoop();
   }).catch(() => { /* 起不来就当没有这一层 */ });
   // 这一页现在**没有 WebGL 那一层**了（见 useFilmPose.js 的头注释）：
@@ -1185,6 +1352,7 @@ onMounted(async () => {
   readCards();
   observeCovers();
   syncTarget();
+  if (scroller.value && scroller.value.scrollLeft === 0) restoreScroll();
 });
 
 // keep-alive 复用时 onMounted 不会重跑：轨道重新挂进文档、宽度变了都得重来一遍
@@ -1194,6 +1362,9 @@ onActivated(async () => {
   measure();
   readCards();
   syncTarget();
+  // 补一次位置：activate() 那次可能因为列表还没插回文档（cycleWidth=0）跳过了。
+  // 判据用"还停在 0"——轨道活着的时候永远不会是 0（回卷会把它圈回中间那一份）。
+  if (scroller.value && scroller.value.scrollLeft === 0) restoreScroll();
 });
 
 onDeactivated(() => {
@@ -1242,6 +1413,10 @@ if (typeof window !== 'undefined') {
       // 下一次松手算出来的甩动速度（px/帧）、采样窗口跨度与样本数 ——
       // 调"甩出去能滑多远"时用得上，不用猜。
       fling: lastFling,
+      // 诊断：离开时记下的位置。回归后如果它和 scrollLeft 对不上，就是恢复那条路的问题。
+      savedScroll: Math.round(savedScroll),
+      storedScroll: readSavedScroll(),
+      cycleWidth,
       // 扭曲层：起没起来、几个 mesh / 几张贴图、当前速度 ——
       // 排"图和字对不齐""轨道不扭"这类问题时先看这里。
       film: film ? {
@@ -1306,7 +1481,7 @@ function onVisibility() {
         @pointermove="onPointerMove"
         @pointerleave="onTrackLeave"
         @pointerup="onPointerUp"
-        @pointercancel="onPointerUp"
+        @pointercancel="onPointerCancel"
         @wheel="onWheel"
         @keydown="onKeydown"
       >
@@ -1342,6 +1517,38 @@ function onVisibility() {
                 draggable="false"
                 decoding="async"
               >
+              <!-- 封面右下角：切到"墙角"视图。**放在封面里**，不是卡片右下 ——
+                   卡片右下那一行是"X MIN READ"，放那儿会压到它。
+                 ⚠ 它是卡片里唯一一个**自己带行为**的元素：轨道的点击判定走
+                   PointerEvent + 几何（见 onPointerUp），指针捕获会把 click 重定向到
+                   轨道上，所以它在 PointerEvent 那条路上要单独认出来。 -->
+              <!-- 两个入口并排：左边"只看封面"，右边"墙角视图"。
+                   都放在封面右下角（卡片右下那一行是阅读时长，放那儿会压到它）。 -->
+              <button
+                class="jb-coverbtn"
+                type="button"
+                :aria-label="`只看封面打开《${card.post.cardTitle}》`"
+                title="只看封面"
+                @click.stop="onCoverActivate(card.post, $event)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M9 4H4v5M15 20h5v-5M20 9V4h-5M4 15v5h5" />
+                </svg>
+              </button>
+              <button
+                class="jb-corner"
+                type="button"
+                :aria-label="`以墙角视图打开《${card.post.cardTitle}》`"
+                title="墙角视图"
+                @click.stop="onCornerActivate(card.post, $event)"
+              >
+                <!-- 描边/填充直接写在标签上：不依赖任何样式表被覆盖不到 -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M7 18V8l5 4 5-4v10" />
+                </svg>
+              </button>
             </figure>
 
             <div class="jb-card-bottom">
@@ -1532,6 +1739,34 @@ function onVisibility() {
    留着一圈小字反而更乱。所以背面的标签一律不显示，转过正面（is-back 摘掉）再回来。 */
 .jb-card.is-back .jb-card-top,
 .jb-card.is-back .jb-card-bottom {
+  visibility: hidden;
+}
+
+/* 骨架屏只在**"扭曲层还没画上这张卡的封面"**时出现：
+   · 已经画上（is-film-live）→ 收掉，否则流光会盖在弯着的照片上；
+   · 还没画上 → 留着。这段时间的真相就是"图还没下完"（懒加载 + CDN/worker 首包），
+     留一块**会流动的骨架屏**比留一块纯色占位块诚实得多 —— 纯色块看起来就像
+     "图突然没了"（用户报的就是这个）。
+   （`.is-film` 之外照常显示，和以前一样。） */
+.jb-stage.is-film .jb-card.is-film-live .skeleton-loader {
+  display: none;
+}
+
+/* ⚠ 背面那一圈的卡片**自己不画任何东西**。
+   它们是 DOM，而 DOM 永远画在 canvas 之上 —— 只要它们自己画点什么（占位底色、
+   骨架屏、还没加载出来的 <img>、加载失败的提示），那块就会盖到**正面**的照片上。
+   整块背面本来就由 canvas 上的曲面负责（贴图好了画图、没贴图画占位色），
+   所以这里把它们全收掉：一个像素都不许从 DOM 里冒出来。
+   （`.is-film` 之外照常显示 —— 那一层起不来时背面也要能看见照片。） */
+.jb-card.is-back .skeleton-loader {
+  display: none;
+}
+
+.jb-stage.is-film .jb-card.is-back .jb-media {
+  background: transparent;
+}
+
+.jb-stage.is-film .jb-card.is-back .jb-media > * {
   visibility: hidden;
 }
 
@@ -1793,6 +2028,63 @@ function onVisibility() {
   stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* ── 右下角那个"墙角视图"按钮 ──────────────────────────────────────────
+   压在封面右下角（和参考站那颗小圆钮同一个位置语言）。
+   ⚠ 它在卡片里，会跟着卡片一起被 matrix3d 摆到圆柱上 —— 这正是想要的（跟着卡片歪）。
+   ⚠ 背面的卡片整块 `.jb-media > *` 是隐藏的（见上面那段注释），这个按钮跟着一起收掉，
+     背面本来也不该点。 */
+.jb-corner,
+.jb-coverbtn {
+  position: absolute;
+  bottom: 0.5rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  /* 最安静的一档：没有描边、没有底色、没有圆角，只有一枚小记号，
+     颜色压到次级色、平时还要再淡一档 —— 它必须像卡片自己的排版，
+     而不是贴上去的一颗按钮。 */
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--jb-dim);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.35s ease, color 0.35s ease;
+}
+
+.jb-corner {
+  right: 0.5rem;
+}
+
+.jb-coverbtn {
+  right: 2.3rem; /* 并排在墙角按钮左边 */
+}
+
+.jb-corner svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 悬停/聚焦时和标题同一拍地亮起来（不位移、不缩放，避免"跳出来"的感觉） */
+.jb-card:hover .jb-corner,
+.jb-card:focus .jb-corner,
+.jb-card:focus-visible .jb-corner,
+.jb-card:hover .jb-coverbtn,
+.jb-card:focus .jb-coverbtn,
+.jb-card:focus-visible .jb-coverbtn {
+  opacity: 1;
+  color: var(--jb-fg);
 }
 
 .jb-card:hover .jb-title,

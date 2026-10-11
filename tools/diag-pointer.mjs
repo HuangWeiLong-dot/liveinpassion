@@ -3,7 +3,7 @@
 //   node tools/diag-pointer.mjs http://localhost:4174
 //
 // 用 Input.dispatchMouseEvent 真的移动指针（CDP 走的是渲染进程的命中测试路径，
-// 和真鼠标同一条路），然后读 .hero-cursor 方块的实际矩形。
+// 和真鼠标同一条路），然后读 .block-cursor 方块的实际矩形。
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -36,7 +36,7 @@ async function moveMouse(x, y) {
 }
 
 const CURSOR_INFO = `(() => {
-  const el = document.querySelector('.hero-cursor');
+  const el = document.querySelector('.block-cursor');
   const probe = window.__probe || null;
   if (!el) return { exists: false };
   const r = el.getBoundingClientRect();
@@ -138,10 +138,10 @@ document.addEventListener('pointerover', (e) => {
     })()`);
     console.log(JSON.stringify(hit, null, 2));
 
-    // 指针停在页脚时，把 .hero-cursor 的 transform 和 lastPointer 对比，看看差在哪
+    // 指针停在页脚时，把 .block-cursor 的 transform 和 lastPointer 对比，看看差在哪
     console.log('\n== 差量分析 ==');
     const diff = await evaluate(`(() => {
-      const el = document.querySelector('.hero-cursor');
+      const el = document.querySelector('.block-cursor');
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       const hero = document.querySelector('.hero-concept');

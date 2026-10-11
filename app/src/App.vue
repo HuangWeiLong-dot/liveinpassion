@@ -16,6 +16,7 @@ import ThemeToggle from './components/ThemeToggle.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
 import Lightbox from './components/Lightbox.vue';
 import MobileDock from './components/MobileDock.vue';
+import BlockCursor from './components/BlockCursor.vue';
 import { useBrandOverlay } from './composables/useBrandOverlay.js';
 import { useEdgeReveal } from './composables/useEdgeReveal.js';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -106,6 +107,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   </router-view>
 
   <Lightbox />
+
+  <!-- 方块光标。原来是首页 Hero 自己的东西（只在那一个 section 里跟着走），
+       现在提到这里、全站一份：它自己 Teleport 到 body，并且压在所有层之上
+       （含品牌遮罩和转场板子）。 -->
+  <BlockCursor />
 
   <!-- 手机上把左下作者区 + 右下按钮收进一个汉堡（宽屏下它整个不渲染） -->
   <MobileDock />

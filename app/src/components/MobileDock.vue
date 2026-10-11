@@ -86,6 +86,18 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
+    /* ⚠ 这一条不能省。收起时 .dock-panel 用的是 visibility: hidden（为了保住过渡，
+       不能用 display: none），它**仍然占着布局** —— 于是 .dock 这个容器盒子从底部
+       一路顶到屏幕中间（六个 44px 的项 + 内边距），而容器自己没有 visibility，
+       一直都能吃掉点击。实测：在 390×844 上点博客卡片从 15% 高度往下，
+       elementFromPoint 命中的就是 DIV.dock，卡片下半截整个点不动。
+       这里让容器让开事件，只让真正看得见的两件东西接。 */
+    pointer-events: none;
+  }
+
+  .dock-btn,
+  .dock-panel {
+    pointer-events: auto;
   }
 
   /* 展开的面板：平时只占位不可见，点一下才出来（不用 display: none，

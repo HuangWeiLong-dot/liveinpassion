@@ -706,8 +706,7 @@ async function run() {
             hasBlur: getComputedStyle(imgs[0] || w).filter.includes('blur'),
           };
         })(),
-        cursorExists: !!document.querySelector('.hero-cursor'),
-        heroCursor: getComputedStyle(document.querySelector('.hero-concept')).cursor,
+        cursorExists: !!document.querySelector('.block-cursor'),
         oldHero: !!document.querySelector('.hero-flip-card'),
         oldGallery: !!document.querySelector('.gallery-masonry, .home-gallery, #home-gallery'),
       };
@@ -736,7 +735,7 @@ async function run() {
       structure.grain ? `${structure.grain.w}x${structure.grain.h}` : 'MISSING');
     check(structure.photoOpacity.every((o) => Number(o) === 0), '静止态真实照片隐藏（露出的是星尘）',
       structure.photoOpacity.join(', '));
-    check(structure.heroCursor === 'none', '自定义光标生效（系统光标已隐藏）', structure.heroCursor);
+    check(structure.cursorExists, '方块光标在（全站一份，见 tools/verify-block-cursor.mjs）');
     check(!structure.oldHero && !structure.oldGallery, '旧的 HeroCard 与随机画廊都不在首页');
 
     // ── 背景拼贴：最新 8 篇非人格文章 ──────────────────────────────────
@@ -1046,16 +1045,25 @@ async function run() {
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cursorBox.x, y: cursorBox.y, buttons: 0 });
     await sleep(450);
     const cursor = await evaluate(`(() => {
-      const c = document.querySelector('.hero-cursor');
+      const c = document.querySelector('.block-cursor');
+      if (!c) return null; // 没装这一层就别把后面几条一起带崩（本工具还要验别的）
       return {
         opacity: getComputedStyle(c).opacity,
         transform: getComputedStyle(c).transform,
-        dot: getComputedStyle(c.querySelector('.hero-cursor__dot')).transform,
+        dot: getComputedStyle(c.querySelector('.block-cursor__dot')).transform,
+        // 系统光标现在由 html.is-block-cursor 全站压掉，而那个类**只在第一次
+        // pointermove 之后**才挂（先挂的话，从加载到第一次挪鼠标之间会一个光标都没有）。
+        // 上面刚推过指针，所以这时候量才对得上。
+        heroCursor: getComputedStyle(document.querySelector('.hero-concept')).cursor,
       };
     })()`);
-    check(cursor.opacity === '1', '方块光标已显示', cursor.opacity);
-    check(/matrix/.test(cursor.transform), '方块光标跟随鼠标', cursor.transform);
-    check(/1\.5/.test(cursor.dot), '压在星尘上时方块放大 1.5 倍', cursor.dot);
+    check(cursor !== null, '方块光标存在（components/BlockCursor.vue）');
+    if (cursor) {
+      check(cursor.opacity === '1', '方块光标已显示', cursor.opacity);
+      check(/matrix/.test(cursor.transform), '方块光标跟随鼠标', cursor.transform);
+      check(/1\.5/.test(cursor.dot), '压在星尘上时方块放大 1.5 倍', cursor.dot);
+      check(cursor.heroCursor === 'none', '自定义光标生效（系统光标已隐藏）', cursor.heroCursor);
+    }
 
     // ── 主体水波纹（WebGL）────────────────────────────────────────────────
     const rippleReady = await evaluate(`(() => {
@@ -1220,7 +1228,7 @@ async function run() {
 
     // 光标方块的颜色混合也会计入差分，而且它就在鼠标位置上，会把重心拉向正确位置、
     // 掩盖竖直镜像的 bug。测这一条时先把它藏掉。
-    await evaluate(`document.querySelector('.hero-cursor').style.display = 'none'`);
+    await evaluate(`(() => { const c = document.querySelector('.block-cursor'); if (c) c.style.display = 'none'; return 1; })()`);
 
     // 涟漪跟着鼠标走 —— 用**受控 A/B** 验，不看重心的位移。
     //
@@ -1258,7 +1266,7 @@ async function run() {
 
     const atMouseA = await magAt(A.u, A.v);
     const atMouseB = await magAt(B.u, B.v);
-    await evaluate(`document.querySelector('.hero-cursor').style.display = ''`);
+    await evaluate(`(() => { const c = document.querySelector('.block-cursor'); if (c) c.style.display = ''; return 1; })()`);
 
     // 比的是**同一个位置**在两种鼠标位置下的扰动 —— 内容一样，差的只有涟漪距离。
     // （反过来的比法 —— 同一个鼠标位置下比两个位置 —— 会被内容对比度带偏：
@@ -1288,7 +1296,7 @@ async function run() {
         dark: document.documentElement.classList.contains('dark'),
         bg: getComputedStyle(hero).backgroundColor,
         labelColor: getComputedStyle(document.querySelector('.persona__label')).color,
-        cursorBg: getComputedStyle(document.querySelector('.hero-cursor__dot')).backgroundColor,
+        cursorBg: (() => { const d = document.querySelector('.block-cursor__dot'); return d ? getComputedStyle(d).backgroundColor : '(没有方块光标)'; })(),
         dustLuma: dust.meanLuma,
       };
     })()`;
@@ -1619,7 +1627,7 @@ async function run() {
       const hero = document.querySelector('.hero-concept').getBoundingClientRect();
       return {
         fine: window.matchMedia('(hover: hover) and (pointer: fine)').matches,
-        cursorDisplay: getComputedStyle(document.querySelector('.hero-cursor')).display,
+        cursorDisplay: (() => { const c = document.querySelector('.block-cursor'); return c ? getComputedStyle(c).display : '(没有方块光标)'; })(),
         heroCursor: getComputedStyle(document.querySelector('.hero-concept')).cursor,
         // 场景画布铺满整个 hero —— 被拖走的人格不会在舞台外被裁掉
         dustCoversHero: Math.abs(dust.width - hero.width) < 2 && Math.abs(dust.height - hero.height) < 2,

@@ -17,7 +17,7 @@
 //     ⚠ 它**不再**挂 view-transition-name —— 理由见下面"样式绑定"那段。
 //   - 投影公式只有一份：相机在 (0,0,NEAR) 看向 -Z，屏幕偏移 = 世界坐标 ×
 //     focal / (NEAR - z)。组件用 project() 摆 DOM，着色器里是同一套。
-import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import gsap from 'gsap';
 import { blogBySlug, blogPosts } from '../data/blogPosts.js';
@@ -27,6 +27,10 @@ import { createRippleEffect } from '../composables/useRippleEffect.js';
 import { useTheme } from '../composables/useTheme.js';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { useWallPref } from '../composables/useWallPref.js';
+// 方块光标已经提到全局（components/BlockCursor.vue，挂在 App.vue）。
+// 这里只留"指针压在人像 / 人格卡上时让它放大"这一件事 —— 那两处没有可认的
+// 语义标签（主体就是一张铺满的 <div>），自动判定认不出来，得自己举手。
+import { clearBlockCursorHot, setBlockCursorHot } from '../composables/useBlockCursor.js';
 import {
   CARD_HALF,
   NEAR,
@@ -208,35 +212,16 @@ const assembledSet = ref({});
 const forcedAssembled = ref(null);
 let subjectParticles = null;
 
-// ── 方块光标 ────────────────────────────────────────────────────────────
-const cursorEl = ref(null);
-const cursorVisible = ref(false);
-const cursorActive = ref(false);
+// ── 指针形态 ────────────────────────────────────────────────────────────
+// 方块光标本体和"跟着指针走"都已经在全局那一份里（components/BlockCursor.vue），
+// 这里只留一个 finePointer：下面一大批交互（涟漪、拖拽、hover 才生效的那些）
+// 仍然只对精确指针开放。
 const finePointer = ref(false);
 const reducedMotion = ref(false);
 const isCompact = ref(false);
 // 主题切换时的淡出态。必须是 Vue 状态而不是手动加类 ——
 // 这个元素上挂着 :class 绑定，重渲染时 Vue 会把手动加的类冲掉。
 const themeShifting = ref(false);
-let rafCursor = 0;
-let cursorX = 0;
-let cursorY = 0;
-
-function flushCursor() {
-  rafCursor = 0;
-  if (cursorEl.value) cursorEl.value.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0)`;
-}
-function onPointerMove(event) {
-  if (!finePointer.value) return;
-  cursorX = event.clientX;
-  cursorY = event.clientY;
-  if (!cursorVisible.value) cursorVisible.value = true;
-  if (!rafCursor) rafCursor = requestAnimationFrame(flushCursor);
-}
-function onPointerLeave() {
-  cursorVisible.value = false;
-  cursorActive.value = false;
-}
 
 // ── 采样图片 ────────────────────────────────────────────────────────────
 // gx/gy 是 0..1 的图内坐标；u 是"沿流的位置"；seed 决定起飞延迟和抖动相位。
@@ -699,17 +684,19 @@ function setTarget(g, value) {
 }
 
 // ── 交互 ────────────────────────────────────────────────────────────────
-function onTileEnter(g) {
+function onTileEnter(g, event) {
   if (!finePointer.value) return;
-  cursorActive.value = true;
+  // 全局方块光标：压在人上就放大。举旗要带上**这个元素**（event.currentTarget）——
+  // 换页时整张卡被摘出文档、pointerleave 不会到，靠元素自检才收得回来。
+  setBlockCursorHot(event?.currentTarget, true);
   setTarget(g, 1);
   preloadCover(g.config);
 }
 
-function onTileLeave(g) {
+function onTileLeave(g, event) {
   if (!finePointer.value) return;
   if (drag.id === g.config.id) return; // 拖拽中别散开
-  cursorActive.value = false;
+  setBlockCursorHot(event?.currentTarget, false);
   setTarget(g, 0);
 }
 
@@ -950,12 +937,23 @@ function applySubjectSolid() {
   el.style.setProperty('--subject-blur', `${blur.toFixed(2)}px`);
   // 人像让位的同时粒子长出来
   el.style.setProperty('--subject-grain', (1 - v).toFixed(3));
+  // 人像本身也要跟着走。
+  // 桌面上"人像让位"是涟漪层干的 —— 它静止时整片铺背景色，把人像盖住，
+  // 所以这行在桌面上看不出区别（人像本来就被盖着）。
+  // 但触屏上**没有涟漪层**（setupRipple 只在精确指针下建），人像是这张 <img> 自己，
+  // 不给它写 opacity 的话 v 归零之后它还留在那儿 —— 那份椭圆遮罩会把它裁成
+  // 一个永远消不掉的人像椭圆（"主人格的椭圆不能够消失"就是这么来的）。
+  el.style.setProperty('--subject-photo', v.toFixed(3));
 }
 
 /** ① 让人像亮起来。涟漪层没就绪就没法画（那一层才是"人像"本身），等它就绪了再来一次。 */
 function showSubjectSolid() {
   // 关了动效就没有"先看一会儿人像"这回事，直接停在粒子态
-  if (subjectSolidShown || reducedMotion.value || !ripple) return;
+  // ⚠ 这里**不能**再要求 `ripple` 存在：触屏上根本没有涟漪层，加了这条就等于
+  //   "先人像、再化开"在触屏上整段跳过 —— 人像一直亮着、永远不散成粒子。
+  //   涟漪只管它自己那层的实感（下面那行是可选的），人像/粒子/模糊三件都由
+  //   applySubjectSolid 按同一个 v 驱动，没有涟漪照样成立。
+  if (subjectSolidShown || reducedMotion.value) return;
   subjectSolidShown = true;
   subjectSolid.v = 1;
   applySubjectSolid();
@@ -988,15 +986,15 @@ function subjectPoint(event) {
 
 function onSubjectEnter(event) {
   if (!finePointer.value) return;
-  cursorActive.value = true;
+  setBlockCursorHot(event?.currentTarget, true);
   subjectHovered.value = true;
   ripple?.setHover(true);
   onSubjectMove(event);
 }
 
-function onSubjectLeave() {
+function onSubjectLeave(event) {
   if (!finePointer.value) return;
-  cursorActive.value = false;
+  setBlockCursorHot(event?.currentTarget, false);
   subjectHovered.value = false;
   ripple?.setHover(false);
   grainMouse = null;
@@ -1082,7 +1080,9 @@ function onVisibility() {
 
 function syncPointerMode(event) {
   finePointer.value = event.matches;
-  if (!event.matches) cursorVisible.value = false;
+  // 换成触屏了：把握着的那杆旗放下（全局方块光标自己也有一份判定，
+  // 但这条旗是我们举的，得我们来放）
+  if (!event.matches) clearBlockCursorHot();
 }
 
 function syncCompact(event) {
@@ -1259,10 +1259,31 @@ watch(isDark, async (dark) => {
 
 onActivated(() => {
   forcedAssembled.value = null;
+  // 从别的页面回到首页：这一页是 keep-alive 的，离开时节点被摘出文档 ——
+  // 那期间 IntersectionObserver 会把 heroVisible 置成 false、渲染循环停掉，
+  // 回来时也不能假定它一定又收到了 isIntersecting=true（实测过不动的情况），
+  // 于是画面就停在离开那一刻的一帧上 —— "回来之后粒子是错的"。
+  // 这里显式地重新对一次：重跑 relayout 让画布尺寸/焦距按当前布局对齐，
+  // 再把可见性和循环重新点起来。
+  // 等两帧：keep-alive 把节点插回文档之后布局才算完，量早了全是 0。
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    relayout();
+    heroVisible.value = true;
+    ensureTicking();
+  }));
+  // 顺带兜住另一种"回来看见椭圆"的情况：人像还没化开就离开首页的话，
+  // 化开那一步从没排上（它挂在"开场走完"上），v 会一直停在 1 ——
+  // 也就是一张模糊的完整人像糊在那儿，粒子反而不见了。这里补排一次。
+  if (subjectSolidShown && !subjectDissolving) scheduleSubjectDissolve();
 });
 
+// 离开首页。keep-alive 只是把首页摘出文档、不卸载 —— 而**元素被摘走时浏览器
+// 不会补一次 pointerleave**，所以压在某个人格卡上时点了它，那杆旗会一直举着，
+// 方块从那一刻起在**每一页**都停在放大态（实测）。这里当场放下。
+// （全局组件每帧也会自检一遍兜底，见 composables/useBlockCursor.js。）
+onDeactivated(() => clearBlockCursorHot());
+
 onBeforeUnmount(() => {
-  if (rafCursor) cancelAnimationFrame(rafCursor);
   if (masterRaf) cancelAnimationFrame(masterRaf);
   masterRaf = 0;
   clearTimeout(resizeTimer);
@@ -1287,13 +1308,10 @@ onBeforeUnmount(() => {
     ref="heroEl"
     class="hero-concept"
     :class="{
-      'is-fine': finePointer,
       'is-dark': isDark,
       'is-theme-shift': themeShifting,
       'is-risen': brandEntered,
     }"
-    @pointermove="onPointerMove"
-    @pointerleave="onPointerLeave"
   >
     <!-- 背景拼贴的开关。和主题按钮、播放器同一条竖列（fixed 右下角往上数第三格），
          所以它跟着别的悬浮控件一起被 X 键收起来（见 styles/main.css 的名单）。 -->
@@ -1386,8 +1404,8 @@ onBeforeUnmount(() => {
               :aria-label="g.config.label"
               @click="onTileClick($event, g.config)"
               @pointerdown="onTileDown($event, g)"
-              @pointerenter="onTileEnter(g)"
-              @pointerleave="onTileLeave(g)"
+              @pointerenter="onTileEnter(g, $event)"
+              @pointerleave="onTileLeave(g, $event)"
             >
               <img
                 class="persona__photo"
@@ -1404,26 +1422,6 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 方块光标。**必须 Teleport 到 body**，不能留在 Hero 里 ——
-         .hero-concept 上有 transform（首屏 translateY(100%)，落定后也是
-         translateY(0)），被 transform 的祖先会把内部 position:fixed 的包含块
-         改成它自己。于是这个"跟指针走"的方块实际跟的是**Hero**：页面一滚，
-         Hero 上移，方块就跟着上移，而指针钉在视口里不动 —— 两者越差越远
-         （实测滚到页脚差 116px），而系统光标又被 cursor:none 压掉了，
-         用户看到的就是"指针和实际位置对不上"。
-         挂到 body 上，包含块回到初始包含块，translate3d(clientX, clientY)
-         才是真正的视口坐标。（和 .wall-toggle 同一条理由，见下。）
-         底色变量不再靠 .hero-concept 继承，改由这里的 is-dark 自带。 -->
-    <Teleport to="body">
-      <div
-        ref="cursorEl"
-        class="hero-cursor"
-        :class="{ 'is-visible': cursorVisible, 'is-active': cursorActive, 'is-dark': isDark }"
-        aria-hidden="true"
-      >
-        <span class="hero-cursor__dot" />
-      </div>
-    </Teleport>
   </section>
 </template>
 
@@ -1447,7 +1445,6 @@ onBeforeUnmount(() => {
      只剩 #ececec，等于没有。亮色给到 0.16 才立得住，暗色保持原来的 7.5%。 */
   --wordmark-opacity: 0.16;
   --hero-noise-opacity: 0.05;
-  --hero-cursor: #000000; /* 亮色模式：纯黑方块 */
   /* 背景拼贴的浓度。照片是去色的，压在白底上比压在黑底上更容易"化掉"，
      所以亮色这一档从 0.17 提到 0.22（暗色仍是 0.26）。 */
   --wall-opacity: 0.22;
@@ -1490,18 +1487,13 @@ onBeforeUnmount(() => {
   --hero-fg-strong: rgba(255, 255, 255, 0.95);
   --wordmark-opacity: 0.075;
   --hero-noise-opacity: 0.042;
-  --hero-cursor: #ffffff; /* 暗色模式：纯白方块 */
   --wall-opacity: 0.26;
 }
 
-/* 系统光标要彻底压掉。只写 .hero-concept 是不够的 ——
-   UA 样式表给 <a> 的 cursor:pointer 比父级的 cursor:none 更具体，
-   压在图上会冒出手型光标。所以连后代一起写。 */
-.hero-concept.is-fine,
-.hero-concept.is-fine a,
-.hero-concept.is-fine a * {
-  cursor: none;
-}
+/* ⚠ 这里原来有一条"系统光标压掉"的规则（.hero-concept.is-fine ... cursor:none），
+   现在归全局：方块光标是全站的（components/BlockCursor.vue），压光标的类挂在
+   <html> 上、规则在 styles/main.css 的 html.is-block-cursor 那一段。
+   放这儿只会管住首页，而且 .hero-concept 一离开就失效。 */
 
 .hero-concept__noise {
   position: absolute;
@@ -1758,6 +1750,9 @@ onBeforeUnmount(() => {
      初值就是粒子态的终值：揭示没跑成也不会留下半拆开的样子。 */
   --subject-blur: 0px;
   --subject-grain: 1;
+  /* 人像那一层的浓度。初值 1（不是粒子态的 0）：脚本没跑起来时这张照片就是全部内容，
+     真要没人推它也该看得见。 */
+  --subject-photo: 1;
 }
 
 @keyframes subject-wind {
@@ -1803,6 +1798,11 @@ onBeforeUnmount(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+  /* 由 applySubjectSolid 逐帧写（和 --subject-blur / --subject-grain 是同一个 v）。
+     初值 1：脚本还没跑起来（或者 WebGL 整个不可用）时，这张照片就是全部内容。
+     粒子化之后它归 0 —— 触屏上只有这一层照片，不归 0 的话那个椭圆遮罩会把
+     它裁成一个消不掉的人像轮廓。 */
+  opacity: var(--subject-photo, 1);
   /* 触屏上没有涟漪层（setupRipple 只在精确指针下建），人像就是这张照片本身，
      所以模糊也得给它一份，否则那种设备上"先人像后粒子"会跳过模糊那一步。
      桌面上这张被涟漪层完全盖住，这份 filter 看不见，只多一点点光栅化开销。 */
@@ -1960,43 +1960,8 @@ onBeforeUnmount(() => {
 
 
 /* ── 方块光标 ──────────────────────────────────────────────────────────── */
-.hero-cursor {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 120;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  will-change: transform;
-  /* 底色变量必须**自带**，不能像别的规则那样从 .hero-concept 继承 ——
-     这个元素被 Teleport 到 body 了，已经不是 Hero 的后代。 */
-  --hero-cursor: #000000; /* 亮色模式：纯黑方块 */
-}
-
-.hero-cursor.is-dark {
-  --hero-cursor: #ffffff; /* 暗色模式：纯白方块 */
-}
-
-.hero-cursor.is-visible {
-  opacity: 1;
-}
-
-.hero-cursor__dot {
-  display: block;
-  width: 10px;
-  height: 10px;
-  /* 颜色跟着主题走：亮色模式纯黑、暗色模式纯白。
-     早先用的是 difference 混合想自动取反，但结果受底色影响（浅灰底上会变成
-     近黑的灰、而不是黑），明暗两个主题下都不干脆，还不如直接给死。 */
-  background: var(--hero-cursor);
-  transform: translate(-50%, -50%) scale(1);
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hero-cursor.is-active .hero-cursor__dot {
-  transform: translate(-50%, -50%) scale(1.5);
-}
+/* 已经整体搬到 components/BlockCursor.vue（含样式）。这里不再留一份 ——
+   两边各写一套的话，改一边就会和另一边对不上。 */
 
 /* ── 移动端 ────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -2034,12 +1999,6 @@ onBeforeUnmount(() => {
   .hero-caption {
     padding-top: 0.7rem;
     font-size: 10px;
-  }
-}
-
-@media (hover: none) {
-  .hero-cursor {
-    display: none;
   }
 }
 </style>
