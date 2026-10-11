@@ -3,15 +3,20 @@
 // 状态放模块作用域（旧版是 initMusicPlayer 的闭包，生命周期等于整个页面）：
 // 这样即使组件因任何原因被重新挂载，播放状态、曲目、静音状态都不会被重置。
 //
-// 注意一个旧版行为，这里**原样保留**：初始化时 audio.muted = true 且 isMuted = true，
-// 首次交互触发的 tryAutoPlay() 只调用 play() 而不会解除静音——也就是说自动播放开始后
-// 是"静音在播放"，要用户自己点音量键才会出声。这是旧版既有行为，迁移不做改变。
+// 与旧版**有意**的两处不同（站点负责人定的，别当回归改回去）：
+//   1. 起始曲目固定为第一首（Almost Nothing）。旧版是 Math.floor(Math.random() * length)
+//      随机抽一首 —— 但进站的音乐是"开场的一部分"，每次刷新换一首就不成编排了。
+//   2. 起播就出声。旧版初始 audio.muted = true 且 isMuted = true，所谓自动播放其实是
+//      "静音在放"，要用户自己点音量键才听得到；现在初始化即不静音。
+//
+// 另外：首屏那个 ENTER 按钮的点击**就是**这里的"首次交互"（document 上的 click 监听会
+// 收到它冒泡上来的事件），所以点 ENTER 即起播是有意为之，不是谁漏了 stopPropagation。
 import { ref, computed } from 'vue';
 import { playlist } from '../data/playlist.js';
 
 const currentTrackIndex = ref(0);
 const isPlaying = ref(false);
-const isMuted = ref(true);
+const isMuted = ref(false); // 初始即不静音 —— 跟 init() 里的取值一致（见文件头第 2 条）
 const playerVisible = ref(false);
 const playlistVisible = ref(false);
 const progressPercent = ref(0);
@@ -41,12 +46,16 @@ function loadTrack() {
   audioEl.src = track.src;
 }
 
+// isPlaying 只在 play() **兑现之后**才置上，不能同步置。
+// 置早了就会给出一个自相矛盾的状态：音频没在放，按钮却已经是"暂停"（自动播放被策略
+// 拒掉时就是这个组合）；反过来漏置则更糟 —— 进度条在走、按钮还显示"播放"，用户要点
+// 两下才停得下来（旧版的自动起播正是这样，因为 tryAutoPlay 只调 play()）。
 function playTrack() {
   if (!audioEl) return;
-  audioEl.play().catch(() => {
-    // 旧版对 play() 的拒绝同样不做处理
-  });
-  isPlaying.value = true;
+  audioEl.play().then(
+    () => { isPlaying.value = true; },
+    () => { /* 被自动播放策略或加载失败挡住：保持暂停态，等用户按播放键 */ }
+  );
 }
 
 function pauseTrack() {
@@ -113,10 +122,11 @@ function seek(percent) {
   audioEl.currentTime = percent * audioEl.duration;
 }
 
-// 首次用户交互后开始播放一次（自动播放策略的绕行方案）
+// 首次用户交互后开始播放一次（自动播放策略的绕行方案）。
+// 走 playTrack 而不是自己 play()，播放状态才会跟着一起置上。
 function tryAutoPlay() {
   if (!audioEl) return;
-  audioEl.play().catch(() => {});
+  playTrack();
   document.removeEventListener('click', tryAutoPlay);
   document.removeEventListener('touchstart', tryAutoPlay);
   document.removeEventListener('keydown', tryAutoPlay);
@@ -127,12 +137,13 @@ export function useMusicPlayer() {
   function init(el) {
     audioEl = el;
     if (!audioEl) return;
-    // 旧的初始化顺序：先随机选曲并 loadTrack，再设音量，最后设静音
-    currentTrackIndex.value = Math.floor(Math.random() * playlist.length);
+    // 顺序沿用旧的：先选曲并 loadTrack，再设音量，最后设静音。
+    // 两处取值换掉了（见文件头）：固定第一首、且不静音。
+    currentTrackIndex.value = 0;
     loadTrack();
     audioEl.volume = 0.3;
-    audioEl.muted = true;
-    isMuted.value = true;
+    audioEl.muted = false;
+    isMuted.value = false;
     updatePlaylistUI();
 
     if (!interactionBound) {

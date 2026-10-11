@@ -24,3 +24,21 @@ Thumbs.db
 tools/parity-out/
 
 CLAUDE.md
+# 验证工具的截图产物（verify-hero.mjs / verify-page-transition.mjs 输出）
+.hero-shots/
+
+# 本机 Claude Code 配置（含 worktree 隔离开关），不进仓库
+.claude/
+
+# 大体积素材源，不上线
+#   example/    build-personas.mjs 的输入（11~25MB PNG，不在静态白名单，不发布）
+#   me/*.jpg    全尺寸原图，只用于生成 me/hero_compressed 与 me/personas 压缩版
+example/
+me/Advocate.jpg
+me/idealist.jpg
+me/Individuation.jpg
+me/Observer.jpg
+me/Romanticist.jpg
+
+# 遗留导出，无任何引用（压缩版是 me/hero_compressed/Individuation.jpg）
+me/hero_compressed/Individuation.png

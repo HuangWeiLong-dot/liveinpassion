@@ -1,14 +1,11 @@
 <script setup>
-// 首页：hero 翻转卡 + 随机排布画廊 + 页脚（旧 index.html L4852-L4888）。
-import HeroCard from '../components/HeroCard.vue';
-import RandomGallery from '../components/RandomGallery.vue';
-import AppFooter from '../components/AppFooter.vue';
+// 首页：概念入口（页脚已按决定删除，AppFooter 组件仍被其它页面使用）。
+// 原来的 HeroCard 翻转卡和随机画廊按决定从首页撤下（组件文件仍在，没有再被引用）。
+import HeroConcept from '../components/HeroConcept.vue';
 </script>
 
 <template>
   <main class="page active">
-    <HeroCard />
-    <RandomGallery />
-    <AppFooter />
+    <HeroConcept />
   </main>
 </template>

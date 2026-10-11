@@ -1,0 +1,116 @@
+/* View Transitions API 的全局规则。**只管两个场景**：
+ *
+ *   · 主题切换 → 画面放大冲过去，再从放大态缩回（不置 data-vt，走"整屏缩放"那套）
+ *   · 首页磁贴 → 博客详情 → 根走干净的竖直滑动（<html data-vt="cover">）
+ *
+ * ── 为什么必须放在全局、不能写进组件的 <style scoped> ──────────────────
+ * ::view-transition-* 伪元素挂在根元素下，不在组件的 DOM 子树里，
+ * scoped 会往选择器上加 [data-v-xxx] 属性，一条都匹配不上。
+ *
+ * ── 普通导航（滑块转场）为什么**不在这个文件里** ────────────────────────
+ * 那一条路的驱动逻辑和样式分别在 composables/usePageTransition.js 和
+ * components/PageTransitionOverlay.vue（scoped 样式）。它是一块**普通 DOM**
+ * 板子 + 一条 GSAP 时间线，从头到尾不碰 View Transitions —— 原因写在
+ * usePageTransition.js 顶部：伪元素树在 top layer（板子压不过它，做不出
+ * "划进来盖住旧页面"），而 startViewTransition 每跳一次都要抓一张整页位图，
+ * 首页那种带 WebGL 画布 + 几十张图的页面，抓那一张就是点击后那一下卡顿。
+ *
+ * ── ⚠⚠ 参数化只能走**自定义属性**，不能走祖先选择器 ────────────────────
+ * 实测：`html[data-vt='cover'] ::view-transition-old(root)` 这种写法**根本不匹配**
+ *（伪元素树在样式匹配上不吃祖先选择器这一套），转场照样按默认那条跑。
+ * 自定义属性是继承的，根上的值会被伪元素树继承下去 —— 这是唯一能按条件换皮肤的路子。
+ * 用长写属性而不是 animation 简写：简写里只要有一个 var 代换后非法，整条就变
+ * unset，出了问题很难查。
+ */
+
+/* ══ 第 1 套：整屏放大（主题切换）══════════════════════════════════════
+ * 放大倍率与模糊半径：1.55 倍 / 14px 是用户选的"强烈"档。
+ *
+ * ⚠ 每个动画都拆成"前半段只动 transform / 后半段才动 opacity"两步，不是随手分的：
+ * 一开始写成 scale 和 opacity 一起线性走，结果**放大的峰值和"旧画面已经透明"撞在
+ * 一起** —— 缩放到 1.55 的那一瞬它几乎看不见了，整条弧线读出来只是"模糊交叉淡化"，
+ * "放大"根本没发生。把透明度压到后半段，前半段才是实打实能看见的推近。 */
+@keyframes vt-zoom-away {
+  from { transform: scale(1); filter: blur(0px); opacity: 1; }
+  50% { transform: scale(1.55); filter: blur(14px); opacity: 1; }
+  to { transform: scale(1.55); filter: blur(14px); opacity: 0; }
+}
+
+/* 新画面同理反过来：先在半程处**原地**等着（此时屏幕还是旧画面在推近），
+   等旧画面开始退场，才一边显形一边从 1.55 缩回 1。 */
+@keyframes vt-zoom-settle {
+  from { transform: scale(1.55); filter: blur(14px); opacity: 0; }
+  50% { transform: scale(1.55); filter: blur(14px); opacity: 0; }
+  to { transform: scale(1); filter: blur(0px); opacity: 1; }
+}
+
+:root {
+  /* 整屏缩放那条的时长。0.8s：推近半程 0.4s，退场半程 0.4s。 */
+  --vt-root-duration: 0.8s;
+  --vt-old-name: vt-zoom-away;   /* 旧画面：稳稳推近，推到底才开始退场 */
+  --vt-old-ease: cubic-bezier(0.45, 0, 0.55, 1);
+  --vt-new-name: vt-zoom-settle; /* 新画面：显形的同时缩回原位 */
+  --vt-new-ease: cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+/* ══ 第 2 套：竖直滑动（首页磁贴 → 博客详情）══════════════════════════
+ * 参考 tlb.betteroff.studio 的换页语言：**整页往上走，新页从下面顶上来**
+ *（那边的 .slide-enter/leave 就是 translateY(±100%) + cubic-bezier(.19,1,.22,1)）。
+ * 封面那一下的"磁贴变成详情大图"由 GSAP FLIP 负责（见 composables/useCoverHandoff.js），
+ * 不在这里 —— 共享元素那套活在视口坐标系，而根快照同时在整页竖直滑动，
+ * 两个坐标系各动各的，中途必然错位。
+ *
+ * ⚠ 为什么这里可以整页 transform，而别处不行：给容器加 transform 会造出新的包含块、
+ * 把 fixed 悬浮件顶跑位。那说的是**自己动 DOM**。
+ * ::view-transition-old/new(root) 是浏览器抓下来的**静态位图快照**，动它不影响
+ * 文档里任何元素的包含块。 */
+:root[data-vt='cover'] {
+  --vt-root-duration: 0.72s;
+  --vt-old-name: vt-slide-away-up;
+  --vt-old-ease: cubic-bezier(0.19, 1, 0.22, 1);
+  --vt-new-name: vt-slide-in-up;
+  --vt-new-ease: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* 旧页：往上走掉。不回淡出 —— 淡出会和"上滑"读成两件事，
+   而且两张快照一旦半透明交叠，中间那段会糊成灰色。 */
+@keyframes vt-slide-away-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+
+/* 新页：从下面顶上来，落到原位。
+   同一时长、同一条曲线，所以上下两半是一段连续的运动。 */
+@keyframes vt-slide-in-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* 根快照 = 整个视口（含头部、主题按钮、播放器、页脚）—— 所以是"整屏"一起动。 */
+::view-transition-group(root) {
+  animation-duration: var(--vt-root-duration);
+  animation-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: var(--vt-old-name);
+  animation-duration: var(--vt-root-duration);
+  animation-timing-function: var(--vt-old-ease);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(root) {
+  animation-name: var(--vt-new-name);
+  animation-duration: var(--vt-root-duration);
+  animation-timing-function: var(--vt-new-ease);
+  animation-fill-mode: both;
+}
+
+/* 减少动态效果：JS 那边已经整段跳过转场了，这里再兜一层，防止别的触发路径漏进来。 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

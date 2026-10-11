@@ -93,6 +93,32 @@
             -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
             width: 100%;
+            /* 藏掉浏览器默认滚动条（整站在暗底上，那一条灰杠很显眼）。
+               注意是**藏**不是禁用：页面照旧能滚，只是不画那条轨道。
+               三个写法各管一批浏览器：scrollbar-width 是标准（Firefox），
+               -ms-* 管老 Edge，::-webkit-scrollbar 管 Chrome / Safari。
+               只写 overflow: hidden 的话页面就滚不动了，那是另一回事。 */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        html::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
+        /* body 也来一份：有些浏览器/设置下滚动容器是 body 而不是 html，
+           只写 html 的话那一条还在。 */
+        body {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        body::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
         }
 
         body {
@@ -3616,7 +3642,7 @@
             right: 32px;
             width: 56px;
             height: 56px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求） */
             background: var(--text-primary);
             color: var(--bg);
             display: flex;
@@ -3675,7 +3701,7 @@
             right: 32px;
             width: 56px;
             height: 56px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求：按钮统一去圆角） */
             background: var(--text-primary);
             background-image: linear-gradient(to right, var(--text-primary) 0%, var(--text-primary) 100%);
             color: var(--bg);
@@ -3802,7 +3828,7 @@
             z-index: 998;
             background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 0; /* 直角（需求） */
             box-shadow: 0 8px 40px rgba(0,0,0,0.3);
             overflow: hidden;
             width: 460px;
@@ -3840,7 +3866,7 @@
         .player-btn {
             width: 32px;
             height: 32px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求） */
             background: transparent;
             border: none;
             color: var(--text-primary);
@@ -3870,7 +3896,7 @@
         .player-play-btn {
             width: 40px;
             height: 40px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求） */
             background: var(--text-primary);
             border: none;
             color: var(--bg);
@@ -3927,7 +3953,7 @@
             flex: 1;
             height: 4px;
             background: var(--border);
-            border-radius: 2px;
+            border-radius: 0; /* 直角（需求） */
             cursor: pointer;
             overflow: hidden;
         }
@@ -3957,7 +3983,7 @@
             -webkit-appearance: none;
             appearance: none;
             background: var(--border);
-            border-radius: 2px;
+            border-radius: 0; /* 直角（需求） */
             cursor: pointer;
             outline: none;
         }
@@ -3967,7 +3993,7 @@
             appearance: none;
             width: 10px;
             height: 10px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求） */
             background: var(--text-primary);
             cursor: pointer;
         }
@@ -3975,7 +4001,7 @@
         .volume-slider::-moz-range-thumb {
             width: 10px;
             height: 10px;
-            border-radius: 50%;
+            border-radius: 0; /* 直角（需求） */
             background: var(--text-primary);
             cursor: pointer;
             border: none;
@@ -5143,3 +5169,59 @@
                 overflow-x: auto;
             }
         }
+
+/*
+ * X 键：把页面上所有的图标 / 按钮收起来（见 App.vue 的 onKeydown）。
+ * 用 html 上的类 + 全局选择器，是因为这些控件分散在 shell 和各个页面里
+ * （头部、主题按钮、播放器、作者区、首页那个"背景开关"）——
+ * 逐组件透传一个 prop 不如一条规则省事。
+ * 加这个新控件时记得把它也写进这张名单（以及下面 `.is-edge-hover` 那两张）。
+ */
+html.is-chrome-hidden #header,
+html.is-chrome-hidden .theme-toggle,
+html.is-chrome-hidden .author-section,
+html.is-chrome-hidden .music-toggle-btn,
+html.is-chrome-hidden .wall-toggle {
+    /* ⚠ 必须 !important：App.vue 里"逐个浮出来"那套是
+       `.shell.is-ready > #header` 这种带 id 的选择器、还带着 scoped 的属性选择器，
+       权重比这里高得多（实测头部和主题按钮压不下去，就是被它顶掉的）。
+       这里要的就是"不管前面怎么写的，都先收起来"。 */
+    opacity: 0 !important;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+/*
+ * 边缘滑出：左下角的作者区、右下那一竖列悬浮按钮，平时推到屏幕外，
+ * 指针靠到那个角上才滑进来。
+ *
+ * 为什么用独立的 translate 属性，而不是 transform：主题按钮和背景开关的 hover 是
+ * `transform: scale(1.1)`，两者挤进同一个 transform 就会互相覆盖 —— 一 hover
+ * 元素就跳回原位。translate / rotate / scale 三个独立属性是三条互不干扰的通道。
+ *
+ * 怎么判定在 composables/useEdgeReveal.js：
+ *   is-edge-hover —— 这台设备有真指针、能 hover，才把控件收起来。
+ *                    触屏上没有 hover，收了就再也叫不出来，所以不加这个类、保持常显。
+ *   is-edge-left / is-edge-right —— 指针这会儿就在那一边。
+ *
+ * 位移量取得比"刚好藏起来"更宽（桌面要 88px，这里给 112px）：好处是
+ * 800 / 480 两个断点下控件变小、边距变窄，一个值照样盖得住，不必跟着写三份。
+ * 过渡写在 App.vue 的 `.shell > .theme-toggle` 那几条（跟淡入同一处，
+ * scoped 权重更高，写在别处会被它顶掉）；背景开关在自己的 scoped 样式里。
+ */
+html.is-edge-hover .author-section {
+    translate: -112px 0;
+}
+
+html.is-edge-hover .theme-toggle,
+html.is-edge-hover .music-toggle-btn,
+html.is-edge-hover .wall-toggle {
+    translate: 112px 0;
+}
+
+html.is-edge-hover.is-edge-left .author-section,
+html.is-edge-hover.is-edge-right .theme-toggle,
+html.is-edge-hover.is-edge-right .music-toggle-btn,
+html.is-edge-hover.is-edge-right .wall-toggle {
+    translate: 0 0;
+}

@@ -113,6 +113,32 @@
             -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
             width: 100%;
+            /* 藏掉浏览器默认滚动条（整站在暗底上，那一条灰杠很显眼）。
+               注意是**藏**不是禁用：页面照旧能滚，只是不画那条轨道。
+               三个写法各管一批浏览器：scrollbar-width 是标准（Firefox），
+               -ms-* 管老 Edge，::-webkit-scrollbar 管 Chrome / Safari。
+               只写 overflow: hidden 的话页面就滚不动了，那是另一回事。 */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        html::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
+        /* body 也来一份：有些浏览器/设置下滚动容器是 body 而不是 html，
+           只写 html 的话那一条还在。 */
+        body {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        body::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
         }
 
         body {

@@ -32,10 +32,25 @@
     <link rel="preconnect" href="https://img.liveinpassion.me">
 
     <!-- 字体 CSS 非阻塞加载：preload 高优先级拉取，加载完成后转为 stylesheet 应用 -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" onload="this.rel='stylesheet'">
+    <link id="fontCSS" rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" onload="this.rel='stylesheet'">
     <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
     </noscript>
+
+    <script>
+        // 字体就绪信号。字体 CSS 是异步加载的，在它到位之前 document.fonts 里
+        // 一条 @font-face 都没有 —— 这时候谁去 await document.fonts.ready 都会
+        // **立刻兑现**，等于没等：首屏会先用兜底字体画一遍，等 Oswald 真正到了
+        // 再换一次。整屏只有一个大字的画面上，那一下非常显眼。
+        // 所以把"CSS 已应用"这一步先单独收成一个 promise，首屏那边 await 它。
+        window.__fontCSSReady = new Promise(function (resolve) {
+            var link = document.getElementById('fontCSS');
+            if (!link || link.sheet) { resolve(); return; }
+            link.addEventListener('load', function () { resolve(); }, { once: true });
+            // 兜底：网慢就别卡着首屏不放，宁可换一次字体
+            setTimeout(resolve, 2500);
+        });
+    </script>
 
     <script>
         // 主题必须在首次绘制前落到 <html> 上。

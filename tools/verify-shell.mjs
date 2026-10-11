@@ -136,9 +136,11 @@ const check = (label, ok, detail = '') => {
       src: decodeURIComponent(document.getElementById('audioPlayer').src),
       plays: window.__marks.plays.length
     })`));
-    check('初始静音（为自动播放做准备）', audio.muted === true);
+    // 起播就出声：初始**不**静音（旧版是 muted = true，所谓自动播放其实是静音在放）
+    check('初始不静音（起播就出声）', audio.muted === false);
     check('音量 0.3', Math.abs(audio.volume - 0.3) < 0.001, String(audio.volume));
-    check('已随机选中一首歌', /music\/.+\.mp3$/.test(audio.src), audio.src.split('/').pop());
+    // 起始曲目固定第一首（旧版是 Math.random() 抽一首）
+    check('固定选中第一首 Almost Nothing', /music\/Almost Nothing - Silent PoetsOkay Kaya\.mp3$/.test(audio.src), audio.src.split('/').pop());
     check('挂载时未调用 play()', audio.plays === 0, `${audio.plays} 次`);
 
     // 首次用户交互触发一次播放，且监听器自移除
@@ -146,6 +148,10 @@ const check = (label, ok, detail = '') => {
     await sleep(600);
     const afterFirst = await evaluate(`window.__marks.plays.length`);
     check('首次交互后播放一次', afterFirst === 1, `${afterFirst} 次`);
+    // 起播的**状态**也要跟上：旧版自动起播只调 play() 不置 isPlaying，
+    // 于是进度条在走、按钮还显示"播放"，用户要点两下才停得下来。
+    const playIconAfter = await evaluate(`document.querySelector('.play-icon').style.display`);
+    check('起播后播放键切到暂停态（isPlaying 与真实播放同步）', playIconAfter === 'none', `display=${playIconAfter}`);
     await evaluate(`document.body.click()`);
     await sleep(300);
     const afterSecond = await evaluate(`window.__marks.plays.length`);

@@ -15,16 +15,20 @@ const imgRef = ref(null);
 
 onMounted(() => loadImage(imgRef.value));
 
-function open() {
+// ⚠ 不能叫 open：模板里 `@click="open"` 会解析成全局 window.open，
+// 点下去只是调用了一个空窗口，页面不跳也不报错。见 views/BlogsView.vue 同类注释。
+function openPost() {
   router.push(`/blogs/${props.post.slug}`);
 }
 </script>
 
 <template>
-  <article class="blog-card" @click="open">
+  <article class="blog-card" @click="openPost">
     <div class="blog-card-image">
       <div class="skeleton-loader"></div>
-      <img ref="imgRef" :data-src="post.image.src" :data-full-src="post.image.fullSrc" alt="Blog Featured Image" class="blur-placeholder">
+      <!-- 列表卡片只加载压缩图（loadImage 的取值顺序 data-src → data-full-src）：
+           原图只在详情页那张大图上请求。 -->
+      <img ref="imgRef" :data-src="post.image.src" alt="Blog Featured Image" class="blur-placeholder">
     </div>
     <div class="blog-card-overlay">
       <span class="blog-card-date">{{ post.cardDate }}</span>

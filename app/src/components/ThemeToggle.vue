@@ -2,12 +2,15 @@
 // 主题切换按钮。旧版把 class="dark" 写死在标记里再由 loadThemeState() 同步；
 // 新版从 <html> 上的 class 读初值（首帧已由 index.html 的内联脚本设好），避免两个来源打架。
 import { useTheme } from '../composables/useTheme.js';
+import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 
-const { isDark, toggle } = useTheme();
+const { isDark } = useTheme();
+// 切换走品牌遮罩：屏幕被完全盖住之后才真正换主题，用户看不到颜色硬切
+const { switchTheme } = useBrandOverlay();
 </script>
 
 <template>
-  <button class="theme-toggle" :class="{ dark: isDark }" id="themeToggle" aria-label="Toggle theme" tabindex="-1" @click="toggle">
+  <button class="theme-toggle" :class="{ dark: isDark }" id="themeToggle" aria-label="Toggle theme" tabindex="-1" @click="switchTheme">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="5"></circle>
       <line x1="12" y1="1" x2="12" y2="3"></line>
