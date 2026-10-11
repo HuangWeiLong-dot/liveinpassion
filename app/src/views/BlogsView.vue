@@ -20,18 +20,20 @@ import { gsap } from 'gsap';
 import { loadImage } from '../composables/useImageLoader.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
 import { rememberCoverHandoff, consumeReturningFromDetail } from '../composables/useCoverHandoff.js';
-// 胶片那层：FILM / focalOf / poseAt / cssMatrix 是**纯数学**（不带 three，静态引入零成本），
-// 只有 createFilmStrip 里头才动态 import three（见那个文件的头注释）。
+// 轨道的姿态数学（纯数学，不依赖 three / WebGL）：整排卡片贴在圆柱上的位置、
+// 转角、后退与投影。**已经没有 WebGL overlay 了**，见那个文件的头注释。
 import {
-  FILM, focalOf, poseAt, cssMatrix, ringRadius, createFilmStrip,
-} from '../composables/useFilmStrip.js';
+  FILM, focalOf, poseAt, cssMatrix, ringRadius,
+} from '../composables/useFilmPose.js';
+// 扭曲层：把封面画在能弯的细分平面上（唯一必须 WebGL 的部分）。
+// 它**不带姿态数学** —— 姿态只有 useFilmPose 那一份，两边共用，避免劈叉。
+import { createFilmStrip } from '../composables/useFilmStrip.js';
 import AppFooter from '../components/AppFooter.vue';
 
 const route = useRoute();
 const router = useRouter();
 
 const scroller = ref(null);
-const filmCanvas = ref(null);
 const activeIndex = ref(0);
 const progress = ref(0);
 const dragging = ref(false);
@@ -121,8 +123,9 @@ function coverStyle(post) {
 //   只调一边的话，要么淡到一半列表就被摘走（剩下的半程没了、元素啪一下消失），
 //   要么等完了还愣着不动。
 const TAKEOVER_MS = 420;
-// 胶片那层淡出的时长，必须和上面那条 CSS transition 是同一个数
-// （CSS 管 DOM 卡片、这里管 canvas 画的封面，两边差一拍就看得出来）。
+// 扭曲层淡出的时长，要和 BlogDetailView 里那条
+// `html.bd-taking-cover ... { transition: opacity 0.4s }` 是同一个数
+// （CSS 管 DOM 卡片、这里管 canvas 上的封面，两边差一拍就看得出来）。
 const TAKEOVER_FADE = 0.4;
 
 function openPost(post, el = null) {
@@ -141,7 +144,7 @@ function openPost(post, el = null) {
   // 被点的那张**不参与渐隐**：它要一直亮着，等详情页那张封面从同一个矩形接手
   // （见 BlogDetailView 的 .jb-card:not(.is-flying)）。
   clicked?.classList.add('is-flying');
-  // 胶片那层照同一条规矩来：除被点这张之外，canvas 上的封面也一起淡掉。
+  // 扭曲层照同一条规矩：除被点这张之外，canvas 上的封面也一起淡掉。
   // （它在 DOM 之外，CSS 那条规则管不到它，所以要单独补这一下。）
   filmFlying = clicked ? cards.indexOf(clicked) : null;
   if (film && !reduceMotion) {
@@ -214,8 +217,7 @@ function maybeUpgradeLegacy(img) {
   if (!full || !src.includes('blog_photos_compressed')) return;
   if (!img.naturalWidth || img.naturalWidth > LEGACY_MAX_W) return;
   // 这张图的跨域加载被拒过（见 loadCoverImage）：img 上还挂着 crossOrigin，
-  // 换 src 会再走一次 CORS 加载、必挂 —— 那就等于把一张好好的压缩图换成破图。
-  // 就地停手，继续用现在这张。
+  // 换 src 会再走一次 CORS 加载、必挂 —— 等于把一张好好的压缩图换成破图。
   if (img.dataset.noTex === '1') return;
   img.dataset.bdUpgraded = '1';
   const probe = new Image();
@@ -233,14 +235,13 @@ const loadedSet = new Set();
 
 // ── 卡片图的加载：带 crossOrigin 那一版 ──────────────────────────────────
 // 为什么不能直接 loadImage：跨域的图能显示，但**画进 canvas 会污染它**，
-// 而污染过的 canvas 上传到 WebGL 会直接抛 SecurityError —— 胶片那层就拿不到贴图，
-// 只能画占位色（实测：贴图 11 张全黑，控制台一路 texSubImage2D 报错）。
+// 污染过的 canvas 上传到 WebGL 直接抛 SecurityError —— 扭曲层就拿不到贴图。
 // 所以卡片图按 CORS 模式加载：canvas 干净，DOM 和 WebGL **共用同一次下载**。
 //
 // ⚠ CDN 只放行线上域名（`Vary: Origin`，实测 https://liveinpassion.me 放行、
-//   http://localhost:5173 不放行）。本地 dev 上这一版会加载失败 —— 所以挂了
-//   一次重试：去掉 crossOrigin 用普通方式再加载一遍。那一路页面完全正常，
-//   只是胶片那层停在占位色（这正是"拿不到贴图就优雅退化"那条路）。
+//   http://localhost:5173 不放行）。本地 dev 上这一版会失败 —— 所以挂了一次重试：
+//   去掉 crossOrigin 用普通方式再加载一遍。那一路页面完全正常，只是那几张
+//   拿不到贴图（扭曲层停在占位色，见 useFilmStrip 的 is-film-live）。
 function loadCoverImage(img) {
   if (img.dataset.corsTried === '1') {
     loadImage(img); // 重试那一遍
@@ -255,9 +256,8 @@ function loadCoverImage(img) {
     img.style.display = '';
     img.parentElement?.querySelectorAll('.load-error-msg').forEach((n) => n.remove());
     img.removeAttribute('crossorigin');
-    // ⚠ 记一笔：这一张的像素是"污染"的（跨域且没走 CORS）。
-    //   胶片那层必须**完全不碰它** —— 拿污染过的 canvas 去 texSubImage2D 会每帧抛
-    //   SecurityError（实测就是这么刷屏的）；这一张就老老实实留在占位色上。
+    // 记一笔：这一张的像素是"污染"的，扭曲层必须**完全不碰它**
+    // （拿污染过的 canvas 去 texSubImage2D 会每帧抛 SecurityError）。
     img.dataset.noTex = '1';
     loadImage(img);
   };
@@ -379,8 +379,8 @@ const TILT_CLAMP = 1.35;  // 屏幕外的卡片最多算到 1.35 倍，别把远
 // ── 随滚动扭曲（"胶片转起来"那一层）─────────────────────────────────────
 // 每帧量一次轨道的滚动速度，平滑之后按比例叠到上面的姿态上（整条带子朝运动方向
 // 倾一点、俯仰一点、再撑大一点），速度归零就自己回正。
-// 幅度那几个数在 useFilmStrip 的 FILM 里（wFull / wYaw / wPitch / wStretch），
-// 和 WebGL 那边共用一份；这里只留平滑系数。
+// 幅度那几个数在 useFilmPose 的 FILM 里（wFull / wYaw / wPitch / wStretch），
+// 姿态和扭曲层共用同一份；这里只留平滑系数。
 const WARP_FOLLOW = 0.22;  // 速度平滑系数（60Hz 每帧逼近比例）
 
 let rafId = 0;
@@ -401,13 +401,14 @@ let warp = 0;      // px/帧；正 = scrollLeft 在变大（轨道往左走）
 let warpPhase = 0;
 // 量卡片几何时的 scrollLeft（那些视口坐标是那一刻的，之后按差值换算）
 let readScroll = 0;
-// "有张图刚加载完，需要重画一帧"（胶片那层的贴图是在渲染时按需建的）
-let filmDirty = false;
-// 胶片那层（three 拉下来了才非 null）。null = 退回"DOM 图片 + 只有几何在 3D"。
+// 扭曲层（three 拉下来了才非 null）。null = 退回"纯 DOM"：卡片照常，
+// 只是画面不会弯（那一步 CSS 做不到）。
 let film = null;
-let filmAlive = false;   // 组件还活着吗（异步 import 回来时可能已经卸载了）
-let filmFlying = null;   // 被点的那张卡的 key：交接期间它不跟着淡
+let filmAlive = false; // 组件还活着吗（异步 import 回来时可能已经卸载了）
+let filmFlying = null; // 被点的那张卡的 key：交接期间它不跟着淡
+let filmDirty = false; // 有张图刚加载完，需要重画一帧（贴图是在渲染时按需建的）
 const filmOn = ref(false);
+const filmCanvas = ref(null);
 
 // ── 鼠标跟随倾斜（叠在"按滚动位置"的微倾上）─────────────────────────────
 // 每张卡按"指针相对它自己中心的位置"补一点 rotateX / rotateY：指针在卡片左边，
@@ -495,9 +496,15 @@ function readCards() {
     if (img && img.dataset.bdLegacyBound !== '1') {
       img.dataset.bdLegacyBound = '1';
       img.addEventListener('load', () => maybeUpgradeLegacy(img));
+      // 图加载完要**喊一帧**：贴图是在主循环里按需建的，而图是懒加载、往往等
+      // 主循环静止之后才到 —— 不叫醒它，这一张就一直停在占位色上。
+      img.addEventListener('load', () => {
+        filmDirty = true;
+        startLoop();
+      });
       // 图加载完要**喊一帧**：胶片那层是在主循环里按需建贴图的，而图是懒加载、
       // 往往等主循环静止之后才到 —— 不叫醒它，卡片就一直停在占位色块上，
-      // 直到用户滚一下才补上（实测就是这个：一开始 textures: 0）。
+      // 直到用户滚一下才补上（实测过：一开始贴图数一直是 0）。
       img.addEventListener('load', () => {
         filmDirty = true;
         startLoop();
@@ -627,11 +634,11 @@ function frame(now) {
   warpPhase += warp * 0.03; // 波形的相位跟着走过的距离走：停下就定住
 
   const left = root.scrollLeft;
-  // 静止、指针不动、**而且没有别的东西在动**才收工：
-  //   · 速度还没衰减完（带子正在回正）
-  //   · 胶片那层的不透明度还在补间（交接的淡入淡出，GSAP 在推它）
-  // 漏掉这两个判据，停下之后的那一小段就没人重画了（带子卡在歪着的那一帧）。
+  // 静止、指针不动、**而且回正还没走完**才收工：速度衰减那一小段也得逐帧重算，
+  // 否则停下之后整排会卡在歪着的那一帧。
   const warpMoving = Math.abs(warp) > 0.05;
+  // 交接的淡入淡出（GSAP 在推 film.op）和"刚有图加载完"也得各算一帧，
+  // 否则停下之后那两段没人重画（一个卡在半透明，一个停在占位色）。
   const opMoving = !!film && gsap.isTweening(film.op);
   if (left === lastLeft && !ptrMoving && !warpMoving && !opMoving && !filmDirty) return;
   lastLeft = left;
@@ -645,19 +652,19 @@ function frame(now) {
   // 以轨道中线为基准：**中间那张正面朝前、最近**，越靠边越绕 Y 转开、越往后退、
   // 越小；再叠一层随滚动速度的扭曲（停下自己回正）。
   //
-  // poseAt / cssMatrix 都是 useFilmStrip 里的**纯函数**（不带 three）：
-  // 同一份姿态既写 DOM 的 matrix3d，也喂给 WebGL 那层画封面 —— 两边同一个投影，
-  // 图和字不会各算一套。也因此 WebGL 拉不下来时，这套 3D 排布照样在。
+  // poseAt / cssMatrix 都是 useFilmPose 里的**纯函数**，直接写成 CSS 的 matrix3d。
   //
-  // 处理窗口 = **整整一圈**（一份轨道 = 一圈）：这是"能看见圆柱后面"的前提 ——
-  // 背面那一圈卡片也要拿到圆柱姿态，否则它们只会平躺在屏幕外，看不到。
-  // 一圈 24 张，逐帧写 24 个 matrix3d 是可以接受的（写 transform 不触发布局，
-  // 而且值没变就不写）；真正贵的是贴图，那部分只给正面弧内的一小撮（见下）。
-  // ⚠ 投影要按**视口**算，不是按轨道：相机是按 canvas（铺满视口）建的，
-  //   两边用不同的高度就会得到两个不同的焦距 D —— 图和字会各缩各的。
+  // 处理窗口 = "视口 ± 一张卡"：远端卡片既看不见、又会让浏览器一次维护二十几个
+  // 合成层，滚动反而更卡。离开窗口的卡片把 transform 清掉（它本来就停在屏幕外）。
+  // ⚠ 投影要按**视口**算：焦距 D 是从视口高度推出来的，用轨道的高度会得到另一个 D，
+  //   于是离中线越远的地方偏得越多。
   const view = { w: window.innerWidth, h: window.innerHeight };
   const D = focalOf(view.h);
-  const R = ringRadius(cycleWidth); // 一圈的半径：一份轨道铺在圆柱上刚好绕一圈
+  // 处理窗口 = **整整一圈**（一份轨道 = 一圈）：这是"能看见圆柱后面"的前提 ——
+  // 背面那一圈也得拿到圆柱姿态，否则它们只会平躺在屏幕外。一圈 24 张、逐帧写
+  // 24 个 matrix3d 是可以接受的（写 transform 不触发布局，值没变就不写）；
+  // 真正贵的是贴图，那部分按远近分两档（见 items 里的 texSize）。
+  const R = ringRadius(cycleWidth);
   const lo = left - cycleWidth / 2;
   const hi = left + cycleWidth / 2;
   const wnorm = reduceMotion ? 0 : Math.max(-1, Math.min(1, warp / FILM.wFull));
@@ -676,7 +683,6 @@ function frame(now) {
     const cx = m.mediaViewCx - (left - readScroll);
     const cy = m.mediaViewCy;
     const theta = (cx - view.w / 2) / R; // 圆柱上转过的角度（正 = 往右）
-    const front = Math.abs(theta) < FILM.frontArc;
     const pose = poseAt(cx, cy, view, wnorm, R);
     // 鼠标跟随那一份并进姿态里（不再另写一套 transform）：
     // 指针在卡片左边 → 卡片朝左转过来（读起来像卡片在看鼠标）。
@@ -687,9 +693,8 @@ function frame(now) {
     pose.yaw += -relX * MOUSE_TILT_Y * (Math.PI / 180);
     pose.pitch += relY * MOUSE_TILT_X * (Math.PI / 180);
 
-    // ① DOM：整张卡片（含标题编号）用同一个投影写死。
-    //    ⚠ 支点取**媒体盒中心**（WebGL 那块平面也绕它转，两边必须同一个支点，
-    //      否则一转身图和字就劈叉），所以不能沿用 CSS 里的 50% 50%。
+    // 整张卡片（含标题编号）用同一个投影写死。
+    //    ⚠ 支点取**媒体盒中心**（旋转/缩放都绕它走），不能沿用 CSS 里的 50% 50%。
     //    只在真的变了才写：写一次 transform 要走一遍样式重算 + 合成器改层，
     //    连续量四舍五入之后很多相邻帧是同一个值，白写的那几帧就是滚动里的毛刺。
     const origin = `${m.mediaOx}px ${m.mediaOy}px`;
@@ -701,30 +706,44 @@ function frame(now) {
     }
     m.tilted = true;
 
-    // ② **整圈**都交给 WebGL 画（它自己有深度排序），DOM 里那张 <img> 一律藏着。
-    //    ⚠ 别想省事把背面那圈留给 DOM 的 <img>：DOM 卡片在 canvas **上面**
-    //      （canvas 是 z-index 1、轨道是 2），那样背面会反过来压在正面之上 ——
-    //      实测就是"前/后颠倒"。
-    //    文字标签是另一回事：它们是 DOM，不吃 canvas 的深度排序，所以在
-    //    **背面那一圈**上要藏掉（is-back），否则背面卡片的编号/日期会从正面卡片里透出来。
-    //    类的切换只在真的变了才写（classList.toggle 会无条件重写属性 = 一次样式重算）。
-    const back = !front;
-    if (m.isBack !== back) {
-      m.isBack = back;
-      m.el.classList.toggle('is-back', back);
-    }
+    // 交给扭曲层画封面（正反面都给：背面也走 WebGL，才有正确的深度排序）。
+    // 远近分两档贴图：正面清楚、背面小一号，整圈一起驻留才扛得住显存。
     if (items) {
       items.push({
         key: i,
+        el: m.el,
         pose,
         media: { width: m.mediaW, height: m.mediaH },
         img: m.img,
         tone: m.tone,
         hover: m.hover,
+        texSize: Math.abs(theta) < 0.75 ? 'near' : 'far',
+        // 这张卡离屏幕中线多远（0 = 正中间，1 = 屏幕边缘）——扭曲层按它给弧度
+        edge: Math.min(1, Math.abs(cx - view.w / 2) / (view.w / 2)),
       });
     }
+
+    // 前后遮挡：**必须显式给 z-index**。
+    // 这些卡片不在同一个 3D 场景里（每张各自一个 matrix3d，父级没有 preserve-3d），
+    // 所以浏览器只按 DOM 顺序画 —— 轨道铺了三份，背面那几张的下标可能比正面的大，
+    // 于是后画的（DOM 上更靠后的）就压到了正面的标签上。按"离观众多远"排一遍即可。
+    const z = Math.round(2000 - pose.depth / 4);
+    if (m.z !== z) {
+      m.z = z;
+      m.el.style.zIndex = String(z);
+    }
+
+    // 背面那一圈（转过 labelArc）：文字标签收起来。标签是 DOM 文本，永远画在
+    // canvas **之上**，留着的话会浮在前面那些封面上（实测就是"糊成一团"）。
+    const back = Math.abs(theta) > FILM.labelArc;
+    if (m.isBack !== back) {
+      m.isBack = back;
+      m.el.classList.toggle('is-back', back);
+    }
+
   }
-  if (film) film.render(items, { phase: warpPhase, flyingKey: filmFlying });
+
+  if (film && items) film.render(items, { phase: warpPhase, flyingKey: filmFlying });
 
   // ── 读数 ──
   let best = 0;
@@ -1095,6 +1114,14 @@ watch(
   async (p) => {
     if (p !== '/blogs' || !consumeReturningFromDetail()) return;
     await nextTick(); // 等列表的 DOM 真的回到文档里，再去找元素
+    // 扭曲层的封面跟着一起淡回来：canvas 不吃 CSS 的 opacity，不补这一下
+    // 就是"标签慢慢长出来、照片已经在了"。
+    filmFlying = null;
+    if (film && !reduceMotion) {
+      gsap.fromTo(film.op, { v: 0 }, { v: 1, duration: RETURN_FADE, ease: 'power2.out' });
+    } else if (film) {
+      film.op.v = 1;
+    }
     const els = document.querySelectorAll(RETURN_FADE_SELECTOR);
     if (els.length && !reduceMotion) {
       gsap.fromTo(els, { opacity: 0 }, {
@@ -1126,7 +1153,7 @@ onMounted(async () => {
   // 回来时 onActivated 的路径会把 target 咬回真实 scrollLeft。
   document.addEventListener('visibilitychange', onVisibility);
   filmAlive = true;
-  // 胶片层是**异步**起来的（three 走动态 import，不进首屏包）。
+  // 扭曲层是**异步**起来的（three 走动态 import，不进首屏包）。
   // 拿不到就什么都不做：卡片退回普通的 <img>，3D 排布照旧（那部分是纯 CSS 数学）。
   createFilmStrip(filmCanvas.value).then((f) => {
     if (!f) return;
@@ -1136,9 +1163,11 @@ onMounted(async () => {
     }
     film = f;
     film.resize();
-    filmOn.value = true; // 到这一刻才把 DOM 图片藏起来：没起来之前一切照旧
+    filmOn.value = true; // 到这一刻才开始把有贴图的 <img> 藏起来
     startLoop();
   }).catch(() => { /* 起不来就当没有这一层 */ });
+  // 这一页现在**没有 WebGL 那一层**了（见 useFilmPose.js 的头注释）：
+  // 卡片本身就是 DOM，用 matrix3d 摆到圆柱上，图片还是页面里那张 <img>。
   await nextTick();
   // 等字体落地再量一次：Oswald 到位前字标是回退字体，行高不一样
   document.fonts?.ready?.then(() => {
@@ -1207,6 +1236,14 @@ if (typeof window !== 'undefined') {
       // 下一次松手算出来的甩动速度（px/帧）、采样窗口跨度与样本数 ——
       // 调"甩出去能滑多远"时用得上，不用猜。
       fling: lastFling,
+      // 扭曲层：起没起来、几个 mesh / 几张贴图、当前速度 ——
+      // 排"图和字对不齐""轨道不扭"这类问题时先看这里。
+      film: film ? {
+        on: filmOn.value,
+        op: Number(film.op.v.toFixed(3)),
+        warp: Number(warp.toFixed(2)),
+        ...film.stats(),
+      } : null,
       // 胶片那层：起没起来、几个 mesh / 几张贴图、交接时的透明度、当前速度。
       // 排"图和字对不齐""轨道不扭"这类问题时，先看这里。
       film: film ? {
@@ -1232,11 +1269,15 @@ function onVisibility() {
   <main class="page active blogs-lookback-page">
     <!-- 这一块是整页的固定版心：字标、横向轨道、页脚条三段。 -->
     <section class="jb-stage" :class="{ 'is-film': filmOn }">
+      <!-- 扭曲层：封面由这一张 canvas 画（能弯、能随滚动扭，CSS 做不到）。
+           它在卡片**下面**（z-index 1）：卡片那一层还要负责标题编号、点击命中、
+           键盘焦点，以及返回交接要量的那个矩形 —— 图像不在 DOM 上，别的都在。
+           three 拉不下来 / 拿不到跨域贴图时，卡片退回普通的 <img>。 -->
+      <canvas ref="filmCanvas" class="jb-film" aria-hidden="true"></canvas>
       <!-- 胶片层：封面由这一张 canvas 画（能弯、能随滚动扭，CSS 做不到）。
            它在卡片**下面**（z-index 1）：卡片那一层还要负责标题编号、点击命中、
            键盘焦点，以及返回交接要量的那个矩形 —— 图像不在 DOM 上，别的都在。
            three 拉不下来时这层整个不出现，卡片退回普通的 <img>。 -->
-      <canvas ref="filmCanvas" class="jb-film" aria-hidden="true"></canvas>
 
       <!-- 巨号字标 = 板块名本身（这页的标题读作 BLOGS，不是品牌名；品牌字标在 header 里）。
            下面一行是描述（条数取自数据）。两行错时揭幕（纯 CSS 动画，不占 JS）。
@@ -1424,7 +1465,7 @@ function onVisibility() {
   color: var(--jb-fg);
   /* 让 fixed 铺满时也吃站内的字体变量 */
   font-family: 'Poppins', sans-serif;
-  /* 卡片间距：**几乎挨着**。整排卡片是贴在圆柱面上的（见 useFilmStrip 的 FILM.radius），
+  /* 卡片间距：**几乎挨着**。整排卡片是贴在圆柱面上的（见 useFilmPose 的 laps / ringRadius），
      横向间距是弧长、投影之后越往边上挤得越紧 —— 缝要靠几何合上，不是靠留白。
      留这一丝 4px 是给"边上两张的投影刚好咬合"留一点余量，别让标题压到邻居身上。 */
   --jb-gap: 0.25rem;
@@ -1468,22 +1509,23 @@ function onVisibility() {
   display: block;
 }
 
-/* 封面交给 canvas 之后，DOM 里那张 <img> 只剩三个用途：懒加载的触发者、
-   纹理的来源、以及 alt 文本。藏起来但**不能** display:none ——
-   那样浏览器可能干脆不解码，纹理就没得做了（visibility 不影响加载）。 */
+/* 扭曲层开始画这张卡的封面之后，DOM 里那张 <img> 就藏起来（它只剩懒加载触发者和
+   纹理来源两个用途；不能 display:none，那样浏览器可能干脆不解码）。
+   ⚠ 只在 **is-film-live**（这张卡真的拿到贴图了）时才藏：本地 dev 拿不到跨域像素，
+   那些卡就一直是照片，不会变成空框。 */
 .jb-stage.is-film .jb-media {
   background: transparent;
 }
 
-.jb-stage.is-film .jb-media img {
+.jb-stage.is-film .jb-card.is-film-live .jb-media img {
   visibility: hidden;
 }
 
-/* 圆柱**背面那一圈**的卡片：封面由 WebGL 画（有深度排序，会被正面挡住/露出来），
-   但**文字标签是 DOM**，不吃那套排序 —— 不藏的话，背面卡片的编号/日期会直接
-   压在正面卡片上面。所以背面的标签一律不显示，转过正面（is-back 摘掉）再回来。 */
-.jb-stage.is-film .jb-card.is-back .jb-card-top,
-.jb-stage.is-film .jb-card.is-back .jb-card-bottom {
+/* 圆柱**背面那一圈**的卡片：封面本身有 z-index 排序（见主循环），会被正面挡住、
+   只在两侧和上方露出来；但**文字标签**是另算的 —— 它们在卡片里、尺寸不随 3D 缩，
+   留着一圈小字反而更乱。所以背面的标签一律不显示，转过正面（is-back 摘掉）再回来。 */
+.jb-card.is-back .jb-card-top,
+.jb-card.is-back .jb-card-bottom {
   visibility: hidden;
 }
 
