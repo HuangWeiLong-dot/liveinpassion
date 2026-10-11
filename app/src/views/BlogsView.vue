@@ -721,7 +721,14 @@ function frame(now) {
     // 媒体盒中心的**视口**坐标：量的时候记了基准，之后只有横向滚动会改它
     const cx = m.mediaViewCx - (left - readScroll);
     const cy = m.mediaViewCy;
-    const theta = (cx - view.w / 2) / R; // 圆柱上转过的角度（正 = 往右）
+    // 圆柱上转过的角度（正 = 往右）。
+    // ⚠ 必须**归一到 (-π, π]**：位置和朝向都是周期量（差 2π 完全等价），但下面
+    //   `is-back`（背面那一圈的标签显不显示）是按角度判的 —— 回卷那一帧轨道整体
+    //   平移一个周期、θ 会整体跳 2π，不归一的话整圈卡片的 is-back 同时翻转，
+    //   标签齐刷刷消失又出现，看起来就是"滚到某个读数闪一下"（实测 20 张一起翻）。
+    const TWO_PI = Math.PI * 2;
+    const rawTheta = (cx - view.w / 2) / R;
+    const theta = rawTheta - TWO_PI * Math.floor((rawTheta + Math.PI) / TWO_PI);
     const pose = poseAt(cx, cy, view, wnorm, R);
     // 鼠标跟随那一份并进姿态里（不再另写一套 transform）：
     // 指针在卡片左边 → 卡片朝左转过来（读起来像卡片在看鼠标）。
