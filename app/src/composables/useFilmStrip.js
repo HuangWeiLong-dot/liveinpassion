@@ -121,13 +121,29 @@ export async function createFilmStrip(canvas) {
   const scene = new Scene();
   const camera = new PerspectiveCamera(FOV, 1, 1, 100000);
   const geometry = new PlaneGeometry(1, 1, 24, 16); // 细分是为了能弯；4 个顶点弯不了
-  let texCache = new Map(); // <img> → { size, tex }（Map 保持插入序，当 LRU 用）
+  // 贴图缓存。键 = `${尺寸}#${图的唯一 id}` —— **一张图的两个档位是两条独立记录**。
+  // 早先是"一个 <img> 一条记录"，于是卡片在近/远档之间切换时，旧记录被 dispose、
+  // 而另一张还在用它的 mesh 就采样到纯黑（用户报的"照片加载出来了却黑屏"）。
+  // Map 保持插入序，顺手当 LRU 用。
+  let texCache = new Map();
+  const imgIds = new WeakMap();
+  let imgSeq = 0;
+  const idOf = (img) => {
+    let v = imgIds.get(img);
+    if (!v) { v = ++imgSeq; imgIds.set(img, v); }
+    return v;
+  };
   const pool = [];
   const live = new Map();   // key → mesh
   const op = { v: 1 };      // 全局不透明度（调用方直接补间它）
   let disposed = false;
   let texWarned = false;
   let texBlocked = false;   // 贴图被浏览器拒过一次之后，这一层就永远只用占位色
+  // 这一层**不再画了**（WebGL 上下文丢了 / 贴图彻底不可用）：
+  //   ⚠ 这时必须把"我把 DOM 那张 <img> 藏起来了"这件事**撤回** ——
+  //     否则画面上是 canvas 一片黑、而照片被我们自己藏了 = **黑屏**
+  //     （用户报的"照片明明加载出来了却黑屏"就是这一类）。
+  let dead = false;
   let lastW = 0;
   let lastH = 0;
 
@@ -155,16 +171,12 @@ export async function createFilmStrip(canvas) {
     // 画进 canvas 再传 WebGL 会每帧抛 SecurityError。这一张索性不做贴图。
     if (img.dataset && img.dataset.noTex === '1') return null;
     const size = TEX_SIZES[bucket] || TEX_SIZES.near;
-    const hit = texCache.get(img);
-    if (hit && hit.size === size) {
-      texCache.delete(img); // 命中就挪到队尾（LRU）
-      texCache.set(img, hit);
-      return hit.tex;
-    }
-    // 档位变了（卡片从背面转到正面、或反过来）：旧的丢掉重做，否则会一直糊着。
+    const key = `${size}#${idOf(img)}`;
+    const hit = texCache.get(key);
     if (hit) {
-      texCache.delete(img);
-      hit.tex.dispose();
+      texCache.delete(key); // 命中就挪到队尾（LRU）
+      texCache.set(key, hit);
+      return { key, tex: hit.tex };
     }
     const sw = img.naturalWidth;
     const sh = img.naturalHeight;
@@ -190,13 +202,22 @@ export async function createFilmStrip(canvas) {
     t.generateMipmaps = true;
     t.minFilter = LinearMipmapLinearFilter;
     t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    texCache.set(img, { size, tex: t });
+    texCache.set(key, { tex: t });
+    // ⚠ 回收时**跳过正在被 mesh 用的那些**：把 live 的那张 dispose 掉、mesh 还指着它，
+    //   采样出来就是纯黑（实测：上限 22 < 同时在画 24 张，先建的那几张被回收 → 全黑）。
+    //   上限调大只是缓解，这道判断才是根治。
+    const inUse = new Set();
+    for (const [, m] of live) if (m.userData.texKey) inUse.add(m.userData.texKey);
     while (texCache.size > TEX_KEEP) {
-      const [oldImg, oldEntry] = texCache.entries().next().value;
-      texCache.delete(oldImg);
-      oldEntry.tex.dispose();
+      let victim = null;
+      for (const [k] of texCache) {
+        if (!inUse.has(k)) { victim = k; break; }
+      }
+      if (!victim) break; // 全都在用：宁可不回收，也不许把画面弄黑
+      texCache.get(victim).tex.dispose();
+      texCache.delete(victim);
     }
-    return t;
+    return { key, tex: t };
   }
 
   function acquire() {
@@ -261,20 +282,22 @@ export async function createFilmStrip(canvas) {
         mesh.material.uniforms.uTone.value.set(it.tone || '#c8cdd2');
         live.set(it.key, mesh);
       }
+      mesh.userData.el = it.el; // 出事时要照着它把 DOM 那张 <img> 放回来
       const u = mesh.material.uniforms;
       // 图是懒加载来的，加载完不通知我们：每帧顺手看一眼，能建就建。
       // textureFor 对"没加载完"一句话返回 null，命中缓存 O(1)，白看不贵。
       if (!u.uHasTex.value) {
-        const tex = textureFor(it.img, it.texSize);
-        if (tex) {
-          u.uTex.value = tex;
+        const got = textureFor(it.img, it.texSize);
+        if (got) {
+          u.uTex.value = got.tex;
           u.uHasTex.value = 1;
-          u.uTextureAspect.value = tex.image.width / tex.image.height;
+          u.uTextureAspect.value = got.tex.image.width / got.tex.image.height;
+          mesh.userData.texKey = got.key; // 让回收器知道这张正在用
         }
       }
       // 有贴图了才把 DOM 那张 <img> 藏起来（见文件头）；没贴图就一直留着，
       // 本地 dev 拿不到跨域像素时卡片照旧是照片，不会变成空框。
-      const ready = u.uHasTex.value === 1;
+      const ready = u.uHasTex.value === 1 && !dead;
       if (it.el && it.live !== ready) {
         it.live = ready;
         it.el.classList.toggle('is-film-live', ready);
@@ -292,6 +315,7 @@ export async function createFilmStrip(canvas) {
       u.uPhase.value = state.phase;
     }
 
+    if (dead) return; // 已经收工（见 dead 的注释），后面每帧都只是空转
     try {
       renderer.render(scene, camera);
     } catch (err) {
@@ -304,13 +328,35 @@ export async function createFilmStrip(canvas) {
       for (const [, en] of texCache) en.tex.dispose();
       texCache = new Map();
       const clear = (m) => {
+        m.userData.texKey = null;
         m.material.uniforms.uTex.value = null;
         m.material.uniforms.uHasTex.value = 0;
       };
-      for (const [, m] of live) clear(m);
+      for (const [, m] of live) {
+        clear(m);
+        // 撤回：这张卡的封面交回给 DOM 里那张 <img>（它就是照片本身）
+        m.userData.el?.classList.remove('is-film-live');
+      }
       for (const m of pool) clear(m);
+      // 这一层作废：DOM 图片全部放回来，别留一片黑
+      for (const [, m] of live) m.visible = false;
+      dead = true;
     }
   }
+
+  // WebGL 上下文丢了（驱动重置、切显卡、标签页被回收）：canvas 立刻变全黑，
+  // 而我们的 DOM 图片是藏着的 —— 必须马上把封面交回 DOM（见 dead）。
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    dead = true;
+    for (const [, m] of live) {
+      m.userData.el?.classList.remove('is-film-live');
+      m.visible = false;
+    }
+    for (const [, en] of texCache) en.tex.dispose();
+    texCache = new Map();
+    console.warn('[film] WebGL 上下文丢失，封面交回 DOM 图片显示。');
+  });
 
   resize();
 
@@ -320,9 +366,11 @@ export async function createFilmStrip(canvas) {
     op,
     render,
     resize,
-    stats: () => ({ meshes: live.size, textures: texCache.size, dpr: renderer.getPixelRatio() }),
+    stats: () => ({ meshes: live.size, textures: texCache.size, dead,
+      dpr: renderer.getPixelRatio() }),
     dispose() {
       disposed = true;
+      for (const [, m] of live) m.userData.el?.classList.remove('is-film-live');
       for (const [, mesh] of live) mesh.material.dispose();
       live.clear();
       for (const m of pool) m.material.dispose();
