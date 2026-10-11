@@ -19,7 +19,7 @@ import { blogPosts } from '../data/blogPosts.js';
 import { gsap } from 'gsap';
 import { loadImage } from '../composables/useImageLoader.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
-import { rememberCoverHandoff, consumeReturningFromDetail } from '../composables/useCoverHandoff.js';
+import { rememberCoverHandoff, consumeReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 // 轨道的姿态数学（纯数学，不依赖 three / WebGL）：整排卡片贴在圆柱上的位置、
 // 转角、后退与投影。**已经没有 WebGL overlay 了**，见那个文件的头注释。
 import {
@@ -118,23 +118,28 @@ function coverStyle(post) {
 // 于是点击只是调了一次"开新窗口"，页面永远不跳，控制台也不报错。
 // 这类"名字撞全局"的坑同样适用于 name / status / close / focus / top / self / print。
 // 点下去之后"周围元素渐隐"的那一拍：跳转要等这段时间，否则列表会被立刻摘走、卡片来不及淡。
-// ⚠ 这个数要和 BlogDetailView 里那条 `html.bd-taking-cover ... { transition: opacity ... }`
-//   的时长**对齐**（现在两边都是 0.4s）：CSS 那边负责"淡"，这里负责"等它淡完再换页"。
+// ⚠ 这个数要和 BlogDetailView / App.vue 里那两条 `html.bd-taking-cover ... { transition }`
+//   的时长**对齐**（现在三边都是 0.24s）：CSS 那边负责"淡"，这里负责"等它淡完再换页"。
 //   只调一边的话，要么淡到一半列表就被摘走（剩下的半程没了、元素啪一下消失），
 //   要么等完了还愣着不动。
-const TAKEOVER_MS = 420;
-// 扭曲层淡出的时长，要和 BlogDetailView 里那条
-// `html.bd-taking-cover ... { transition: opacity 0.4s }` 是同一个数
-// （CSS 管 DOM 卡片、这里管 canvas 上的封面，两边差一拍就看得出来）。
-const TAKEOVER_FADE = 0.4;
+//
+// 为什么从 0.42 收到 0.24：这一拍是**唯一**一段"点下去之后画面完全不动"的时间 ——
+// 路由不换页，封面就还没法起飞（它活在详情页里）。实测逐帧看，0.42 那一版
+// 从点击到封面第一次移动隔了 ~600ms，读起来就是"点了一下，愣一下，才开始飞"。
+// 淡出本身留 0.24s 仍然看得见，但"愣"的那一下没了。
+const TAKEOVER_MS = 240;
+// ⚠ 这里原本还有一个 TAKEOVER_FADE（"扭曲层"淡出用的，要和 CSS 那两条对齐）。
+//   canvas 扭曲层删掉之后它就没有任何读取方了 —— 别再照着旧注释"补"一个回来，
+//   真正要对齐的只有上面那一个 TAKEOVER_MS。
 
 function openPost(post, el = null, query = null, instant = false) {
   if (opening.value || !post) return;
   opening.value = true;
   // 过渡的第一拍：**除这张卡片之外全部渐隐**（header、字标、页脚条、悬浮件，
-  // 以及轨道上其余卡片）。视觉规则写在 BlogDetailView 的 scoped :global 里 ——
-  // 那边才是这条过渡的归属；这里只负责在点击的这一刻把类挂上。
-  document.documentElement.classList.add('bd-taking-cover');
+  // 以及轨道上其余卡片）。这里只负责在点击的这一刻把幕布挂上；
+  // 视觉规则分两处：列表自己那几个块在 BlogDetailView，站点固定件在 App.vue
+  //（权重那笔账见 useCoverHandoff 里 setCoverCurtain 的注释）。
+  setCoverCurtain(true);
   // 离开之前落一次盘：主循环每帧也在记，但那只是内存里的
   if (scroller.value) saveScroll(scroller.value.scrollLeft);
   // ⚠ 元素必须是**被点的那个**：无限循环把每篇文章铺了三份，只用下标去找会拿到
@@ -368,6 +373,75 @@ function loadInBatches(list) {
     cursor += 2;
     if (cursor < list.length) setTimeout(() => requestAnimationFrame(next), 40);
   })();
+}
+
+// ── 回卷落点那一屏的图：**必须在回卷之前**就装好 ──────────────────────────
+// 这是"滚到某一处整排闪一下"的根源（实测落点正好在第 13～14 篇之间）。链条：
+//   1. 上面的 releaseObserver 在卡片离开视野 ±3 屏时就把 src 摘了（为了释放
+//      那批 5700×4800 的解码位图，见那段注释）——这是**故意**的，别动它；
+//   2. 回卷（见 wrapLoop）是"整体平移一个周期"，而一份轨道 = 13060px ≈ **9 屏**：
+//      落点那一屏在回卷前离视口整整一个周期，早被释放过了；
+//   3. 于是回卷那一帧，屏幕上那几张一起变空，再等懒加载那条"进视口才观察、
+//      每批 2 张隔 40ms"慢慢补回来。逐帧探针（tools/）实测：空 5～6 帧才开始
+//      回来，四张填满要 8 帧以上 —— 眼睛看到的就是"整排闪一下"。
+// 回卷点落在哪一篇是**固定的**（由 ringRadius 的"一份绕一整圈"和卡片宽度决定），
+// 所以这个闪是恒定复现的，不是偶发。
+//
+// 解法分两半：**预热**（快到回卷点先把落点那一屏装上）+ **兜底**（回卷那一帧
+// 把当前这一屏直接排进队列）。预热之所以几乎不花钱：落点那一屏与刚在屏幕上的
+// 那一份**是同一批 URL**（同一篇的三份共用同一个压缩图地址），HTTP 缓存里现成，
+// 只是重新解一次 —— 到回卷那一帧它们已经 .loaded，接缝真的看不见。
+const WRAP_PRIME_LEAD = 2880; // 距回卷点还剩多少 px 开始预热（≈ 两屏；按最大甩速折算 ≈ 0.5s）
+let primeArmed = true;        // 预热"上膛"：回卷后先下膛，滚出预热区再重新上膛
+
+// 把布局坐标 [from, to] 这一段里**还没图的**卡片立刻排进加载队列。
+// ⚠ 刻意不走懒加载那条路：它要等卡片进"视口 ±120%"才观察得到，而回卷是一帧
+//   之内把视口挪过去的 —— 延迟的那几帧正是要治的东西。这里也不做去重以外的
+//   节流：命中的是缓存，一次排完比按 40ms 分批快得多。
+// ⚠ 位置一律取**缓存好的 metrics**（readCards 量的），不要在这里读 offsetLeft：
+//   主循环每帧都在写 transform，中间插一次布局读就是"读-写-读"交错，滚动会掉帧
+//   —— 这正是上面缓存 offsetLeft / offsetWidth 的原因。
+function primeCovers(from, to) {
+  const queue = [];
+  metrics.forEach((m) => {
+    if (m.left < from || m.left > to) return;
+    const img = m.img;
+    // 已经有 src（正在加载 / 已就位）或已经在队列里：不动它
+    if (!img || loadedSet.has(img) || img.getAttribute('src')) return;
+    loadedSet.add(img);
+    queue.push(img);
+  });
+  if (queue.length) loadInBatches(queue);
+}
+
+// 每帧看一眼（在 frame 里回卷处理完之后调用）。
+// @param {number} left 这一帧的 scrollLeft（回卷已经处理过了）
+// @param {boolean} wrapped 这一帧刚发生过回卷
+function primeWrapCovers(left, wrapped) {
+  if (!cycleWidth) return;
+  // 落点：往右回卷（left 冲到 1.5C）落在 0.5C；往左回卷（left 掉到 0.5C 以下）
+  // 落在 1.5C —— 两处都是"整份平移一个周期"算出来的定点，见 wrapLoop。
+  const lead = Math.min(WRAP_PRIME_LEAD, cycleWidth * 0.25);
+  let land = 0;
+  if (left > cycleWidth * 1.5 - lead) land = cycleWidth * 0.5;
+  else if (left < cycleWidth * 0.5 + lead) land = cycleWidth * 1.5;
+  // ⚠ 绝大多数帧从这里就出去了 —— 只算几个数，**一个布局都不读**。
+  //   clientWidth 会强制一次布局，只在真要动手的那一帧才量（见下）。
+  if (!wrapped && (!land || !primeArmed)) {
+    if (!land) primeArmed = true; // 滚出预热区 → 下一次接近允许再预一遍
+    return;
+  }
+  const w = scroller.value?.clientWidth || window.innerWidth;
+  const margin = w * 1.2; // 与懒加载那条 rootMargin 120% 对齐
+  if (wrapped) {
+    // 兜底：甩得太快、没赶上预热窗口时（以及刚回卷完又往回滚的那种来回搓），
+    // 至少在这一帧把**当前**这一屏排上 —— 命中缓存，比等懒加载快 6 帧以上。
+    primeCovers(left - margin, left + w + margin);
+    primeArmed = false; // 落点就在脚下，别顺手把反向那一份也预了
+  } else {
+    primeArmed = false;
+    primeCovers(land - margin, land + w + margin);
+  }
 }
 
 // ── 平滑滚动 + 卡片微倾 ────────────────────────────────────────────────────
@@ -672,6 +746,10 @@ function frame(now) {
   warpPhase += warp * 0.03; // 波形的相位跟着走过的距离走：停下就定住
 
   const left = root.scrollLeft;
+  // 回卷落点那一屏的图：必须在回卷发生**之前**就装好（见 primeWrapCovers 上面那段）。
+  // 放这儿是因为要用**回卷已经处理过**的 left（兜底那一路按它算当前这一屏）；
+  // 它自己只读缓存好的 metrics，不碰布局，所以插在主循环哪一处都不影响帧率。
+  primeWrapCovers(left, wrapped !== 0);
   // 静止、指针不动、**而且回正还没走完**才收工：速度衰减那一小段也得逐帧重算，
   // 否则停下之后整排会卡在歪着的那一帧。
   const warpMoving = Math.abs(warp) > 0.05;
@@ -722,10 +800,12 @@ function frame(now) {
     const cx = m.mediaViewCx - (left - readScroll);
     const cy = m.mediaViewCy;
     // 圆柱上转过的角度（正 = 往右）。
-    // ⚠ 必须**归一到 (-π, π]**：位置和朝向都是周期量（差 2π 完全等价），但下面
-    //   `is-back`（背面那一圈的标签显不显示）是按角度判的 —— 回卷那一帧轨道整体
-    //   平移一个周期、θ 会整体跳 2π，不归一的话整圈卡片的 is-back 同时翻转，
-    //   标签齐刷刷消失又出现，看起来就是"滚到某个读数闪一下"（实测 20 张一起翻）。
+    // ⚠ 必须**归一到 (-π, π]**：位置和朝向本身都是周期量（差 2π 完全等价，姿态矩阵
+    //   一模一样），但下面 `is-back`（背面那一圈的标签显不显示）是**按角度大小**判的，
+    //   它不周期 —— 回卷那一帧轨道整体平移一个周期、θ 整体跳 2π，不归一的话整圈
+    //   卡片的 is-back 会在同一帧集体翻面。归一到同一个区间，"在哪半圈"才是良定义的。
+    //   （注：屏幕上看得见的卡片 θ 到不了 labelArc，所以这条**不是**回卷那一帧
+    //   闪一下的原因 —— 那个是图片被释放观察器摘了，见 primeWrapCovers 上面那段。）
     const TWO_PI = Math.PI * 2;
     const rawTheta = (cx - view.w / 2) / R;
     const theta = rawTheta - TWO_PI * Math.floor((rawTheta + Math.PI) / TWO_PI);
@@ -1100,10 +1180,12 @@ function onResize() {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     measure();
-    // 卡片宽度是 vw 的：窗口一改，媒体盒的宽高就变了，胶片那层摆 mesh 用的是
-    // 量好的那份尺寸，必须跟着重量（readCards 顺带把行内变换摘掉再量，见那里）。
+    // 卡片宽度是 vw 的：窗口一改，媒体盒的宽高就变了，摆位用的那份尺寸必须重量
+    //（readCards 顺带把行内变换摘掉再量，见那里）。
+    // ⚠ 这里原本还有一句 `film?.resize()` —— 那是已经删掉的 WebGL 那层的。
+    //   `film` 是未声明的标识符，`?.` 也救不了：求值当场抛 ReferenceError，
+    //   后面的 syncTarget() 跟着一起不执行（表现是改过窗口之后轨道的目标位置不更新）。
     readCards();
-    film?.resize();
     syncTarget();
   }, 120);
 }
@@ -1132,7 +1214,8 @@ function activate() {
   // 兜底：详情那条过渡会挂 .bd-taking-cover（除卡片外全部隐去），正常由详情在卡片
   // 落地时摘掉；但用户可能**飞行途中就用返回键退出**，那一步不会执行 —— 不在这里
   // 补一刀的话，回到列表会是一片空白。
-  document.documentElement.classList.remove('bd-taking-cover', 'blog-detail-open');
+  setCoverCurtain(false);
+  document.documentElement.classList.remove('blog-detail-open');
   clearTimeout(holdTimer);
   // 从详情返回这一趟：周围元素渐入（规则见上面的 html.bd-return-fade 那组）。
   //
@@ -1220,13 +1303,12 @@ watch(
         onComplete: () => { gsap.set(els, { clearProps: 'opacity' }); },
       });
     }
-    // 胶片那层的封面跟着一起淡回来：它不在 DOM 的渐入名单里（canvas 画的东西
-    // 不吃 CSS 的 opacity），不补这一下就是"标签慢慢长出来、照片已经在了"。
-    if (film && !reduceMotion) {
-      gsap.fromTo(film.op, { v: 0 }, { v: 1, duration: RETURN_FADE, ease: 'power2.out' });
-    } else if (film) {
-      film.op.v = 1;
-    }
+    // ⚠ 这里原本还有一段"胶片那层的封面跟着一起淡回来"（canvas 不吃 CSS 的 opacity，
+    //   所以以前要单独补一次）。WebGL 那层删掉之后 `film` 已经不存在了，
+    //   但这段还留着 —— `film` 是**未声明**的标识符，条件求值直接抛 ReferenceError，
+    //   于是它后面那几行**一行都不会执行**：`.is-flying` 的清理定时器从来没被挂上，
+    //   被点过的那张卡会永远带着这个标记（下次返回时它被排除在渐入名单之外，
+    //   就会"啪"地直接出现）。整段删掉，顺带把清理恢复回来。 */
     clearTimeout(returnFadeTimer);
     // 被点那张卡的标记等渐入演完再清（它给封面接手用）：清早了，落点那一格会在
     // 渐入半路被拉回 0（它也在 RETURN_FADE_SELECTOR 之外，靠的就是这个标记）。

@@ -76,6 +76,33 @@ export function clearCoverHandoff() {
   }
 }
 
+// ── 那条"除封面之外全部隐去"的幕布 ──────────────────────────────────────
+// 一个类，挂**两个**元素上：
+//   · <html> —— 列表自己那几个块（.jb-wordmark / .jb-card …）靠它，规则写在
+//     BlogDetailView 的 scoped 样式里（那边只能用 `:global(html.bd-taking-cover …)`）。
+//   · .shell —— **站点固定件**（header / 主题键 / 作者区 / 播放器键）靠它。它们在
+//     App.vue 的 scoped 样式里被 `.shell.is-ready > …`（1,3,0）按着，外面那条
+//     `html.bd-taking-cover header`（0,1,2）根本压不过去 —— 这是它**从来没生效过**的原因
+//     （实测：整段飞行里 header 透明度一直是 1，logo 和 HOME/BLOGS/STATS 亮着浮在黑场上方）。
+//     修法是在冲突的同一边写一条权重更高的，而那边要拿到 scoped 的属性选择器，
+//     选择器里就必须有个本地的 `.shell` —— 所以类得挂在 shell 上。
+//
+// ⚠ 别写成 `:global(html.bd-taking-cover) .shell > #header`：Vue 的编译器会把
+//   `:global()` 后面的那一串**整段丢掉**，编译结果是赤裸的 `html.bd-taking-cover`
+//   （实测），看着像写对了，其实是条死规则。
+let curtainOn = false;
+
+/** 开关这条过渡的幕布（<html> + .shell 各挂一份，见上）。
+ *  ⚠ 不做"值没变就跳过"的短路：类是 DOM 上的状态，别处（比如列表那条兜底清理）
+ *    可能已经摘过它而这里的变量不知道 —— 短路会让下一次开幕变成空操作。
+ *    两个 toggle 本身就是幂等的，多跑一次不值一提。 */
+export function setCoverCurtain(on) {
+  if (typeof document === 'undefined') return;
+  curtainOn = on; // 只留作调试（DevTools 里看当前态）
+  document.documentElement.classList.toggle('bd-taking-cover', on);
+  document.querySelector('.shell')?.classList.toggle('bd-taking-cover', on);
+}
+
 // ── "刚从详情返回"这个信号 ──────────────────────────────────────────────
 // 详情页在退出时置位，列表在 onActivated 里取用（取用即清）。
 //

@@ -73,9 +73,10 @@ export function poseAt(cx, cy, view, warpNorm, radius) {
   const R = radius || FILM.fallbackRadius;
   // **整圈**：卡片一路绕到背面再回来（见文件头）。
   // ⚠ 但 θ 必须**归一到 (-π, π]**：位置/朝向本身是周期量（差 2π 完全等价），
-  //   可"这张卡在环的哪一半"（is-back，决定背面那一圈的标签显不显示）是按角度判的。
-  //   回卷那一帧轨道整体平移一个周期、θ 会整体跳 2π —— 不归一的话，所有卡片的
-  //   is-back 同一帧集体翻转，标签齐刷刷消失又出现，表现就是"滚到某个读数闪一下"。
+  //   可"这张卡在环的哪一半"（is-back，决定背面那一圈的标签显不显示）是**按角度
+  //   大小**判的、不周期。回卷那一帧轨道整体平移一个周期、θ 会整体跳 2π ——
+  //   不归一的话，所有卡片的 is-back 会在同一帧集体翻转。归一到同一个区间，
+  //   "在哪半圈"才是良定义的。
   const TWO_PI = Math.PI * 2;
   const raw = (x / R) * FILM.sign;
   const theta = raw - TWO_PI * Math.floor((raw + Math.PI) / TWO_PI);

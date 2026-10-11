@@ -19,7 +19,7 @@ import { gsap } from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { blogPosts, blogBySlug } from '../data/blogPosts.js';
 import { loadImage } from '../composables/useImageLoader.js';
-import { readCoverHandoff, markReturningFromDetail } from '../composables/useCoverHandoff.js';
+import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
 
 gsap.registerPlugin(CustomEase);
@@ -36,6 +36,16 @@ const T_FADE = 0.35;   // 交叉淡（换篇）
 // 那一趟飞行，面板先淡干净、封面才落地）。
 const T_PANEL = 0.55;
 const T_PANEL_OUT = 0.8;
+// ── 退场那一条**和入场不是同一档**（这是有意的，别"统一"掉）──────────────
+// 入场用 snappy 是对的：起步就快，之后几乎不动的收尾正好和"左侧正文在淡入、
+// 在打字"撞在一起，有东西陪着那半秒。退场没有这层陪衬 —— 面板到 0.8s 已经淡干净，
+// 同一档缓动剩下的收尾就是**纯静止**。实测逐帧：封面约 0.6s 就停在卡片那一格，
+// 一直停到 0.97s 列表回来，中间 400ms 是一张一动不动的照片配全黑背景
+//（帧 6/7/8 三张几乎逐像素相同），读起来就是"卡住了"。
+// 所以回来这一路换成两头都有起停的 power2.inOut：整段都在走，
+// 落到卡片那一格的那一刻正好走完，既不提前落地干等，也不会在终点前抢一拍。
+const EASE_RETURN = 'power2.inOut';
+const T_MAIN_OUT = 0.8; // 与 T_PANEL_OUT 同长（见 close 里的注释）
 // 封面那段主位移用**参考站那条 snappy**：起步就快、后面收得干净。
 // （之前写的是 power2.inOut —— 起步很慢，读起来就是"顿一下才动"，是"生硬"的主要来源之一。
 //   用户要的就是参考站那种"一口气滑过去"的手感。）
@@ -598,7 +608,7 @@ function playEnter() {
     if (covImg) gsap.set(covImg, { clearProps: 'width,height,maxWidth,maxHeight' });
     gsap.set(inner, { opacity: 1 });
     gsap.set(panel, { opacity: 1 });
-    document.documentElement.classList.remove('bd-taking-cover');
+    setCoverCurtain(false);
     document.querySelector('.jb-card.is-flying')?.classList.remove('is-flying');
     startTyping();
     return;
@@ -612,7 +622,7 @@ function playEnter() {
     toPageBg(T_PANEL, 0); // 窄屏没有飞行，底色跟着面板一起立刻走完（见 pageBg 那段注释）
     gsap.set(inner, { opacity: 1 });
     gsap.set(panel, { opacity: 1 });
-    document.documentElement.classList.remove('bd-taking-cover');
+    setCoverCurtain(false);
     document.querySelector('.jb-card.is-flying')?.classList.remove('is-flying');
     startTyping();
     return;
@@ -677,7 +687,7 @@ function playEnter() {
   // 幕在封面落定前就撤：header / 悬浮件淡回来这一点也算进同一口气里，
   // 否则封面停稳之后画面还会"再变一次"，又是一拍。
   timeline.add(() => {
-    document.documentElement.classList.remove('bd-taking-cover');
+    setCoverCurtain(false);
     document.querySelector('.jb-card.is-flying')?.classList.remove('is-flying');
   }, at(CURTAIN_AT));
 }
@@ -732,6 +742,20 @@ function close() {
   if (leaving) return;
   leaving = true;
   clearTimeout(enterFallback); // 别让"等解码"那条兜底在退场半路再补一遍入场（见 start）
+  // 退场这一趟也把 site chrome 淡掉（header / 主题键 / 作者区 / 播放器键）。
+  //
+  // 为什么需要：列表那边回来时会把整页**从 0 淡入**（BlogsView 的 RETURN_FADE，
+  // 名单里就有 header）。而退场飞行途中 header 一直亮着 —— 于是换页那一帧它
+  // 从 1 **啪一下归零**、再花 1 秒淡回来，实测是这一段里最明显的一下"闪"。
+  // 起飞时先把它淡到 0（时长同 TAKEOVER，见 App.vue 那条权重说明），
+  // 换页那一刻它本来就是 0，淡入就接得上了。
+  // 另外顺带盖住了 header 本身的样式切换：详情页那条实心底（blog-detail-open）
+  // 会在 activate() 里被摘掉，背着淡入的话那一档底色是硬切的。
+  // 清除交给 BlogsView.activate()（它本来就会摘这个类）。
+  //
+  // ⚠ "减少动态效果"下**不挂**：那时没有飞行，挂上去只会让 header 先淡没、
+  //   换页后再淡回来 —— 白白多闪一下。回列表那条淡入本来也是跳过的。
+  if (!reducedMotion) setCoverCurtain(true);
   // 窄屏：抽屉是屏幕外的一层，没有"缩回列表那一格"这回事。
   // 只把正文淡掉再走，别的不动。
   if (isNarrow.value) {
@@ -819,16 +843,17 @@ function close() {
     defaults: { ease: EASE_MAIN },
   });
   // 面板淡出拉长到和封面飞行同拍（T_PANEL_OUT = 0.8s，而不是 0.35s）：淡得太快的话，
-  // 剩下的半程里左半边是空的，屏幕会有一段时间"什么都没有"。也不再慢过 T_MAIN ——
-  // 面板得在封面落地之前淡干净，否则那一格会留下半透明的一块。
+  // 剩下的半程里左半边是空的，屏幕会有一段时间"什么都没有"。
+  // 两者同长（T_MAIN_OUT = T_PANEL_OUT = 0.8s）：面板淡干净与封面落地同时发生，
+  // 谁也不会在后面留下半透明的一块、或让落点那一格空等。
   timeline.to(panel, { opacity: 0, duration: T_PANEL_OUT, ease: 'power1' }, 0);
   timeline.to(inner, {
     x: back.left,
     y: back.top,
     width: back.width,
     height: back.height,
-    duration: T_MAIN,
-    ease: EASE_TRAVEL, // 和进入同一档缓动：回来这一路是"逐渐退回"，两头都有起停
+    duration: T_MAIN_OUT,
+    ease: EASE_RETURN,
   }, 0);
   // ⚠ 这里**不淡出封面**：整段就是"这张图一直在，从右边逐渐退回初始那一格"。
   // 淡出会让它在中途消失 —— 用户明确不要这个。
@@ -1287,25 +1312,28 @@ if (typeof window !== 'undefined') {
 
 <style scoped>
 /* ── "点下去之后，除这张卡片之外全部隐去" ──────────────────────────────────
-   点击那一刻 BlogsView 给 <html> 挂上 .bd-taking-cover，卡片落地后由 playEnter
-   的收尾摘掉。列表本身在详情挂上来的时候就被 keep-alive 从文档里摘走了
-   （所以背后不会看到它），这里要处理的是**站点 header 和那几个悬浮件** ——
-   飞行途中只该看见那张正在变大的照片。 */
-:global(html.bd-taking-cover header),
+   点击那一刻 BlogsView 给 <html> 与 .shell 各挂一份 .bd-taking-cover
+   （setCoverCurtain，见 useCoverHandoff），卡片落地后由 playEnter 的收尾摘掉；
+   退场那一趟由 close() 再挂一次（见那里的注释）。
+   列表本身在详情挂上来的时候就被 keep-alive 从文档里摘走了（所以背后不会看到它），
+   这里管的是**列表自己那几个块** —— 飞行途中只该看见那张正在变大的照片。
+   ⚠ 站点 header / 主题键 / 作者区 / 播放器键**不在这里**：它们挂在 .shell 下，
+   会被 App.vue 的 `.shell.is-ready > …`（1,3,0）以权重压掉 —— 那几条写在下面
+   一样是死规则。真正生效的那份在 App.vue，别搬回来。 */
 :global(html.bd-taking-cover .jb-wordmark),
 :global(html.bd-taking-cover .jb-rail),
 :global(html.bd-taking-cover .jb-end),
-:global(html.bd-taking-cover .music-toggle-btn),
 :global(html.bd-taking-cover .music-player),
-:global(html.bd-taking-cover .theme-toggle),
 /* 轨道上"其余那些卡片"一起淡出。被点的那张带 .is-flying，不在这条规则里 ——
    它要一直亮着，等详情页那张封面从同一个矩形接手，否则中间会空一帧。
-   ⚠ 时长要和 BlogsView 里那一拍的等待（TAKEOVER_MS = 420ms）对齐：路由会在
-   那一拍结束时换页、列表随之被摘出文档，淡出必须在这之前演完。 */
+   ⚠ 时长要和 BlogsView 里那一拍的等待（TAKEOVER_MS = 240ms）对齐：路由会在
+   那一拍结束时换页、列表随之被摘出文档，淡出必须在这之前演完。
+   （站点 header 那几件的淡出在 App.vue —— 它们被那边的 .shell.is-ready 规则
+     以权重压住，写在这里一样输，见那里的注释。） */
 :global(html.bd-taking-cover .jb-card:not(.is-flying)) {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.24s ease;
 }
 
 /* 详情页里站点 header 要变成实心：正文从它下面滚过去，而 header 默认是透明的

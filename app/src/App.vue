@@ -176,4 +176,31 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .shell.is-ready > :deep(.music-toggle-btn) {
   transition-delay: 0.3s, 0s;
 }
+
+/* ── "封面飞行途中，站点固定件一并隐去" ──────────────────────────────────
+   这就是上面那三条 `.shell.is-ready > …` 的**对立态**，写在它们后面是为了读得顺。
+
+   ⚠⚠ 为什么必须写在这里、而且必须带上 `.is-ready`：
+   这个意图原本写在 BlogDetailView 里（`html.bd-taking-cover header, …`），**从来没生效过** ——
+   那条是 (0,1,2)，而上面那条是 (1,3,0)（scoped 的属性选择器白送一个类级，
+   靠 `header` 这个标签名赢不回来）。表现是：点卡片之后 logo 与 HOME/BLOGS/STATS
+   一直亮着，浮在纯黑背景上方飞完整个入场（逐帧实测，header 透明度全程 1）。
+   而 `:global(html.bd-taking-cover) .shell > #header` 这种写法也不行 ——
+   Vue 的编译器会把 `:global()` 后面那一串整段丢掉，只剩赤裸的 `html.bd-taking-cover`，
+   看着对、实际上是死规则（实测）。所以：类由 useCoverHandoff 的 setCoverCurtain
+   同时挂到 <html> 和 .shell 上，这里用本地的 `.shell` 拿到 scoped 属性、
+   再叠一个 `.is-ready` 把权重抬到 (1,4,0)，稳稳压过上面那条。
+
+   时长跟 BlogsView 的 TAKEOVER_MS 对齐（都是 0.24s）—— 路由会在那一拍结束时换页、
+   列表随之被摘出文档，淡出必须在那之前演完；不写这条的话它会沿用上面的 0.6s，
+   飞到一半才淡干净。 */
+.shell.is-ready.bd-taking-cover > #header,
+.shell.is-ready.bd-taking-cover > .theme-toggle,
+.shell.is-ready.bd-taking-cover > .author-section,
+.shell.is-ready.bd-taking-cover > :deep(.music-toggle-btn) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease, translate 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 </style>
