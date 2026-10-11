@@ -99,10 +99,21 @@ const ROOM_SHIFT_KEY = 'lip:corner-shift';
 // 封面视图里"标题"的位置（水平用 vw、垂直用 vh，窗口变了也跟着走）
 const CV_X_KEY = 'lip:cover-title-x';
 const CV_Y_KEY = 'lip:cover-title-y';
-const isCorner = computed(() => route.query.view === 'corner');
+// 封面视图里标题用的字形。站内只加载了这三套（都是设计里已经在用的），
+// 所以"切换字体"就切这三套，不引新字体、不动首屏字节。
+const CV_FONT_KEY = 'lip:cover-title-font';
+const CV_FONTS = [
+  { id: 'oswald', label: 'OSWALD', css: "'Oswald', sans-serif", spacing: '0.02em', transform: 'uppercase' },
+  { id: 'poppins', label: 'POPPINS', css: "'Poppins', sans-serif", spacing: '-0.01em', transform: 'none' },
+  { id: 'mono', label: 'MONO', css: "'JetBrains Mono', ui-monospace, monospace", spacing: '0.02em', transform: 'none' },
+];
+// ⚠ 窄屏（响应式设备）上这两种模式**不生效**：它们整套版面（3D 夹角 / 放大封面 +
+//   错位标题）是为宽屏做的，手机上封面本来就是左侧抽屉那一套。所以直接叠一个
+//   `!isNarrow` —— 带 ?view=... 直接打开也只按普通详情渲染。
+const isCorner = computed(() => route.query.view === 'corner' && !isNarrow.value);
 // 「封面视图」：只把封面放大到屏幕中间、标题错位压在它斜上方（见下面那段样式）。
 // 和墙角是并列的两种模式，靠同一个 query 切换。
-const isCoverView = computed(() => route.query.view === 'cover');
+const isCoverView = computed(() => route.query.view === 'cover' && !isNarrow.value);
 const anyView = computed(() => isCorner.value || isCoverView.value);
 function goView(v) {
   router.replace({ name: 'blog-detail', params: route.params, query: v ? { view: v } : {} });
@@ -113,6 +124,8 @@ const roomPitch = ref(7);     // 俯视角度（deg）：越大越像从上方�
 const roomShift = ref(0);     // 视角上下（%）：正 = 画面整体下移（机位抬高）
 const cvTitleX = ref(6);      // 封面视图：标题的水平位置（vw）
 const cvTitleY = ref(15);     // 封面视图：标题的垂直位置（vh）
+const cvFont = ref('oswald'); // 封面视图：标题字形（见 CV_FONTS）
+const cvFontCss = computed(() => (CV_FONTS.find((f) => f.id === cvFont.value) || CV_FONTS[0]));
 if (typeof window !== 'undefined') {
   try {
     const l = window.localStorage;
@@ -130,10 +143,14 @@ if (typeof window !== 'undefined') {
     read(ROOM_SHIFT_KEY, -40, 40, (v) => { roomShift.value = v; });
     read(CV_X_KEY, -10, 70, (v) => { cvTitleX.value = v; });
     read(CV_Y_KEY, 2, 80, (v) => { cvTitleY.value = v; });
+    try {
+      const f = l.getItem(CV_FONT_KEY);
+      if (f && CV_FONTS.some((x) => x.id === f)) cvFont.value = f;
+    } catch { /* 隐私模式 */ }
   } catch { /* 隐私模式 */ }
 }
 // 三个数一起存：只存其中一个的话，下次进来另外两个会退回默认值（看起来就是"设置没生效"）
-watch([cornerAngle, roomZoom, roomPitch, roomShift, cvTitleX, cvTitleY], ([a, z, p, s2, tx, ty]) => {
+watch([cornerAngle, roomZoom, roomPitch, roomShift, cvTitleX, cvTitleY, cvFont], ([a, z, p, s2, tx, ty, ft]) => {
   try {
     const l = window.localStorage;
     l.setItem(CORNER_KEY, String(a));
@@ -142,6 +159,7 @@ watch([cornerAngle, roomZoom, roomPitch, roomShift, cvTitleX, cvTitleY], ([a, z,
     l.setItem(ROOM_SHIFT_KEY, String(s2));
     l.setItem(CV_X_KEY, String(tx));
     l.setItem(CV_Y_KEY, String(ty));
+    l.setItem(CV_FONT_KEY, String(ft));
   } catch { /* 同上 */ }
 });
 // 摊平 = 回到普通详情（replace，别往历史里堆）
@@ -1052,6 +1070,9 @@ if (typeof window !== 'undefined') {
         '--room-shift': `${roomShift}%`,
         '--cv-title-x': `${cvTitleX}vw`,
         '--cv-title-y': `${cvTitleY}vh`,
+        '--cv-font': cvFontCss.css,
+        '--cv-font-spacing': cvFontCss.spacing,
+        '--cv-font-transform': cvFontCss.transform,
       }"
       @touchstart.passive="onTouchStart"
       @touchend.passive="onTouchEnd"
@@ -1091,6 +1112,20 @@ if (typeof window !== 'undefined') {
             aria-label="标题垂直位置"
           >
           <span class="bd-corner-val">{{ cvTitleY }}vh</span>
+
+          <!-- 字形：站内已加载的三套，点一下就换（直角、hairline，和别的控件同一套语言） -->
+          <span class="bd-corner-lbl">FONT</span>
+          <span class="bd-fonts">
+            <button
+              v-for="f in CV_FONTS"
+              :key="f.id"
+              class="bd-font"
+              type="button"
+              :class="{ 'is-on': cvFont === f.id }"
+              :style="{ fontFamily: f.css }"
+              @click="cvFont = f.id"
+            >{{ f.label }}</button>
+          </span>
         </template>
 
         <template v-if="!isCoverView">
@@ -1557,9 +1592,41 @@ if (typeof window !== 'undefined') {
 }
 
 .blog-detail.is-coverview .blog-detail-title {
+  font-family: var(--cv-font, 'Oswald', sans-serif);
+  letter-spacing: var(--cv-font-spacing, 0.02em);
+  text-transform: var(--cv-font-transform, uppercase);
   font-size: clamp(2.2rem, 4.6vw, 4.6rem);
   line-height: 1.05;
   max-width: 46vw;
+}
+
+/* 字形切换：三个小方钮，当前那个反白 */
+.bd-fonts {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.bd-font {
+  padding: 0.18rem 0.5rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.bd-font:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.bd-font.is-on {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--bg);
 }
 
 /* ── 墙角视图的控件：一条极简的滑杆 + 摊平 ────────────────────────────── */
@@ -1589,6 +1656,13 @@ if (typeof window !== 'undefined') {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+/* 标签里的空格不许折行："TEXT X" 被挤成两行就难看了（它们没有各自的样式，
+   全靠从控件条继承，所以这条得单独写） */
+.bd-corner-lbl,
+.bd-corner-val {
+  white-space: nowrap;
 }
 
 .bd-corner-range {
