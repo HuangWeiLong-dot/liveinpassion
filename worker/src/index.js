@@ -29,6 +29,49 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ---------- 图片 ----------
+// GET /img/<R2 里的 key>：从桶里读出来发给浏览器。
+//
+// 为什么要多这一层（而不是继续直接用 img.liveinpassion.me）：
+//   前台要把封面画进 canvas 当 **WebGL 贴图**（BLOGS 轨道那条曲面），而跨域像素会
+//   污染 canvas、上传显存时直接抛 SecurityError。CDN 会不会回 ACAO 不由我们控制
+//   （实测时好时坏、浏览器侧还会把网络失败报成"没有 ACAO"），worker 自己发就没有
+//   这个不确定性 —— 而且它同时把 admin 里的图片预览也统一到了一条路上。
+//
+// 缓存：先查边缘缓存（Cache API），miss 才回源 R2，再写回缓存。
+// 桶里的对象名本身带内容 hash、且上传时就写了 immutable，所以这里可以放心长缓存。
+app.get('/img/*', async (c) => {
+  const raw = c.req.path.slice('/img/'.length);
+  let key = '';
+  try {
+    key = decodeURIComponent(raw);
+  } catch {
+    return c.json({ error: 'Bad key' }, 400);
+  }
+  if (!key) return c.notFound();
+
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(c.req.url).toString(), { method: 'GET' });
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const obj = await c.env.IMG_BUCKET.get(key);
+  if (!obj) return c.notFound();
+
+  const res = new Response(obj.body, {
+    headers: {
+      'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      // 前台要把它画进 canvas：必须显式放行
+      'Access-Control-Allow-Origin': '*',
+      ETag: obj.httpEtag,
+    },
+  });
+  // 写缓存不挡这次响应（waitUntil）
+  c.executionCtx.waitUntil(cache.put(cacheKey, res.clone()).catch(() => {}));
+  return res;
+});
+
 // ---------- 自建登录（不依赖 cloudflareaccess.com，国内移动网络可用） ----------
 
 // 登录失败限流：同一 IP 10 分钟内最多 10 次（Worker isolate 级 best-effort）

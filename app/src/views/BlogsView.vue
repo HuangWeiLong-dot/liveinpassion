@@ -214,7 +214,10 @@ function maybeUpgradeLegacy(img) {
   if (!img?.src || img.dataset.bdUpgraded === '1') return;
   const full = img.dataset.fullSrc;
   const src = img.dataset.src || '';
-  if (!full || !src.includes('blog_photos_compressed')) return;
+  // 旧的 `blog_photos_compressed/` 和迁移后的 `_compressed/` 都算"压缩图这一路"
+  // （迁移把前 6 篇的封面换成了 blog/<年月>/_compressed/<hash>.jpg，只认旧串的话
+  // 这几张的画质兜底会当场失效）
+  if (!full || !(src.includes('blog_photos_compressed') || src.includes('/_compressed/'))) return;
   if (!img.naturalWidth || img.naturalWidth > LEGACY_MAX_W) return;
   // 这张图的跨域加载被拒过（见 loadCoverImage）：img 上还挂着 crossOrigin，
   // 换 src 会再走一次 CORS 加载、必挂 —— 等于把一张好好的压缩图换成破图。
@@ -223,7 +226,10 @@ function maybeUpgradeLegacy(img) {
   const probe = new Image();
   probe.decoding = 'async';
   probe.onload = () => {
-    if (img.isConnected) img.src = full;
+    // ⚠ 这里要判**原图**的宽度，不是"当前这张压缩图"的 —— 之前查错了对象，
+    //   于是 4895×4869 / 27.9MB 那种原图也被换了上去（卡片的封面变成几十 MB）。
+    //   probe 本来就要把原图下下来（下完在缓存里，换过去是免费的），顺手量一下不花钱。
+    if (probe.naturalWidth && probe.naturalWidth <= LEGACY_MAX_W && img.isConnected) img.src = full;
   };
   probe.onerror = () => { /* 原图挂了就继续用压缩图 */ };
   probe.src = full;

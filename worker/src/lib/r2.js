@@ -3,7 +3,13 @@
 //   新文件: {type}/{yyyyMM}/{hash前8位}.{ext}，压缩图放 {type}/{yyyyMM}/_compressed/{hash前8位}.{ext}
 //   旧文件保持原名不动
 
-const CDN_BASE = 'https://img.liveinpassion.me';
+// 图片对外地址。走**本 worker** 的 /img/*（见 src/index.js 里那条路由）：
+//   · 它显式带 `Access-Control-Allow-Origin: *` —— 前台要把封面画进 canvas 当 WebGL
+//     贴图，跨域像素会被污染、上传显存直接抛 SecurityError。CDN 那边能不能稳定回
+//     ACAO 不由我们说了算（实测时好时坏），worker 自己发就没有这个不确定性。
+//   · 它从 R2 读 + 走边缘缓存（Cache API），所以也不比 CDN 慢。
+// 想退回 CDN 只改这一行即可（旧 key 一直都还在桶里，没删）。
+const CDN_BASE = 'https://cms.liveinpassion.me/img';
 
 // 计算内容 hash 前 8 位用于生成不可变文件名
 async function contentHash(arrayBuffer) {
