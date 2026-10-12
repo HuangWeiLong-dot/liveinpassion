@@ -806,7 +806,11 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1000;
+            /* ⚠ 必须高过移动端那条 .dock（z-index 1001，MobileDock.vue）：
+               1000 的话，手机上看灯箱时那条全宽的白色"空格键"会浮在照片下面一截，
+               而且它还吃点击。其余各层都在这之上（品牌遮罩 9999 / 转场板 90000 /
+               方块光标 100000），所以只抬到 1002 —— 别一路加上去。 */
+            z-index: 1002;
             display: flex;
             justify-content: center;
             align-items: center;

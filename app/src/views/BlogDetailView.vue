@@ -1,6 +1,8 @@
 <script setup>
 // 博客详情：**左正文 / 右封面**。点列表里的一张卡 → 封面从那一格飞到右侧并完整铺开，
 // 左侧的正文随后逐渐显现；退出时封面缩回列表里那一格。
+// ⚠ 窄屏（≤1024px）走的不是这一套：没有两列、也没有飞行 —— 封面铺成**整屏背景**，
+//   正文压在上面（固定压暗 + 浅色字），左边缘那颗键只切背景开/关。见样式里"窄屏"那一段。
 //
 // 版面与参照关系：
 //   · 位置交接（封面从哪一格来）沿用列表那边交过来的矩形（composables/useCoverHandoff）。
@@ -19,6 +21,7 @@ import { gsap } from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { blogPosts, blogBySlug } from '../data/blogPosts.js';
 import { loadImage } from '../composables/useImageLoader.js';
+import { useLightbox } from '../composables/useLightbox.js';
 import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
 
@@ -181,9 +184,10 @@ const reducedMotion = typeof window !== 'undefined'
   && typeof window.matchMedia === 'function'
   && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// ── 窄屏：封面收进左侧抽屉 ──────────────────────────────────────────────
-// 断点和移动版外壳（MobileDock）一致。窄屏上进详情**先给完整的正文**，
-// 封面挪到左边缘那条抽屉里，点把手 / 往右拖才拉出来。
+// ── 窄屏：封面就是整屏背景 ──────────────────────────────────────────────
+// 断点和移动版外壳（MobileDock）一致。窄屏上进详情**直接给完整正文**，
+// 封面铺成固定不滚的整屏背景（上面一层固定暗幕、正文切浅色字，见样式里那段），
+// 左边缘那颗键只负责"背景开/关"（用户定的：背景常驻 + 一个开关）。
 // 桌面那套"左正文右封面 + 封面从列表飞过来"一行不动 —— 这里只走窄屏这一支。
 const narrowMql = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
   ? window.matchMedia('(max-width: 1024px)')
@@ -193,81 +197,25 @@ function syncNarrow(e) {
   isNarrow.value = e.matches;
 }
 
-const detailRef = ref(null);      // 挂 --cover-open 的那一层
-const drawerRef = ref(null);      // .bd-right：窄屏下它就是抽屉本体
-const open = ref(false);          // 抽屉是不是开着（0/1 那档由 CSS 给）
-// 拖动中：直接写 --cover-open（0~1 的连续值），松手再交回 CSS 的 0/1。
-// 用一个变量同时驱动抽屉和把手（把手要跟着抽屉的右沿走），中途不会有先后差。
-let drag = null;
-let suppressClick = false;
-
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
-
-function writeShift(v) {
-  detailRef.value?.style.setProperty('--cover-open', String(v));
+const detailRef = ref(null);      // 挂 .is-bg-off 的那一层
+// 封面背景开着没有。**只有窄屏读它** —— 宽屏那份样式里没有任何 .is-bg-off 规则。
+// 初值开；每次重新进详情也回到开（见 onActivated / onDeactivated）：
+// 进一篇就是"看到照片"，要安静读书自己点一下那颗键。
+const bgOn = ref(true);
+function toggleBg() {
+  bgOn.value = !bgOn.value;
 }
 
-function setOpen(next) {
-  open.value = next;
-  // 交回 CSS：类是 0/1 的唯一来源，行内那个连续值只在拖动期间存在
-  detailRef.value?.style.removeProperty('--cover-open');
-}
-
-function toggleCover() {
-  setOpen(!open.value);
-}
-
-// 把手上按下去：记起点，之后的位移换算成 --cover-open
-function onDragDown(e) {
-  if (!isNarrow.value) return;
-  const w = drawerRef.value?.offsetWidth || 1;
-  drag = { x0: e.clientX, v0: open.value ? 1 : 0, w, t0: performance.now(), moved: false, dir: 1 };
-  detailRef.value?.classList.add('is-cover-dragging');
-  e.currentTarget.setPointerCapture?.(e.pointerId);
-}
-
-// 抽屉上按下去：只能往左拖（收回去），dir = -1
-function onDrawerDown(e) {
-  if (!isNarrow.value || !open.value) return;
-  const w = drawerRef.value?.offsetWidth || 1;
-  drag = { x0: e.clientX, v0: 1, w, t0: performance.now(), moved: false, dir: -1 };
-  detailRef.value?.classList.add('is-cover-dragging');
-  e.currentTarget.setPointerCapture?.(e.pointerId);
-}
-
-function onDragMove(e) {
-  if (!drag) return;
-  const dx = (e.clientX - drag.x0) * drag.dir;
-  if (Math.abs(dx) > 6) drag.moved = true;
-  if (drag.dir < 0 && dx > 0) { writeShift(1); return; }  // 关着的时候往右拖不动
-  writeShift(clamp01(drag.v0 + dx / drag.w));
-}
-
-function onDragUp(e) {
-  if (!drag) return;
-  const d = drag;
-  drag = null;
-  detailRef.value?.classList.remove('is-cover-dragging');
-  if (!d.moved) {
-    // 没动过 = 点了一下把手：切换开合（click 会被 suppressClick 吃掉）
-    suppressClick = true;
-    setOpen(!open.value);
-    return;
-  }
-  const dx = (e.clientX - d.x0) * d.dir;
-  const vel = dx / Math.max(1, performance.now() - d.t0);  // px/ms
-  const v = clamp01(d.v0 + dx / d.w);
-  // 拖过 40% 或者甩得够快就按拖的方向定
-  setOpen(vel > 0.5 ? true : vel < -0.5 ? false : v > 0.4);
-}
-
-function onHandleClick() {
-  // 拖动结束后的那一次 click 要丢掉，否则刚拖开又被切成关
-  if (suppressClick) {
-    suppressClick = false;
-    return;
-  }
-  toggleCover();
+// 窄屏那颗"看完整封面"：开**站内灯箱**（App.vue 里那个全局 Lightbox，z-index 1000
+// 压在详情覆盖层之上）—— 全屏、完整不裁剪、点空白 / Esc 关，和站内看别的照片同一套。
+// ⚠ 送进去的是**压缩图**（就是背景那一张，缓存命中、基本瞬开），不是 fullSrc 原图：
+//   压缩图 1920px 宽，在任何手机屏上都是超采样；而原图有几篇是十几 MB 的 PNG ——
+//   为"看一眼完整封面"去冷启动下十几 MB 不值当（详情页当初从原图退回压缩图也是这个理由）。
+//   真要原图：把 fullSrc 一起带上即可（灯箱优先取 fullSrc）。
+const { open: openLightbox, isOpen: lightboxOpen } = useLightbox();
+function openFullCover() {
+  const src = post.value?.image?.src;
+  if (src) openLightbox([{ src }], 0);
 }
 
 // ── 图片 ────────────────────────────────────────────────────────────────
@@ -365,8 +313,14 @@ function stageCover() {
 function pageBg() {
   const panel = panelRef.value;
   if (!panel) return null;
-  const c = getComputedStyle(panel).backgroundColor;
-  return c && c !== 'rgba(0, 0, 0, 0)' ? c : null;
+  const cs = getComputedStyle(panel);
+  const c = cs.backgroundColor;
+  if (c && c !== 'rgba(0, 0, 0, 0)') return c;
+  // 窄屏这一支：面板是**透明**的（封面照片铺在它下面），底色不在面板上、
+  // 而在 --bg 这个令牌上（.blog-detail 自己吃它）。不兜这一下的话
+  // toPageBg 会永远拿不到终点色 —— 覆盖层就一直停在列表那一页的底色上。
+  const token = cs.getPropertyValue('--bg').trim();
+  return token || null;
 }
 
 let stageBgTween = null;
@@ -756,10 +710,9 @@ function close() {
   // ⚠ "减少动态效果"下**不挂**：那时没有飞行，挂上去只会让 header 先淡没、
   //   换页后再淡回来 —— 白白多闪一下。回列表那条淡入本来也是跳过的。
   if (!reducedMotion) setCoverCurtain(true);
-  // 窄屏：抽屉是屏幕外的一层，没有"缩回列表那一格"这回事。
+  // 窄屏：封面是整屏背景，没有"缩回列表那一格"这回事。
   // 只把正文淡掉再走，别的不动。
   if (isNarrow.value) {
-    setOpen(false);
     stopTyping();
     // 窄屏这一支没有飞行，0.25s 读起来就是硬切；和宽屏那一趟（0.8s）不比，
     // 但至少拉到"看得见是淡出去的"这一档。
@@ -861,22 +814,22 @@ function close() {
 
 // ── 键盘 / 触摸 ─────────────────────────────────────────────────────────
 function onKeydown(e) {
+  // ⚠ 灯箱开着时键盘整个归它管（Esc 关灯箱、←/→ 翻图）：这里不挡的话，按一下 Esc
+  //   会**一边关灯箱、一边把这一篇也退掉**（两处 keydown 都挂在 document 上，
+  //   谁也拦不住谁）；←/→ 更糟 —— 灯箱盖着，背后的文章却在偷偷翻篇。
+  if (lightboxOpen.value) return;
   if (e.key === 'Escape') {
-    // 抽屉开着时 Esc 先收抽屉，再按一次才离开这一篇
-    if (isNarrow.value && open.value) setOpen(false);
-    else close();
+    // 窄屏上不再有"先收抽屉"这一拍（封面就是背景，没有可收的东西）——
+    // Esc 一个动作：离开这一篇。
+    close();
   } else if (e.key === 'ArrowLeft') go(-1);
   else if (e.key === 'ArrowRight') go(1);
 }
 
 function onTouchStart(e) {
-  // 从把手上起手的是"拉抽屉"，不是"翻篇"：记个 null 让下面那一拍直接跳过
-  if (isNarrow.value && e.target.closest?.('.bd-handle')) {
-    touchStartPt = null;
-    return;
-  }
-  // 抽屉开着的时候横滑是在跟抽屉较劲，别顺手把篇翻了
-  if (isNarrow.value && open.value) {
+  // 从左边缘那一列小键上起手的是"切背景 / 看完整封面"，不是"翻篇"：
+  // 记个 null 让下面那一拍直接跳过（整列一起判，省得加一颗键就得回来补一条）。
+  if (isNarrow.value && e.target.closest?.('.bd-keys')) {
     touchStartPt = null;
     return;
   }
@@ -971,17 +924,10 @@ function solidifyHeader(on) {
   document.documentElement.classList.toggle('blog-detail-open', on);
 }
 
-// 抽屉拉开时把底部那条"空格键"Dock 收起来：它是固定的全宽白条，压在封面下沿很难看，
-// 而且这一刻用户要的是看封面，不是翻菜单。
-watch(open, (v) => {
-  document.documentElement.classList.toggle('bd-cover-open', v && isNarrow.value);
-});
-
-// 从窄屏转宽屏（或反过来）时把抽屉收干净：转宽之后这套抽屉根本不存在，
-// 留着 open=true 会让下次回到窄屏时"一进来封面就开着"。
-watch(isNarrow, (v) => {
-  if (!v) setOpen(false);
-});
+// ⚠ 原来这里有一条"抽屉拉开时收起底部 Dock"的 watch（往 <html> 挂 bd-cover-open）。
+//   封面改成整屏背景之后**没有这一条了**：背景什么时候都在，底部那条 Dock 也就不该
+//   跟着谁隐身 —— 那只会变成"菜单莫名消失"。那个类全文只有这一页用过，
+//   所以两处引用（这里 + 样式里那条 .dock 规则）删掉就干净了，别处不用找。
 
 onMounted(() => {
   document.addEventListener('keydown', onKeydown);
@@ -997,13 +943,14 @@ onMounted(() => {
 onActivated(() => {
   leaving = false;
   solidifyHeader(true);
+  bgOn.value = true;  // 每次进来都是"看到照片"那一档；要安静读书自己点那颗键
   gsap.set(panelRef.value, { clearProps: 'opacity' });
   scheduleEnter();
 });
 
 onDeactivated(() => {
   solidifyHeader(false);
-  setOpen(false);   // 下次进来从"正文优先"的状态开始（用户定的顺序）
+  bgOn.value = true;  // 同上：留给下一次进来的是默认那一档，不是上次点过的状态
   disableTilt();
   stopTyping();
   clearTimeout(typeSafety);
@@ -1031,10 +978,6 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
   narrowMql?.removeEventListener('change', syncNarrow);
-  // ⚠ 抽屉开着时直接离开（浏览器返回 / 路由跳走）不会走 close()，
-  //   <html> 上那个 bd-cover-open 得在这里摘掉 —— 留着的话它会一直把底部 Dock
-  //   压成 opacity: 0（那条规则是全局的），到了别的页面 Dock 就不见了。
-  document.documentElement.classList.remove('bd-cover-open');
   document.documentElement.style.overflow = '';
   solidifyHeader(false);
   timeline?.kill();
@@ -1067,9 +1010,9 @@ if (typeof window !== 'undefined') {
   window.__bd = {
     go,
     close,
-    // 窄屏抽屉：自动化断言用（tools/blog-shots.mjs 那一路）
-    cover: () => ({ open: open.value, narrow: isNarrow.value }),
-    setCover: setOpen,
+    // 窄屏封面背景：自动化断言用（tools/blog-shots.mjs 那一路）
+    bg: () => ({ on: bgOn.value, narrow: isNarrow.value }),
+    setBg: (v) => { bgOn.value = !!v; },
     state: () => ({
       route: route.params.slug,
       prev: prevPost.value?.slug || null,
@@ -1087,7 +1030,7 @@ if (typeof window !== 'undefined') {
       v-if="post"
       ref="detailRef"
       class="blog-detail"
-      :class="{ 'is-cover-open': open, 'is-corner': isCorner, 'is-coverview': isCoverView }"
+      :class="{ 'is-bg-off': !bgOn, 'is-corner': isCorner, 'is-coverview': isCoverView }"
       :style="{
         '--corner': `${cornerAngle}deg`,
         '--room-zoom': `${roomZoom}`,
@@ -1242,17 +1185,21 @@ if (typeof window !== 'undefined') {
 
       <!-- ── 右：封面。点列表里那张卡，它就从那一格飞到这里、完整铺开。 ────
            封面以外的空白是"点一下返回列表"的热区（之前那个跟随鼠标的 Close 标签
-           已按需求去掉：退出的路是"点空白 / Esc / 浏览器返回"）。 -->
-      <!-- 窄屏：正文之上先压一层暗幕，点它收抽屉（桌面隐藏） -->
+           已按需求去掉：退出的路是"点空白 / Esc / 浏览器返回"）。
+           ⚠ 窄屏上这一块**换身份**：同一份 DOM 铺成整屏背景（见样式里那一段），
+             那个"点空白返回"的热区在窄屏是 display: none（整屏都是背景，没有"空白"）。 -->
+      <!-- 窄屏：压在封面背景之上、正文之下的那层压暗幕（它就是"可读性"，
+           固定强度、纯装饰，不吃点击）。桌面隐藏。 -->
       <div
         class="bd-scrim"
-        :class="{ 'is-on': open }"
+        :class="{ 'is-on': bgOn }"
         aria-hidden="true"
-        @click="setOpen(false)"
       />
 
-      <div ref="drawerRef" class="bd-right" @pointerdown="onDrawerDown">
-        <div class="bd-closezone" @click="isNarrow ? setOpen(false) : close()"></div>
+      <div class="bd-right">
+        <!-- 封面以外的空白是"点一下返回列表"的热区。⚠ 窄屏上它是死的：
+             整屏都是背景（正文面板压在上面、不透），这里由样式直接 display: none。 -->
+        <div class="bd-closezone" @click="close()"></div>
 
         <div ref="coverWrapRef" class="bd-cover">
           <figure class="bd-media" :style="{ '--ratio': ratio }">
@@ -1276,27 +1223,46 @@ if (typeof window !== 'undefined') {
         </div>
       </div>
 
-      <!-- 窄屏：左边缘常显的把手。点一下开合，往右拖跟着走 ——
-           拉开之后它自己骑在抽屉的右沿上，再往左拖就是收回。
-           图标是相机取景框（Tabler 那一路的细线），和站点别处的图标同一门语言。 -->
-      <button
-        class="bd-handle"
-        type="button"
-        aria-label="封面"
-        :aria-expanded="open"
-        @click="onHandleClick"
-        @pointerdown="onDragDown"
-        @pointermove="onDragMove"
-        @pointerup="onDragUp"
-        @pointercancel="onDragUp"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="5" width="18" height="14" rx="2" />
-          <circle cx="9" cy="10.5" r="1.6" />
-          <path d="M4 17.5 9.5 12l4 4 3-2.5 3.5 3" />
-        </svg>
-      </button>
+      <!-- 窄屏：左边缘那一列小键（宽屏整列隐藏）。
+           上面那颗 = 封面背景开/关；下面那颗 = 把完整封面开进站内灯箱。
+           两枚装在同一个容器里，**整列竖着居中** —— 各自 fixed 定位的话，
+           以后再加一颗就得重算一遍 translateY（这里踩过）。位置/尺寸/材质
+           沿用原来那颗抽屉把手：正文左侧那 46px 内边距就是给这一列让位的。 -->
+      <div class="bd-keys">
+        <button
+          class="bd-handle"
+          type="button"
+          aria-label="封面背景"
+          :aria-pressed="bgOn"
+          @click="toggleBg"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+            <path d="M3.5 3.5h8.5v17H3.5z" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
+
+        <!-- 完整封面：背景那张是 cover 裁切过的，想看整张（灯箱里完整不裁剪）点这颗 -->
+        <button
+          class="bd-full"
+          type="button"
+          aria-label="查看完整封面"
+          @click="openFullCover"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16 4h4v4" />
+            <path d="M14 10l6-6" />
+            <path d="M8 20H4v-4" />
+            <path d="M4 20l6-6" />
+            <path d="M16 20h4v-4" />
+            <path d="M14 14l6 6" />
+            <path d="M8 4H4v4" />
+            <path d="M4 4l6 6" />
+          </svg>
+        </button>
+      </div>
       </div><!-- /.bd-room -->
     </section>
 
@@ -1350,14 +1316,9 @@ if (typeof window !== 'undefined') {
   background-color: rgba(26, 26, 26, 0.9);
 }
 
-/* 窄屏拉开封面抽屉时，把底部那条全宽的白条（MobileDock 的"空格键"）收起来：
-   它压住封面下沿很难看，而且这一刻要看的是封面，不是菜单。
-   z-index 1001 比抽屉还高，不藏的话它会浮在封面上。 */
-:global(html.bd-cover-open .dock) {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.24s ease;
-}
+/* ⚠ 这里原来有一条 `html.bd-cover-open .dock { opacity: 0 }`（拉开封面抽屉时把底部
+   那条 Dock 收起来）。封面改成整屏常驻背景之后**没有这个状态了** —— 背景一直都在，
+   Dock 没有任何理由跟着隐身。那个类全文只有这一页挂过，所以随 JS 一起删干净了。 */
 
 /* ══ 覆盖层 ══════════════════════════════════════════════════════════════
    ⚠ 覆盖层整体**不设背景**：动画开始时列表要能透出来（封面就是从那里长过来的）。
@@ -1368,6 +1329,11 @@ if (typeof window !== 'undefined') {
      两级内容都要从它下面开始，否则会和 HOME BLOGS STATS 叠在一起
      （header 是透明的，两层字会直接糊住）。 */
   --bd-top: 88px;
+  /* 正文两侧的呼吸位，以及**版心**（.bd-info 的 max-width）。
+     ⚠ 版心刻意保持 46rem − 两侧呼吸位 = 624px：这是改之前实测的行宽，
+     这次只挪位置、不改行长（要调行宽就改这一个数，别去动 .bd-info 的算式）。 */
+  --bd-gutter: 56px;
+  --bd-measure: calc(46rem - var(--bd-gutter) * 2);
   position: fixed;
   inset: 0;
   z-index: 60; /* 头部是 100，面板从它下面滑过 */
@@ -1527,6 +1493,17 @@ if (typeof window !== 'undefined') {
   max-height: calc(100vh - var(--bd-top, 88px) - 96px);
 }
 
+/* ⚠ 墙角模式下**不做**"正文块收缩 + 居中"：那一堵墙的宽度是刻意定死的 53rem
+   （= 正文版心 + 两侧各 56，见上），正文就该去吃满它。套上 .bd-info 那套之后，
+   文字会缩回 --bd-measure(624)、墙却还是 53rem —— 墙里两侧空出一条，
+   而且上面那段算式注释就全对不上了。 */
+.blog-detail.is-corner .bd-info,
+.blog-detail.is-corner .bd-out-inner {
+  width: auto;
+  max-width: none;
+  margin-inline: 0;
+}
+
 /* 封面列不再占满高：高度由图片自己的比例定（图的宽度仍吃满这一列） */
 .blog-detail.is-corner .bd-cover {
   height: auto;
@@ -1611,6 +1588,15 @@ if (typeof window !== 'undefined') {
   max-height: none;
   padding: 0;
   overflow: visible;
+}
+
+/* 封面视图里这一层只剩标题，位置由滑杆给（left/top），所以同样不做收缩 + 居中 ——
+   不然标题会被 --bd-measure 那 624px 卡一刀，和滑杆的定位搅在一起。 */
+.blog-detail.is-coverview .bd-info,
+.blog-detail.is-coverview .bd-out-inner {
+  width: auto;
+  max-width: none;
+  margin-inline: 0;
 }
 
 /* 标题以外的正文/日期先收掉（这一模式只讲"标题 + 封面"） */
@@ -1758,11 +1744,14 @@ if (typeof window !== 'undefined') {
   box-sizing: border-box;
   padding-inline: var(--bd-side, 3vw);
   display: grid;
-  /* ⚠ 正文列用 `fit-content(46rem)` 而不是固定 59%：
-     它是"按内容收缩"的 —— 硬换行的短句（诗那种）会把这一列收到最长那一行；
-     长散文的 max-content 远超 46rem，于是照旧停在版心宽度。固定比例会让短内容
-     背后空出一大片（实测 2379 宽屏上能空出 700+px，就是用户说的"右侧一片空白"）。 */
-  grid-template-columns: fit-content(46rem) minmax(0, 1fr);
+  /* 左列 = **max(46rem, 一半)**：宽屏上"正文那一堵墙"就是屏幕左半边（分割线正落在
+     中线），1440 及以下退回 46rem。
+     ⚠ 从 `fit-content(46rem)` 改过来的（用户要求"正文在左侧区域里居中"）：
+     原来那一列**跟着内容收缩** —— 短诗（硬换行）会把面板收到只有最长那一行宽、
+     整块贴死在屏幕左缘，右边空一大片。（当初用 fit-content 是为了不让短内容背后
+     空出一大片，但它只把空白甩到了面板右侧、把文字顶到屏幕最左边。）
+     现在定宽 + 内容自己在列内居中，见 .bd-info。 */
+  grid-template-columns: minmax(46rem, 1fr) minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -1784,7 +1773,7 @@ if (typeof window !== 'undefined') {
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--bd-top) 56px 96px;
+  padding: var(--bd-top) var(--bd-gutter) 96px;
   /* 滚动条藏掉：这一页是"整屏覆盖层"，右边的滚动条一露出来就破了整个版面 */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1818,12 +1807,17 @@ if (typeof window !== 'undefined') {
   z-index: 3;
   overflow: hidden;
   pointer-events: none;
-  padding: 0 56px;
+  padding: 0 var(--bd-gutter);
   background: var(--bg);
 }
 
+/* ⚠ 收敛 + 居中的那三条必须和 .bd-info 一模一样：这两段是**重叠 0.35s 的交叉淡**，
+   差一个像素都会看到旧文字"横跳"一下再消失。 */
 .bd-out-inner {
   padding-top: calc(var(--bd-top) + 26px); /* 和面板里正文起始位置对齐 */
+  width: fit-content;
+  max-width: var(--bd-measure);
+  margin-inline: auto;
   will-change: transform;
 }
 
@@ -1834,6 +1828,15 @@ if (typeof window !== 'undefined') {
    ⚠ 和 .bd-panel 一样是"初值"，之后由 GSAP 写行内 opacity 接管。 */
 .bd-info {
   opacity: 0;
+  /* ── 正文块在左列里水平居中 ────────────────────────────────────────────
+     `width: fit-content` 是这里的关键：块按**自身最宽那一行**收缩，再靠 auto
+     外边距在中线左右对称 —— 短诗（硬换行）因此不再贴屏幕左缘，而是左右留白相等；
+     长散文的 max-content 远超版心，照旧停在 --bd-measure（一行都不会变长）。
+     只写 `max-width` 而不收缩块宽的话，诗句仍然左对齐在块里、右侧一片空白，
+     看起来一点没居中（试过）。 */
+  width: fit-content;
+  max-width: var(--bd-measure);
+  margin-inline: auto;
 }
 
 /* 被"敲"出来的字符：版面一开始就是最终状态，只有可见性在变（见 startTyping）。
@@ -1889,10 +1892,11 @@ if (typeof window !== 'undefined') {
 }
 
 /* ── 右：封面 ───────────────────────────────────────────────────────── */
-/* 窄屏那套"左侧抽屉 + 边缘把手"在宽屏根本不存在（宽屏走的是右列封面 +
-   从列表那一格飞过来），所以这里先整体关掉，样式全在下面的窄屏块里。 */
+/* 窄屏那套"封面背景 + 左边缘那一列小键"在宽屏根本不存在（宽屏走的是右列封面 +
+   从列表那一格飞过来，封面本来就是完整显示的），所以这里先整体关掉，
+   样式全在下面的窄屏块里。 */
 .bd-scrim,
-.bd-handle {
+.bd-keys {
   display: none;
 }
 
@@ -1973,76 +1977,116 @@ if (typeof window !== 'undefined') {
   transform-origin: 0 0;
 }
 
-/* ── 窄屏：封面在上、正文在下（阅读顺序不变，两级各自占满宽度）─────────── */
-/* ══ 窄屏：正文占满屏，封面收进左侧抽屉 ══════════════════════════════════
+/* ══ 窄屏：正文压在**封面背景**上 ════════════════════════════════════════
    和宽屏那套"左正文 / 右封面 + 封面从列表飞过来"是两条独立的路：
-   窄屏先给完整的正文，封面在左边缘那条抽屉里，靠把手点/拖拉出来。
+   窄屏先给完整正文，封面铺成**固定不滚的整屏背景**，上面压一层固定强度的暗幕、
+   正文切成浅色字（用户定的"固定压暗 + 浅色字"），左边缘那颗键只负责"背景开/关"。
    JS 那边按同一个断点走 isNarrow 分支（playEnter / close / stageCover）。
-   --cover-open 是这条抽屉的唯一驱动量：0 = 收起、1 = 拉开，拖动时写连续值。
-   抽屉和把手都读它，中途不会有先后差。 */
+   ⚠ 这套是**替换**掉原来的"左侧抽屉 + 边缘把手（点/拖拉出来）"那一套的：
+     凡是还写着 --cover-open / --cover-w / is-cover-open / is-cover-dragging 的地方
+     都已经跟着删干净了，别只把某一条改回去 —— 那套的驱动量已经不存在了。 */
 @media (max-width: 1024px) {
   .blog-detail {
     --bd-top: 0px;
-    --cover-w: min(86vw, 420px);
-    --cover-open: 0;
+    /* 背景照片上的压暗层强度。**固定值、不跟主题走** —— 因为这一档的字色也
+       一起钉成浅色（见下）。要调"照片看得清 / 字看得清"的档位就改这一个数。 */
+    --bd-photo-scrim: rgba(0, 0, 0, 0.55);
     display: block; /* 不再分"封面上 / 正文下"两行 */
+    /* 这一页自己的底色：背景照片关掉（.is-bg-off）时露出来的就是它 */
+    background: var(--bg);
   }
 
-  .blog-detail.is-cover-open {
-    --cover-open: 1;
+  /* ── 压在照片上读正文：字色**固定浅色**（不管主题）──────────────────────
+     ⚠ 两条都得写：变量管的是显式写 var(--text-*) 的那些（日期、正文、引用线、
+       打字光标），color 管的是**继承**来的那些 —— 标题自己没有 color 规则，
+       直接继承 body，只改变量的话它在亮色主题下还是深色，压在照片上就是一团糊。 */
+  .blog-detail:not(.is-bg-off) .bd-panel {
+    --text-primary: #fff;
+    --text-secondary: rgba(255, 255, 255, 0.76);
+    color: var(--text-primary);
   }
 
-  /* 正文这一层铺满整屏 */
+  /* 正文这一层铺满整屏，而且**透明**：照片在它底下（关掉背景时露出的才是 --bg） */
   .bd-panel {
     position: absolute;
     inset: 0;
+    z-index: 3;
     border-right: 0;
+    background: transparent;
   }
 
   /* 顶部要让开站点 header（fixed，88px），底部要让开那条"空格键"Dock（68px）——
      正文是这一个滚动容器里的内容，Dock 直接压在它上面。
-     左边额外让出 46px：那条把手是 fixed 的、竖着居中，正文按 24px 排的话
-     中间那几行会被它压住字头。46 = 把手 28 + 18 的间隙。 */
+     左边额外让出 46px：左边缘那一列小键是 fixed、竖着居中，正文按 24px 排的话
+     中间那几行会被它压住字头。46 = 键 28 + 18 的间隙。 */
   .bd-panel-inner {
     padding: 104px 24px 96px 46px;
   }
 
   .bd-out {
-    /* 左内边距和上面 .bd-panel-inner 对齐，交叉淡的时候两段字才在同一条线上 */
+    /* 左内边距和上面 .bd-panel-inner 对齐，交叉淡的时候两段字才在同一条线上。
+       底色必须透明：宽屏那份给的是 var(--bg)，压在照片上就是"整屏忽然黑一下"。 */
     padding: 0 24px 0 46px;
+    background: transparent;
   }
 
   .bd-out-inner {
     padding-top: 130px; /* 和上面正文的起始位置对齐 */
   }
 
-  /* ── 抽屉本体：就是宽屏那个 .bd-right，只是换个位置和尺寸 ─────────── */
-  .bd-right {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--cover-w);
-    z-index: 8;
-    /* 顶部让开 header：抽屉是滑到 header **下面**去的（header z-index 100），
-       不留这一段的话封面会被压在标题栏后面。 */
-    padding: 88px 20px 84px;
-    background: var(--bg);
-    border-right: 1px solid var(--border);
-    /* 投影的位移和模糊半径都乘 --cover-open：抽屉收起时它整个归零。
-       写死 12px/44px 的话，抽屉虽然已经滑到屏幕外（translateX(-100%)），
-       它的投影尾巴还留在屏幕左边 —— 实测收起状态下最左 56px 比别处暗 2~3 个
-       灰阶，就是一条没有抽屉的"左侧阴影"。 */
-    box-shadow: calc(var(--cover-open) * 12px) 0 calc(var(--cover-open) * 44px) rgba(0, 0, 0, 0.28);
-    transform: translateX(calc(-100% + var(--cover-open) * 100%));
-    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform;
+  /* 窄屏不吃"收缩 + 居中"那一套：这一档没有左右两列，正文就该吃满可用宽度
+     （套上版心 624 会让散文/图片块在平板上反而变窄）。 */
+  .bd-info,
+  .bd-out-inner {
+    width: auto;
+    max-width: none;
+    margin-inline: 0;
   }
 
-  /* 拖动中：位置直接跟手指，别再有补间 */
-  .blog-detail.is-cover-dragging .bd-right,
-  .blog-detail.is-cover-dragging .bd-handle {
-    transition: none;
+  /* ── 封面 = 整屏背景（固定不滚）────────────────────────────────────────
+     固定而不是随内容滚：长文滚到中段时照片还在后面；随滚的话"背景"只在开头
+     那一屏看得到。object-fit: cover 铺满、裁掉多余部分（不再是"完整显示封面"）。
+     关掉背景整层淡出（露出来的就是上面那个 --bg），而不是 display: none ——
+     淡出读起来才是"背景关掉了"，硬切会闪一下。 */
+  .bd-right {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    z-index: 1;
+    padding: 0;
+    border: 0;
+    background: #000; /* 图还没解码出来那几帧是黑的，不是站点底色 */
+    box-shadow: none;
+    transform: none;
+    pointer-events: none; /* 背景只是背景：不参与点击（正文那一层在它上面） */
+    transition: opacity 0.3s ease;
+  }
+
+  .blog-detail.is-bg-off .bd-right {
+    opacity: 0;
+  }
+
+  /* 整屏都是背景，"点封面以外的空白返回列表"这个热区在窄屏没有意义 */
+  .bd-closezone {
+    display: none;
+  }
+
+  .bd-cover {
+    width: 100%;
+    height: 100%;
+  }
+
+  .bd-media {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    max-height: none;
+  }
+
+  .bd-media__inner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   /* 窄屏上封面是**可见**的（宽屏那套由 GSAP 逐帧写 opacity，初值是 0） */
@@ -2050,13 +2094,13 @@ if (typeof window !== 'undefined') {
     opacity: 1;
   }
 
-  /* ── 暗幕：压在正文之上、抽屉之下，点它收抽屉 ───────────────────────── */
+  /* ── 暗幕：照片之上、正文之下。固定强度、纯装饰（不吃点击）───────────── */
   .bd-scrim {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 7;
-    background: rgba(0, 0, 0, 0.42);
+    z-index: 2;
+    background: var(--bd-photo-scrim);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -2066,21 +2110,29 @@ if (typeof window !== 'undefined') {
   .bd-scrim.is-on {
     opacity: 1;
     visibility: visible;
-    pointer-events: auto;
   }
 
-  /* ── 把手：左边缘那一条，点一下开合、往右拖跟着走 ─────────────────────
-     毛玻璃：底子只给六成，剩下靠 backdrop-filter 糊 —— 底下的正文会透成一片
-     模糊的墨色，而不是被一块实心色块盖住。
-     正文那边留了 46px 的左内边距（见上），所以收起状态下它其实不压字；
-     拉开之后它整个让到抽屉的**右沿之外**（位移 = 抽屉宽度），也不会压在封面上。 */
-  .bd-handle {
+  /* ── 左边缘那一列小键（上：背景开/关；下：看完整封面）──────────────────
+     整列竖着居中，定位挂在**容器**上、不挂在按钮上 —— 每颗各自 fixed 的话，
+     加一颗就得重算一次 translateY。
+     位置/宽度/毛玻璃沿用原来那颗抽屉把手（正文左侧留的 46px 就是给这一列让位的）。
+     压在照片上时改成浅色 hairline + 深玻璃：亮色主题下用主题色的话，
+     它会在照片上变成一条看不见的白线。 */
+  .bd-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     position: fixed;
     left: 0;
     top: 50%;
     z-index: 9;
+    transform: translateY(-50%);
+  }
+
+  /* 两颗键共用这一套外观（只有高度不同）；48px 高也是触摸下点得中的下限 */
+  .bd-keys button {
     width: 28px;
-    height: 96px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2091,21 +2143,18 @@ if (typeof window !== 'undefined') {
     background: color-mix(in srgb, var(--bg) 58%, transparent);
     backdrop-filter: blur(14px) saturate(1.1);
     color: var(--text-primary);
-    cursor: grab;
-    /* 拖它的时候别让浏览器当成页面滚动 */
-    touch-action: none;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    /* 拉开之后整条让到抽屉右沿外面 —— 停在抽屜里侧会盖住封面，
-       骑在边线上又切一半，都不好看。 */
-    transform: translateY(-50%) translateX(calc(var(--cover-open) * var(--cover-w)));
-    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
 
-  .bd-handle:active {
-    cursor: grabbing;
+  .blog-detail:not(.is-bg-off) .bd-keys button {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.3);
   }
 
-  .bd-handle svg {
+  .bd-keys svg {
     width: 17px;
     height: 17px;
   }
