@@ -292,7 +292,10 @@ function onScrubEnd(e) {
   <div class="player-overlay" id="playerOverlay" :class="{ visible: playerVisible }" @click="togglePlayer"></div>
 
   <div class="music-player" id="musicPlayer" :class="{ visible: playerVisible }">
-    <audio id="audioPlayer" ref="audioRef" preload="auto" @timeupdate="onTimeUpdate" @ended="nextTrack"></audio>
+    <!-- crossorigin 必须开：音频在 CDN（img.liveinpassion.me），频谱要把 <audio>
+         接进 Web Audio 分析；不声明 CORS 的话，跨域媒体在 MediaElementSource 之后
+         输出会被静音，分析器也只会拿到 0。R2 桶的 CORS 已放行本站与本地开发地址。 -->
+    <audio id="audioPlayer" ref="audioRef" preload="auto" crossorigin="anonymous" @timeupdate="onTimeUpdate" @ended="nextTrack"></audio>
 
     <!-- 播放器控制栏 -->
     <div class="player-bar">

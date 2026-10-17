@@ -5,7 +5,7 @@
 // 播放器会优先使用本地这份：
 //
 // export const localLyrics = {
-//   'music/Almost%20Nothing%20-%20Silent%20PoetsOkay%20Kaya.mp3': `
+//   'https://img.liveinpassion.me/music/Almost%20Nothing%20-%20Silent%20PoetsOkay%20Kaya.mp3': `
 // [00:12.30]第一行歌词
 // [00:18.75]第二行歌词
 // `,

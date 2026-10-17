@@ -42,3 +42,7 @@ me/Romanticist.jpg
 
 # 遗留导出，无任何引用（压缩版是 me/hero_compressed/Individuation.jpg）
 me/hero_compressed/Individuation.png
+
+# 音乐已迁到 Cloudflare R2 / CDN（https://img.liveinpassion.me/music/…），
+# 本地源文件不入库，也不再由 copy-static 复制进 dist
+music/

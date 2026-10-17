@@ -13,7 +13,8 @@ const appDir = path.resolve(scriptDir, '..');
 const repoRoot = path.resolve(appDir, '..');
 const distDir = path.join(appDir, 'dist');
 
-const STATIC_DIRS = ['icons', 'avatar', 'me', 'logo', 'music'];
+// music 已迁到 Cloudflare R2 / CDN，仓库里不再保留音频文件
+const STATIC_DIRS = ['icons', 'avatar', 'me', 'logo'];
 const STATIC_FILES = ['favicon.png', 'CNAME'];
 
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {

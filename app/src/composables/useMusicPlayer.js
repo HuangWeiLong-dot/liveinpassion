@@ -14,16 +14,31 @@
 import { ref, computed } from 'vue';
 import { playlist } from '../data/playlist.js';
 
-// 播放列表沿用旧版的相对地址（`music/...`）：只有页面停在 `/` 时才对。
-// 新版是 History 路由，直达或刷新 `/blogs`、`/me/gallery` 这类深链接时，
-// 相对地址会被解析成 `/blogs/music/...` —— GitHub Pages 返回 404 的 HTML，
-// audio 报 MEDIA_ELEMENT_ERROR: Format error，点 ENTER 也起不来。
-// BASE_URL 是 Vite 的部署基路径（本站为 `/`），拼成绝对地址后与当前路由无关。
+// 播放列表现在用的是 CDN 绝对地址（https://img.liveinpassion.me/music/…，存于
+// Cloudflare R2）。这里保留相对路径的兜底：旧数据 / 本地覆盖如果还写成 `music/…`，
+// 按 BASE_URL 拼成站点根开头的地址，避免在 `/blogs` 这类深链接下被解析成
+// `/blogs/music/…`（GitHub Pages 会回 404 的 HTML，audio 报 Format error）。
 const ASSET_BASE = import.meta.env.BASE_URL || '/';
+const MUSIC_CDN_BASE = 'https://img.liveinpassion.me/music/';
+
+// 本地开发（localhost / 127.0.0.1）给 CDN 地址加一个固定查询参数：
+// R2 自定义域的缓存键不含 Origin，而 CORS 响应头是跟缓存一起存的。线上那条
+// （不带参数的）URL 可能已经被以 `https://liveinpassion.me` 的 ACAO 缓存过，
+// 本地打开时就会因为 ACAO 不匹配被浏览器拦掉。加 `?local=1` 走独立缓存条目，
+// 本地第一次请求就会按 localhost 的来源拿到正确的 ACAO。
+const IS_LOCAL_HOST = typeof location !== 'undefined'
+  && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 
 function resolveTrackSrc(src) {
-  if (/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(src) || src.startsWith('/')) return src;
-  return ASSET_BASE + src;
+  let url = src;
+  if (!/^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(url) && !url.startsWith('/')) {
+    // 旧数据 / 本地覆盖可能还写成 `music/…`：按部署基路径补成站点根开头的地址
+    url = ASSET_BASE + url;
+  }
+  if (IS_LOCAL_HOST && url.startsWith(MUSIC_CDN_BASE)) {
+    url += (url.includes('?') ? '&' : '?') + 'local=1';
+  }
+  return url;
 }
 
 const currentTrackIndex = ref(0);
@@ -43,7 +58,8 @@ let interactionBound = false;
 // ── 频谱分析 ────────────────────────────────────────────────────────────────
 // <audio> → MediaElementSource → Analyser → destination。必须在用户交互里创建
 // AudioContext（自动播放策略），所以惰性等到第一次 playTrack 再搭图。
-// 所有曲目都是同源地址（/music/…），Analyser 不会被 CORS 污染。
+// 曲目在 CDN 上（跨域），所以 <audio> 必须带 crossorigin="anonymous"，且 R2 的
+// CORS 要放行本站 —— 否则媒体接进 Web Audio 后会被判成"跨域污染"而静音。
 let audioCtx = null;
 let analyser = null;
 let freqData = null;

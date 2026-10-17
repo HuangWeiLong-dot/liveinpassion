@@ -9,7 +9,7 @@ const repoRoot = path.resolve(appDir, '..');
 
 // 仓库根的静态资源只有一份（8 个 mp3、头像、图标等），不复制进 app/。
 // 开发服务器默认不服务工程根之外的文件，所以这里补一层只读中间件。
-const ROOT_STATIC_DIRS = ['icons', 'avatar', 'me', 'logo', 'music'];
+const ROOT_STATIC_DIRS = ['icons', 'avatar', 'me', 'logo'];
 const ROOT_STATIC_FILES = ['favicon.png'];
 
 const MIME = {

@@ -11,6 +11,31 @@
 
 ---
 
+## update: 30 — 2026-10-17
+
+### 音乐资源迁到 Cloudflare R2 / CDN
+- 21 首曲目全部上传到 R2 桶 `liveinpassion`，key 为 `music/<原文件名>`，
+  对外地址 `https://img.liveinpassion.me/music/…`。已验证 206 Range 分段、
+  正确的 `audio/mpeg` / `audio/flac` 与 CORS 响应头。
+- 新增 13 首曲目补齐上传；其中两首文件名带 `'`（`I'll Come Along`、
+  `Everything's Perfect`），第一次 CLI 上传因路径解析失败，已用 Windows 风格路径重传。
+- R2 桶的 CORS 规则增加本地开发来源（`localhost` / `127.0.0.1` 的 5173–5175、
+  4174、8123），生产来源 `liveinpassion.me` / `www.liveinpassion.me` 保持不变。
+- `<audio>` 增加 `crossorigin="anonymous"`：跨域音频接入 Web Audio 后不会被静音，
+  频谱分析器能正常拿到数据。
+- 播放列表（`app/src/data/playlist.js` 与旧站 `index.html`）全部改为 CDN 绝对地址；
+  `useMusicPlayer` 保留相对路径兜底。
+
+### 仓库与构建
+- `music/` 加入 `.gitignore` 并从版本库移除（本地文件保留）。
+- `copy-static.mjs` 与 Vite dev 中间件不再处理 `music/`，构建产物不再携带约 432MB 音频。
+
+### 注意
+- update: 29 曾把音频文件提交进 git，历史里仍有这 432MB；要彻底缩小仓库需要重写
+  历史（本次未做）。
+
+---
+
 ## update: 29 — 2026-10-17
 
 ### 音乐播放
