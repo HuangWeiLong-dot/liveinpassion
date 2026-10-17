@@ -18,6 +18,7 @@ const MIME = {
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.mp3': 'audio/mpeg',
+  '.flac': 'audio/flac',
 };
 
 function serveRepoRootAssets() {
@@ -35,7 +36,41 @@ function serveRepoRootAssets() {
         if (!filePath.startsWith(repoRoot + path.sep) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
           return next();
         }
-        res.setHeader('Content-Type', MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream');
+
+        const stat = fs.statSync(filePath);
+        const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
+        res.setHeader('Content-Type', type);
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        // 必须支持 Range：<audio> 拖动进度条 / 跳到未缓冲的位置时，浏览器会发
+        // `Range: bytes=…`，只回 200 整份文件时它无法定位，进度会直接回到 0。
+        // 生产环境的 GitHub Pages 本来就走 206，这里只是让本地 dev 对齐。
+        const range = req.headers.range;
+        const match = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (match) {
+          let start = match[1] === '' ? null : Number(match[1]);
+          let end = match[2] === '' ? null : Number(match[2]);
+          if (start === null) {
+            // 后缀范围：bytes=-N，取文件末尾 N 字节
+            start = Math.max(0, stat.size - (end ?? 0));
+            end = stat.size - 1;
+          } else {
+            end = end === null ? stat.size - 1 : Math.min(end, stat.size - 1);
+          }
+          if (start >= stat.size || start > end) {
+            res.statusCode = 416;
+            res.setHeader('Content-Range', `bytes */${stat.size}`);
+            return res.end();
+          }
+          res.statusCode = 206;
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+          res.setHeader('Content-Length', end - start + 1);
+          if (req.method === 'HEAD') return res.end();
+          return fs.createReadStream(filePath, { start, end }).pipe(res);
+        }
+
+        res.setHeader('Content-Length', stat.size);
+        if (req.method === 'HEAD') return res.end();
         fs.createReadStream(filePath).pipe(res);
       });
     },

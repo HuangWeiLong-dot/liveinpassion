@@ -305,7 +305,7 @@ const report = [
   ['MORE 背景池 (groupPhotosData)', groupMorePhotos.length, 26],
   ['引用', meQuotes.length, 7],
   ['首页布局套数', fullLayouts.length, 4],
-  ['歌单', playlist.length, 8],
+  ['歌单', playlist.length, 21],
   ['博客', posts.length, 6],
 ];
 let allOk = true;

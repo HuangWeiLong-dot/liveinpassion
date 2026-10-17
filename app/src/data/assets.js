@@ -12,6 +12,7 @@ export const ICONS = {
   pause: '/icons/TiMediaPause.svg',
   forward: '/icons/TiMediaFastForward.svg',
   playlist: '/icons/TiThMenu.svg',
+  eye: '/icons/TiEye.svg',
 };
 
 export const LOCAL_ASSETS = {

@@ -3852,6 +3852,151 @@
             box-shadow: 0 12px 50px rgba(0,0,0,0.35);
         }
 
+        /* 正在播放：屏幕底部中间。歌词逐行滚动 + 频谱，无底板。
+           不接指针事件，页面上的点击不会被它挡住。 */
+        .now-playing {
+            position: fixed;
+            left: 50%;
+            bottom: 40px;
+            transform: translateX(-50%);
+            z-index: 996;
+            width: min(560px, calc(100vw - 48px));
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        /* 歌词视口：上下用 mask 淡出，滚出视野的行自然消失 */
+        .now-playing__lyrics {
+            position: relative;
+            height: 132px;
+            overflow: hidden;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+        }
+
+        /* 首屏编排的最后一步：主人格落定之后，整块从下方浮上来。
+           进场慢一点、带一点过冲收尾；收起要快，别拖泥带水。 */
+        .stage-fade-enter-active {
+            transition: opacity 0.8s ease, translate 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .stage-fade-leave-active {
+            transition: opacity 0.3s ease, translate 0.3s ease;
+        }
+
+        .stage-fade-enter-from,
+        .stage-fade-leave-to {
+            opacity: 0;
+            translate: 0 44px;
+        }
+
+        /* 频谱：柱状图由 Web Audio Analyser 驱动（画法见 MusicPlayer.vue 的 drawSpectrum） */
+        .now-playing__spectrum {
+            display: block;
+            width: 100%;
+            height: 56px;
+        }
+
+        .lyrics-track {
+            position: relative;
+            /* 上下各留出"视口一半减半行"的内边距：第一行也能滚到正中 */
+            padding: 52px 16px;
+            text-align: center;
+            transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+
+        /* 行高由内容决定（长句会换行），居中的位移在脚本里按 offsetTop 量 */
+        .lyrics-line {
+            margin: 0;
+            min-height: 28px;
+            line-height: 1.6;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            opacity: 0.35;
+            transform: scale(0.96);
+            transform-origin: center;
+            /* 没有底板，用背景色的柔光把字从照片上托起来 */
+            text-shadow: 0 1px 12px color-mix(in srgb, var(--bg) 85%, transparent);
+            transition: opacity 0.35s ease, transform 0.35s ease, color 0.35s ease;
+        }
+
+        .lyrics-line.is-past {
+            opacity: 0.2;
+        }
+
+        .lyrics-line.is-active {
+            opacity: 1;
+            transform: scale(1);
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+            /* 唱到哪填到哪：--p 是当前行进度，由 JS 每帧推进（约 0.5% 一步）。
+               未唱到的部分用半透明的次级色，填充边界才看得出来。 */
+            background-image: linear-gradient(
+                90deg,
+                var(--text-primary) 0 var(--p, 0%),
+                color-mix(in srgb, var(--text-secondary) 55%, transparent) var(--p, 0%) 100%
+            );
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .lyrics-track,
+            .lyrics-line {
+                transition: none;
+            }
+        }
+
+        /* 手机上底部有 dock（MobileDock），整块抬到它上方 */
+        @media (max-width: 1024px) {
+            .now-playing {
+                bottom: 84px;
+                width: min(480px, calc(100vw - 32px));
+            }
+
+            .now-playing__lyrics {
+                height: 112px;
+            }
+
+            .lyrics-track {
+                padding: 42px 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .now-playing__spectrum {
+                height: 48px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .now-playing {
+                bottom: 80px;
+                width: calc(100vw - 24px);
+            }
+
+            .now-playing__lyrics {
+                height: 96px;
+            }
+
+            .now-playing__spectrum {
+                height: 40px;
+            }
+
+            .lyrics-track {
+                padding: 36px 10px;
+            }
+
+            .lyrics-line {
+                font-size: 0.74rem;
+                min-height: 24px;
+            }
+        }
+
         .player-bar {
             display: flex;
             align-items: center;
@@ -3946,7 +4091,8 @@
 
         .player-progress {
             flex: 2;
-            min-width: 120px;
+            /* 100 而不是 120：右侧多了一个显隐开关，不缩这一点 460px 面板会挤爆 */
+            min-width: 100px;
             max-width: 200px;
             display: flex;
             align-items: center;
@@ -3954,12 +4100,23 @@
         }
 
         .progress-track {
+            position: relative;
             flex: 1;
             height: 4px;
             background: var(--border);
             border-radius: 0; /* 直角（需求） */
             cursor: pointer;
-            overflow: hidden;
+            /* 拖拽时别让触屏把页面一起滚走 */
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* 视觉上仍是 4px，上下各多 8px 的透明命中区：
+           4px 高的条子用手指/鼠标都不好按住，拖拽几乎起不来。 */
+        .progress-track::before {
+            content: '';
+            position: absolute;
+            inset: -8px 0;
         }
 
         .progress-fill {
@@ -3967,6 +4124,11 @@
             background: var(--text-primary);
             width: 0%;
             transition: width 0.1s linear;
+        }
+
+        /* 拖拽期间进度完全跟手，不要那 0.1s 的补间 */
+        .progress-track.is-scrubbing .progress-fill {
+            transition: none;
         }
 
         .progress-time {
@@ -4013,6 +4175,29 @@
 
         .playlist-toggle.active {
             background: var(--border);
+        }
+
+        /* 频谱 / 歌词显隐开关：关掉时图标变淡并划一道斜杠 */
+        .visuals-toggle {
+            position: relative;
+        }
+
+        .visuals-toggle img {
+            transition: opacity 0.2s ease;
+        }
+
+        .visuals-toggle.is-off img {
+            opacity: 0.45;
+        }
+
+        .visuals-toggle.is-off::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 2px;
+            background: var(--text-primary);
+            transform: rotate(-45deg);
+            pointer-events: none;
         }
 
         /* 播放列表样式 */
