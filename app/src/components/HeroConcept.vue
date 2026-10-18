@@ -6,7 +6,8 @@
 //
 // 最新 8 篇其他博客则完全不进这套粒子系统 —— 它们是 Hero **背后的一层拼贴底纹**：
 // 去色、模糊、极淡，散在背景上，开场走完之后由 GSAP 一张一张淡进来
-//（见 revealBlogWall）。不承载悬停、不承载点击。
+//（见 revealBlogWall）。不承载悬停、不承载点击，但会跟着指针透镜一起弯
+//（见 updateWallLens）。
 //
 // 三维是怎么落的：
 //   - 人格的粒子场整个交给 Three.js（composables/usePersonaScene.js）。
@@ -390,6 +391,10 @@ function updateScene(now) {
 
   if (spinOn) rings.persona.angle += (dt / 1000) * rings.persona.speed;
 
+  // 指针透镜先推进（位置/强度缓动）。现在只有背景拼贴吃这套透镜；
+  // 主体和四个人格保持原样，不参与形变。
+  updateLens(dt);
+
   // 主体在场景里的中心与半尺寸（世界单位）。主体是 DOM，位置现读。
   const su = readSubject();
   if (su) {
@@ -417,6 +422,26 @@ function updateScene(now) {
     const pr = scene3d.project(w.x, w.y, w.z);
     g.el.style.transform =
       `translate(-50%, -50%) translate(${pr.x}px, ${pr.y}px) scale(${pr.scale.toFixed(4)})`;
+  }
+
+  updateWallLens();
+}
+
+// 背景 8 张封面：同一套透镜，局部雅可比近似成一张斜切/缩放的四边形。
+// 它们自己有一条 rotate(var(--r)) 的 CSS 规则，写 inline 时必须把旋转带上。
+function updateWallLens() {
+  if (!lensVisible()) {
+    for (const it of wallItems) {
+      if (it.el.style.transform) it.el.style.transform = '';
+    }
+    return;
+  }
+  for (const it of wallItems) {
+    const m = warpLensMatrix(it.cx, it.cy, it.hw, it.hh);
+    it.el.style.transform =
+      `translate(${(m.x - it.cx).toFixed(2)}px, ${(m.y - it.cy).toFixed(2)}px) ` +
+      `matrix(${m.a.toFixed(4)}, ${m.b.toFixed(4)}, ${m.c.toFixed(4)}, ${m.d.toFixed(4)}, 0, 0) ` +
+      `rotate(${it.r})`;
   }
 }
 
@@ -609,8 +634,154 @@ watch(intro, (v) => {
 // ── 动画驱动 ────────────────────────────────────────────────────────────
 let masterRaf = 0;
 const heroVisible = ref(true);
-const heroBox = { left: 0, top: 0 };
+// hero 的尺寸。透镜的坐标以 hero 中心为原点（背景拼贴铺满 hero）。
+const heroBox = { left: 0, top: 0, w: 0, h: 0 };
 const groupEls = [];
+// 背景拼贴的 8 张封面也要跟着透镜弯（用户要求"包括背景"）。
+// 它们的位置是 left/top/width 百分比写死的，量一次就行；尺寸/位置只在 relayout 变。
+// 注意不能每次用 getBoundingClientRect 量：那里面已经含上一帧我们自己写的
+// transform，会越量越偏 —— 这里用 offset*（不受 transform 影响）。
+const wallItems = [];
+
+function measureWall() {
+  wallItems.length = 0;
+  const wall = wallEl.value;
+  if (!wall) return;
+  const wr = wall.getBoundingClientRect();
+  const hcx = heroBox.left + heroBox.w / 2;
+  const hcy = heroBox.top + heroBox.h / 2;
+  for (const el of wall.querySelectorAll('img')) {
+    const r = el.style.getPropertyValue('--r') || '0deg';
+    wallItems.push({
+      el,
+      cx: wr.left + el.offsetLeft + el.offsetWidth / 2 - hcx,
+      cy: wr.top + el.offsetTop + el.offsetHeight / 2 - hcy,
+      hw: el.offsetWidth / 2,
+      hh: el.offsetHeight / 2,
+      r,
+    });
+  }
+}
+
+// ── 指针透镜（参考 sashamartynchuk.com 首页的 dome grid）──────────────────
+// 指针在 Hero 里移动时，以它为中心形成一个圆顶状的凸起：基础径向放大 + 一个
+// 高斯气泡。**只作用在背景拼贴的 8 张封面上** —— 主体和四个人格不参与形变，
+// 人脸和标签保持原样。
+//
+// 数值是从参考站那套参数（k=.15 / A=.25 / σ≈1.5 个格子宽）按我们的构图收下来的。
+const LENS = {
+  k: 0.06,         // 基础径向放大（背景整体往四周鼓一点）
+  bulge: 0.24,     // 指针气泡的强度
+  sigma: 0.95,     // 气泡半径（单位：半个屏幕高）
+  follow: 0.12,    // 指针位置缓动（每 60fps 帧的追近比例）
+  build: 0.08,     // 气泡强度的缓动
+};
+const lens = {
+  x: 0, y: 0,       // 当前气泡中心（相对 hero 中心，CSS 像素，y 向下）
+  tx: 0, ty: 0,     // 目标
+  s: 0, ts: 0,      // 当前 / 目标强度
+};
+
+function lensActive() {
+  return finePointer.value && !reducedMotion.value;
+}
+
+// 真正要不要形变。强度低于这个门槛时背景直接回到 CSS 的静态旋转。
+function lensVisible() {
+  return lensActive() && lens.s > 0.0005;
+}
+
+/** 缓动：把参考站的 U(cur, target, ease, dt) 原样搬过来（按 60fps 归一）。 */
+function easeTo(cur, target, ease, dtMs) {
+  return cur + (target - cur) * (1 - Math.pow(1 - ease, (dtMs / 1000) * 60));
+}
+
+function updateLens(dt) {
+  if (!lensActive()) {
+    lens.x = 0;
+    lens.y = 0;
+    lens.s = 0;
+    return;
+  }
+  lens.x = easeTo(lens.x, lens.tx, LENS.follow, dt);
+  lens.y = easeTo(lens.y, lens.ty, LENS.follow, dt);
+  lens.s = easeTo(lens.s, lens.ts, LENS.build, dt);
+  if (lens.ts === 0 && lens.s < 0.001) lens.s = 0;
+}
+
+/**
+ * 把 hero 坐标（相对中心，CSS 像素，y 向下）弯到透镜后的位置。
+ * q 以「半个屏幕高」为单位，和参考站的公式同式。
+ */
+function warpLens(px, py) {
+  const halfH = heroBox.h / 2 || 1;
+  let qx = px / halfH;
+  let qy = -py / halfH;
+  // 基础放大也乘强度：指针第一次进入时不会"啪"地鼓起来，离开时一起收回。
+  const mag = 1 + LENS.k * (qx * qx + qy * qy) * lens.s;
+  qx *= mag;
+  qy *= mag;
+  if (lens.s > 0.0005) {
+    const dx = qx - lens.x / halfH;
+    const dy = qy + lens.y / halfH;
+    const sig2 = LENS.sigma * LENS.sigma;
+    const g = LENS.bulge * lens.s * Math.exp(-(dx * dx + dy * dy) / sig2);
+    qx += dx * g;
+    qy += dy * g;
+  }
+  return { x: qx * halfH, y: -qy * halfH };
+}
+
+/**
+ * 背景封面的局部形变：在图片中心取一个十字，用数值差分得到 2×2 雅可比。
+ * 只做 translate+scale 的话，圆顶边缘的「剪切」就没了 —— 参考站之所以像
+ * 一块被顶起来的布，靠的正是相邻格子的四边形各自变形。
+ */
+function warpLensMatrix(px, py, halfW, halfH) {
+  if (!lensVisible()) {
+    return { x: px, y: py, a: 1, b: 0, c: 0, d: 1 };
+  }
+  const w = warpLens(px, py);
+  const ex = Math.max(1, halfW);
+  const ey = Math.max(1, halfH);
+  const x1 = warpLens(px + ex, py);
+  const x0 = warpLens(px - ex, py);
+  const y1 = warpLens(px, py + ey);
+  const y0 = warpLens(px, py - ey);
+  return {
+    x: w.x,
+    y: w.y,
+    // CSS matrix(a,b,c,d,e,f)：x' = a·x + c·y + e，y' = b·x + d·y + f
+    a: (x1.x - x0.x) / (2 * ex),
+    b: (x1.y - x0.y) / (2 * ex),
+    c: (y1.x - y0.x) / (2 * ey),
+    d: (y1.y - y0.y) / (2 * ey),
+  };
+}
+
+function resetLens() {
+  lens.tx = 0;
+  lens.ty = 0;
+  lens.ts = 0;
+  lens.x = 0;
+  lens.y = 0;
+  lens.s = 0;
+}
+
+function onHeroPointerMove(event) {
+  if (!lensActive() || !heroEl.value) return;
+  const r = heroEl.value.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  lens.tx = event.clientX - (r.left + r.width / 2);
+  lens.ty = event.clientY - (r.top + r.height / 2);
+  lens.ts = 1;
+  ensureTicking();
+}
+
+function onHeroPointerLeave() {
+  lens.ts = 0;
+  ensureTicking();
+}
 
 function paused() {
   return document.hidden || !heroVisible.value;
@@ -1081,8 +1252,11 @@ function onVisibility() {
 function syncPointerMode(event) {
   finePointer.value = event.matches;
   // 换成触屏了：把握着的那杆旗放下（全局方块光标自己也有一份判定，
-  // 但这条旗是我们举的，得我们来放）
-  if (!event.matches) clearBlockCursorHot();
+  // 但这条旗是我们举的，得我们来放），透镜也一起归位。
+  if (!event.matches) {
+    clearBlockCursorHot();
+    resetLens();
+  }
 }
 
 function syncCompact(event) {
@@ -1098,6 +1272,14 @@ function relayout() {
   const w = stage.clientWidth;
   const h = stage.clientHeight;
   if (!w || !h) return;
+  // 透镜的坐标系：hero 的尺寸。布局没变时也重算一遍 ——
+  // 滚动、地址栏收起都会改变 rect。
+  const hr = heroEl.value.getBoundingClientRect();
+  heroBox.left = hr.left;
+  heroBox.top = hr.top;
+  heroBox.w = hr.width;
+  heroBox.h = hr.height;
+  measureWall();
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
   // 画布盖住整个 hero，粒子和被拖走的格子才不会在舞台外被裁掉
   canvas.style.width = `${heroEl.value.clientWidth}px`;
@@ -1281,7 +1463,12 @@ onActivated(() => {
 // 不会补一次 pointerleave**，所以压在某个人格卡上时点了它，那杆旗会一直举着，
 // 方块从那一刻起在**每一页**都停在放大态（实测）。这里当场放下。
 // （全局组件每帧也会自检一遍兜底，见 composables/useBlockCursor.js。）
-onDeactivated(() => clearBlockCursorHot());
+onDeactivated(() => {
+  clearBlockCursorHot();
+  // 离开首页时把透镜收回 0：keep-alive 回来时指针多半在别处，
+  // 留着旧气泡会在回到页面的第一帧闪一下。
+  resetLens();
+});
 
 onBeforeUnmount(() => {
   if (masterRaf) cancelAnimationFrame(masterRaf);
@@ -1312,6 +1499,8 @@ onBeforeUnmount(() => {
       'is-theme-shift': themeShifting,
       'is-risen': brandEntered,
     }"
+    @pointermove.passive="onHeroPointerMove"
+    @pointerleave="onHeroPointerLeave"
   >
     <!-- 背景拼贴的开关。和主题按钮、播放器同一条竖列（fixed 右下角往上数第三格），
          所以它跟着别的悬浮控件一起被 X 键收起来（见 styles/main.css 的名单）。 -->
@@ -1334,7 +1523,8 @@ onBeforeUnmount(() => {
     </Teleport>
 
     <!-- 背景拼贴：最新 8 篇其他博客的封面。去色、模糊、极淡，只是底纹 ——
-         不承载悬停也不承载点击（pointer-events: none），一切都浮在它上面。
+         不承载悬停也不承载点击（pointer-events: none），一切都浮在它上面；
+         但指针透镜会把它们一起弯（updateWallLens）。
          这里**不写 src**：首屏一个请求都不该为它花，等开场走完由 revealBlogWall
          一张一张挂上并淡进来。 -->
     <div ref="wallEl" class="hero-wall" :class="{ 'is-off': wallHidden }" aria-hidden="true">

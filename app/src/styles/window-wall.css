@@ -1,0 +1,418 @@
+/* 窗户墙（GALLERY / MY GALLERY 共用）。
+   展示方式参考 wndws.space；配色、字体、直角边框跟整站保持一致。 */
+.win-page {
+  --win-bg: var(--bg);
+  --win-empty: var(--bg);
+  --win-frame: var(--bg);
+  --win-ink: var(--text-primary);
+  --win-muted: var(--text-secondary);
+  --win-line: var(--border-color);
+  --win-dock: var(--bg);
+  --win-dock-line: var(--border-color);
+
+  position: relative;
+  min-height: 100vh;
+  padding: 128px 40px 130px;
+  background: var(--win-bg);
+  color: var(--win-ink);
+  transition: background 0.35s ease, color 0.35s ease;
+}
+
+.win-inner {
+  width: min(1340px, 100%);
+  margin: 0 auto;
+}
+
+/* ── 页内字标 ─────────────────────────────────────────────────────────── */
+.win-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 42px;
+}
+
+.win-header__side {
+  justify-self: start;
+  border: 0;
+  padding: 4px 0;
+  background: none;
+  color: var(--win-muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.win-header__side--end {
+  justify-self: end;
+}
+
+.win-header__side:hover {
+  color: var(--win-ink);
+}
+
+.win-header__title {
+  margin: 0;
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: center;
+  color: var(--win-ink);
+}
+
+/* ── 窗户墙 ───────────────────────────────────────────────────────────── */
+.win-wall {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.win {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  padding: 3px;
+  border: 1px solid var(--win-line);
+  border-radius: 0;
+  overflow: hidden;
+  background: var(--win-frame);
+  /* 华容道式换位：window 在网格里交换位置时用 translate，
+     不和 hover 的 transform（缩放/上浮）打架。
+     不再用 content-visibility —— 它会和逐格移动的绘制打架。 */
+  translate: var(--wall-tx, 0px) var(--wall-ty, 0px);
+}
+
+/* 普通空槽：保留淡淡的窗框，是墙面的质感。 */
+.win--empty {
+  padding: 0;
+  background: transparent;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* 真正的空洞：不画窗框、不画占位符，甚至连指针都不接。
+   它只是替网格占住一个格子，同时也是华容道唯一能滑进去的地方。 */
+.win-gap {
+  aspect-ratio: 3 / 4;
+  pointer-events: none;
+}
+
+.win--filled {
+  cursor: pointer;
+  transition:
+    translate 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease,
+    opacity 0.3s ease;
+}
+
+/* 不属于当前筛选的窗格：保留窗框，只把内容淡出 —— 就是其他选项的「空位」。
+   透明度交给 GSAP 逐帧控制，这里不要写 opacity，否则切换时会先跳到终值。 */
+.win--filled.is-muted {
+  pointer-events: none;
+}
+
+.win--filled:hover {
+  z-index: 3;
+  transform: translateY(-3px) scale(1.06);
+  border-color: var(--win-ink);
+}
+
+.win__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  background: var(--win-empty);
+  /* 图片挂了也不要把 alt 文本铺在几十像素的小窗格里 */
+  color: transparent;
+  font-size: 0;
+  /* 整站是黑白语言；hover 时回一点颜色 */
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0;
+  transition: opacity 0.55s ease, filter 0.3s ease;
+}
+
+.win__img.is-on.is-loaded {
+  opacity: 1;
+}
+
+.win--filled:hover .win__img {
+  filter: grayscale(0) contrast(1.03);
+}
+
+.win__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: 1px dashed var(--win-line);
+  border-radius: 0;
+  color: var(--win-muted);
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+}
+
+/* ── 底部统计 + 筛选 ──────────────────────────────────────────────────── */
+.win-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 140;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 10px 8px 16px;
+  border: 1px solid var(--win-dock-line);
+  border-radius: 0;
+  background: var(--win-dock);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.win-stats {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--win-muted);
+}
+
+.win-filters {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.win-filter {
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 7px 12px;
+  background: transparent;
+  color: var(--win-muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.win-filter:hover {
+  border-color: var(--win-line);
+  color: var(--win-ink);
+}
+
+.win-filter.active {
+  background: var(--win-ink);
+  border-color: var(--win-ink);
+  color: var(--win-bg);
+}
+
+/* ── 指针提示 ─────────────────────────────────────────────────────────── */
+.win-tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  pointer-events: none;
+  opacity: 0;
+  color: #fff;
+  mix-blend-mode: difference;
+  transition: opacity 0.15s ease;
+  will-change: transform;
+}
+
+.win-tip.visible {
+  opacity: 1;
+}
+
+.win-tip__kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.win-tip__title {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.05;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ── 响应式 ───────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .win-wall {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* MobileDock 在 1024 以下都会出现（固定底部）。统计/筛选条固定到它上方，
+     再给页面留出足够的底部余量，让最后一行窗户能滚到条的上方。 */
+  .win-page {
+    padding-bottom: 190px;
+  }
+
+  .win-dock {
+    position: fixed;
+    left: 50%;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    width: min(calc(100vw - 28px), 560px);
+    margin: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    transform: translateX(-50%);
+    white-space: normal;
+  }
+
+  .win-stats {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .win-page {
+    padding: 108px 24px 190px;
+  }
+
+  .win-wall {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .win-header {
+    margin-bottom: 30px;
+  }
+}
+
+@media (max-width: 700px) {
+  .win-wall {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .win-header__title {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .win-page {
+    padding: 96px 14px 190px;
+  }
+
+  .win-wall {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .win-header {
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .win-header__title {
+    font-size: 1.45rem;
+  }
+
+  .win-header__side {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+
+  .win-dock {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .win-stats {
+    width: 100%;
+    text-align: center;
+  }
+
+  .win-filter {
+    padding: 6px 9px;
+    font-size: 9px;
+  }
+}
+
+/* MY GALLERY 的月份筛选：横向可滚动，不换行 */
+.win-months {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 55vw;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.win-months::-webkit-scrollbar {
+  display: none;
+}
+
+.win-months .win-filter {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 1024px) {
+  .win-months {
+    max-width: calc(100vw - 56px);
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* 群组 / 好友相册里的墙复用同一套变量（这些页面没有 .win-page 包裹） */
+.win-wall {
+  --win-bg: var(--bg);
+  --win-empty: var(--bg);
+  --win-frame: var(--bg);
+  --win-ink: var(--text-primary);
+  --win-muted: var(--text-secondary);
+  --win-line: var(--border-color);
+  --win-dock: var(--bg);
+  --win-dock-line: var(--border-color);
+}
+
+/* 页面内的筛选条：不固定，跟在标题下面 */
+.win-dock--static {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  white-space: normal;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.win-dock--static .win-stats {
+  width: auto;
+  text-align: left;
+}
+
+.win-dock--static .win-months {
+  max-width: 100%;
+}

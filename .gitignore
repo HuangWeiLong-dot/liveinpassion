@@ -33,12 +33,14 @@ CLAUDE.md
 # 大体积素材源，不上线
 #   example/    build-personas.mjs 的输入（11~25MB PNG，不在静态白名单，不发布）
 #   me/*.jpg    全尺寸原图，只用于生成 me/hero_compressed 与 me/personas 压缩版
+#   me/HuangWeiLong_*.png  新版个像的全尺寸源图，只用于生成 hero_compressed webp
 example/
 me/Advocate.jpg
 me/idealist.jpg
 me/Individuation.jpg
 me/Observer.jpg
 me/Romanticist.jpg
+me/HuangWeiLong_*.png
 
 # 遗留导出，无任何引用（压缩版是 me/hero_compressed/Individuation.jpg）
 me/hero_compressed/Individuation.png

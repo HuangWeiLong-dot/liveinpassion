@@ -19,7 +19,9 @@ const currentItem = computed(() => items.value[index.value] || null);
 const currentSrc = computed(() => {
   const item = currentItem.value;
   if (!item) return '';
-  return item.fullSrc || item.src || '';
+  // 优先压缩图：原图往往是 3071px 以上的大文件，切换照片时要等很久才换过来，
+  // 看起来就像“还停在上一次点击的那张”。压缩图足够灯箱尺寸，也能秒切。
+  return item.src || item.fullSrc || '';
 });
 
 function resolve(url) {

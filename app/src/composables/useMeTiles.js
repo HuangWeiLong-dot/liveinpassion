@@ -16,7 +16,8 @@ const meCompressed = (name) =>
 
 // MORE 磁贴背景池 = 群组照片(26) + 所有好友照片(69)，都用压缩图
 const morePool = [
-  ...groupMorePhotos.map((p) => `${CDN_BASE}/${p.compressed}`),
+  // groupMorePhotos 现在是 CMS 快照的绝对地址，不要再拼 CDN_BASE
+  ...groupMorePhotos.map((p) => p.compressed),
   ...friends.flatMap((f) => f.photos.map((p) => p.src)),
 ];
 

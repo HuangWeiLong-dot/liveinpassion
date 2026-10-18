@@ -30,6 +30,15 @@ watch(
   { immediate: true }
 );
 
+// 缩略图是异步生成的：它晚于 open() 到达时也要接住，否则模糊占位永远不出现
+watch(
+  () => props.thumb,
+  (thumb) => {
+    if (!props.visible || !thumb) return;
+    if (!loaded.value) thumbActive.value = true;
+  }
+);
+
 function onFullLoad(e) {
   const img = e.target;
   const show = () => {

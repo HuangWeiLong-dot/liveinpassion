@@ -6,8 +6,8 @@
 //  1. <keep-alive> —— 旧版所有页面的 DOM 常驻、只切 .active，所以首页随机布局、
 //     好友随机头像、ME 相册的月份缓存、"只创建一次"的三个 iframe 才能保持稳定。
 //     不用 keep-alive 这些行为都会变。
-//  2. 视图不按 fullPath 做 key —— 旧版 /friends/a → /friends/b 是复用同一个容器重填，
-//     视图内部用 watch(route.params) 复现。
+//  2. 视图不按 fullPath 做 key —— 需要在同一个实例里切换内容的页面，
+//     由视图内部自己 watch 路由参数。
 import AppHeader from './components/AppHeader.vue';
 import BrandOverlay from './components/BrandOverlay.vue';
 import PageTransitionOverlay from './components/PageTransitionOverlay.vue';

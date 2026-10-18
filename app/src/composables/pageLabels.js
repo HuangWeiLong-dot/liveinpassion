@@ -19,7 +19,6 @@ const SECTIONS = {
   me: 'ME',
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
-  'group-photos': 'GROUP PHOTOS',
   stats: 'STATS',
   'not-found': 'NOT FOUND',
 };

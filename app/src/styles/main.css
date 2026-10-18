@@ -5001,21 +5001,886 @@
             margin: 0 auto;
         }
 
-        .stats-loading {
-            position: relative;
-            height: 120px;
+        /* ---- Hero ---- */
+        .stats-hero {
+            text-align: center;
+        }
+
+        .stats-hero-kicker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.66rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            white-space: nowrap;
+        }
+
+        .stats-live {
+            color: var(--text-primary);
+        }
+
+        .stats-live-dot {
+            width: 6px;
+            height: 6px;
+            background: currentColor;
+            display: inline-block;
+            flex: 0 0 auto;
+        }
+
+        .stats-kicker-rule {
+            width: 44px;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .stats-clock b {
+            font-weight: 400;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stats-title {
+            margin-top: 26px;
+            font-family: 'Oswald', sans-serif;
+            font-weight: 600;
+            font-size: clamp(2.4rem, 7vw, 5.6rem);
+            line-height: 1;
+            letter-spacing: 0.18em;
+            color: var(--text-primary);
+        }
+
+        /* 逐字升起靠这一层做遮罩 */
+        .stats-title-line {
+            display: inline-block;
+            overflow: hidden;
+            line-height: 1.08;
+            padding: 0.04em 0.1em 0;
+            margin-bottom: -0.04em;
+        }
+
+        .stats-char {
+            display: inline-block;
+            will-change: transform;
+        }
+
+        .stats-hero-rule {
+            width: min(360px, 42vw);
+            height: 1px;
+            margin: 26px auto 0;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .stats-hero-rule span {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: var(--text-primary);
+            transform-origin: left center;
+        }
+
+        .stats-subtitle {
+            margin-top: 22px;
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .stats-hero-meta {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-hero-meta i {
+            width: 3px;
+            height: 3px;
+            background: var(--border);
+            display: inline-block;
+        }
+
+        /* ---- 系统信息跑马灯 ---- */
+        .stats-ticker {
+            margin-top: 46px;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+            padding: 12px 0;
+        }
+
+        .stats-ticker-track {
+            display: flex;
+            width: max-content;
+            will-change: transform;
+        }
+
+        .stats-ticker-group {
+            display: flex;
+            flex: 0 0 auto;
+        }
+
+        .stats-ticker-item {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            padding-left: 30px;
+            white-space: nowrap;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-ticker-sep {
+            width: 4px;
+            height: 4px;
+            background: var(--text-primary);
+            display: inline-block;
+            flex: 0 0 auto;
+        }
+
+        /* ---- KPI 卡片 ---- */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
             margin-top: 48px;
         }
 
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+            background: var(--bg);
+            padding: 28px 28px 24px;
+            min-height: 190px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: color 0.32s ease;
+        }
+
+        /* 悬浮时整张卡由下往上翻成反色 —— 和方块光标同一套黑白语言 */
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--text-primary);
+            transform: scaleY(0);
+            transform-origin: bottom center;
+            transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 0;
+        }
+
+        .stat-card:hover::before {
+            transform: scaleY(1);
+        }
+
+        .stat-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-card:hover,
+        .stat-card:hover .stat-index,
+        .stat-card:hover .stat-eyebrow,
+        .stat-card:hover .stat-note,
+        .stat-card:hover .stat-number,
+        .stat-card:hover .stat-trend {
+            color: var(--bg);
+        }
+
+        .stat-card-live {
+            cursor: default;
+        }
+
+        .stat-card-head {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+
+        .stat-index {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            transition: color 0.32s ease;
+        }
+
+        .stat-eyebrow {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            color: var(--text-secondary);
+            transition: color 0.32s ease;
+        }
+
+        .stat-number-wrap {
+            margin-top: auto;
+            display: flex;
+            align-items: flex-end;
+            min-height: 1em;
+        }
+
+        .stat-number {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2.3rem, 3.5vw, 3.5rem);
+            font-weight: 600;
+            line-height: 1;
+            letter-spacing: 0.01em;
+            color: var(--text-primary);
+            transition: color 0.32s ease;
+        }
+
+        .stat-card-foot {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            min-height: 1em;
+        }
+
+        .stat-note {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            transition: color 0.32s ease;
+        }
+
+        .stat-trend {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
+            color: var(--text-primary);
+            transition: color 0.32s ease;
+        }
+
+        .stat-trend-arrow {
+            font-size: 0.72em;
+            margin-right: 3px;
+        }
+
+        .stat-trend.is-up .stat-trend-arrow {
+            display: inline-block;
+        }
+
+        /* ONLINE NOW 的方块脉冲：核心 + 三层向外扩散的方框 */
+        .stat-live-rings {
+            position: absolute;
+            top: 27px;
+            right: 27px;
+            width: 8px;
+            height: 8px;
+            color: var(--text-primary);
+            transition: color 0.32s ease;
+            pointer-events: none;
+        }
+
+        .stat-card:hover .stat-live-rings {
+            color: var(--bg);
+        }
+
+        .stat-live-rings b {
+            position: absolute;
+            inset: 0;
+            background: currentColor;
+            display: block;
+        }
+
+        .stat-live-rings i {
+            position: absolute;
+            inset: 0;
+            border: 1px solid currentColor;
+            display: block;
+            opacity: 0;
+            transform-origin: center center;
+        }
+
+        /* ---- 面板 ---- */
+        .stats-panel {
+            margin-top: 40px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .stats-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-panel-title {
+            display: flex;
+            align-items: baseline;
+            gap: 14px;
+        }
+
+        .stats-panel-index {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .stats-panel-head h2 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            color: var(--text-primary);
+        }
+
+        .stats-panel-sub {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-legend {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-legend span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .lg-swatch {
+            width: 8px;
+            height: 8px;
+            background: var(--text-primary);
+            display: inline-block;
+        }
+
+        .lg-line {
+            position: relative;
+            width: 16px;
+            height: 1px;
+            background: var(--text-secondary);
+            display: inline-block;
+        }
+
+        .lg-line::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: -2px;
+            width: 4px;
+            height: 4px;
+            border: 1px solid var(--text-secondary);
+            border-radius: 50%;
+            background: var(--bg);
+        }
+
+        /* ---- 30 天图表 ---- */
+        .stats-chart {
+            padding: 28px 28px 16px;
+        }
+
+        .stats-chart-main {
+            display: flex;
+            gap: 18px;
+        }
+
+        .stats-chart-plot {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            height: 320px;
+        }
+
+        .stats-chart-grid {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .stats-chart-grid i {
+            display: block;
+            width: 100%;
+            height: 1px;
+            background: var(--border);
+            opacity: 0.7;
+        }
+
+        .stats-chart-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 2;
+            color: var(--text-primary);
+        }
+
+        .stats-chart-line {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 1.5;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .stats-chart-area {
+            fill: url(#statsAreaGrad);
+            opacity: 0;
+        }
+
+        .stats-bars {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            z-index: 1;
+        }
+
+        .stats-bar-col {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            cursor: crosshair;
+            outline: none;
+        }
+
+        .stats-bar {
+            width: 100%;
+            background: var(--text-primary);
+            transform-origin: bottom center;
+            transition: opacity 0.25s ease;
+        }
+
+        /* 今天的柱是"未完成"的：用斜纹区分，避免和整天直接比较 */
+        .stats-bar-col.is-today .stats-bar {
+            background: repeating-linear-gradient(
+                135deg,
+                var(--text-primary) 0 2px,
+                transparent 2px 5px
+            );
+        }
+
+        /* 只在真的指到某一根柱子上时才压暗其他柱子；指在图表上方的空白处
+           不动整张图（hoverIndex 由 Vue 绑到 .is-hovering 上） */
+        .stats-bars.is-hovering .stats-bar {
+            opacity: 0.3;
+        }
+
+        .stats-bar-col:hover .stats-bar,
+        .stats-bar-col:focus-visible .stats-bar {
+            opacity: 1;
+        }
+
+        .stats-bar-col:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 2px;
+        }
+
+        .stats-chart-cursor {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--text-primary);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3;
+            transition: left 0.16s ease, opacity 0.2s ease;
+        }
+
+        .stats-chart-tooltip {
+            position: absolute;
+            top: 0;
+            transform: translateX(-50%);
+            min-width: 118px;
+            padding: 10px 13px 11px;
+            background: var(--text-primary);
+            color: var(--bg);
+            pointer-events: none;
+            z-index: 4;
+            opacity: 0;
+            transition: left 0.16s ease;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+        }
+
+        .stats-tip-date {
+            display: block;
+            font-size: 0.54rem;
+            letter-spacing: 0.16em;
+            opacity: 0.65;
+            margin-bottom: 6px;
+        }
+
+        .stats-tip-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 14px;
+            font-size: 0.66rem;
+            letter-spacing: 0.04em;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stats-tip-row b {
+            font-weight: 500;
+        }
+
+        .stats-tip-row em {
+            font-style: normal;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            opacity: 0.6;
+        }
+
+        .stats-chart-scan {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 1px;
+            background: linear-gradient(
+                to bottom,
+                transparent,
+                var(--text-primary) 30%,
+                var(--text-primary) 70%,
+                transparent
+            );
+            opacity: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .stats-chart-yaxis {
+            width: 46px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stats-chart-xaxis {
+            display: flex;
+            gap: 4px;
+            margin-top: 10px;
+            padding-right: 64px;
+        }
+
+        .stats-chart-xaxis span {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.02em;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ---- 月度 ---- */
+        .stats-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        .stats-two-col .stats-panel {
+            margin-top: 32px;
+        }
+
+        .stats-month-list {
+            padding: 4px 28px 18px;
+        }
+
+        .stats-month-head,
+        .stats-month-row {
+            display: grid;
+            grid-template-columns: 92px 1fr 68px 68px;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stats-month-head {
+            padding: 12px 0 9px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-month-head span:nth-child(3),
+        .stats-month-head span:nth-child(4) {
+            text-align: right;
+        }
+
+        .stats-month-row {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-month-row:last-child {
+            border-bottom: none;
+        }
+
+        .stats-month-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            color: var(--text-primary);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .stats-month-row:hover .stats-month-label {
+            transform: translateX(4px);
+        }
+
+        .stats-month-track {
+            height: 2px;
+            background: var(--border);
+            display: flex;
+        }
+
+        .stats-month-fill {
+            display: block;
+            height: 100%;
+            background: var(--text-primary);
+            transform-origin: left center;
+        }
+
+        .stats-month-row:hover .stats-month-fill {
+            box-shadow: 0 0 0 1px var(--text-primary);
+        }
+
+        .stats-month-pv {
+            text-align: right;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.66rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
+        }
+
+        .stats-month-uv {
+            text-align: right;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-secondary);
+        }
+
+        /* ---- 热门页面 ---- */
+        .stats-paths {
+            list-style: none;
+            margin: 0;
+            padding: 6px 28px 18px;
+        }
+
+        .stats-path-item {
+            display: grid;
+            grid-template-columns: 32px 1fr auto;
+            column-gap: 12px;
+            align-items: baseline;
+            padding: 11px 0 9px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stats-path-item:last-child {
+            border-bottom: none;
+        }
+
+        .stats-rank {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        .stats-path-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.13em;
+            color: var(--text-primary);
+            transition: letter-spacing 0.3s ease;
+        }
+
+        .stats-path-item:hover .stats-path-name {
+            letter-spacing: 0.19em;
+        }
+
+        .stats-path-num {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.66rem;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-primary);
+        }
+
+        .stats-path-track {
+            grid-column: 2 / 4;
+            display: flex;
+            height: 2px;
+            margin-top: 8px;
+            background: var(--border);
+        }
+
+        .stats-path-fill {
+            display: block;
+            height: 100%;
+            background: var(--text-primary);
+            transform-origin: left center;
+        }
+
+        .stats-panel-empty {
+            padding: 34px 28px;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-chart-empty {
+            padding: 56px 28px;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        /* ---- 页脚 ---- */
+        .stats-foot {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 24px;
+            margin-top: 34px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stats-foot span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stats-foot i {
+            width: 4px;
+            height: 4px;
+            background: var(--text-secondary);
+            display: inline-block;
+        }
+
+        /* ---- 加载 / 错误 ---- */
+        .stats-loading {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            margin-top: 48px;
+            height: 190px;
+            border: 1px solid var(--border);
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .stats-loading span {
+            position: relative;
+            display: block;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        .stats-loading span::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                105deg,
+                transparent 25%,
+                var(--border) 50%,
+                transparent 75%
+            );
+            transform: translateX(-100%);
+            animation: stats-shimmer 1.4s ease-in-out infinite;
+        }
+
+        @keyframes stats-shimmer {
+            to {
+                transform: translateX(100%);
+            }
+        }
+
         .stats-empty {
-            margin-top: 80px;
+            margin-top: 56px;
+            padding: 64px 24px;
+            border: 1px solid var(--border);
             text-align: center;
         }
 
         .stats-empty p {
-            font-weight: 300;
-            opacity: 0.7;
             margin-bottom: 24px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
         }
 
         .stats-retry {
@@ -5035,245 +5900,6 @@
             color: var(--text-primary);
         }
 
-        /* 大数字卡片 */
-        .stats-cards {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background: var(--border);
-            border: 1px solid var(--border);
-            margin-top: 56px;
-        }
-
-        .stat-card {
-            position: relative;
-            background: var(--bg);
-            padding: 36px 32px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .stat-eyebrow {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 500;
-            letter-spacing: 0.2em;
-            color: var(--text-secondary);
-        }
-
-        .stat-number {
-            font-family: 'Oswald', sans-serif;
-            font-size: clamp(2.2rem, 4vw, 3.2rem);
-            font-weight: 600;
-            line-height: 1;
-            color: var(--text-primary);
-        }
-
-        .stat-note {
-            font-size: 0.75rem;
-            font-weight: 300;
-            color: var(--text-secondary);
-            letter-spacing: 0.04em;
-        }
-
-        /* ONLINE NOW 的呼吸方块 */
-        .stat-pulse {
-            position: absolute;
-            top: 32px;
-            right: 32px;
-            width: 10px;
-            height: 10px;
-            background: var(--text-primary);
-            animation: stat-pulse 1.8s ease-in-out infinite;
-        }
-
-        @keyframes stat-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.25; }
-        }
-
-        /* 面板 */
-        .stats-panel {
-            margin-top: 48px;
-            border: 1px solid var(--border);
-            background: var(--bg);
-        }
-
-        .stats-panel-head {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            padding: 24px 32px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .stats-panel-head h2 {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 500;
-            letter-spacing: 0.2em;
-            color: var(--text-primary);
-        }
-
-        .stats-panel-head span {
-            font-size: 0.75rem;
-            font-weight: 300;
-            color: var(--text-secondary);
-            letter-spacing: 0.05em;
-        }
-
-        /* 近 30 天柱图 */
-        .stats-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 6px;
-            padding: 32px;
-            height: 280px;
-        }
-
-        .stats-bar-col {
-            flex: 1;
-            min-width: 0;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-
-        .stats-bar-track {
-            flex: 1;
-            display: flex;
-            align-items: flex-end;
-        }
-
-        .stats-bar {
-            width: 100%;
-            background: var(--text-primary);
-            transition: opacity 0.25s ease;
-        }
-
-        .stats-bar-col:hover .stats-bar {
-            opacity: 0.55;
-        }
-
-        .stats-bar-label {
-            font-size: 0.6rem;
-            font-weight: 300;
-            letter-spacing: 0.05em;
-            color: var(--text-secondary);
-            text-align: center;
-            margin-top: 10px;
-            white-space: nowrap;
-        }
-
-        .stats-two-col {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-        }
-
-        .stats-two-col .stats-panel {
-            margin-top: 32px;
-        }
-
-        /* 月度表格 */
-        .stats-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .stats-table td {
-            padding: 16px 32px;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.85rem;
-            font-weight: 300;
-        }
-
-        .stats-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .stats-table-label {
-            font-family: 'Oswald', sans-serif;
-            letter-spacing: 0.12em;
-            font-size: 0.8rem;
-            color: var(--text-primary);
-        }
-
-        .stats-table-num {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-            color: var(--text-primary);
-            width: 80px;
-        }
-
-        .stats-table-muted {
-            color: var(--text-secondary);
-        }
-
-        .stats-table-empty {
-            padding: 32px;
-            text-align: center;
-            font-size: 0.8rem;
-            font-weight: 300;
-            color: var(--text-secondary);
-        }
-
-        /* 热门页面 */
-        .stats-paths {
-            list-style: none;
-            padding: 24px 32px 32px;
-            margin: 0;
-        }
-
-        .stats-paths li {
-            margin-bottom: 20px;
-        }
-
-        .stats-paths li:last-child {
-            margin-bottom: 0;
-        }
-
-        .stats-path-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 8px;
-        }
-
-        .stats-path-name {
-            font-family: 'Oswald', sans-serif;
-            font-size: 0.75rem;
-            letter-spacing: 0.12em;
-            color: var(--text-primary);
-        }
-
-        .stats-path-num {
-            font-size: 0.8rem;
-            font-weight: 300;
-            font-variant-numeric: tabular-nums;
-            color: var(--text-secondary);
-        }
-
-        .stats-path-track {
-            height: 3px;
-            background: var(--border);
-        }
-
-        .stats-path-fill {
-            height: 100%;
-            background: var(--text-primary);
-        }
-
-        .stats-foot {
-            margin-top: 32px;
-            font-size: 0.72rem;
-            font-weight: 300;
-            color: var(--text-secondary);
-            letter-spacing: 0.04em;
-        }
-
         /* ---- 平板 ---- */
         @media (max-width: 1024px) {
             .stats-section {
@@ -5289,9 +5915,8 @@
                 gap: 0;
             }
 
-            .stats-bars {
-                height: 240px;
-                padding: 24px;
+            .stats-chart-plot {
+                height: 260px;
             }
         }
 
@@ -5301,61 +5926,207 @@
                 padding: 100px 20px 64px;
             }
 
-            .stat-card {
-                padding: 28px 24px;
+            .stats-hero-kicker {
+                gap: 10px;
+                font-size: 0.56rem;
+                letter-spacing: 0.1em;
             }
 
-            .stat-pulse {
-                top: 26px;
-                right: 24px;
+            .stats-kicker-rule {
+                width: 20px;
+            }
+
+            .stats-title {
+                margin-top: 20px;
+            }
+
+            .stats-subtitle {
+                font-size: 0.88rem;
+            }
+
+            .stats-hero-meta {
+                font-size: 0.52rem;
+                gap: 8px 12px;
+            }
+
+            /* 换行后分隔点会掉在行尾，窄屏直接靠间距分区 */
+            .stats-hero-meta i {
+                display: none;
+            }
+
+            .stats-ticker {
+                margin-top: 36px;
+                padding: 10px 0;
+            }
+
+            .stats-ticker-item {
+                gap: 22px;
+                padding-left: 22px;
+                font-size: 0.54rem;
+            }
+
+            .stats-cards {
+                margin-top: 36px;
+            }
+
+            .stat-card {
+                padding: 24px 20px 20px;
+                min-height: 160px;
+                gap: 12px;
+            }
+
+            .stat-number {
+                font-size: clamp(2rem, 9vw, 2.8rem);
+            }
+
+            .stat-live-rings {
+                top: 23px;
+                right: 20px;
+            }
+
+            .stats-panel {
+                margin-top: 28px;
             }
 
             .stats-panel-head {
-                flex-direction: column;
-                gap: 6px;
-                padding: 20px 24px;
+                padding: 16px 20px;
+                gap: 8px 14px;
             }
 
-            .stats-bars {
-                height: 200px;
-                padding: 20px;
-                gap: 3px;
+            .stats-panel-head h2 {
+                font-size: 0.82rem;
             }
 
-            .stats-bar-label {
+            .stats-legend {
+                gap: 14px;
                 font-size: 0.5rem;
             }
 
-            .stats-table td {
-                padding: 14px 24px;
+            .stats-chart {
+                padding: 22px 20px 12px;
+            }
+
+            .stats-chart-plot {
+                height: 210px;
+            }
+
+            .stats-chart-main {
+                gap: 12px;
+            }
+
+            .stats-chart-yaxis {
+                width: 34px;
+                font-size: 0.48rem;
+            }
+
+            .stats-chart-xaxis {
+                padding-right: 46px;
+                gap: 3px;
+            }
+
+            .stats-chart-xaxis span {
+                font-size: 0.44rem;
+            }
+
+            .stats-bars {
+                gap: 3px;
+            }
+
+            .stats-chart-tooltip {
+                min-width: 104px;
+                padding: 9px 11px;
+            }
+
+            .stats-two-col .stats-panel {
+                margin-top: 24px;
+            }
+
+            .stats-month-list,
+            .stats-paths {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .stats-month-head,
+            .stats-month-row {
+                grid-template-columns: 66px 1fr 52px 52px;
+                gap: 8px;
+            }
+
+            .stats-month-label,
+            .stats-path-name {
+                font-size: 0.72rem;
+            }
+
+            .stats-month-pv,
+            .stats-month-uv,
+            .stats-path-num {
+                font-size: 0.58rem;
             }
 
             .stats-paths {
-                padding: 20px 24px 28px;
+                padding-top: 4px;
+            }
+
+            .stats-path-item {
+                grid-template-columns: 26px 1fr auto;
+                column-gap: 9px;
+            }
+
+            .stats-loading {
+                height: 160px;
+                margin-top: 36px;
             }
 
             .stats-foot {
-                padding: 0 4px;
+                gap: 7px 16px;
+                font-size: 0.5rem;
             }
         }
 
         /* ---- 小屏手机 ---- */
         @media (max-width: 480px) {
+            .stats-hero-kicker .stats-kicker-rule {
+                display: none;
+            }
+
             .stats-cards {
                 grid-template-columns: 1fr;
             }
 
-            .stats-bars {
-                height: 160px;
+            .stat-card {
+                min-height: 148px;
             }
 
-            /* 30 根柱在窄屏过密：只保留间距，横向滚动查看 */
-            .stats-bar-col {
-                min-width: 12px;
+            .stats-chart-plot {
+                height: 180px;
             }
 
-            .stats-bars {
-                overflow-x: auto;
+            .stats-chart-yaxis {
+                display: none;
+            }
+
+            .stats-chart-xaxis {
+                padding-right: 0;
+            }
+
+            .stats-month-head,
+            .stats-month-row {
+                grid-template-columns: 1fr 46px 46px;
+                gap: 6px;
+            }
+
+            .stats-month-track {
+                display: none;
+            }
+
+            .stats-month-head span:nth-child(2) {
+                display: none;
+            }
+
+            .stats-loading {
+                grid-template-columns: repeat(2, 1fr);
+                height: 300px;
             }
         }
 

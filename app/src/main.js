@@ -5,6 +5,7 @@ import { installTracker } from './composables/useTracker.js';
 import { installPageTransition } from './composables/usePageTransition.js';
 import './styles/main.css';
 import './styles/view-transition.css';
+import './styles/window-wall.css';
 
 const app = createApp(App);
 app.use(router);

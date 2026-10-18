@@ -12,8 +12,6 @@ import BlogDetailView from '../views/BlogDetailView.vue';
 import MeView from '../views/MeView.vue';
 import MeGalleryView from '../views/MeGalleryView.vue';
 import GalleryView from '../views/GalleryView.vue';
-import FriendDetailView from '../views/FriendDetailView.vue';
-import GroupPhotosView from '../views/GroupPhotosView.vue';
 import StatsView from '../views/StatsView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 
@@ -24,8 +22,6 @@ const routes = [
   { path: '/me', name: 'me', component: MeView },
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },
-  { path: '/friends/:id', name: 'friend-detail', component: FriendDetailView },
-  { path: '/group-photos', name: 'group-photos', component: GroupPhotosView },
   { path: '/stats', name: 'stats', component: StatsView },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ];
