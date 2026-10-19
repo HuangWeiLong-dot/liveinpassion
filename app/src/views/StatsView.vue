@@ -15,7 +15,6 @@
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import AppFooter from '../components/AppFooter.vue';
 import OdometerNumber from '../components/OdometerNumber.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 
@@ -960,7 +959,5 @@ function setLiveEl(el) {
         </p>
       </template>
     </section>
-
-    <AppFooter />
   </main>
 </template>

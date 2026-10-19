@@ -18,7 +18,7 @@ export const ICONS = {
 export const LOCAL_ASSETS = {
   authorAvatar: '/avatar/1.jpg',
   meAvatar: '/avatar/2.jpg',
-  moviePoster: '/me/1.jpg',
-  albumArt: '/me/2.jpg',
+  moviePoster: '/me/posters/dead_poets_society.jpg',
+  albumArt: '/me/posters/ok_computer.jpg',
   favicon: '/favicon.png',
 };

@@ -94,6 +94,9 @@
   background: transparent;
   opacity: 0.45;
   pointer-events: none;
+  /* 华容道换位时，没有照片的占位窗也要像照片窗一样滑过去，不能瞬移。
+     translate 的过渡原本只写在 .win--filled 上，空窗格漏了。 */
+  transition: translate 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* 真正的空洞：不画窗框、不画占位符，甚至连指针都不接。
@@ -415,4 +418,23 @@
 
 .win-dock--static .win-months {
   max-width: 100%;
+}
+
+/* ── 首屏入场（composables/useWallEntry.js）──────────────────────────────
+   整面墙在放大态时会超出页面，先裁掉；页内字标和筛选条在入场期间让位，
+   入场结束（.is-entering 移除）后再淡回来。 */
+.win-page.is-entering {
+  /* 用 clip 而不是 hidden：hidden 会把这一页变成滚动容器，
+     入场结束移除时滚动区域/锚点变化，最后会看到一下位置偏移。 */
+  overflow: clip;
+}
+
+.win-header,
+.win-dock {
+  transition: opacity 0.4s ease;
+}
+
+.win-page.is-entering .win-header,
+.win-page.is-entering .win-dock {
+  opacity: 0;
 }

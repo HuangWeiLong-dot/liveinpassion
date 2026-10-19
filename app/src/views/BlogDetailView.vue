@@ -24,6 +24,7 @@ import { loadImage } from '../composables/useImageLoader.js';
 import { useLightbox } from '../composables/useLightbox.js';
 import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
+import AppFooter from '../components/AppFooter.vue';
 
 gsap.registerPlugin(CustomEase);
 
@@ -1168,6 +1169,8 @@ if (typeof window !== 'undefined') {
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
             <div ref="bodyRef" class="blog-detail-content" v-html="post.body"></div>
           </div>
+          <!-- 文章滚到底才看得到的页脚；正文面板有固定行宽，所以用紧凑版 -->
+          <AppFooter compact />
         </div>
 
         <!-- 打字机光标：fixed 定位，位置由 moveCaret() 每帧写；打完自己收起来 -->

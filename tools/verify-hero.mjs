@@ -378,7 +378,7 @@ async function run() {
         const line = fs.readFileSync(portFile, 'utf8').split('\n')[0].trim();
         if (line) port = Number(line);
       } catch {}
-      if (!port) await sleep(250);
+      if (!port) await sleep(520);
     }
     if (!port) throw new Error('Chrome 没有写出 DevToolsActivePort，起不来了');
 
@@ -693,6 +693,13 @@ async function run() {
           const imgs = [...w.querySelectorAll('img')];
           const cs = getComputedStyle(w);
           const subj = document.querySelector('.hero-subject');
+          // 网格对齐：用 offset* 量，getBoundingClientRect 会被透镜矩阵污染
+          const boxes = imgs.map((i) => ({
+            l: i.offsetLeft, t: i.offsetTop, w: i.offsetWidth, h: i.offsetHeight,
+          }));
+          const lefts = [...new Set(boxes.map((b) => b.l))].sort((a, b) => a - b);
+          const steps = [];
+          for (let i = 1; i < lefts.length; i++) steps.push(lefts[i] - lefts[i - 1]);
           return {
             count: imgs.length,
             srcs: imgs.filter((i) => i.getAttribute('src')).length,
@@ -704,6 +711,10 @@ async function run() {
             // 底纹必须在主体**下面**：同为 z-index:0 时靠 DOM 顺序决定
             beforeSubject: !!(w.compareDocumentPosition(subj) & Node.DOCUMENT_POSITION_FOLLOWING),
             hasBlur: getComputedStyle(imgs[0] || w).filter.includes('blur'),
+            display: cs.display,
+            gap: cs.columnGap,
+            sizes: [...new Set(boxes.map((b) => b.w + 'x' + b.h))],
+            colSteps: [...new Set(steps)],
           };
         })(),
         cursorExists: !!document.querySelector('.block-cursor'),
@@ -738,11 +749,16 @@ async function run() {
     check(structure.cursorExists, '方块光标在（全站一份，见 tools/verify-block-cursor.mjs）');
     check(!structure.oldHero && !structure.oldGallery, '旧的 HeroCard 与随机画廊都不在首页');
 
-    // ── 背景拼贴：最新 8 篇非人格文章 ──────────────────────────────────
+    // ── 背景海报墙：规则网格（28 张封面循环铺 64 块）────────────────────
     const wall = structure.wall;
-    check(wall && wall.count === 8, '背景拼贴有 8 张（最新 8 篇其他博客）',
+    check(wall && wall.count === 64, '背景海报墙铺了 64 块（28 张封面循环）',
       wall ? `count=${wall.count}` : 'MISSING');
     if (wall) {
+      check(wall.display === 'grid' && wall.sizes.length === 1
+        && wall.colSteps.length === 1
+        && wall.colSteps[0] === parseFloat(wall.sizes[0]) + parseFloat(wall.gap),
+        '海报是等宽等高的规则网格（对齐，不再是散点/随机旋转）',
+        `display=${wall.display} size=${wall.sizes.join(',')} step=${wall.colSteps.join(',')} gap=${wall.gap}`);
       // 结构这一刻开场可能刚走完、图还没挂上；所以这里只断言"看不见"，
       // 真正挂上去在后面几秒再验（见下面 wallAfter）。
       check(wall.visibilities.every((v) => v === 'hidden') || wall.opacities.some((o) => o > 0),
@@ -860,7 +876,7 @@ async function run() {
           && Number(getComputedStyle(i).opacity) > 0.9).length,
       };
     })()`);
-    for (let i = 0; i < 20 && wallState && wallState.shown !== wallState.count; i++) {
+    for (let i = 0; i < 40 && wallState && wallState.shown !== wallState.count; i++) {
       await sleep(500);
       wallState = await evaluate(`(() => {
         const imgs = [...document.querySelectorAll('.hero-wall img')];
@@ -873,10 +889,48 @@ async function run() {
       })()`);
     }
     check(wallState && wallState.withSrc === wallState.count,
-      '拼贴的 8 张封面最后都取回来了', wallState ? `${wallState.withSrc}/${wallState.count}` : 'MISSING');
+      '拼贴的 64 张封面最后都取回来了', wallState ? `${wallState.withSrc}/${wallState.count}` : 'MISSING');
     check(wallState && wallState.shown === wallState.count,
       '拼贴一张张淡进来了（GSAP 把每一张都拉到了显示态）',
       wallState ? `${wallState.shown}/${wallState.count}` : 'MISSING');
+
+    // ── 指针透镜：指针附近的格子被弯，屏幕外的格子保持原样 ─────────────
+    const heroBox = await evaluate(`(() => {
+      const r = document.querySelector('.hero-concept').getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    await send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: Math.round(heroBox.x),
+      y: Math.round(heroBox.y),
+      button: 'none',
+    });
+    await sleep(900);
+    const lens = JSON.parse(await evaluate(`(() => {
+      const px = ${JSON.stringify(Math.round(heroBox.x))};
+      const py = ${JSON.stringify(Math.round(heroBox.y))};
+      const imgs = [...document.querySelectorAll('.hero-wall__img')].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { el, d: Math.hypot(r.left + r.width / 2 - px, r.top + r.height / 2 - py) };
+      }).sort((a, b) => a.d - b.d);
+      const scaleOf = (el) => {
+        const m = (el.style.transform || '').match(/matrix\\(([^)]+)\\)/);
+        return m ? Number(m[1].split(',')[0]) : 1;
+      };
+      return JSON.stringify({
+        nearDist: Math.round(imgs[0].d),
+        nearScale: scaleOf(imgs[0].el),
+        farScale: scaleOf(imgs[imgs.length - 1].el),
+      });
+    })()`));
+    check(lens.nearScale > 1.03, '指针附近的海报被顶起来（原来的透镜形变生效）',
+      `dist=${lens.nearDist} scale=${lens.nearScale}`);
+    check(Math.abs(lens.farScale - 1) < 0.05, '屏幕外的格子没有被放大到离谱',
+      `farScale=${lens.farScale}`);
+
+    // 指针移开，让主体退出悬停/涟漪，后面量椭圆时会干净
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 20, y: 20, button: 'none' });
+    await sleep(900);
 
     await send('Page.captureScreenshot', {})
       .then((r) => fs.writeFileSync(path.join(outDir, 'hero-01-dispersed.png'), Buffer.from(r.data, 'base64')));
@@ -1357,8 +1411,16 @@ async function run() {
     const corner = {
       x: lightSubj.x + 4, y: lightSubj.y + 4, width: 24, height: 24, scale: 1,
     };
+    // 背景海报墙/噪点会把角落压暗，量"画布是否露出矩形"时先藏掉
+    await evaluate(`document.querySelector('.hero-wall').style.opacity='0';
+      document.querySelector('.hero-concept__noise').style.opacity='0';
+      document.querySelector('.hero-dust').style.opacity='0'; 1`);
+    await sleep(520);
     const cornerShot = await send('Page.captureScreenshot', { clip: corner });
     const cornerLuma = await evaluate(`window.__shotLuma(${JSON.stringify(cornerShot.data)})`);
+    await evaluate(`document.querySelector('.hero-wall').style.opacity='';
+      document.querySelector('.hero-concept__noise').style.opacity='';
+      document.querySelector('.hero-dust').style.opacity=''; 1`);
     const bgLuma = await evaluate(`(() => {
       const m = getComputedStyle(document.querySelector('.hero-concept')).backgroundColor.match(/\\d+/g);
       return 0.2126 * +m[0] + 0.7152 * +m[1] + 0.0722 * +m[2];
@@ -1370,16 +1432,30 @@ async function run() {
     // 只要填充和背景差一点，那片椭圆就会显出来 —— 把粒子层藏掉直接量最干净。
     // 实测过一次：容器的 brightness(1.06) 把 #fafafa 顶成纯白，差 5/255，
     // 平色上一眼就看得出来。
+    const rippleIdle = await evaluate(`(() => {
+      const c = document.querySelector('.hero-subject__ripple');
+      return c ? { idle: c.classList.contains('is-idle'), opacity: Number(getComputedStyle(c).opacity) } : null;
+    })()`);
+    check(rippleIdle && rippleIdle.idle && rippleIdle.opacity === 0,
+      '主人格静止时椭圆填充层完全隐藏',
+      rippleIdle ? `idle=${rippleIdle.idle} opacity=${rippleIdle.opacity}` : 'MISSING');
+
     const bareFill = async () => {
-      await evaluate(`document.querySelector('.hero-subject__grain').style.opacity = '0'`);
-      await sleep(320);
+      await evaluate(`document.querySelector('.hero-subject__grain').style.opacity = '0';
+        document.querySelector('.hero-wall').style.opacity = '0';
+        document.querySelector('.hero-concept__noise').style.opacity = '0';
+        document.querySelector('.hero-dust').style.opacity = '0'; 1`);
+      await sleep(520);
       const r = await evaluate(`(() => {
         const b = document.querySelector('.hero-subject').getBoundingClientRect();
         return { x: b.left + b.width / 2 - 20, y: b.top + b.height / 2 - 20, width: 40, height: 40, scale: 1 };
       })()`);
       const shot = await send('Page.captureScreenshot', { clip: r });
       const luma = await evaluate(`window.__shotLuma(${JSON.stringify(shot.data)})`);
-      await evaluate(`document.querySelector('.hero-subject__grain').style.opacity = ''`);
+      await evaluate(`document.querySelector('.hero-subject__grain').style.opacity = '';
+        document.querySelector('.hero-wall').style.opacity = '';
+        document.querySelector('.hero-concept__noise').style.opacity = '';
+        document.querySelector('.hero-dust').style.opacity = ''; 1`);
       return luma;
     };
     const lightFill = await bareFill();
@@ -1549,7 +1625,7 @@ async function run() {
     })`);
     check(backHome.path === '/', '从详情页返回首页', backHome.path);
     check(backHome.personas === 4, '返回后四个人格仍在（keep-alive 复用）', `count=${backHome.personas}`);
-    check(backHome.wall === 8, '返回后背景拼贴也还在', `count=${backHome.wall}`);
+    check(backHome.wall === 64, '返回后背景海报墙也还在', `count=${backHome.wall}`);
     check(backHome.vtCalls === 2, '返回这一步没有再触发过渡', `calls=${backHome.vtCalls}`);
     check(backHome.canvasesAlive, '返回后 canvas 尺寸没被重置');
 

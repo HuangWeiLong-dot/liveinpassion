@@ -42,7 +42,6 @@ const FRAG = /* glsl */ `
   uniform float uPlaneAspect;   // 显示区的 宽/高
   uniform float uTextureAspect; // 贴图的 宽/高
   uniform float uRestSolid;     // 静止时主体保留多少实感
-  uniform float uBg;            // 背景亮度：暗色主题 0，浅色主题 1（淡出要淡向它）
   uniform float uSolid;         // 悬停幅度：鼠标处照片显形（重组）
   uniform float uSolidRadius;   // 重组半径
   varying vec2 vUv;
@@ -76,12 +75,13 @@ const FRAG = /* glsl */ `
     // （"彻底粒子化"）。鼠标压住的地方 focus→1，照片在那里显形 —— 这就是"重组"。
     // 只在一块局部显形，不是整张主体一起变亮，所以和"删掉变亮"不冲突。
     //
-    // 显形显向**背景色**而不是黑：暗色主题下背景就是黑，直接乘等价；
-    // 浅色主题下背景是白，乘下去照片的暗部会变成一块纯黑剪影。
+    // 显形用 alpha，而不是往画布里填背景色：
+    // 悬停时只有指针附近 alpha→1，其余区域整层透明，露出背后的海报墙和粒子。
+    // （原来整片填背景色时，椭圆遮罩会把那块平色裁成一个明显的椭圆。）
     float focus = 1.0 - smoothstep(0.0, uSolidRadius, d);
-    col = mix(vec3(uBg), col, mix(uRestSolid, 1.0, focus * uSolid));
+    float solidAmt = mix(uRestSolid, 1.0, focus * uSolid);
 
-    gl_FragColor = vec4(col, 1.0);
+    gl_FragColor = vec4(col, solidAmt);
   }
 `;
 
@@ -89,7 +89,7 @@ const FRAG = /* glsl */ `
  * @param {HTMLCanvasElement} canvas
  * @param {string} src 图片地址
  * @returns {Promise<{ setPointer: (u:number,v:number)=>void, setHover: (on:boolean)=>void,
- *             resize: ()=>void, dispose: ()=>void } | null>}
+ *             setRestSolid: (v:number)=>void, resize: ()=>void, dispose: ()=>void } | null>}
  */
 export async function createRippleEffect(canvas, src) {
   let THREE;
@@ -105,7 +105,16 @@ export async function createRippleEffect(canvas, src) {
 
   let renderer;
   try {
-    renderer = new WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power' });
+    // alpha: true —— 这层现在是一张透明贴图，只在指针附近显形；
+    // premultipliedAlpha: false 让 shader 输出的 alpha 按直通（straight）混合。
+    renderer = new WebGLRenderer({
+      canvas,
+      antialias: false,
+      alpha: true,
+      premultipliedAlpha: false,
+      powerPreference: 'low-power',
+    });
+    renderer.setClearColor(0x000000, 0);
   } catch {
     return null; // 没有 WebGL，交给调用方退回 <img>
   }
@@ -133,7 +142,6 @@ export async function createRippleEffect(canvas, src) {
     // （用户要的"将主体粒子化"）；调到 1 就退回"照片 + 粒子噪点"。
     // 注意 tools/verify-hero.mjs 里有个 1/uRestSolid 的反向亮度要跟着改。
     uRestSolid: { value: 0 },
-    uBg: { value: 0 },
     uSolid: { value: 0 },
     uSolidRadius: { value: 0.26 },
   };
@@ -166,6 +174,7 @@ export async function createRippleEffect(canvas, src) {
     if (amp > 0) uniforms.uTime.value += dt / 1000;
 
     renderer.render(scene, camera);
+    syncIdle();
 
     // 静止在 0 就别再占帧了
     if (amp !== target || amp > 0) raf = requestAnimationFrame(loop);
@@ -173,6 +182,14 @@ export async function createRippleEffect(canvas, src) {
 
   function kick() {
     if (!raf && !disposed) raf = requestAnimationFrame(loop);
+  }
+
+  // 静止且不悬停时，这层画布整片只是背景色。椭圆遮罩会把这块平色裁成
+  // 一个可见的椭圆（尤其背景上有粒子/海报时）。没有东西要画就整层藏掉，
+  // 等悬停或"先实后散"再显示。
+  function syncIdle() {
+    const idle = amp === 0 && target === 0 && uniforms.uRestSolid.value <= 0.002;
+    canvas.classList.toggle('is-idle', idle);
   }
 
   function resize() {
@@ -198,6 +215,7 @@ export async function createRippleEffect(canvas, src) {
       uniforms.uTex.value = texture;
       uniforms.uTextureAspect.value = texture.image.width / texture.image.height;
       canvas.classList.add('is-ready'); // 贴图就绪后才把 canvas 显出来，避免闪黑
+      syncIdle();
       resize();
     },
     undefined,
@@ -213,15 +231,9 @@ export async function createRippleEffect(canvas, src) {
       uniforms.uMouse.value.set(u, v);
       if (target > 0) kick(); // 悬停时指针一动就要重画；静止时不用
     },
-    // 淡出要淡向**真实的背景色**，不能写死 0 / 1。
-    // 浅色主题下的背景是 #fafafa（0.98），写死成纯白 1.0 的话画布会比背景亮 2%，
-    // 那一整块矩形就显出来了 —— 就是"明显的边界感"的来源之一。
-    setBackground(luminance) {
-      uniforms.uBg.value = luminance;
-      renderer.render(scene, camera);
-    },
     setHover(on) {
       target = on ? 1 : 0;
+      syncIdle();
       kick();
     },
     /**
@@ -230,10 +242,11 @@ export async function createRippleEffect(canvas, src) {
      * 就是靠这个值从 1 连续降到 0 —— 光靠 setHover 只有 0/1 两态，做不出过渡。
      *
      * 静止时渲染循环是停的（raf 为 0），所以这里必须自己画一帧，
-     * 否则改了 uniform 也看不见（和 setBackground 同一个道理）。
+     * 否则改了 uniform 也看不见。
      */
     setRestSolid(v) {
       uniforms.uRestSolid.value = Math.max(0, Math.min(1, v));
+      syncIdle();
       if (!disposed && !raf) renderer.render(scene, camera);
     },
     resize,

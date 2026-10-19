@@ -9,18 +9,29 @@
 //
 // 网格是确定性的：槽位打乱用固定种子，筛选只改变「哪些槽位装图」，
 // 所以来回切换不会让整面墙重新洗牌。
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { clearBlockCursorHot, setBlockCursorHot } from '../composables/useBlockCursor.js';
 import { thumbUrl } from '../composables/useThumbnails.js';
 import { useLightbox } from '../composables/useLightbox.js';
-import { playWallIntro, staggerWallReveal } from '../composables/useWallMotion.js';
+import { staggerWallReveal } from '../composables/useWallMotion.js';
+import { createWallEntry } from '../composables/useWallEntry.js';
 import { resetWall, shuffleWall } from '../composables/useWallPuzzle.js';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { friends } from '../data/friends.js';
 import { mePhotos, mePhotoByName } from '../data/mePhotos.js';
 import albumContent from '../data/content/albums.json';
 
+const route = useRoute();
 const router = useRouter();
 const { open: openLightbox } = useLightbox();
 const { entered: brandEntered } = useBrandOverlay();
@@ -29,17 +40,21 @@ let introPlayed = false;
 let introTimer = 0;
 let prefetchTimer = 0;
 let resizeTimer = 0;
-// 位移是 px 的，列数一变就不再落在格子上：停下后把窗户放回自己的槽位。
-function onWallResize() {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => resetWall(wallRef.value), 180);
-}
+
+// 首屏入场（参照 wndws.space）：每次进入这个页面都重播一次
+const wallEntry = createWallEntry();
+
 function scheduleIntro() {
   if (introPlayed) return;
   introPlayed = true;
   clearTimeout(introTimer);
-  // 等通用转场的黑板滑走之后再开始，否则入场会被盖住
-  introTimer = setTimeout(() => playWallIntro(wallRef.value), 1400);
+  introTimer = setTimeout(() => wallEntry.play(wallRef.value), 1400);
+}
+
+// 位移是 px 的，列数一变就不再落在格子上：停下后把窗户放回自己的槽位。
+function onWallResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => resetWall(wallRef.value), 180);
 }
 
 // 140 个槽位：64 扇有照片的窗户 + 大量普通空窗格（墙面的质感）。
@@ -167,8 +182,14 @@ const slotOrder = (() => {
   return arr;
 })();
 
-const selectedFilter = ref('all');
-const displayFilter = ref('all');
+// 支持从 ME 页的 FRIENDS 卡片直接带筛选进来：/gallery?filter=friends
+const FILTER_IDS = new Set(FILTERS.map((f) => f.id));
+const filterFromQuery = (value) => (
+  typeof value === 'string' && FILTER_IDS.has(value) ? value : 'all'
+);
+const initialFilter = filterFromQuery(route.query.filter);
+const selectedFilter = ref(initialFilter);
+const displayFilter = ref(initialFilter);
 
 const slots = (() => {
   const bySlot = new Map();
@@ -294,20 +315,48 @@ function setFilter(id) {
   selectedFilter.value = id;
   clearBlockCursorHot();
   hideTip();
+  // 筛选状态同步到 URL，ME 页的 FRIENDS 卡片才能反复把人带到同一个视图
+  router.replace({
+    query: { ...route.query, filter: id === 'all' ? undefined : id },
+  });
 }
 
-function openWindow(item) {
+watch(
+  () => route.query.filter,
+  (value) => {
+    const next = filterFromQuery(value);
+    if (next !== selectedFilter.value) setFilter(next);
+  }
+);
+
+// 照片详情的飞行起点：当前这扇窗里的照片矩形 + 图片地址/比例
+function originFromEvent(event) {
+  const el = event?.currentTarget;
+  const img = el?.querySelector('.win__img');
+  const r = (img || el)?.getBoundingClientRect();
+  if (!r) return null;
+  return {
+    rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+    src: img?.currentSrc || img?.getAttribute('src') || '',
+    aspect: img?.naturalWidth && img?.naturalHeight
+      ? img.naturalWidth / img.naturalHeight
+      : r.width / r.height,
+  };
+}
+
+function openWindow(item, event) {
   hideTip();
+  const from = originFromEvent(event);
   // 群组 / 个人相册都没有独立页面了：直接在 Gallery 里开灯箱
   if (item.kind === 'friend') {
     const list = friendPhotoLists[item.friendId] || [];
     if (item.friendPhotoIndex >= 0 && list[item.friendPhotoIndex]) {
-      openLightbox(list, item.friendPhotoIndex);
+      openLightbox(list, item.friendPhotoIndex, from);
     }
     return;
   }
   if (item.kind === 'group') {
-    openLightbox(groupPool, item.groupIndex);
+    openLightbox(groupPool, item.groupIndex, from);
     return;
   }
   if (item.to) router.push(item.to);
@@ -349,11 +398,29 @@ onMounted(() => {
   finePointer.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   nextTick(observeWallImages);
   window.addEventListener('resize', onWallResize);
-  if (brandEntered.value) scheduleIntro();
   // 开场之后把整面墙的缩略图在后台排进队列，后续切换筛选不再等图片
   prefetchTimer = setTimeout(() => {
     for (const item of WALL_ITEMS) if (item.src) thumbUrl(item.src, 200);
   }, 2600);
+});
+
+// keep-alive：每次从导航进入这个页面都重播一次入场
+onActivated(() => {
+  clearTimeout(introTimer);
+  introPlayed = false;
+  wallEntry.reset(wallRef.value);
+  nextTick(() => {
+    wallEntry.prime(wallRef.value);
+    observeWallImages();
+  });
+  if (brandEntered.value) scheduleIntro();
+});
+
+onDeactivated(() => {
+  // 只停掉计时器：不要在这里 reset。页面正在被转场板带走，
+  // 这时把墙恢复成"完好的整面墙"会在转场边缘闪一下。
+  // 重置放到下一次 onActivated、首帧绘制之前做。
+  clearTimeout(introTimer);
 });
 
 watch(brandEntered, (v) => {
@@ -367,6 +434,7 @@ onBeforeUnmount(() => {
   clearTimeout(introTimer);
   clearTimeout(prefetchTimer);
   clearTimeout(resizeTimer);
+  wallEntry.reset(wallRef.value);
 });
 </script>
 
@@ -402,7 +470,7 @@ onBeforeUnmount(() => {
               :tabindex="isActive(item) ? 0 : -1"
               :aria-hidden="!isActive(item)"
               :aria-label="`${item.kicker}: ${item.title}`"
-              @click="isActive(item) && openWindow(item)"
+              @click="isActive(item) && openWindow(item, $event)"
               @pointerenter="isActive(item) && enterWindow(item, $event)"
               @pointerleave="leaveWindow"
             >
@@ -447,3 +515,4 @@ onBeforeUnmount(() => {
     </section>
   </main>
 </template>
+

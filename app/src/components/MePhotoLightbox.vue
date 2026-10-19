@@ -8,17 +8,79 @@
 //   - 原图就绪前先显示压缩图占位（与网格同源，通常已在 HTTP 缓存里，近乎即时），
 //     且用 img.decode() 把解码移出主线程
 //   - 原图失败时保留压缩图占位当兜底
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
+import { flyPhoto, photoTargetRect, rectOf } from '../composables/usePhotoFlight.js';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   src: { type: String, default: '' },
   thumb: { type: String, default: '' },
+  // 打开它的那扇窗：{ rect, src, aspect }
+  origin: { type: Object, default: null },
 });
 const emit = defineEmits(['close']);
 
 const loaded = ref(false);
 const thumbActive = ref(false);
+const fullEl = ref(null);
+const leaving = ref(false);
+let closing = false;
+
+// 打开：照片从窗口飞到大图位置（参照 wndws.space）
+watch(() => props.visible, async (visible) => {
+  if (!visible) return;
+  leaving.value = false;
+  await nextTick();
+  const img = fullEl.value;
+  const o = props.origin;
+  if (!img || !o?.rect) return;
+  const aspect = o.aspect
+    || (img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0)
+    || o.rect.width / o.rect.height;
+  const to = photoTargetRect(aspect);
+  img.style.opacity = '0';
+  flyPhoto({
+    from: o.rect,
+    to,
+    // 优先用窗口里已加载的缩略图，避免大图未解码时出现一帧黑底
+    src: o.src || img.getAttribute('src'),
+    duration: 0.68,
+    fromGray: true,
+    toGray: false,
+    onDone: () => {
+      // 克隆还在时先让大图可见（没加载完也没关系，后面的模糊缩略图还在）
+      img.style.transition = 'none';
+      img.style.opacity = '1';
+      requestAnimationFrame(() => { img.style.transition = ''; });
+    },
+  });
+});
+
+// 关闭：大图飞回窗口，遮罩同时淡出
+function requestClose() {
+  if (closing) return;
+  const img = fullEl.value;
+  const o = props.origin;
+  if (!img || !o?.rect) { emit('close'); return; }
+  closing = true;
+  const from = rectOf(img);
+  const src = img.currentSrc || o.src || img.getAttribute('src');
+  img.style.opacity = '0';
+  leaving.value = true;
+  flyPhoto({
+    from,
+    to: o.rect,
+    src,
+    duration: 0.55,
+    fromGray: false,
+    toGray: true,
+    onDone: () => {
+      closing = false;
+      leaving.value = false;
+      emit('close');
+    },
+  });
+}
 
 watch(
   () => [props.visible, props.src],
@@ -55,10 +117,16 @@ function onFullLoad(e) {
 </script>
 
 <template>
-  <div class="me-photo-lightbox" id="mePhotoLightbox" :class="{ active: visible }" @click.self="emit('close')">
-    <span class="me-photo-lightbox-close" @click="emit('close')">&times;</span>
+  <div
+    class="me-photo-lightbox"
+    id="mePhotoLightbox"
+    :class="{ active: visible, leaving }"
+    @click.self="requestClose"
+  >
+    <span class="me-photo-lightbox-close" @click="requestClose">&times;</span>
     <img class="me-photo-lightbox-thumb" :class="{ active: thumbActive }" :src="thumbActive ? thumb : null" alt="">
     <img
+      ref="fullEl"
       class="me-photo-lightbox-full"
       :class="{ loaded }"
       :src="visible ? src : null"

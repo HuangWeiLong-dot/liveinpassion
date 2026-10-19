@@ -14,8 +14,5 @@ const route = useRoute();
         <p class="hero-subtitle">这页不存在：{{ route.fullPath }}</p>
       </div>
     </section>
-    <footer>
-      <p>© 2026 LIVE IN PASSION. Be Brave. Be Genuine. Be Humble. And don't be a dick.</p>
-    </footer>
   </main>
 </template>

@@ -31,19 +31,10 @@ CLAUDE.md
 .claude/
 
 # 大体积素材源，不上线
-#   example/    build-personas.mjs 的输入（11~25MB PNG，不在静态白名单，不发布）
-#   me/*.jpg    全尺寸原图，只用于生成 me/hero_compressed 与 me/personas 压缩版
-#   me/HuangWeiLong_*.png  新版个像的全尺寸源图，只用于生成 hero_compressed webp
+#   example/       build-personas.mjs 的输入效果图（11~25MB PNG）
+#   example/me/    全尺寸人像源图（旧版四张 + 新的 HuangWeiLong 系列），
+#                  只用于生成 me/personas 与 me/hero_compressed 的压缩版
 example/
-me/Advocate.jpg
-me/idealist.jpg
-me/Individuation.jpg
-me/Observer.jpg
-me/Romanticist.jpg
-me/HuangWeiLong_*.png
-
-# 遗留导出，无任何引用（压缩版是 me/hero_compressed/Individuation.jpg）
-me/hero_compressed/Individuation.png
 
 # 音乐已迁到 Cloudflare R2 / CDN（https://img.liveinpassion.me/music/…），
 # 本地源文件不入库，也不再由 copy-static 复制进 dist

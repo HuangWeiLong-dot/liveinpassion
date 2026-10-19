@@ -17,9 +17,11 @@ import MusicPlayer from './components/MusicPlayer.vue';
 import Lightbox from './components/Lightbox.vue';
 import MobileDock from './components/MobileDock.vue';
 import BlockCursor from './components/BlockCursor.vue';
+import AppFooter from './components/AppFooter.vue';
 import { useBrandOverlay } from './composables/useBrandOverlay.js';
 import { useEdgeReveal } from './composables/useEdgeReveal.js';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
 // 品牌遮罩揭开之后：主体和四个人格先出来（它们在 Hero 里），
 // 头部 / 两个悬浮按钮 / 播放器 / 作者区这批晚一步 —— 先把注意力留给画面。
@@ -45,6 +47,17 @@ useEdgeReveal();
 //（头部、主题、播放器、作者区、首页那个背景开关），一条全局规则最省事。
 // 哪些元素算"图标/按钮"写在 styles/main.css 里（.is-chrome-hidden 那段）。
 const chromeHidden = ref(false);
+
+// 页脚是固定底部的"抽屉"，必须在页面内容之后全局挂一份：
+// 页面的 .page 背景盖住它，滚到页尾才从占位里露出来。
+// BLOGS 列表页现在也允许纵向滚到页尾（横向轨道滚到头之后继续下滑），
+// 所以同样挂这一份；文章详情仍是全屏阅读布局，用它自己的 compact 版。
+const route = useRoute();
+// ME 页是一个独立的整屏滚动体验，固定页脚会和它的 sticky 舞台/滚动行程打架，
+// 所以那一页不挂全局页脚。
+const showGlobalFooter = computed(
+  () => route.name !== 'blog-detail' && route.name !== 'me'
+);
 
 // 同一批键盘快捷键都走这一个入口：
 //   X —— 收起页面上所有图标/按钮（左下角头像、主题按钮在内，见 main.css 那张名单）
@@ -105,6 +118,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
       <component :is="Component" />
     </keep-alive>
   </router-view>
+
+  <!-- 全局页脚：固定在底部，被页面内容盖住，滚到页尾才露出 -->
+  <AppFooter v-if="showGlobalFooter" />
 
   <Lightbox />
 

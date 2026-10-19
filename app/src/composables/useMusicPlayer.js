@@ -254,6 +254,15 @@ function tryAutoPlay() {
   interactionBound = false;
 }
 
+// 「ENTER WITHOUT MUSIC」：直接取消首次交互自动起播。
+// 之后用户仍然可以自己点播放键。
+function cancelAutoPlay() {
+  document.removeEventListener('click', tryAutoPlay);
+  document.removeEventListener('touchstart', tryAutoPlay);
+  document.removeEventListener('keydown', tryAutoPlay);
+  interactionBound = false;
+}
+
 export function useMusicPlayer() {
   function init(el) {
     audioEl = el;
@@ -296,6 +305,7 @@ export function useMusicPlayer() {
     onTimeUpdate,
     init,
     dispose,
+    cancelAutoPlay,
     selectTrack,
     togglePlay,
     togglePlayer,

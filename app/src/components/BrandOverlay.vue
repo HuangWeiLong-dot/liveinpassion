@@ -13,12 +13,14 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { useTheme } from '../composables/useTheme.js';
+import { useMusicPlayer } from '../composables/useMusicPlayer.js';
 
 const TEXT = 'LIVEINPASSION';
 const BG_ALPHA = 0.075; // 落到背景字时的浓度（和 .hero-wordmark 的 opacity 对齐）
 
 const { visible, phase, showEnter, bg, runId, markReady, enter } = useBrandOverlay();
 const { isDark } = useTheme();
+const { cancelAutoPlay } = useMusicPlayer();
 
 const solidRef = ref(null);
 
@@ -58,6 +60,12 @@ watch(runId, () => {
   ty.value = '0px';
   alpha.value = 1;
 });
+
+// 无音乐进入：先摘掉首次交互自动起播的监听，再走同一条进入时序
+function enterNoMusic() {
+  cancelAutoPlay();
+  enter();
+}
 
 // 字体就绪（带兜底时限）。两步缺一不可：
 //   ① 先等字体 CSS 应用上 —— 它到位之前 @font-face 根本不存在，fonts.ready 秒兑现；
@@ -122,15 +130,26 @@ onBeforeUnmount(() => {
       {{ TEXT }}
     </div>
 
-    <button
+    <div
       v-show="showEnter && phase === 'idle'"
-      class="brand__enter"
-      type="button"
-      @click="enter"
-      @keyup.enter="enter"
+      class="brand__actions"
     >
-      ENTER
-    </button>
+      <button
+        class="brand__enter"
+        type="button"
+        @click="enter"
+        @keyup.enter="enter"
+      >
+        ENTER
+      </button>
+      <button
+        class="brand__enter brand__enter--quiet"
+        type="button"
+        @click="enterNoMusic"
+      >
+        ENTER WITHOUT MUSIC
+      </button>
+    </div>
   </div>
 </template>
 
@@ -190,11 +209,18 @@ onBeforeUnmount(() => {
   color: #ffffff;
 }
 
-.brand__enter {
+.brand__actions {
   position: absolute;
   bottom: 15vh;
   left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   transform: translateX(-50%);
+}
+
+.brand__enter {
   padding: 13px 42px;
   background: transparent;
   border: 1px solid currentcolor;
@@ -211,6 +237,21 @@ onBeforeUnmount(() => {
 
 .brand.is-ready .brand__enter {
   opacity: 1;
+}
+
+.brand__enter--quiet {
+  padding: 6px 0;
+  border: 0;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 1px;
+}
+
+.brand__enter--quiet:hover {
+  letter-spacing: 0.26em;
 }
 
 .brand.is-dark .brand__enter {
@@ -232,10 +273,18 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 768px) {
-  .brand__enter {
+  .brand__actions {
     bottom: 12vh;
+  }
+
+  .brand__enter {
     padding: 11px 30px;
     font-size: 10px;
+  }
+
+  .brand__enter--quiet {
+    padding: 6px 0;
+    font-size: 8px;
   }
 }
 </style>

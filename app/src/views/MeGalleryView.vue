@@ -4,7 +4,16 @@
 //   - 月份照片散落在窗户网格里，其余是空窗格
 //   - 底部是月份筛选 + 统计
 // 点击窗户仍然打开原来的单图灯箱（MePhotoLightbox）。
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
 import { useRouter } from 'vue-router';
 import { CDN_BASE } from '../data/cdn.js';
 import { mePhotoByName } from '../data/mePhotos.js';
@@ -13,11 +22,11 @@ import { clearBlockCursorHot, setBlockCursorHot } from '../composables/useBlockC
 import { thumbUrl } from '../composables/useThumbnails.js';
 import {
   fadeWallImages,
-  playWallIntro,
   restoreWallImages,
   staggerWallReveal,
 } from '../composables/useWallMotion.js';
 import { resetWall, shuffleWall } from '../composables/useWallPuzzle.js';
+import { createWallEntry } from '../composables/useWallEntry.js';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import MePhotoLightbox from '../components/MePhotoLightbox.vue';
 
@@ -31,6 +40,10 @@ let introPlayed = false;
 let introTimer = 0;
 let prefetchTimer = 0;
 let resizeTimer = 0;
+
+// 和 /gallery 同一套入场：每次进入这个页面都重播
+const wallEntry = createWallEntry();
+
 function onWallResize() {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => resetWall(wallRef.value), 180);
@@ -39,7 +52,7 @@ function scheduleIntro() {
   if (introPlayed) return;
   introPlayed = true;
   clearTimeout(introTimer);
-  introTimer = setTimeout(() => playWallIntro(wallRef.value), 1400);
+  introTimer = setTimeout(() => wallEntry.play(wallRef.value), 1400);
 }
 
 const items = computed(() =>
@@ -210,10 +223,27 @@ onMounted(() => {
   finePointer.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   nextTick(observeWallImages);
   window.addEventListener('resize', onWallResize);
-  if (brandEntered.value) scheduleIntro();
   prefetchTimer = setTimeout(() => {
     for (const it of items.value) if (it.thumb) thumbUrl(it.thumb, 200);
   }, 2600);
+});
+
+// keep-alive：每次点击进入 /me/gallery 都重播入场
+onActivated(() => {
+  clearTimeout(introTimer);
+  introPlayed = false;
+  wallEntry.reset(wallRef.value);
+  nextTick(() => {
+    wallEntry.prime(wallRef.value);
+    observeWallImages();
+  });
+  if (brandEntered.value) scheduleIntro();
+});
+
+onDeactivated(() => {
+  // 不在离场时重置：转场板正带着这一页走，重置会让墙面在边缘闪一下。
+  // 下一次 onActivated 会在首帧绘制前重置并重新摆位。
+  clearTimeout(introTimer);
 });
 
 watch(brandEntered, (v) => {
@@ -223,6 +253,7 @@ watch(brandEntered, (v) => {
 onBeforeUnmount(() => {
   clearBlockCursorHot();
   wallIo?.disconnect();
+  wallEntry.reset(wallRef.value);
   window.removeEventListener('resize', onWallResize);
   clearTimeout(introTimer);
   clearTimeout(prefetchTimer);
@@ -233,8 +264,20 @@ onBeforeUnmount(() => {
 const lightboxOpen = ref(false);
 const lightboxSrc = ref('');
 const lightboxThumb = ref('');
-function openPhoto(item) {
+const lightboxOrigin = ref(null);
+function openPhoto(item, event) {
   hideTip();
+  // 打开详情时记下这扇窗的矩形：照片从它飞到大图位置
+  const el = event?.currentTarget;
+  const img = el?.querySelector('.win__img');
+  const r = (img || el)?.getBoundingClientRect();
+  lightboxOrigin.value = r ? {
+    rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+    src: img?.currentSrc || item.thumb,
+    aspect: img?.naturalWidth && img?.naturalHeight
+      ? img.naturalWidth / img.naturalHeight
+      : r.width / r.height,
+  } : null;
   // 灯箱主图用压缩图（原图太大，切换时容易停在上一张）；
   // 先挂 200px 缩略图做模糊占位，主图载入后由组件无缝替换。
   lightboxSrc.value = item.thumb;
@@ -277,7 +320,7 @@ function openPhoto(item) {
               :style="{ '--win-i': index }"
               type="button"
               :aria-label="`ME: ${item.date || item.filename}`"
-              @click="openPhoto(item)"
+              @click="openPhoto(item, $event)"
               @pointerenter="enterWindow(item, $event)"
               @pointerleave="leaveWindow()"
             >
@@ -323,6 +366,7 @@ function openPhoto(item) {
       :visible="lightboxOpen"
       :src="lightboxSrc"
       :thumb="lightboxThumb"
+      :origin="lightboxOrigin"
       @close="lightboxOpen = false"
     />
   </main>

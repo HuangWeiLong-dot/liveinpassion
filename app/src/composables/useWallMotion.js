@@ -1,56 +1,10 @@
-// 窗户墙的 GSAP 动效。
+// 窗户墙的内容切换动效。
 //
-//   playWallIntro        —— 首次进入页面：窗格从上下左右四个方向滑进来，逐一浮现
 //   staggerWallReveal    —— 滑到目标格之后，按目标位置错开淡入新内容
 //   fadeWallImages       —— 切月份前先把旧照片淡出，避免一刀切
+//   restoreWallImages    —— 撤掉淡出用的内联样式
 //
-// 窗口之间的华容道滑动在 useWallPuzzle.js（靠真正的空格 .win-gap 算），
-// 这里负责入场和内容切换的动效。
-import gsap from 'gsap';
-
-const DIRS = [
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-  { x: 0, y: -1 },
-];
-
-function dirFor(i) {
-  return DIRS[i % DIRS.length];
-}
-
-export function playWallIntro(root, { emptyOpacity = 0.45 } = {}) {
-  if (!root) return;
-  const wins = [...root.querySelectorAll('.win')];
-  if (!wins.length) return;
-  gsap.killTweensOf(wins);
-
-  gsap.fromTo(
-    wins,
-    {
-      opacity: 0,
-      x: (i) => dirFor(i).x * 72,
-      y: (i) => dirFor(i).y * 72,
-      scale: 0.92,
-    },
-    {
-      opacity: (i, el) => (el.classList.contains('is-muted') ? emptyOpacity : 1),
-      x: 0,
-      y: 0,
-      scale: 1,
-      duration: 0.68,
-      ease: 'power3.out',
-      stagger: { each: 0.018, from: 'start' },
-      clearProps: 'transform',
-      onComplete() {
-        for (const el of wins) {
-          el.style.opacity = el.classList.contains('is-muted') ? String(emptyOpacity) : '1';
-        }
-      },
-    }
-  );
-}
-
+// 首屏入场在 useWallEntry.js；华容道滑动在 useWallPuzzle.js。
 // ── 内容切换的交接动画 ─────────────────────────────────────────────────
 // 华容道滑完之后不能整面墙「啪」一下换掉：按每扇窗**落点**在墙上的位置
 // 从左到右、从上到下排个序，让新内容依次淡入。

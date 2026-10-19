@@ -96,60 +96,54 @@ const PERSONAS = [
     id: 'romantics',
     label: 'Romantics',
     slug: 'romanticist-fragment-i',
-    src: '/me/personas/1.jpg',
+    src: '/me/personas/romanticist.jpg',
   },
   {
     id: 'idealist',
     label: 'Idealist',
     slug: 'idealist-fragment-ii',
-    src: '/me/personas/2.jpg',
+    src: '/me/personas/idealist.jpg',
   },
   {
     id: 'advocate',
     label: 'Advocate',
     slug: 'advocate-fragment-iii',
-    src: '/me/personas/4.jpg',
+    src: '/me/personas/advocate.jpg',
   },
   {
     id: 'observer',
     label: 'Observer',
     slug: 'observer-fragment-iv',
-    src: '/me/personas/3.jpg',
+    src: '/me/personas/observer.jpg',
   },
 ];
 
-// ── 背景拼贴：其他博客 ──────────────────────────────────────────────────
-// CMS 里最新的 8 篇**非人格**文章（人格那四篇已经是环上那四格了）。
+// ── 背景拼贴：博客封面墙 ────────────────────────────────────────────────
+// 参照 sashamartynchuk.com 首页的 dome grid：
+//   · 等宽等高的海报排成**规则网格**（不是散点，也不带随机旋转）；
+//   · 整面墙贴在一个大球面上，边缘略微后退；
+//   · 指针经过时，附近 1.5 个格子内的海报被往镜头方向顶起并放大。
 //
-// 位置写死成一张表，不随机：背景是构图的一部分，每次刷新都换个摆法会让
-// 主体和人格的位置看起来忽紧忽松。数组顺序 = 淡入的先后。
-// x/y 是左上角在 hero 里的百分比，w 是宽度（占 hero 宽的百分比），r 是旋转角度。
-// 摆法刻意避开中间那块 —— 主体在 x 30~70% / y 20~80%，压上去会糊成一片。
-const WALL = [
-  { x: 2, y: 9, w: 13, r: -6 },
-  { x: 12, y: 61, w: 11, r: 4 },
-  { x: 23, y: 5, w: 10, r: 7 },
-  { x: 31, y: 75, w: 12, r: -3 },
-  { x: 57, y: 4, w: 11, r: 5 },
-  { x: 68, y: 71, w: 13, r: -7 },
-  { x: 82, y: 12, w: 12, r: 3 },
-  { x: 86, y: 57, w: 10, r: -4 },
-];
+// 网格由 CSS grid 自动铺满，这里只准备足够多的瓦片；封面循环使用，
+// 避免相邻两格总是同一张。src 用 CMS 的压缩封面（这层本来就压得很淡）。
+const WALL_COVERS = (() => {
+  const personaSlugs = new Set(PERSONAS.map((p) => p.slug));
+  return blogPosts
+    .filter((p) => !personaSlugs.has(p.slug) && p.image?.src)
+    .map((p) => ({ slug: p.slug, src: p.image.src }))
+    .slice(0, 28);
+})();
 
-const PERSONA_SLUGS = new Set(PERSONAS.map((p) => p.slug));
-
-// src 用**压缩图**：这层被模糊 + 去色 + 压到两成不透明度，原图那点细节看不出来，
-// 白白多花十几倍字节。
-const BLOG_WALL = blogPosts
-  .filter((p) => !PERSONA_SLUGS.has(p.slug) && p.image?.src)
-  .slice(0, WALL.length)
-  .map((p, i) => ({ slug: p.slug, src: p.image.src, ...WALL[i] }));
+// 64 块足够铺到 2560 宽的屏幕；多出来的会被 .hero-wall 的 overflow 裁掉。
+const WALL_TILES = WALL_COVERS.length
+  ? Array.from({ length: 64 }, (_, i) => WALL_COVERS[i % WALL_COVERS.length])
+  : [];
 
 const ORBIT_PERIOD = 60; // 公转一圈多少秒
 
 // 主体：个体化。悬停时水波纹 + 鼠标处粒子重组；点它把散出去的四条收回来（不跳转）。
 const SUBJECT = {
-  src: '/me/hero_compressed/Individuation.jpg',
+  src: '/me/individuation.jpg',
   alt: 'Individuation',
 };
 
@@ -427,16 +421,19 @@ function updateScene(now) {
   updateWallLens();
 }
 
-// 背景 8 张封面：同一套透镜，局部雅可比近似成一张斜切/缩放的四边形。
-// 它们自己有一条 rotate(var(--r)) 的 CSS 规则，写 inline 时必须把旋转带上。
+// 背景海报墙：原来的指针透镜（全局扭曲态，参照 sashamartynchuk.com）。
+// 局部雅可比近似成一张斜切/缩放的四边形；网格是平的，扭曲只发生在指针附近。
 function updateWallLens() {
-  if (!lensVisible()) {
-    for (const it of wallItems) {
-      if (it.el.style.transform) it.el.style.transform = '';
-    }
-    return;
-  }
+  const active = lensVisible();
+  // 网格现在铺到 hero 之外很远；透镜的径向放大是距离平方，远处格子会被
+  // 放大到几倍、位移几千像素。只弯视口附近的格子，屏外的清掉变换。
+  const limitX = heroBox.w * 0.72;
+  const limitY = heroBox.h * 0.72;
   for (const it of wallItems) {
+    if (!active || Math.abs(it.cx) > limitX || Math.abs(it.cy) > limitY) {
+      if (it.el.style.transform) it.el.style.transform = '';
+      continue;
+    }
     const m = warpLensMatrix(it.cx, it.cy, it.hw, it.hh);
     it.el.style.transform =
       `translate(${(m.x - it.cx).toFixed(2)}px, ${(m.y - it.cy).toFixed(2)}px) ` +
@@ -650,29 +647,29 @@ function measureWall() {
   const wr = wall.getBoundingClientRect();
   const hcx = heroBox.left + heroBox.w / 2;
   const hcy = heroBox.top + heroBox.h / 2;
-  for (const el of wall.querySelectorAll('img')) {
-    const r = el.style.getPropertyValue('--r') || '0deg';
+  // offsetLeft/Top 不受 transform 影响，量到的是格子的**基准**位置。
+  for (const el of wall.querySelectorAll('.hero-wall__img')) {
     wallItems.push({
       el,
       cx: wr.left + el.offsetLeft + el.offsetWidth / 2 - hcx,
       cy: wr.top + el.offsetTop + el.offsetHeight / 2 - hcy,
       hw: el.offsetWidth / 2,
       hh: el.offsetHeight / 2,
-      r,
+      // 网格已经对齐，不再有逐张的旋转；保留这个字段给透镜写 inline 用
+      r: '0deg',
     });
   }
 }
 
 // ── 指针透镜（参考 sashamartynchuk.com 首页的 dome grid）──────────────────
 // 指针在 Hero 里移动时，以它为中心形成一个圆顶状的凸起：基础径向放大 + 一个
-// 高斯气泡。**只作用在背景拼贴的 8 张封面上** —— 主体和四个人格不参与形变，
+// 高斯气泡。**只作用在背景海报墙上** —— 主体和四个人格不参与形变，
 // 人脸和标签保持原样。
-//
-// 数值是从参考站那套参数（k=.15 / A=.25 / σ≈1.5 个格子宽）按我们的构图收下来的。
 const LENS = {
-  k: 0.06,         // 基础径向放大（背景整体往四周鼓一点）
-  bulge: 0.24,     // 指针气泡的强度
-  sigma: 0.95,     // 气泡半径（单位：半个屏幕高）
+  // 不再做全局径向放大：只让指针周围那一块起泡，远处的格子保持原样。
+  k: 0,
+  bulge: 0.1,      // 指针气泡的强度（原来 0.24，收小一半以上）
+  sigma: 0.5,      // 气泡半径（单位：半个屏幕高）——约一个格子多一点
   follow: 0.12,    // 指针位置缓动（每 60fps 帧的追近比例）
   build: 0.08,     // 气泡强度的缓动
 };
@@ -686,7 +683,7 @@ function lensActive() {
   return finePointer.value && !reducedMotion.value;
 }
 
-// 真正要不要形变。强度低于这个门槛时背景直接回到 CSS 的静态旋转。
+// 真正要不要顶起。强度低于门槛时墙面只剩静态球面。
 function lensVisible() {
   return lensActive() && lens.s > 0.0005;
 }
@@ -912,11 +909,11 @@ let wallRevealed = false;
 function revealBlogWall() {
   if (wallRevealed) return;
   wallRevealed = true;
-  const els = [...(wallEl.value?.querySelectorAll('img') || [])];
+  const els = [...(wallEl.value?.querySelectorAll('.hero-wall__img') || [])];
   if (!els.length) return;
 
   els.forEach((el, i) => {
-    const entry = BLOG_WALL[i];
+    const entry = WALL_TILES[i];
     if (!entry) return;
     // 直接挂到真元素上、听它自己的 load：省掉"先用 Image 预热再赋值"的第二次请求
     el.addEventListener('load', () => {
@@ -930,10 +927,12 @@ function revealBlogWall() {
       // 于是图失去宽度和定位，退回原始尺寸铺在静态位置上：就是"闪烁 + 放大"。
       // 只写 opacity/visibility 的话两边互不干涉，也不需要 clearProps。
       // 浓度（--wall-opacity）挂在容器上，所以这里淡到 1 就对了，收尾没有跳变。
+      // 墙面现在是 64 块：按行/列铺开一个短波浪，而不是每块都等 0.22s
+      const delay = Math.min(1.2, (i % 8) * 0.035 + Math.floor(i / 8) * 0.045);
       gsap.fromTo(
         el,
         { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 1.15, delay: i * 0.22, ease: 'power2.out' }
+        { autoAlpha: 1, duration: 0.9, delay, ease: 'power2.out' }
       );
     }, { once: true });
     el.src = entry.src;
@@ -1036,31 +1035,6 @@ const subjectHovered = ref(false);
 let ripple = null;
 let rippleGone = false;
 
-// 涟漪画布的"背景"必须和 hero 的实际背景完全一致，否则那块画布会比背景
-// 亮一点点、露出一个矩形。
-//
-// 读的是 CSS 变量 --hero-bg，**不是 getComputedStyle().backgroundColor**：
-// 背景色现在是带过渡的（0.4s），而这个函数在主题切换后 230ms 就被调用，
-// 读计算值会拿到黑到白之间约 57% 处的一片中灰 —— 淡出那 230ms 把它遮住了，
-// 但淡回来之后画布就带着这个错颜色一直留着（"背景颜色不协调"就是这么来的）。
-// 自定义属性不参与过渡，拿到的永远是目标值。
-function syncRippleBackground() {
-  if (!ripple || !heroEl.value) return;
-  const raw = getComputedStyle(heroEl.value).getPropertyValue('--hero-bg').trim();
-  const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  let lum;
-  if (hex) {
-    const h = hex[1].length === 3 ? hex[1].split('').map((c) => c + c).join('') : hex[1];
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  } else {
-    lum = isDark.value ? 0 : 0.98;
-  }
-  ripple.setBackground(lum);
-}
-
 async function setupRipple() {
   if (!finePointer.value || reducedMotion.value || !rippleCanvas.value) return;
   const canvas = rippleCanvas.value;
@@ -1072,7 +1046,6 @@ async function setupRipple() {
   }
   if (rippleGone || !instance) return;
   ripple = instance;
-  syncRippleBackground();
   ripple.setHover(subjectHovered.value);
   // 涟漪层（"完整人像"那一层）就绪了才能演"先实后散"。
   // 遮罩早就揭开过了的话（涟漪加载慢），这里会立刻把人像亮起来。
@@ -1279,6 +1252,15 @@ function relayout() {
   heroBox.top = hr.top;
   heroBox.w = hr.width;
   heroBox.h = hr.height;
+  // 海报墙的格子尺寸照参考站来：0.25 * sqrt(宽*高)，夹到 140~360；
+  // 间距是格子的 12%，透视按球面半径给（0.62 倍）。
+  const wallCell = Math.round(
+    Math.min(460, Math.max(140, 0.25 * Math.sqrt(hr.width * hr.height)))
+  );
+  if (wallEl.value) {
+    wallEl.value.style.setProperty('--wall-cell', `${wallCell}px`);
+    wallEl.value.style.setProperty('--wall-gap', `${Math.round(wallCell * 0.12)}px`);
+  }
   measureWall();
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
   // 画布盖住整个 hero，粒子和被拖走的格子才不会在舞台外被裁掉
@@ -1423,7 +1405,7 @@ watch(brandEntered, (v) => {
   showSubjectSolid();
 });
 
-// 主题一换：浅色下粒子要反过来（uInvert），水波纹那层也要改淡出方向。
+// 主题一换：浅色下粒子要反过来（uInvert）。
 // 颜色不能硬切 —— 先把粒子层淡掉、换完色再淡回来，背景色本身由 CSS 过渡。
 watch(isDark, async (dark) => {
   if (!reducedMotion.value) {
@@ -1431,7 +1413,6 @@ watch(isDark, async (dark) => {
     await new Promise((r) => setTimeout(r, 230));
   }
   if (scene3d) scene3d.uniforms.uInvert.value = dark ? 0 : 1;
-  syncRippleBackground();
   layoutGrain();
   if (grainCanvas.value) drawGrain(performance.now(), grainMouse);
   if (scene3d) updateScene(performance.now());
@@ -1522,17 +1503,16 @@ onBeforeUnmount(() => {
     </button>
     </Teleport>
 
-    <!-- 背景拼贴：最新 8 篇其他博客的封面。去色、模糊、极淡，只是底纹 ——
-         不承载悬停也不承载点击（pointer-events: none），一切都浮在它上面；
-         但指针透镜会把它们一起弯（updateWallLens）。
+    <!-- 背景海报墙：规则网格铺满 hero，封面上限 28 张循环使用。
+         去色、极淡，只是底纹 —— 不承载悬停也不承载点击；
+         指针靠近时附近格子会被顶起（updateWallLens）。
          这里**不写 src**：首屏一个请求都不该为它花，等开场走完由 revealBlogWall
-         一张一张挂上并淡进来。 -->
+         一批挂上并淡进来。 -->
     <div ref="wallEl" class="hero-wall" :class="{ 'is-off': wallHidden }" aria-hidden="true">
       <img
-        v-for="b in BLOG_WALL"
-        :key="b.slug"
+        v-for="(_, i) in WALL_TILES"
+        :key="i"
         class="hero-wall__img"
-        :style="{ left: b.x + '%', top: b.y + '%', width: b.w + '%', '--r': b.r + 'deg' }"
         alt=""
         decoding="async"
         draggable="false"
@@ -1928,11 +1908,8 @@ onBeforeUnmount(() => {
   mask-image: radial-gradient(ellipse 46% 46% at 50% 50%, #000 50%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse 46% 46% at 50% 50%, #000 50%, transparent 100%);
   /* 这里**不能放 filter**。
-     涟漪画布静止时整片填的是背景色（uBg）；容器上只要有 contrast/brightness，
-     那个填充就会被推离背景色 —— 浅色下 #fafafa 被 brightness(1.06) 顶成纯白 255，
-     背景是 250，差 2%。平时看不出来，但椭圆遮罩会把这块填充裁成一个椭圆，
-     在一大片平色上就是一块明显的椭圆（切换主题时粒子淡出，它就先露出来了）。
-     人像图本来就是黑白的，grayscale 是空转；contrast/brightness 那 8% 不值得换这个。 */
+     contrast/brightness 会把涟漪画布里的照片和粒子层的灰度一起推离原值，
+     浅色下尤其明显（人像会发灰/发白）。人像图本来就是黑白的，grayscale 是空转。 */
   /* 闲置时在风里飘。关键帧刻意做得不规则 —— 单一正弦摆起来是机械的，
      几个不均匀的节点加长周期才像被风推着。 */
   animation: subject-wind 17s ease-in-out infinite;
@@ -2016,6 +1993,13 @@ onBeforeUnmount(() => {
 
 .hero-subject__ripple.is-ready {
   opacity: 1;
+}
+
+/* 静止且没有悬停：整层没有东西要画（见 useRippleEffect 的 syncIdle）。
+   藏掉它，椭圆遮罩里那块背景色就不会被看见 —— 否则背景上有海报/粒子时，
+   那块平色会被裁成一个明显的椭圆。 */
+.hero-subject__ripple.is-idle {
+  opacity: 0;
 }
 
 /* 粒子层压在照片上面。人像那一阶段它要让位（否则粒子直接糊在人像上，
@@ -2122,29 +2106,38 @@ onBeforeUnmount(() => {
 
 .hero-wall {
   position: absolute;
-  inset: 0;
+  /* 往外多铺一格：球面把边缘的格子往后/往外推，不留出硬边 */
+  inset: calc(-1 * var(--wall-cell, 240px));
   z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--wall-cell, 240px));
+  grid-auto-rows: var(--wall-cell, 240px);
+  gap: var(--wall-gap, 29px);
+  /* 横向居中（左右各留一格 overscan）；纵向从顶部铺起 —— 64 块会比墙面多，
+     居中会把前几行推到视口上方，最先加载的封面就全看不见了。 */
+  place-content: start center;
   pointer-events: none;
   overflow: hidden;
   opacity: var(--wall-opacity);
   transition: opacity 0.4s ease;
-  mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, #000 40%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 72% 72% at 50% 50%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 42%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 42%, transparent 100%);
 }
 
 .hero-wall__img {
-  position: absolute;
-  aspect-ratio: 3 / 4;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
   display: block;
   /* GSAP 从 0 淡到 1（见 revealBlogWall）；浓度由 .hero-wall 那一层压 */
   opacity: 0;
   visibility: hidden;
-  transform: rotate(var(--r, 0deg));
+  transform-origin: 50% 50%;
+  will-change: transform;
+  backface-visibility: hidden;
   /* 清晰，但去色 —— 整站是黑白语言，底纹带上颜色就会跳出来 */
   filter: grayscale(1);
-
 }
 
 

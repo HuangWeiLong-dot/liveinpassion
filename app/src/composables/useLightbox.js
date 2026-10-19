@@ -14,6 +14,8 @@ const items = ref([]);
 const index = ref(0);
 const isOpen = ref(false);
 const isLoading = ref(false);
+// 打开它的那个窗口矩形（照片飞行过渡的起点）；外部直接 open 时可以为空
+const origin = ref(null);
 
 const currentItem = computed(() => items.value[index.value] || null);
 const currentSrc = computed(() => {
@@ -34,11 +36,14 @@ function resolve(url) {
 }
 
 export function useLightbox() {
-  function open(list, startIndex = 0) {
+  function open(list, startIndex = 0, from = null) {
     items.value = Array.isArray(list) ? list : [];
     index.value = startIndex;
     isLoading.value = true;
     isOpen.value = true;
+    origin.value = from && from.rect
+      ? { rect: { ...from.rect }, src: from.src || '', aspect: from.aspect || 0 }
+      : null;
     document.body.style.overflow = 'hidden';
   }
 
@@ -65,5 +70,5 @@ export function useLightbox() {
     isLoading.value = false;
   }
 
-  return { items, index, isOpen, isLoading, currentSrc, resolve, open, close, prev, next, onImageSettled };
+  return { items, index, isOpen, isLoading, currentSrc, origin, resolve, open, close, prev, next, onImageSettled };
 }

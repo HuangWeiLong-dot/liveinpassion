@@ -28,7 +28,6 @@ import {
 // 扭曲层：把封面画在能弯的细分平面上（唯一必须 WebGL 的部分）。
 // 它**不带姿态数学** —— 姿态只有 useFilmPose 那一份，两边共用，避免劈叉。
 
-import AppFooter from '../components/AppFooter.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -1224,7 +1223,9 @@ function activate() {
   // 插回文档，querySelector 一律返回 null（实测就漏在这儿），而且实测那次返回
   // onActivated 根本没来。route watcher 是 flush: 'pre'（DOM 更新之前），
   // 类会赶在元素重新进文档之前挂上，动画正好在插回时开播。
-  document.documentElement.style.overflow = 'hidden'; // 这一页只横滚
+  // 这一页的纵向滚动现在留给"轨道滚到头之后继续下滑，露出全局抽屉页脚"。
+  // 每次进来先回到轨道顶部。
+  window.scrollTo(0, 0);
   reduceMotion = typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   bindClickCapture();
@@ -1265,7 +1266,6 @@ function deactivate() {
   // 这棵 DOM 已经被移出文档了，scrollLeft 读回来是 0，照单全收就把位置抹平了。
   if (scroller.value?.scrollLeft) saveScroll(scroller.value.scrollLeft);
   document.documentElement.classList.remove('blogs-lookback');
-  document.documentElement.style.overflow = '';
   // ⚠ 这里**不要**去摘 bd-return-fade：实测这一跳里 deactivate 也会跑，
   // 刚挂上的"渐入"类会被当场摘掉，动画根本没播（返回时周围元素直接以 1 出现）。
   // 类的清理交给那个定时器 —— 它是普通 setTimeout，即使组件被停用也照样到点执行。
@@ -1580,7 +1580,6 @@ function onVisibility() {
             >{{ m.label }}</span>
           </div>
         </div>
-        <AppFooter />
       </div>
     </section>
   </main>
@@ -1631,8 +1630,11 @@ function onVisibility() {
 
 /* ── 版心 ────────────────────────────────────────────────────────────── */
 .jb-stage {
-  position: fixed;
-  inset: 0;
+  /* 不再 fixed 铺满：页面要能继续向下滚，把全局抽屉页脚露出来。
+     高度仍锁一屏，横向轨道、字标、rail 的布局不变。 */
+  position: relative;
+  height: 100vh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   overflow: hidden;

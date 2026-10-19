@@ -91,7 +91,12 @@
             scroll-behavior: smooth;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            /* clip 而不是 hidden：hidden 会把 html/body 变成滚动容器，
+               页面里的 position: sticky（ME 的隧道舞台）就会失效。
+               clip 同样不产生横向滚动，但不会建滚动容器。
+               前一行是旧浏览器的兜底。 */
             overflow-x: hidden;
+            overflow-x: clip;
             width: 100%;
             /* 藏掉浏览器默认滚动条（整站在暗底上，那一条灰杠很显眼）。
                注意是**藏**不是禁用：页面照旧能滚，只是不画那条轨道。
@@ -128,6 +133,7 @@
             font-weight: 300;
             line-height: 1.7;
             overflow-x: hidden;
+            overflow-x: clip;
             width: 100%;
             will-change: scroll-position;
         }
@@ -563,6 +569,11 @@
             display: none;
             width: 100%;
             overflow-x: hidden;
+            /* 页面内容是一块不透明的"抽屉"，盖住固定在底部的全局 footer；
+               滚到页尾、进入 footer 的占位时，footer 才露出来（见 AppFooter.vue） */
+            position: relative;
+            z-index: 1;
+            background: var(--bg);
         }
 
         .page.active {
@@ -1217,7 +1228,7 @@
 
         /* 电影海报按钮 */
         .me-movie-box {
-            background: url('/me/1.jpg') center/cover no-repeat;
+            background: url('/me/posters/dead_poets_society.jpg') center/cover no-repeat;
             position: relative;
             overflow: hidden;
         }
@@ -1240,7 +1251,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: url('/me/1.jpg') center/cover no-repeat;
+            background: url('/me/posters/dead_poets_society.jpg') center/cover no-repeat;
             transform: scale(1);
             transition: transform 0.3s ease;
         }
@@ -1262,7 +1273,7 @@
 
         /* 专辑封面按钮 */
         .me-album-box {
-            background: url('/me/2.jpg') center/cover no-repeat;
+            background: url('/me/posters/ok_computer.jpg') center/cover no-repeat;
             position: relative;
             overflow: hidden;
         }
@@ -1285,7 +1296,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: url('/me/2.jpg') center/cover no-repeat;
+            background: url('/me/posters/ok_computer.jpg') center/cover no-repeat;
             transform: scale(1);
             transition: transform 0.3s ease;
         }
@@ -1671,6 +1682,12 @@
             justify-content: center;
             align-items: center;
             cursor: zoom-out;
+            transition: opacity 0.4s ease;
+        }
+
+        /* 照片飞回窗口期间，遮罩跟着淡出 */
+        .me-photo-lightbox.leaving {
+            opacity: 0;
         }
 
         .me-photo-lightbox.active {

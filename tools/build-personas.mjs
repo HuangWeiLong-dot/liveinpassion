@@ -4,12 +4,16 @@
 //   node tools/build-personas.mjs
 //
 // 产物：
-//   me/personas/1.jpg ~ 4.jpg   720x960 q82，按哈希文件名排序（顺序稳定，
-//                               对应关系写在 HeroConcept.vue 的 PERSONAS 配置里）
+//   me/personas/advocate.jpg / idealist.jpg / observer.jpg / romanticist.jpg
+//                               720x960 q82，文件名直接对应人格
 //   控制台提示的对照图路径       源图（上排） vs 效果图（下排）
 //
+// 源图归档在 example/me/（example/ 整体 gitignore）：
+//   example/me/Advocate.jpg / idealist.jpg / Observer.jpg / Romanticist.jpg
+//   example/me/Individuation.jpg（主体那张，不参与本脚本）
+//
 // example/ 不在 vite 的静态目录白名单里（只有 icons/avatar/me/logo/music），
-// 所以必须落到 me/ 下面才会被 dev server 和构建复制。放 me/personas/。
+// 所以压缩产物必须落到 me/ 下面才会被 dev server 和构建复制。放 me/personas/。
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -18,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const exampleDir = path.join(repoRoot, 'example');
+const sourceDir = path.join(exampleDir, 'me');
 const meDir = path.join(repoRoot, 'me');
 const outDir = path.join(meDir, 'personas');
 const sheetPath = path.join(repoRoot, '.hero-shots', 'persona-sheet.png');
@@ -25,11 +30,15 @@ const sheetPath = path.join(repoRoot, '.hero-shots', 'persona-sheet.png');
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(path.dirname(sheetPath), { recursive: true });
 
-const examples = fs.readdirSync(exampleDir).filter((f) => f.endsWith('.png')).sort();
+// example/ 顶层还有主体用的 individuation.png，不能一起当成人格效果图
+const PERSONA_EXAMPLES = ['Advocate.png', 'Idealist.png', 'Observer.png', 'Romanticist.png'];
+const examples = PERSONA_EXAMPLES
+  .filter((f) => fs.existsSync(path.join(exampleDir, f)))
+  .sort();
 const sources = ['Advocate.jpg', 'idealist.jpg', 'Observer.jpg', 'Romanticist.jpg'];
 
 if (examples.length !== 4) {
-  console.error(`预期 4 张 example，实际 ${examples.length}`);
+  console.error(`预期 4 张 example 效果图，实际 ${examples.length}`);
   process.exit(1);
 }
 
@@ -39,6 +48,7 @@ from PIL import Image, ImageDraw
 Image.MAX_IMAGE_PIXELS = None
 
 examples, sources, out_dir, sheet = json.loads(sys.argv[1]), json.loads(sys.argv[2]), sys.argv[3], sys.argv[4]
+names = ['advocate.jpg', 'idealist.jpg', 'observer.jpg', 'romanticist.jpg']
 
 CELL_W, CELL_H = 300, 400
 LABEL_H = 22
@@ -63,7 +73,7 @@ made = []
 for i, p in enumerate(examples):
     im = Image.open(p)
     cell(im, i * CELL_W, CELL_H + LABEL_H, 'EX  #' + str(i + 1) + '  ' + p.split('\\\\')[-1][:8])
-    out = out_dir + '/' + str(i + 1) + '.jpg'
+    out = out_dir + '/' + names[i]
     im.convert('RGB').resize((720, 960), Image.LANCZOS).save(out, 'JPEG', quality=82, optimize=True)
     made.append(out)
 
@@ -73,7 +83,7 @@ print(json.dumps({'sheet': sheet, 'made': made}))
 
 const out = execFileSync(
   'python',
-  ['-c', script, JSON.stringify(examples.map((f) => path.join(exampleDir, f))), JSON.stringify(sources), outDir.replace(/\\/g, '/'), sheetPath.replace(/\\/g, '/'), meDir.replace(/\\/g, '/')],
+  ['-c', script, JSON.stringify(examples.map((f) => path.join(exampleDir, f))), JSON.stringify(sources), outDir.replace(/\\/g, '/'), sheetPath.replace(/\\/g, '/'), sourceDir.replace(/\\/g, '/')],
   { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
 );
 
