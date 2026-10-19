@@ -1734,6 +1734,18 @@ function copyWeChat() {
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* 桌面端：人物整体再放大一点；FRIENDS 的群像（cover）保持原比例不动。
+   46vw / 44vw 是窄桌面下的宽度上限，避免人物把卡片挤出视口。 */
+@media (min-width: 901px) {
+  .me-beam--me .me-beam__subject {
+    height: min(72vh, 720px, 50vw);
+  }
+
+  .me-beam--gallery .me-beam__subject {
+    height: min(66vh, 660px, 48vw);
+  }
+}
+
 /* ── 响应式 ───────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .me-beam__inner {
