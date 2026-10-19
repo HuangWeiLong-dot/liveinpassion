@@ -99,8 +99,12 @@ export function createWallEntry() {
 
     // 一扇窗在屏幕上大约 300px 宽时开始
     const scale = Math.min(5, Math.max(2.8, 300 / Math.max(1, centerEl.offsetWidth)));
-    const dx = window.innerWidth / 2 - originX;
-    const dy = window.innerHeight / 2 - originY;
+    // 用 clientWidth/clientHeight 而不是 innerWidth/innerHeight：
+    // Windows 上滚动条占的宽度也算在 innerWidth 里，直接除以 2 会偏半个滚动条。
+    const viewW = document.documentElement.clientWidth || window.innerWidth;
+    const viewH = document.documentElement.clientHeight || window.innerHeight;
+    const dx = viewW / 2 - originX;
+    const dy = viewH / 2 - originY;
 
     gsap.set(wall, { transformOrigin: `${cx}px ${cy}px`, x: dx, y: dy, scale });
     for (const el of children) {

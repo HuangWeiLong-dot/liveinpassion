@@ -48,7 +48,12 @@ function scheduleIntro() {
   if (introPlayed) return;
   introPlayed = true;
   clearTimeout(introTimer);
-  introTimer = setTimeout(() => wallEntry.play(wallRef.value), 1400);
+  introTimer = setTimeout(() => {
+    // 真正开演前再按当前布局/字体/滚动量一次，保证焦点窗在屏幕正中
+    wallEntry.reset(wallRef.value);
+    wallEntry.prime(wallRef.value);
+    wallEntry.play(wallRef.value);
+  }, 1400);
 }
 
 // 位移是 px 的，列数一变就不再落在格子上：停下后把窗户放回自己的槽位。
@@ -410,8 +415,12 @@ onActivated(() => {
   introPlayed = false;
   wallEntry.reset(wallRef.value);
   nextTick(() => {
-    wallEntry.prime(wallRef.value);
-    observeWallImages();
+    // 等路由的 scrollBehavior 把页面滚回顶部后再量；nextTick 里量到的
+    // 可能还是上一页的滚动位置，焦点窗会因此偏出屏幕中心。
+    requestAnimationFrame(() => {
+      wallEntry.prime(wallRef.value);
+      observeWallImages();
+    });
   });
   if (brandEntered.value) scheduleIntro();
 });
