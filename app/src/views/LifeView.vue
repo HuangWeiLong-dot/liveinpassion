@@ -48,6 +48,7 @@ const MONTHS = [
 ];
 
 const data = ref(null);
+const rawIndex = ref(null);
 const error = ref(false);
 const loading = ref(true);
 const clock = ref('--:--:--');
@@ -65,6 +66,10 @@ const tipRef = ref(null);
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-US');
+}
+
+function daysWord(n) {
+  return n === 1 ? 'day' : 'days';
 }
 
 function compact(n) {
@@ -246,28 +251,28 @@ const kpis = computed(() => {
       key: 'tracked',
       label: 'TRACKED HOURS',
       value: trackedDays ? round(tracked, 1) : null,
-      note: `${trackedDays} days with desktop data`,
+      note: `${trackedDays} ${daysWord(trackedDays)} with desktop data`,
       delay: 0.1,
     },
     {
       key: 'steps',
       label: 'STEPS',
       value: stepDays ? Math.round(steps) : null,
-      note: `${stepDays} days recorded`,
+      note: `${stepDays} ${daysWord(stepDays)} recorded`,
       delay: 0.15,
     },
     {
       key: 'moving',
       label: 'HOURS MOVING',
       value: locationDays ? round(movingMinutes / 60, 1) : null,
-      note: `${locationDays} days with location`,
+      note: `${locationDays} ${daysWord(locationDays)} with location`,
       delay: 0.2,
     },
     {
       key: 'unlocks',
       label: 'PHONE UNLOCKS',
       value: phoneDays ? Math.round(unlocks) : null,
-      note: `${phoneDays} days recorded`,
+      note: `${phoneDays} ${daysWord(phoneDays)} recorded`,
       delay: 0.25,
     },
     {
@@ -578,12 +583,29 @@ const hasAi = computed(() => payloads.value.some((p) => p.ai && p.ai.cost != nul
 
 const tickerItems = computed(() => [
   'Aggregated nightly at 23:00',
-  'City-level places only',
-  'No coordinates published',
-  'No window titles or URLs',
+  'Full raw archive below',
+  'Journals · notes · tasks · events',
+  'Credential-like URL values redacted',
   data.value?.timezone || 'Asia/Shanghai (UTC+8)',
   'Refreshes every 60 seconds',
 ]);
+
+const ARCHIVE_TABS = [
+  { kind: 'journal', label: 'JOURNAL', note: 'Full daily entries' },
+  { kind: 'notes', label: 'NOTES', note: 'Quick notes and recaps' },
+  { kind: 'tasks', label: 'TASKS', note: 'Done and open' },
+  { kind: 'qa', label: 'Q & A', note: 'Questions answered' },
+  { kind: 'events', label: 'EVENTS', note: 'Raw event stream' },
+  { kind: 'blocks', label: 'BLOCKS', note: 'Window titles and URLs' },
+  { kind: 'weekly', label: 'REVIEWS', note: 'Weekly summaries' },
+];
+
+const archiveTabs = computed(() => ARCHIVE_TABS.map((t) => {
+  const items = rawIndex.value?.kinds?.[t.kind] || [];
+  return { ...t, count: items.length, latest: items[0]?.id || null };
+}));
+
+const archiveTotal = computed(() => archiveTabs.value.reduce((a, t) => a + t.count, 0));
 
 // ── 拉数据 ──────────────────────────────────────────────────────────────
 
@@ -599,6 +621,15 @@ let dotTween = null;
 let stopBrandWatch = null;
 let abortCtl = null;
 const revealTriggers = [];
+
+async function loadRawIndex() {
+  try {
+    const res = await fetch(`${CMS_BASE}/api/life/raw/index`, { cache: 'no-store' });
+    if (res.ok) rawIndex.value = await res.json();
+  } catch {
+    /* 归档计数是附加信息，失败不影响总览 */
+  }
+}
 
 async function load() {
   if (abortCtl) abortCtl.abort();
@@ -617,6 +648,7 @@ async function load() {
     error.value = false;
     loading.value = false;
     lastUpdated.value = formatWhen(json.updatedAt || json.generatedAt);
+    loadRawIndex();
 
     await nextTick();
     if (!activeNow) return;
@@ -1034,7 +1066,7 @@ onBeforeUnmount(() => {
         <p class="stats-subtitle">A quiet record of time, motion, places and attention</p>
 
         <div class="stats-hero-meta">
-          <span>Last {{ rows.length || '—' }} days</span>
+          <span>Last {{ rows.length || '—' }} {{ rows.length === 1 ? 'day' : 'days' }}</span>
           <i aria-hidden="true"></i>
           <span>{{ city }}</span>
           <i aria-hidden="true"></i>
@@ -1430,9 +1462,43 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No AI spend recorded in this window.</p>
         </div>
 
+        <!-- 06 归档：全量原始数据 -->
+        <div class="stats-panel life-panel life-archive-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">06</span>
+              <h2>THE ARCHIVE</h2>
+            </div>
+            <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>
+          </div>
+
+          <div class="life-archive-grid">
+            <router-link
+              v-for="(t, i) in archiveTabs"
+              :key="t.kind"
+              :to="`/life/archive/${t.kind}`"
+              class="life-archive-card"
+            >
+              <span class="life-archive-index">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="life-archive-name">{{ t.label }}</span>
+              <span class="life-archive-note">{{ t.note }}</span>
+              <span class="life-archive-meta">
+                {{ t.count ? t.count + ' entries' : 'No entries yet' }}
+              </span>
+              <span class="life-archive-arrow" aria-hidden="true">→</span>
+            </router-link>
+          </div>
+
+          <p class="life-archive-privacy">
+            <i aria-hidden="true"></i>
+            Raw life log: coordinates, window titles, URLs, journals and notes are public.
+            Credential-like URL query values are replaced with REDACTED.
+          </p>
+        </div>
+
         <p class="stats-foot" data-reveal>
-          <span><i aria-hidden="true"></i>City-level places only</span>
-          <span><i aria-hidden="true"></i>No coordinates, titles or package names</span>
+          <span><i aria-hidden="true"></i>Raw archive includes coordinates and window titles</span>
+          <span><i aria-hidden="true"></i>Credential-like URL values redacted</span>
           <span><i aria-hidden="true"></i>{{ data.timezone }}</span>
           <span><i aria-hidden="true"></i>Refreshes every 60 seconds</span>
         </p>

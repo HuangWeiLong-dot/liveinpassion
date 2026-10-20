@@ -21,6 +21,7 @@ const SECTIONS = {
   gallery: 'GALLERY',
   stats: 'STATS',
   life: 'LIFE',
+  'life-archive': 'ARCHIVE',
   'not-found': 'NOT FOUND',
 };
 

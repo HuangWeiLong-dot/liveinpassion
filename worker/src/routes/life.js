@@ -157,9 +157,9 @@ function validateDay(d) {
   return null;
 }
 
-// ---------- POST /api/life/ingest ----------
-
-lifeRoutes.post('/life/ingest', async (c) => {
+// 共享的写入鉴权：Bearer token 与 LIFE_INGEST_TOKEN 做常量时间比较。
+// 原始数据接口也用它，避免两套逻辑漂移。
+export async function lifeAuth(c) {
   const secret = c.env.LIFE_INGEST_TOKEN;
   if (!secret) return c.json({ error: 'life ingest not configured' }, 503);
 
@@ -168,6 +168,14 @@ lifeRoutes.post('/life/ingest', async (c) => {
   if (!match || !(await checkPassword(secret, match[1]))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
+  return null;
+}
+
+// ---------- POST /api/life/ingest ----------
+
+lifeRoutes.post('/life/ingest', async (c) => {
+  const denied = await lifeAuth(c);
+  if (denied) return denied;
 
   const declared = Number(c.req.header('Content-Length') || 0);
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {

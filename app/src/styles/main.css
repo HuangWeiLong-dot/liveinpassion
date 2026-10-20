@@ -6551,6 +6551,812 @@
             }
         }
 
+        /* ---- LIFE 归档入口（总览页 06） ---- */
+        .life-archive-panel {
+            margin-top: 32px;
+        }
+
+        .life-archive-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border-top: 1px solid var(--border);
+            border-left: 1px solid var(--border);
+        }
+
+        .life-archive-card {
+            position: relative;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            grid-template-rows: auto auto auto;
+            column-gap: 12px;
+            row-gap: 7px;
+            padding: 22px 24px;
+            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .life-archive-card:hover {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-archive-index {
+            grid-column: 1;
+            grid-row: 1;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .life-archive-name {
+            grid-column: 2;
+            grid-row: 1;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.05rem;
+            letter-spacing: 0.16em;
+        }
+
+        .life-archive-note {
+            grid-column: 1 / 3;
+            grid-row: 2;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .life-archive-meta {
+            grid-column: 1 / 3;
+            grid-row: 3;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .life-archive-arrow {
+            grid-column: 3;
+            grid-row: 1 / 4;
+            align-self: center;
+            font-size: 1rem;
+            transition: transform 0.3s ease;
+        }
+
+        .life-archive-card:hover .life-archive-index,
+        .life-archive-card:hover .life-archive-note,
+        .life-archive-card:hover .life-archive-meta {
+            color: var(--bg);
+            opacity: 0.65;
+        }
+
+        .life-archive-card:hover .life-archive-arrow {
+            transform: translateX(4px);
+        }
+
+        .life-archive-privacy {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            line-height: 1.7;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-archive-privacy i {
+            flex: 0 0 auto;
+            width: 4px;
+            height: 4px;
+            margin-top: 0.55em;
+            background: var(--text-secondary);
+        }
+
+        /* ==================== LIFE 归档页 ==================== */
+        .life-archive-section {
+            padding-top: 128px;
+        }
+
+        .life-archive-title {
+            font-size: clamp(2.2rem, 8vw, 5rem);
+            letter-spacing: 0.2em;
+        }
+
+        .life-archive-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1px;
+            width: max-content;
+            max-width: 100%;
+            margin-top: 40px;
+            border: 1px solid var(--border);
+            background: var(--border);
+            overflow-x: auto;
+        }
+
+        .life-archive-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 13px 18px;
+            background: var(--bg);
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.14em;
+            text-decoration: none;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        .life-archive-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .life-archive-tab.is-active {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-archive-tab-count {
+            font-size: 0.5rem;
+            opacity: 0.55;
+        }
+
+        .life-daybar {
+            display: flex;
+            gap: 1px;
+            width: max-content;
+            max-width: 100%;
+            margin-top: 18px;
+            padding: 1px;
+            border: 1px solid var(--border);
+            background: var(--border);
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        .life-day {
+            flex: 0 0 auto;
+            padding: 9px 12px;
+            border: 0;
+            background: var(--bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-day:hover {
+            color: var(--text-primary);
+        }
+
+        .life-day.is-active {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-doc-panel {
+            margin-top: 22px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .life-doc-head {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-doc-kind,
+        .life-doc-day {
+            color: var(--text-primary);
+        }
+
+        .life-doc-day {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-doc-count {
+            margin-left: auto;
+        }
+
+        .life-doc {
+            padding: 24px 28px 30px;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.92rem;
+            line-height: 1.75;
+        }
+
+        .life-doc h1 {
+            margin-bottom: 1rem;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+        }
+
+        .life-doc h2 {
+            margin: 2rem 0 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 500;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .life-doc h3 {
+            margin: 1.4rem 0 0.5rem;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            font-weight: 500;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-doc p {
+            margin: 0.65rem 0;
+            line-height: 1.75;
+        }
+
+        .life-doc ul,
+        .life-doc ol {
+            margin: 0.6rem 0 0.9rem 1.2rem;
+        }
+
+        .life-doc li {
+            margin: 0.28rem 0;
+            line-height: 1.65;
+        }
+
+        .life-doc input[type="checkbox"] {
+            margin-right: 0.45rem;
+            accent-color: var(--text-primary);
+            transform: translateY(1px);
+        }
+
+        .life-doc a {
+            color: var(--text-primary);
+            text-underline-offset: 3px;
+        }
+
+        .life-doc blockquote {
+            margin: 1rem 0;
+            padding-left: 1rem;
+            border-left: 1px solid var(--text-secondary);
+            color: var(--text-secondary);
+        }
+
+        .life-doc code {
+            padding: 0.1em 0.3em;
+            background: var(--background-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.8em;
+        }
+
+        .life-doc pre {
+            margin: 0.8rem 0;
+            padding: 1rem;
+            background: var(--background-secondary);
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.72rem;
+            line-height: 1.6;
+        }
+
+        .life-doc table {
+            width: 100%;
+            margin: 0.8rem 0;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        .life-doc th,
+        .life-doc td {
+            padding: 0.45rem 0.6rem;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .life-doc hr {
+            margin: 1.5rem 0;
+            border: 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-raw-details {
+            padding: 14px 28px 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-raw-details summary {
+            cursor: pointer;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-raw-details pre {
+            max-height: 420px;
+            margin-top: 14px;
+            padding: 16px;
+            background: var(--background-secondary);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.68rem;
+            line-height: 1.6;
+        }
+
+        .life-note,
+        .life-qa {
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-note:last-child,
+        .life-qa:last-child {
+            border-bottom: none;
+        }
+
+        .life-note-meta,
+        .life-qa-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-note-text,
+        .life-qa-question {
+            white-space: pre-wrap;
+            color: var(--text-primary);
+            font-size: 0.92rem;
+            line-height: 1.75;
+        }
+
+        .life-qa-question {
+            margin-bottom: 0.7rem;
+        }
+
+        .life-qa-answer,
+        .life-qa-note {
+            display: flex;
+            gap: 12px;
+            margin: 0.35rem 0;
+            white-space: pre-wrap;
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+
+        .life-qa-label {
+            flex: 0 0 auto;
+            padding-top: 0.35em;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-qa-note {
+            color: var(--text-secondary);
+        }
+
+        .life-qa-options {
+            margin: 0.5rem 0 0 1.2rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .life-tasks {
+            list-style: none;
+            margin: 0;
+            padding: 6px 28px 18px;
+        }
+
+        .life-task {
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            gap: 12px;
+            align-items: baseline;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-task:last-child {
+            border-bottom: none;
+        }
+
+        .life-task-box {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .life-task-text {
+            font-size: 0.92rem;
+            line-height: 1.65;
+        }
+
+        .life-task.is-done .life-task-text {
+            color: var(--text-secondary);
+            text-decoration: line-through;
+            text-decoration-thickness: 1px;
+        }
+
+        .life-event-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1px;
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--border);
+        }
+
+        .life-filter {
+            padding: 7px 11px;
+            border: 0;
+            background: var(--bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .life-filter b {
+            margin-left: 4px;
+            font-weight: 400;
+            opacity: 0.55;
+        }
+
+        .life-filter:hover {
+            color: var(--text-primary);
+        }
+
+        .life-filter.is-active {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-event-table {
+            padding: 0 24px;
+        }
+
+        .life-event {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-event-main {
+            display: grid;
+            grid-template-columns: 72px 88px 150px minmax(0, 1fr) 130px;
+            gap: 14px;
+            align-items: baseline;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            line-height: 1.5;
+        }
+
+        .life-event-time {
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-event-domain {
+            color: var(--text-primary);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .life-event-metric {
+            color: var(--text-secondary);
+        }
+
+        .life-event-value {
+            color: var(--text-primary);
+            overflow-wrap: anywhere;
+        }
+
+        .life-event-source {
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .life-event-meta {
+            margin-top: 6px;
+        }
+
+        .life-event-meta summary {
+            cursor: pointer;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            color: var(--text-secondary);
+        }
+
+        .life-event-meta pre {
+            max-height: 260px;
+            margin-top: 8px;
+            padding: 12px;
+            background: var(--background-secondary);
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.64rem;
+            line-height: 1.55;
+        }
+
+        .life-loadmore {
+            display: block;
+            width: calc(100% - 48px);
+            margin: 16px 24px 22px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.14em;
+        }
+
+        .life-loadmore:hover {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-blocks {
+            padding: 6px 0 10px;
+        }
+
+        .life-block {
+            padding: 16px 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-block:last-child {
+            border-bottom: none;
+        }
+
+        .life-block.is-blackhole {
+            border-left: 2px solid var(--text-primary);
+        }
+
+        .life-block-main {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            align-items: baseline;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-block-time {
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-block-category {
+            color: var(--text-primary);
+        }
+
+        .life-block-title {
+            margin-top: 8px;
+            white-space: pre-wrap;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .life-block-url {
+            margin-top: 5px;
+            overflow-wrap: anywhere;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+        }
+
+        .life-block-url a {
+            color: var(--text-primary);
+            text-underline-offset: 3px;
+        }
+
+        .life-block-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-top: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-block.is-blackhole .life-block-meta {
+            color: var(--text-primary);
+        }
+
+        .life-weekly {
+            padding: 24px 28px 30px;
+        }
+
+        .life-weekly-range {
+            margin-bottom: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-prose {
+            white-space: pre-wrap;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.92rem;
+            line-height: 1.8;
+        }
+
+        .life-weekly-facts {
+            margin: 20px 0 0 1.2rem;
+            font-size: 0.84rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+        }
+
+        .life-archive-disclaimer {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            margin-top: 18px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.08em;
+            line-height: 1.7;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-archive-disclaimer i {
+            flex: 0 0 auto;
+            width: 4px;
+            height: 4px;
+            margin-top: 0.55em;
+            background: var(--text-secondary);
+        }
+
+        .life-archive-loading {
+            grid-template-columns: repeat(3, 1fr);
+            height: 180px;
+            margin-top: 22px;
+        }
+
+        @media (max-width: 1024px) {
+            .life-archive-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .life-archive-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .life-archive-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+
+            .life-archive-tab {
+                flex: 0 0 auto;
+            }
+
+            .life-doc {
+                padding: 20px 20px 24px;
+            }
+
+            .life-doc h1 {
+                font-size: 1.25rem;
+            }
+
+            .life-note,
+            .life-qa {
+                padding: 16px 20px;
+            }
+
+            .life-block {
+                padding: 14px 20px;
+            }
+
+            .life-event-table {
+                padding: 0 16px;
+            }
+
+            .life-event-main {
+                grid-template-columns: 62px minmax(0, 1fr) auto;
+                grid-auto-rows: auto;
+                gap: 4px 10px;
+            }
+
+            .life-event-time { grid-column: 1; grid-row: 1; }
+            .life-event-domain { grid-column: 2; grid-row: 1; }
+            .life-event-source { grid-column: 3; grid-row: 1; }
+            .life-event-metric { grid-column: 2; grid-row: 2; }
+            .life-event-value { grid-column: 1 / 4; grid-row: 3; }
+
+            .life-loadmore {
+                width: calc(100% - 32px);
+                margin: 14px 16px 18px;
+            }
+
+            .life-archive-disclaimer {
+                font-size: 0.46rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .life-archive-title {
+                letter-spacing: 0.12em;
+            }
+
+            .life-doc-panel {
+                margin-top: 16px;
+            }
+
+            .life-doc-head {
+                padding: 14px 16px;
+            }
+
+            .life-tasks {
+                padding: 4px 20px 14px;
+            }
+
+            .life-weekly {
+                padding: 18px 20px 22px;
+            }
+        }
+
 /*
  * X 键：把页面上所有的图标 / 按钮收起来（见 App.vue 的 onKeydown）。
  * 用 html 上的类 + 全局选择器，是因为这些控件分散在 shell 和各个页面里

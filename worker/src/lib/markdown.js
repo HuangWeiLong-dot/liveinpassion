@@ -13,11 +13,14 @@ const ALLOWED_TAGS = [
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
   // 照片排版容器：gallery / media-text
   'figure', 'figcaption', 'div', 'section', 'span',
+  // 日记里 GFM 任务列表的只读复选框
+  'input',
 ];
 
 const ALLOWED_ATTRS = {
   a: ['href', 'title', 'target', 'rel'],
   img: ['src', 'alt', 'title', 'width', 'height'],
+  input: ['type', 'checked', 'disabled'],
   '*': ['class', 'data-gid'],
 };
 

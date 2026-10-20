@@ -11,6 +11,29 @@
 
 ---
 
+## update: 34 — 2026-10-20
+
+### LIFE 全量归档（/life/archive）
+- 新增七个归档视图：JOURNAL（完整日记 Markdown）、NOTES（随手记）、TASKS、
+  Q&A、EVENTS（原始事件长表）、BLOCKS（窗口标题/URL/分类时间块）、REVIEWS
+  （周总结，有则显示）。日期切换、事件 domain 筛选、META 展开、LOAD MORE。
+- LIFE 总览底部新增 **06 THE ARCHIVE** 入口卡片，显示各分区条目数。
+- 隐私边界改为「全量」：坐标、轨迹、窗口标题、URL、包名、日记/随手记/问答
+  正文全部公开；只有 URL 里像 token/state/code/part 的 query 值、
+  `sk-`/`ghp_`/`AKIA` 这类 key、Bearer 头与 `password=...` 被替换成 REDACTED。
+  页面顶部与底部都写明了这条边界。
+
+### Worker / 存储
+- 新增 `POST /api/life/raw/ingest`（Bearer token）、`GET /api/life/raw/index`、
+  `GET /api/life/raw/:kind/:id`。原始数据存 R2 `life/raw/<kind>/<id>.{md,json}`，
+  不走 D1（单日事件约 30–50 KB，R2 没有 D1 行大小/SQL 长度限制）。
+- 日记由 Worker 用 `marked` + `sanitize-html` 渲染；允许只读任务复选框。
+- 鉴权抽成 `lifeAuth()`，聚合与原始写入共用。
+
+### 工具
+- 新增 `tools/verify-life-archive.mjs`：七个 tab、日期切换、日记 HTML、
+  随手记、任务、问答、事件筛选/分页、BLOCKS、空周总结、手机无溢出、零报错。
+
 ## update: 33 — 2026-10-20
 
 ### LIFE 页（/life）
