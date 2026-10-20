@@ -25,6 +25,11 @@ import {
   setDocCache,
   setIndexCache,
 } from '../data/lifeArchiveCache.js';
+import {
+  MAP_MAX_DAYS,
+  buildGeoMap,
+  loadLifeTracks,
+} from '../data/lifeGeo.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -53,6 +58,8 @@ const MONTHS = [
   'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
 ];
 
+const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
 const data = ref(null);
 const rawIndex = ref(null);
 const error = ref(false);
@@ -63,10 +70,35 @@ const todayRef = ref('');
 const numbersRun = ref(0);
 const titleChars = [...'LIFE'];
 const rhythmHover = ref(-1);
+const motionHover = ref(-1);
+const phoneHover = ref(-1);
+const aiHover = ref(-1);
+const weekdayHover = ref(-1);
 
 const sectionRef = ref(null);
 const tickerTrackRef = ref(null);
 const tipRef = ref(null);
+const motionTipRef = ref(null);
+const phoneTipRef = ref(null);
+const aiTipRef = ref(null);
+const mapEl = ref(null);
+const mapSvgRef = ref(null);
+const dayCloseRef = ref(null);
+
+// ---- 彩色模式 / 单日详情 ----
+const colorMode = ref(false);
+try {
+  colorMode.value = localStorage.getItem('lifeColorMode') === '1';
+} catch {
+  /* 隐私模式下 localStorage 可能不可用 */
+}
+const dayDetail = ref('');
+let dayLocked = false;
+
+// ---- 地图（raw events 里的轨迹，懒加载） ----
+const mapState = ref('idle'); // idle | loading | ready | empty | error
+const mapTracks = ref([]);
+const mapHover = ref('');
 
 // ── 格式化 ──────────────────────────────────────────────────────────────
 
@@ -96,6 +128,17 @@ function sum(values) {
   return values.reduce((a, v) => a + (Number.isFinite(v) ? v : 0), 0);
 }
 
+function mean(values) {
+  const valid = values.filter((v) => Number.isFinite(v));
+  return valid.length ? sum(valid) / valid.length : null;
+}
+
+function kmLabel(km) {
+  const v = Number(km);
+  if (!Number.isFinite(v) || v <= 0) return '—';
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} km`;
+}
+
 function shortDay(d) {
   return d.slice(5).replace('-', '/');
 }
@@ -103,6 +146,16 @@ function shortDay(d) {
 function fullDay(d) {
   const [, mo, day] = d.split('-');
   return `${MONTHS[Number(mo) - 1]} ${day}`;
+}
+
+const WEEKDAY_LONG = [
+  'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
+];
+
+function weekdayName(d) {
+  const date = new Date(`${d}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return '—';
+  return WEEKDAY_LONG[(date.getUTCDay() + 6) % 7];
 }
 
 function addDays(day, n) {
@@ -329,6 +382,10 @@ const rhythmLegend = computed(() => CATEGORY_ORDER.filter((c) => payloads.value.
 )));
 
 const rhythmHoverRow = computed(() => rhythmRows.value[rhythmHover.value] || null);
+const motionHoverRow = computed(() => motionRows.value[motionHover.value] || null);
+const phoneHoverRow = computed(() => phoneRows.value[phoneHover.value] || null);
+const aiHoverRow = computed(() => aiRows.value[aiHover.value] || null);
+const weekdayHoverRow = computed(() => weekdayRows.value[weekdayHover.value] || null);
 
 const topApps = computed(() => {
   const agg = {};
@@ -384,6 +441,13 @@ function seriesPath(values, n, max) {
     .map(([i, y], k) => `${k ? 'L' : 'M'}${(((i + 0.5) / n) * 1000).toFixed(2)},${y.toFixed(2)}`)
     .join(' ');
 }
+
+const motionMean = computed(() => mean(motionRows.value.map((r) => r.steps)));
+const motionMeanPct = computed(() => (
+  motionMean.value == null
+    ? null
+    : Math.max((motionMean.value / stepsMax.value) * 100, 0.6)
+));
 
 const rollingPath = computed(() => seriesPath(
   rollingMean.value, rows.value.length, stepsMax.value,
@@ -465,6 +529,42 @@ const places = computed(() => {
   };
 });
 
+// ── 03 地图（轨迹来自公开的 raw events） ───────────────────────────────
+
+const geoMap = computed(() => (
+  mapTracks.value.length
+    ? buildGeoMap(mapTracks.value, { width: 1000, height: 560 })
+    : null
+));
+
+const mappedKm = computed(() => (
+  Math.round(mapTracks.value.reduce((a, t) => a + (t.transports || [])
+    .reduce((x, y) => x + y.km, 0), 0))
+));
+
+const mappedPoints = computed(() => sum(mapTracks.value.map((t) => t.points || 0)));
+
+const mapHoverTrack = computed(() => (
+  mapTracks.value.find((t) => t.day === mapHover.value) || null
+));
+
+const transportRows = computed(() => {
+  const agg = {};
+  mapTracks.value.forEach((t) => {
+    (t.transports || []).forEach(({ mode, km }) => {
+      agg[mode] = (agg[mode] || 0) + km;
+    });
+  });
+  const list = Object.entries(agg).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const max = Math.max(...list.map(([, km]) => km), 0.0001);
+  return list.map(([name, km], i) => ({
+    name,
+    km: round(km, 1),
+    pct: Math.max((km / max) * 100, 2),
+    rank: String(i + 1).padStart(2, '0'),
+  }));
+});
+
 // ── 04 手机 ─────────────────────────────────────────────────────────────
 
 const phoneMax = computed(() => Math.max(
@@ -483,6 +583,13 @@ const phoneRows = computed(() => rows.value.map((r, i) => {
     pct: unlocks != null && unlocks > 0 ? Math.max((unlocks / phoneMax.value) * 100, 1.2) : 0,
   };
 }));
+
+const phoneMean = computed(() => mean(phoneRows.value.map((r) => r.unlocks)));
+const phoneMeanPct = computed(() => (
+  phoneMean.value == null
+    ? null
+    : Math.max((phoneMean.value / phoneMax.value) * 100, 0.6)
+));
 
 const phoneTop = computed(() => {
   const agg = {};
@@ -530,6 +637,13 @@ const aiRows = computed(() => rows.value.map((r, i) => {
     pct: cost != null && cost > 0 ? Math.max((cost / aiMax.value) * 100, 1.2) : 0,
   };
 }));
+
+const aiMean = computed(() => mean(aiRows.value.map((r) => r.cost)));
+const aiMeanPct = computed(() => (
+  aiMean.value == null
+    ? null
+    : Math.max((aiMean.value / aiMax.value) * 100, 0.6)
+));
 
 const aiBreakdown = computed(() => {
   const models = {};
@@ -587,8 +701,175 @@ const aiChips = computed(() => {
 
 const hasAi = computed(() => payloads.value.some((p) => p.ai && p.ai.cost != null));
 
+// ── 06 星期轮廓 ─────────────────────────────────────────────────────────
+//
+// 只看有桌面分类数据的天。按“平均每天”而不是总和，否则样本多的星期
+// 会单纯因为天数多而变长。
+
+const weekdayRows = computed(() => {
+  const buckets = WEEKDAYS.map((label) => ({
+    label,
+    days: 0,
+    hours: 0,
+    cats: Object.fromEntries(CATEGORY_ORDER.map((c) => [c, 0])),
+  }));
+
+  payloads.value.forEach((p) => {
+    if (!p.categories || p.trackedHours == null) return;
+    const d = new Date(`${p.day}T00:00:00Z`);
+    if (Number.isNaN(d.getTime())) return;
+    const idx = (d.getUTCDay() + 6) % 7;
+    const b = buckets[idx];
+    b.days += 1;
+    b.hours += p.trackedHours;
+    CATEGORY_ORDER.forEach((c) => {
+      b.cats[c] += Number(p.categories[c] || 0);
+    });
+  });
+
+  const max = Math.max(...buckets.map((b) => (b.days ? b.hours / b.days : 0)), 0.0001);
+
+  return buckets.map((b) => {
+    const total = b.days ? b.hours / b.days : null;
+    const segments = total == null ? [] : CATEGORY_ORDER
+      .filter((c) => b.cats[c] > 0)
+      .map((c) => ({
+        name: c,
+        cat: CATEGORY_INDEX[c],
+        hours: b.cats[c] / b.days,
+      }));
+    return {
+      label: b.label,
+      days: b.days,
+      total,
+      segments,
+      pct: total == null ? 0 : Math.max((total / max) * 100, 1.5),
+      isToday: false,
+    };
+  });
+});
+
+const weekdayChips = computed(() => {
+  const valid = weekdayRows.value.filter((d) => d.total != null);
+  const busiest = [...valid].sort((a, b) => b.total - a.total)[0];
+  const quietest = [...valid].sort((a, b) => a.total - b.total)[0];
+  const work = payloads.value.reduce((a, p) => (
+    p.categories ? a + Number(p.categories.Work || 0) : a
+  ), 0);
+  const tracked = payloads.value.reduce((a, p) => (
+    p.categories && p.trackedHours != null ? a + p.trackedHours : a
+  ), 0);
+
+  return [
+    { label: 'BUSIEST', value: busiest ? busiest.label : '—' },
+    { label: 'QUIETEST', value: quietest ? quietest.label : '—' },
+    { label: 'WORK SHARE', value: tracked ? `${Math.round((work / tracked) * 100)}%` : '—' },
+    { label: 'SAMPLE', value: `${valid.reduce((a, d) => a + d.days, 0)} days` },
+  ];
+});
+
+// ── 单日详情 ────────────────────────────────────────────────────────────
+//
+// 点任意一天任意一根柱子，或者用键盘 Enter，打开当天所有数据源的快照。
+// 数据仍然来自同一个窗口，不额外发请求；缺数据的源显示为 —。
+
+function pairRows(pairs, digits = 2) {
+  const list = Array.isArray(pairs) ? pairs : [];
+  const max = Math.max(...list.map(([, v]) => Number(v) || 0), 0.0001);
+  return list.map(([name, value], i) => ({
+    name,
+    value: round(value, digits),
+    pct: Math.max(((Number(value) || 0) / max) * 100, 2),
+    rank: String(i + 1).padStart(2, '0'),
+  }));
+}
+
+const dayView = computed(() => {
+  const row = rows.value.find((r) => r.day === dayDetail.value);
+  if (!row) return null;
+  const p = row.payload;
+  if (!p) return { row, payload: null };
+
+  const categories = p.categories
+    ? CATEGORY_ORDER
+      .filter((c) => (p.categories[c] || 0) > 0)
+      .map((c) => ({
+        name: c,
+        cat: CATEGORY_INDEX[c],
+        hours: p.categories[c],
+        pct: p.trackedHours ? (p.categories[c] / p.trackedHours) * 100 : 0,
+      }))
+    : [];
+
+  const h = p.health;
+  const healthRows = h ? [
+    h.steps != null && ['STEPS', fmt(h.steps)],
+    h.hrAvg != null && ['AVG HR', `${Math.round(h.hrAvg)} bpm`],
+    h.hrMin != null && ['MIN HR', `${Math.round(h.hrMin)} bpm`],
+    h.runs != null && ['RUNS', String(Math.round(h.runs))],
+    h.runKm != null && ['DISTANCE', `${h.runKm.toFixed(2)} km`],
+    h.runMinutes != null && ['RUN TIME', minutesLabel(h.runMinutes)],
+    h.runPaceS != null && h.runPaceS > 0 && ['BEST PACE', paceLabel(h.runPaceS)],
+    h.vo2max != null && ['VO2MAX', String(h.vo2max)],
+  ].filter(Boolean) : [];
+
+  const l = p.location;
+  const districts = l?.districts?.length ? pairRows(l.districts) : [];
+
+  const ph = p.phone;
+  const phoneApps = ph?.topApps?.length ? pairRows(ph.topApps, 1) : [];
+
+  const a = p.ai;
+  const aiGroups = a ? [
+    a.models?.length && { kind: 'MODELS', rows: pairRows(a.models) },
+    a.projects?.length && { kind: 'PROJECTS', rows: pairRows(a.projects) },
+  ].filter(Boolean) : [];
+
+  return {
+    row,
+    payload: p,
+    categories,
+    healthRows,
+    districts,
+    phoneApps,
+    aiGroups,
+  };
+});
+
+function openDay(day) {
+  if (!day) return;
+  dayDetail.value = day;
+  if (!document.body.classList.contains('no-scroll')) {
+    dayLocked = true;
+    document.body.classList.add('no-scroll');
+  }
+  nextTick(() => dayCloseRef.value?.focus());
+}
+
+function closeDay() {
+  if (!dayDetail.value) return;
+  dayDetail.value = '';
+  if (dayLocked) {
+    dayLocked = false;
+    document.body.classList.remove('no-scroll');
+  }
+}
+
+function onDayKey(e) {
+  if (e.key === 'Escape') closeDay();
+}
+
+watch(colorMode, (v) => {
+  try {
+    localStorage.setItem('lifeColorMode', v ? '1' : '0');
+  } catch {
+    /* 存不了就只在本次会话生效 */
+  }
+});
+
 const tickerItems = computed(() => [
   'Aggregated nightly at 23:00',
+  'Click any bar for a single-day view',
   'Full raw archive below',
   'Journals · notes · tasks · events',
   'Credential-like URL values redacted',
@@ -637,10 +918,88 @@ async function loadRawIndex() {
       rawIndex.value = json;
       // 归档页复用它，避免进去再等一次 R2 list
       setIndexCache(json);
+      return json;
     }
   } catch {
     /* 归档计数是附加信息，失败不影响总览 */
   }
+  return null;
+}
+
+// 地图只拉窗口内最近 7 天；events 索引已经按日期倒序。
+function mapEventDays(index) {
+  const ids = (index?.kinds?.events || []).map((x) => x.id).filter(Boolean);
+  if (!ids.length || !rows.value.length) return [];
+  const from = rows.value[0].day;
+  const to = rows.value[rows.value.length - 1].day;
+  return ids
+    .filter((id) => id >= from && id <= to)
+    .sort()
+    .reverse()
+    .slice(0, MAP_MAX_DAYS);
+}
+
+let mapObserver = null;
+let mapAbort = null;
+let mapStarted = false;
+
+async function loadTracks(force = false) {
+  if (!activeNow || mapState.value === 'loading') return;
+  if (mapStarted && !force) return;
+  mapStarted = true;
+  mapState.value = 'loading';
+
+  if (mapAbort) mapAbort.abort();
+  mapAbort = new AbortController();
+
+  try {
+    const index = rawIndex.value || await loadRawIndex();
+    const days = mapEventDays(index);
+    if (!days.length) {
+      mapState.value = 'empty';
+      return;
+    }
+
+    const tracks = await loadLifeTracks(days, {
+      base: CMS_BASE,
+      signal: mapAbort.signal,
+      concurrency: 3,
+    });
+    if (!activeNow) return;
+
+    mapTracks.value = tracks;
+    mapState.value = tracks.length ? 'ready' : 'empty';
+    if (tracks.length) {
+      mapHover.value = tracks[0].day;
+      await nextTick();
+      animateMap();
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+    mapState.value = 'error';
+    mapStarted = false;
+  }
+}
+
+// 面板离视口还有 700px 就开始拉，滚到跟前时轨迹已经画好。
+function observeMap() {
+  if (mapStarted || !activeNow || !places.value.any) return;
+  nextTick(() => {
+    const el = mapEl.value;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      loadTracks();
+      return;
+    }
+    if (mapObserver) mapObserver.disconnect();
+    mapObserver = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      mapObserver.disconnect();
+      mapObserver = null;
+      loadTracks();
+    }, { rootMargin: '700px 0px' });
+    mapObserver.observe(el);
+  });
 }
 
 // 归档是 LIFE 的延续：不演整屏板子。悬停时预取默认文档，点下去直接出内容。
@@ -686,6 +1045,7 @@ async function load() {
 
     await nextTick();
     if (!activeNow) return;
+    observeMap();
     if (!introStarted) {
       prepareCharts();
       scheduleIntro();
@@ -880,7 +1240,7 @@ function prepareCharts() {
     const bars = panel.querySelectorAll('.life-bar, .life-stack');
     const lines = panel.querySelectorAll('.life-line');
     const areas = panel.querySelectorAll('.life-area');
-    const fills = panel.querySelectorAll('.life-fill');
+    const fills = panel.querySelectorAll('.life-fill, .life-weekday-bar');
 
     if (REDUCED) {
       if (bars.length) gsap.set(bars, { scaleY: 1 });
@@ -942,12 +1302,14 @@ function animateChart(panel, delay = 0) {
     });
   }
 
-  const fills = panel.querySelectorAll('.life-fill');
+  const fills = panel.querySelectorAll('.life-fill, .life-weekday-bar');
   if (fills.length) {
     gsap.to(fills, {
       scaleX: 1, duration: 1.05, ease: 'power3.out', stagger: 0.045, delay,
     });
   }
+
+  if (panel.querySelector('.life-map')) animateMap();
 }
 
 // ── 循环动效 ────────────────────────────────────────────────────────────
@@ -993,23 +1355,64 @@ function startLive() {
   }
 }
 
-// 悬浮提示：位置由 CSS 的 left 过渡，显隐交给 GSAP
-watch(rhythmHoverRow, async (v) => {
+// 悬浮提示：位置由 CSS 的 left 过渡，显隐交给 GSAP。
+// 五个面板共用同一套节奏，避免每个图表各写一遍。
+async function animateTip(el, row) {
   await nextTick();
-  const el = tipRef.value;
   if (!el) return;
   if (REDUCED) {
-    gsap.set(el, { opacity: v ? 1 : 0 });
+    gsap.set(el, { opacity: row ? 1 : 0 });
     return;
   }
-  if (v) {
+  if (row) {
     gsap.fromTo(el, { opacity: 0, y: 8, xPercent: -50 }, {
       opacity: 1, y: 0, xPercent: -50, duration: 0.26, ease: 'power2.out',
     });
   } else {
     gsap.to(el, { opacity: 0, y: 6, xPercent: -50, duration: 0.16, ease: 'power1.in' });
   }
-});
+}
+
+watch(rhythmHoverRow, (v) => animateTip(tipRef.value, v));
+watch(motionHoverRow, (v) => animateTip(motionTipRef.value, v));
+watch(phoneHoverRow, (v) => animateTip(phoneTipRef.value, v));
+watch(aiHoverRow, (v) => animateTip(aiTipRef.value, v));
+
+function animateMap() {
+  const svg = mapSvgRef.value;
+  if (!svg) return;
+  const tracks = svg.querySelectorAll('.life-map-track');
+  const dots = svg.querySelectorAll('.life-map-dot');
+  if (REDUCED) {
+    tracks.forEach((t) => gsap.set(t, { clearProps: 'strokeDasharray,strokeDashoffset' }));
+    if (dots.length) gsap.set(dots, { scale: 1, opacity: 1 });
+    return;
+  }
+  tracks.forEach((t, i) => {
+    const len = t.getTotalLength();
+    if (!len) return;
+    gsap.set(t, { strokeDasharray: len, strokeDashoffset: len });
+    gsap.to(t, {
+      strokeDashoffset: 0,
+      duration: 1.25,
+      delay: i * 0.08,
+      ease: 'power2.out',
+      overwrite: 'auto',
+      onComplete: () => gsap.set(t, { clearProps: 'strokeDasharray,strokeDashoffset' }),
+    });
+  });
+  if (dots.length) {
+    gsap.fromTo(dots, { scale: 0.35, opacity: 0 }, {
+      scale: 1,
+      opacity: 1,
+      duration: 0.7,
+      delay: 0.35,
+      stagger: 0.04,
+      ease: 'power2.out',
+      overwrite: 'auto',
+    });
+  }
+}
 
 // ── 生命周期 ────────────────────────────────────────────────────────────
 
@@ -1020,6 +1423,7 @@ onMounted(() => {
   mountedAt = performance.now();
   startClock();
   startPolling();
+  window.addEventListener('keydown', onDayKey);
   load();
 
   stopBrandWatch = watch(brandVisible, (v) => {
@@ -1043,6 +1447,7 @@ onActivated(() => {
   startClock();
   startPolling();
   load();
+  if (data.value) observeMap();
   if (data.value) {
     clearTimeout(introTimer);
     introTimer = setTimeout(() => {
@@ -1052,24 +1457,44 @@ onActivated(() => {
   }
 });
 
+function teardownMap() {
+  if (mapObserver) {
+    mapObserver.disconnect();
+    mapObserver = null;
+  }
+  if (mapAbort) {
+    mapAbort.abort();
+    mapAbort = null;
+  }
+  if (mapState.value === 'loading') {
+    mapStarted = false;
+    mapState.value = mapTracks.value.length ? 'ready' : 'idle';
+  }
+}
+
 onDeactivated(() => {
   activeNow = false;
+  closeDay();
   stopPolling();
   stopClock();
   killIntro();
   killTicker();
   killLive();
   killReveals();
+  teardownMap();
 });
 
 onBeforeUnmount(() => {
   activeNow = false;
+  window.removeEventListener('keydown', onDayKey);
+  closeDay();
   stopPolling();
   stopClock();
   killIntro();
   killTicker();
   killLive();
   killReveals();
+  teardownMap();
   if (stopBrandWatch) stopBrandWatch();
   if (abortCtl) abortCtl.abort();
 });
@@ -1077,7 +1502,11 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="page active">
-    <section ref="sectionRef" class="stats-section life-section">
+    <section
+      ref="sectionRef"
+      class="stats-section life-section"
+      :class="{ 'is-color': colorMode }"
+    >
       <!-- 用 div 不用 header：全局 header 是 position: fixed -->
       <div class="stats-hero">
         <div class="stats-hero-kicker">
@@ -1105,6 +1534,16 @@ onBeforeUnmount(() => {
           <span>{{ city }}</span>
           <i aria-hidden="true"></i>
           <span>Updated {{ lastUpdated }}</span>
+          <i aria-hidden="true"></i>
+          <button
+            class="life-color-toggle"
+            :class="{ 'is-on': colorMode }"
+            :aria-pressed="colorMode"
+            @click="colorMode = !colorMode"
+          >
+            <span class="life-color-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            {{ colorMode ? 'COLOR ON' : 'COLOR OFF' }}
+          </button>
         </div>
       </div>
 
@@ -1188,6 +1627,8 @@ onBeforeUnmount(() => {
                         @pointerleave="rhythmHover = -1"
                         @focus="rhythmHover = i"
                         @blur="rhythmHover = -1"
+                        @click="openDay(r.day)"
+                        @keydown.enter.prevent="openDay(r.day)"
                       >
                         <div
                           v-if="r.segments.length"
@@ -1273,6 +1714,7 @@ onBeforeUnmount(() => {
             <div class="stats-legend">
               <span><i class="lg-swatch"></i>Steps</span>
               <span><i class="lg-line"></i>7-day mean</span>
+              <span><i class="lg-mean"></i>Period mean</span>
             </div>
           </div>
 
@@ -1297,17 +1739,59 @@ onBeforeUnmount(() => {
                   <path :d="rollingPath" class="life-line" />
                 </svg>
 
-                <div class="life-bars">
+                <div
+                  v-if="motionMeanPct != null"
+                  class="life-mean"
+                  :style="{ bottom: motionMeanPct + '%' }"
+                  aria-hidden="true"
+                >
+                  <span>MEAN {{ compact(Math.round(motionMean)) }}</span>
+                </div>
+
+                <div class="life-bars" :class="{ 'is-hovering': motionHover >= 0 }">
                   <div
-                    v-for="r in motionRows"
+                    v-for="(r, i) in motionRows"
                     :key="r.day"
                     class="life-col"
                     :class="{ 'is-missing': r.missing, 'is-today': r.isToday }"
+                    tabindex="0"
                     role="img"
                     :aria-label="`${fullDay(r.day)}: ${r.steps == null ? 'no steps data' : fmt(r.steps) + ' steps'}`"
+                    @pointerenter="motionHover = i"
+                    @pointerleave="motionHover = -1"
+                    @focus="motionHover = i"
+                    @blur="motionHover = -1"
+                    @click="openDay(r.day)"
+                    @keydown.enter.prevent="openDay(r.day)"
                   >
                     <div class="life-bar" :style="{ height: r.pct + '%' }"></div>
                   </div>
+                </div>
+
+                <div
+                  class="stats-chart-cursor"
+                  aria-hidden="true"
+                  :style="{
+                    left: motionHoverRow ? motionHoverRow.leftPct + '%' : '0%',
+                    opacity: motionHoverRow ? 1 : 0,
+                  }"
+                ></div>
+
+                <div
+                  ref="motionTipRef"
+                  class="stats-chart-tooltip life-tooltip"
+                  aria-hidden="true"
+                  :style="{ left: motionHoverRow ? motionHoverRow.tipPct + '%' : '0%' }"
+                >
+                  <span class="stats-tip-date">{{ motionHoverRow ? fullDay(motionHoverRow.day) : '' }}</span>
+                  <span class="stats-tip-row">
+                    <b>{{ motionHoverRow?.steps == null ? '—' : fmt(motionHoverRow.steps) }}</b>
+                    <em>STEPS</em>
+                  </span>
+                  <span class="stats-tip-row">
+                    <b>{{ compact(Math.round(rollingMean[motionHover] ?? 0)) }}</b>
+                    <em>7-DAY MEAN</em>
+                  </span>
                 </div>
               </div>
 
@@ -1332,8 +1816,8 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No health data recorded yet.</p>
         </div>
 
-        <!-- 03 地点 -->
-        <div class="stats-panel life-panel" data-reveal>
+        <!-- 03 地点：区级时长 + 轨迹地图 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="places">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
               <span class="stats-panel-index">03</span>
@@ -1341,24 +1825,215 @@ onBeforeUnmount(() => {
             </div>
             <span class="stats-panel-sub">
               {{ places.city }}<template v-if="places.cityCount > 1"> +{{ places.cityCount - 1 }}</template>
-              · city level only
+              · {{ mapState === 'ready' ? `${mapTracks.length} days mapped` : 'city level' }}
             </span>
           </div>
 
           <div v-if="places.any" class="life-places">
-            <div v-if="places.rows.length" class="life-rows">
-              <div v-for="(p, i) in places.rows" :key="p.name" class="life-row life-row-wide">
-                <span class="life-rank">{{ String(i + 1).padStart(2, '0') }}</span>
-                <span class="life-name">{{ p.name }}</span>
-                <span class="life-num">{{ hoursLabel(p.hours) }}</span>
-                <span class="life-track"><span class="life-fill" :style="{ width: p.pct + '%' }"></span></span>
+            <div class="life-map-grid">
+              <div class="life-map-col">
+                <div ref="mapEl" class="life-map" :class="{ 'is-hovering': !!mapHover }">
+                  <div class="life-map-head">
+                    <span>ROUTE MAP</span>
+                    <span v-if="mapState === 'loading'">LOADING TRACKS…</span>
+                    <span v-else-if="mapState === 'ready'">
+                      {{ mapTracks.length }} DAYS · {{ fmt(mappedKm) }} KM · {{ fmt(mappedPoints) }} PTS
+                    </span>
+                    <span v-else-if="mapState === 'error'">TRACK ARCHIVE UNAVAILABLE</span>
+                    <span v-else-if="mapState === 'empty'">NO TRACKS IN WINDOW</span>
+                    <span v-else>PUBLIC TRACK ARCHIVE</span>
+                  </div>
+
+                  <div v-if="mapHoverTrack" class="life-map-readout">
+                    <span>{{ fullDay(mapHoverTrack.day) }}</span>
+                    <span>{{ kmLabel(mapHoverTrack.km) }}</span>
+                    <span>{{ fmt(mapHoverTrack.points) }} pts</span>
+                  </div>
+
+                  <svg
+                    v-if="geoMap"
+                    ref="mapSvgRef"
+                    class="life-map-svg"
+                    :viewBox="`0 0 ${geoMap.width} ${geoMap.height}`"
+                    preserveAspectRatio="xMidYMid meet"
+                    role="img"
+                    :aria-label="`Route map: ${mapTracks.length} days around ${places.city}`"
+                  >
+                    <g class="life-map-grid" aria-hidden="true">
+                      <line
+                        v-for="x in geoMap.gridX"
+                        :key="'gx' + x"
+                        :x1="x"
+                        y1="0"
+                        :x2="x"
+                        :y2="geoMap.height"
+                      />
+                      <line
+                        v-for="y in geoMap.gridY"
+                        :key="'gy' + y"
+                        x1="0"
+                        :y1="y"
+                        :x2="geoMap.width"
+                        :y2="y"
+                      />
+                    </g>
+
+                    <text
+                      class="life-map-watermark"
+                      :x="geoMap.width - 24"
+                      :y="geoMap.height - 30"
+                      text-anchor="end"
+                      aria-hidden="true"
+                    >{{ places.city.toUpperCase() }}</text>
+
+                    <g class="life-map-visits" aria-hidden="true">
+                      <g v-for="(v, i) in geoMap.visits" :key="'v' + i">
+                        <circle
+                          class="life-map-visit-ring"
+                          :cx="v.x"
+                          :cy="v.y"
+                          :r="v.r + 4"
+                        />
+                        <circle
+                          class="life-map-dot"
+                          :cx="v.x"
+                          :cy="v.y"
+                          :r="v.r"
+                        />
+                      </g>
+                    </g>
+
+                    <g class="life-map-routes" aria-hidden="true">
+                      <path
+                        v-for="(t, i) in geoMap.paths"
+                        :key="t.day"
+                        class="life-map-track"
+                        :class="{
+                          'is-active': t.day === mapHover,
+                          'is-latest': t.day === mapTracks[0].day,
+                        }"
+                        :style="colorMode ? { stroke: `var(--cat-${i % 8})` } : null"
+                        :d="t.d"
+                      />
+                    </g>
+
+                    <g class="life-map-labels" aria-hidden="true">
+                      <text
+                        v-for="(l, i) in geoMap.labels"
+                        :key="'l' + i"
+                        :x="l.x + l.dx"
+                        :y="l.y + 3"
+                        :text-anchor="l.anchor"
+                      >{{ l.text }}</text>
+                    </g>
+
+                    <g class="life-map-scale" aria-hidden="true">
+                      <line
+                        :x1="geoMap.scale.x"
+                        :y1="geoMap.scale.y"
+                        :x2="geoMap.scale.x + geoMap.scale.px"
+                        :y2="geoMap.scale.y"
+                      />
+                      <line
+                        :x1="geoMap.scale.x"
+                        :y1="geoMap.scale.y - 4"
+                        :x2="geoMap.scale.x"
+                        :y2="geoMap.scale.y + 4"
+                      />
+                      <line
+                        :x1="geoMap.scale.x + geoMap.scale.px"
+                        :y1="geoMap.scale.y - 4"
+                        :x2="geoMap.scale.x + geoMap.scale.px"
+                        :y2="geoMap.scale.y + 4"
+                      />
+                      <text
+                        :x="geoMap.scale.x"
+                        :y="geoMap.scale.y - 10"
+                      >{{ geoMap.scale.km }} KM</text>
+                    </g>
+
+                    <g class="life-map-compass" aria-hidden="true" :transform="`translate(${geoMap.width - 46} 48)`">
+                      <line x1="0" y1="16" x2="0" y2="-8" />
+                      <path d="M-4 -1 L0 -10 L4 -1" />
+                      <text x="0" y="30" text-anchor="middle">N</text>
+                    </g>
+                  </svg>
+
+                  <div v-else class="life-map-placeholder">
+                    <span class="life-map-skeleton" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span>
+                      {{ mapState === 'loading'
+                        ? 'Reading public track archive…'
+                        : mapState === 'error'
+                          ? 'Tracks are temporarily unavailable.'
+                          : 'No track data in this window.' }}
+                    </span>
+                    <button
+                      v-if="mapState === 'error'"
+                      class="life-map-retry"
+                      @click="loadTracks(true)"
+                    >RETRY TRACKS</button>
+                  </div>
+                </div>
+
+                <div v-if="mapTracks.length" class="life-map-days" role="tablist" aria-label="Mapped days">
+                  <button
+                    class="life-map-day"
+                    :class="{ 'is-active': !mapHover }"
+                    role="tab"
+                    :aria-selected="!mapHover"
+                    @pointerenter="mapHover = ''"
+                    @focus="mapHover = ''"
+                    @click="mapHover = ''"
+                  >
+                    ALL
+                  </button>
+                  <button
+                    v-for="t in mapTracks"
+                    :key="t.day"
+                    class="life-map-day"
+                    :class="{ 'is-active': t.day === mapHover }"
+                    role="tab"
+                    :aria-selected="t.day === mapHover"
+                    :aria-label="`${fullDay(t.day)}: ${kmLabel(t.km)}`"
+                    @pointerenter="mapHover = t.day"
+                    @focus="mapHover = t.day"
+                    @click="mapHover = t.day"
+                  >
+                    <span>{{ shortDay(t.day) }}</span>
+                    <b>{{ t.km ? t.km.toFixed(0) : '·' }}</b>
+                  </button>
+                </div>
               </div>
+
+              <aside class="life-rail life-map-rail">
+                <div class="life-rail-head">STAYS BY DISTRICT</div>
+                <div v-for="(p, i) in places.rows" :key="p.name" class="life-row">
+                  <span class="life-rank">{{ String(i + 1).padStart(2, '0') }}</span>
+                  <span class="life-name">{{ p.name }}</span>
+                  <span class="life-num">{{ hoursLabel(p.hours) }}</span>
+                  <span class="life-track"><span class="life-fill" :style="{ width: p.pct + '%' }"></span></span>
+                </div>
+                <p v-if="!places.rows.length" class="life-rail-empty">No district stays yet.</p>
+
+                <div v-if="transportRows.length" class="life-rail-group">
+                  <div class="life-rail-head">TRANSPORT · MAPPED DAYS</div>
+                  <div v-for="t in transportRows" :key="t.name" class="life-row">
+                    <span class="life-rank">{{ t.rank }}</span>
+                    <span class="life-name">{{ t.name }}</span>
+                    <span class="life-num">{{ kmLabel(t.km) }}</span>
+                    <span class="life-track"><span class="life-fill" :style="{ width: t.pct + '%' }"></span></span>
+                  </div>
+                </div>
+              </aside>
             </div>
-            <p v-else class="stats-panel-empty">No city-level stays recorded yet.</p>
 
             <div class="life-chips life-chips-pad">
               <span v-for="c in places.chips" :key="c.label" class="life-chip">
                 <em>{{ c.label }}</em><b>{{ c.value }}</b>
+              </span>
+              <span v-if="mapTracks.length" class="life-chip">
+                <em>MAPPED DAYS</em><b>{{ mapTracks.length }}</b>
               </span>
             </div>
           </div>
@@ -1375,6 +2050,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="stats-legend">
               <span><i class="lg-swatch"></i>Unlocks</span>
+              <span><i class="lg-mean"></i>Period mean</span>
             </div>
           </div>
 
@@ -1384,17 +2060,60 @@ onBeforeUnmount(() => {
                 <div class="life-chart-main">
                   <div class="life-plot">
                     <div class="stats-chart-grid" aria-hidden="true"><i></i><i></i><i></i></div>
-                    <div class="life-bars">
+
+                    <div
+                      v-if="phoneMeanPct != null"
+                      class="life-mean"
+                      :style="{ bottom: phoneMeanPct + '%' }"
+                      aria-hidden="true"
+                    >
+                      <span>MEAN {{ compact(Math.round(phoneMean)) }}</span>
+                    </div>
+
+                    <div class="life-bars" :class="{ 'is-hovering': phoneHover >= 0 }">
                       <div
-                        v-for="r in phoneRows"
+                        v-for="(r, i) in phoneRows"
                         :key="r.day"
                         class="life-col"
                         :class="{ 'is-missing': r.missing, 'is-today': r.isToday }"
+                        tabindex="0"
                         role="img"
                         :aria-label="`${fullDay(r.day)}: ${r.unlocks == null ? 'no phone data' : fmt(r.unlocks) + ' unlocks'}`"
+                        @pointerenter="phoneHover = i"
+                        @pointerleave="phoneHover = -1"
+                        @focus="phoneHover = i"
+                        @blur="phoneHover = -1"
+                        @click="openDay(r.day)"
+                        @keydown.enter.prevent="openDay(r.day)"
                       >
                         <div class="life-bar" :style="{ height: r.pct + '%' }"></div>
                       </div>
+                    </div>
+
+                    <div
+                      class="stats-chart-cursor"
+                      aria-hidden="true"
+                      :style="{
+                        left: phoneHoverRow ? phoneHoverRow.leftPct + '%' : '0%',
+                        opacity: phoneHoverRow ? 1 : 0,
+                      }"
+                    ></div>
+
+                    <div
+                      ref="phoneTipRef"
+                      class="stats-chart-tooltip life-tooltip"
+                      aria-hidden="true"
+                      :style="{ left: phoneHoverRow ? phoneHoverRow.tipPct + '%' : '0%' }"
+                    >
+                      <span class="stats-tip-date">{{ phoneHoverRow ? fullDay(phoneHoverRow.day) : '' }}</span>
+                      <span class="stats-tip-row">
+                        <b>{{ phoneHoverRow?.unlocks == null ? '—' : fmt(phoneHoverRow.unlocks) }}</b>
+                        <em>UNLOCKS</em>
+                      </span>
+                      <span class="stats-tip-row">
+                        <b>{{ phoneHoverRow?.payload?.phone?.screenMinutes == null ? '—' : minutesLabel(phoneHoverRow.payload.phone.screenMinutes) }}</b>
+                        <em>SCREEN TIME</em>
+                      </span>
                     </div>
                   </div>
                   <div class="stats-chart-yaxis" aria-hidden="true">
@@ -1438,7 +2157,13 @@ onBeforeUnmount(() => {
               <span class="stats-panel-index">05</span>
               <h2>AI SPEND</h2>
             </div>
-            <span class="stats-panel-sub">CNY · {{ aiChips[2].value }}</span>
+            <div class="stats-panel-head-right">
+              <span class="stats-panel-sub">CNY · {{ aiChips[2].value }}</span>
+              <div class="stats-legend">
+                <span><i class="lg-swatch"></i>Daily cost</span>
+                <span><i class="lg-mean"></i>Period mean</span>
+              </div>
+            </div>
           </div>
 
           <div v-if="hasAi" class="life-chart">
@@ -1447,17 +2172,60 @@ onBeforeUnmount(() => {
                 <div class="life-chart-main">
                   <div class="life-plot">
                     <div class="stats-chart-grid" aria-hidden="true"><i></i><i></i><i></i></div>
-                    <div class="life-bars">
+
+                    <div
+                      v-if="aiMeanPct != null"
+                      class="life-mean"
+                      :style="{ bottom: aiMeanPct + '%' }"
+                      aria-hidden="true"
+                    >
+                      <span>MEAN ¥{{ aiMean.toFixed(2) }}</span>
+                    </div>
+
+                    <div class="life-bars" :class="{ 'is-hovering': aiHover >= 0 }">
                       <div
-                        v-for="r in aiRows"
+                        v-for="(r, i) in aiRows"
                         :key="r.day"
                         class="life-col"
                         :class="{ 'is-missing': r.missing, 'is-today': r.isToday }"
+                        tabindex="0"
                         role="img"
                         :aria-label="`${fullDay(r.day)}: ${r.cost == null ? 'no AI data' : '¥' + r.cost}`"
+                        @pointerenter="aiHover = i"
+                        @pointerleave="aiHover = -1"
+                        @focus="aiHover = i"
+                        @blur="aiHover = -1"
+                        @click="openDay(r.day)"
+                        @keydown.enter.prevent="openDay(r.day)"
                       >
                         <div class="life-bar" :style="{ height: r.pct + '%' }"></div>
                       </div>
+                    </div>
+
+                    <div
+                      class="stats-chart-cursor"
+                      aria-hidden="true"
+                      :style="{
+                        left: aiHoverRow ? aiHoverRow.leftPct + '%' : '0%',
+                        opacity: aiHoverRow ? 1 : 0,
+                      }"
+                    ></div>
+
+                    <div
+                      ref="aiTipRef"
+                      class="stats-chart-tooltip life-tooltip"
+                      aria-hidden="true"
+                      :style="{ left: aiHoverRow ? aiHoverRow.tipPct + '%' : '0%' }"
+                    >
+                      <span class="stats-tip-date">{{ aiHoverRow ? fullDay(aiHoverRow.day) : '' }}</span>
+                      <span class="stats-tip-row">
+                        <b>{{ aiHoverRow?.cost == null ? '—' : `¥${aiHoverRow.cost.toFixed(2)}` }}</b>
+                        <em>SPEND</em>
+                      </span>
+                      <span class="stats-tip-row">
+                        <b>{{ aiHoverRow?.payload?.ai?.calls == null ? '—' : fmt(aiHoverRow.payload.ai.calls) }}</b>
+                        <em>CALLS</em>
+                      </span>
                     </div>
                   </div>
                   <div class="stats-chart-yaxis" aria-hidden="true">
@@ -1496,11 +2264,72 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No AI spend recorded in this window.</p>
         </div>
 
-        <!-- 06 归档：全量原始数据 -->
-        <div class="stats-panel life-panel life-archive-panel" data-reveal>
+        <!-- 06 星期轮廓 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="weekday">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
               <span class="stats-panel-index">06</span>
+              <h2>WEEKDAY PROFILE</h2>
+            </div>
+            <div class="stats-legend">
+              <span v-for="c in rhythmLegend" :key="c">
+                <i class="life-swatch" :class="`cat-${CATEGORY_INDEX[c]}`"></i>{{ c }}
+              </span>
+            </div>
+          </div>
+
+          <div class="life-weekday">
+            <div class="life-weekday-rows">
+              <div
+                v-for="(d, i) in weekdayRows"
+                :key="d.label"
+                class="life-weekday-row"
+                :class="{ 'is-empty': d.total == null, 'is-hover': weekdayHover === i }"
+                tabindex="0"
+                role="img"
+                :aria-label="`${d.label}: ${d.total == null ? 'no data' : hoursLabel(d.total) + ' average tracked'}`"
+                @pointerenter="weekdayHover = i"
+                @pointerleave="weekdayHover = -1"
+                @focus="weekdayHover = i"
+                @blur="weekdayHover = -1"
+              >
+                <span class="life-weekday-label">{{ d.label }}</span>
+                <span class="life-weekday-track">
+                  <span
+                    class="life-weekday-bar"
+                    :style="{ width: d.pct + '%' }"
+                  >
+                    <span
+                      v-for="s in d.segments"
+                      :key="s.name"
+                      class="life-seg"
+                      :class="`cat-${s.cat}`"
+                      :style="{ flexGrow: s.hours }"
+                    ></span>
+                  </span>
+                </span>
+                <span class="life-weekday-value">{{ d.total == null ? '—' : hoursLabel(d.total) }}</span>
+                <span class="life-weekday-count">{{ d.days }}d</span>
+              </div>
+            </div>
+
+            <div class="life-chips life-chips-pad">
+              <span v-for="c in weekdayChips" :key="c.label" class="life-chip">
+                <em>{{ c.label }}</em><b>{{ c.value }}</b>
+              </span>
+              <span v-if="weekdayHoverRow && weekdayHoverRow.total != null" class="life-chip life-chip-live">
+                <em>{{ weekdayHoverRow.label }}</em>
+                <b>{{ hoursLabel(weekdayHoverRow.total) }} avg</b>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 07 归档：全量原始数据 -->
+        <div class="stats-panel life-panel life-archive-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">07</span>
               <h2>THE ARCHIVE</h2>
             </div>
             <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>
@@ -1540,5 +2369,180 @@ onBeforeUnmount(() => {
         </p>
       </template>
     </section>
+
+    <!-- 单日详情：点任意一天的柱子打开 -->
+    <Teleport to="body">
+      <Transition name="life-day">
+        <div v-if="dayDetail" class="life-day-backdrop" @click.self="closeDay">
+          <div
+            class="life-day-modal"
+            :class="{ 'is-color': colorMode }"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="`${fullDay(dayDetail)} data`"
+          >
+            <div class="life-day-head">
+              <div>
+                <span class="life-day-kicker">Single day · {{ weekdayName(dayDetail) }}</span>
+                <h3>{{ fullDay(dayDetail) }}</h3>
+              </div>
+              <button
+                ref="dayCloseRef"
+                class="life-day-close"
+                aria-label="Close day view"
+                @click="closeDay"
+              >CLOSE <span aria-hidden="true">×</span></button>
+            </div>
+
+            <template v-if="dayView?.payload">
+              <div class="life-day-stats">
+                <span>
+                  <em>TRACKED</em>
+                  <b>{{ dayView.payload.trackedHours == null ? '—' : hoursLabel(dayView.payload.trackedHours) }}</b>
+                </span>
+                <span>
+                  <em>STEPS</em>
+                  <b>{{ dayView.payload.health?.steps == null ? '—' : fmt(dayView.payload.health.steps) }}</b>
+                </span>
+                <span>
+                  <em>MOVING</em>
+                  <b>{{ dayView.payload.location?.movingMinutes == null ? '—' : minutesLabel(dayView.payload.location.movingMinutes) }}</b>
+                </span>
+                <span>
+                  <em>UNLOCKS</em>
+                  <b>{{ dayView.payload.phone?.unlocks == null ? '—' : fmt(dayView.payload.phone.unlocks) }}</b>
+                </span>
+                <span>
+                  <em>AI SPEND</em>
+                  <b>{{ dayView.payload.ai?.cost == null ? '—' : `¥${dayView.payload.ai.cost.toFixed(2)}` }}</b>
+                </span>
+              </div>
+
+              <div class="life-day-body">
+                <div class="life-day-grid">
+                  <section v-if="dayView.categories.length" class="life-day-block">
+                    <h4>CATEGORIES</h4>
+                    <div v-for="c in dayView.categories" :key="c.name" class="life-day-row">
+                      <i class="life-swatch" :class="`cat-${c.cat}`"></i>
+                      <span class="life-name">{{ c.name }}</span>
+                      <span class="life-num">{{ hoursLabel(c.hours) }}</span>
+                      <span class="life-track">
+                        <span
+                          class="life-fill"
+                          :style="{
+                            width: c.pct + '%',
+                            background: colorMode ? `var(--cat-${c.cat})` : null,
+                          }"
+                        ></span>
+                      </span>
+                    </div>
+                  </section>
+
+                  <section v-if="dayView.healthRows.length" class="life-day-block">
+                    <h4>HEALTH</h4>
+                    <div v-for="r in dayView.healthRows" :key="r[0]" class="life-day-kv-row">
+                      <span>{{ r[0] }}</span><b>{{ r[1] }}</b>
+                    </div>
+                  </section>
+
+                  <section v-if="dayView.payload.location" class="life-day-block">
+                    <h4>PLACES · {{ dayView.payload.location.city || 'UNKNOWN CITY' }}</h4>
+                    <div v-for="d in dayView.districts" :key="d.name" class="life-day-row">
+                      <span></span>
+                      <span class="life-name">{{ d.name }}</span>
+                      <span class="life-num">{{ hoursLabel(d.hours) }}</span>
+                      <span class="life-track">
+                        <span
+                          class="life-fill"
+                          :style="{
+                            width: d.pct + '%',
+                            background: colorMode ? 'var(--cat-2)' : null,
+                          }"
+                        ></span>
+                      </span>
+                    </div>
+                    <div class="life-day-kv-row">
+                      <span>STAYING</span>
+                      <b>{{ minutesLabel(dayView.payload.location.stayMinutes) }}</b>
+                    </div>
+                    <div class="life-day-kv-row">
+                      <span>MAX SPAN</span>
+                      <b>{{ kmLabel(dayView.payload.location.spanKm) }}</b>
+                    </div>
+                    <div class="life-day-kv-row">
+                      <span>GPS POINTS</span>
+                      <b>{{ dayView.payload.location.points == null ? '—' : fmt(dayView.payload.location.points) }}</b>
+                    </div>
+                  </section>
+
+                  <section v-if="dayView.payload.phone" class="life-day-block">
+                    <h4>PHONE</h4>
+                    <div class="life-day-kv-row">
+                      <span>SCREEN TIME</span>
+                      <b>{{ minutesLabel(dayView.payload.phone.screenMinutes) }}</b>
+                    </div>
+                    <div class="life-day-kv-row">
+                      <span>APP SWITCHES</span>
+                      <b>{{ dayView.payload.phone.appSwitches == null ? '—' : fmt(dayView.payload.phone.appSwitches) }}</b>
+                    </div>
+                    <div v-for="a in dayView.phoneApps" :key="a.name" class="life-day-row">
+                      <span class="life-rank">{{ a.rank }}</span>
+                      <span class="life-name">{{ a.name }}</span>
+                      <span class="life-num">{{ minutesLabel(a.value) }}</span>
+                      <span class="life-track">
+                        <span
+                          class="life-fill"
+                          :style="{
+                            width: a.pct + '%',
+                            background: colorMode ? 'var(--cat-1)' : null,
+                          }"
+                        ></span>
+                      </span>
+                    </div>
+                  </section>
+
+                  <section v-if="dayView.payload.ai" class="life-day-block">
+                    <h4>AI SPEND</h4>
+                    <div class="life-day-kv-row">
+                      <span>TOTAL</span>
+                      <b>{{ dayView.payload.ai.cost == null ? '—' : `¥${dayView.payload.ai.cost.toFixed(2)}` }}</b>
+                    </div>
+                    <div class="life-day-kv-row">
+                      <span>CALLS</span>
+                      <b>{{ dayView.payload.ai.calls == null ? '—' : fmt(dayView.payload.ai.calls) }}</b>
+                    </div>
+                    <div v-for="g in dayView.aiGroups" :key="g.kind" class="life-day-subgroup">
+                      <h5>{{ g.kind }}</h5>
+                      <div v-for="r in g.rows" :key="r.name" class="life-day-row">
+                        <span class="life-rank">{{ r.rank }}</span>
+                        <span class="life-name">{{ r.name }}</span>
+                        <span class="life-num">¥{{ r.value.toFixed(2) }}</span>
+                        <span class="life-track">
+                          <span
+                            class="life-fill"
+                            :style="{
+                              width: r.pct + '%',
+                              background: colorMode ? 'var(--cat-3)' : null,
+                            }"
+                          ></span>
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <p class="life-day-foot">
+                  Aggregated snapshot · raw events, window titles and coordinates live in THE ARCHIVE
+                </p>
+              </div>
+            </template>
+
+            <p v-else class="life-day-empty">
+              No aggregate data recorded for this day.
+            </p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </main>
 </template>

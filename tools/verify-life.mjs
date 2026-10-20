@@ -122,12 +122,156 @@ const STUB = `
   var params = new URLSearchParams(location.search);
   var mode = params.get('mode') || 'full';
   var orig = window.fetch;
-  window.__lifeFetches = 0;
+
+  function jsonResponse(value) {
+    return Promise.resolve(new Response(JSON.stringify(value), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+  }
+
+  function source() {
+    if (mode === 'sparse') return JSON.parse(SPARSE);
+    if (mode === 'empty') return JSON.parse(EMPTY);
+    return JSON.parse(FULL);
+  }
+
+  var rawDays = (source().days || [])
+    .filter(function (d) { return d.location; })
+    .map(function (d) { return d.day; })
+    .slice(-7);
+
+  function rawIndex() {
+    return {
+      v: 1,
+      kinds: {
+        events: rawDays.map(function (day) {
+          return { id: day, key: 'life/raw/events/' + day + '.json', size: 120000, uploaded: day + 'T12:00:00Z' };
+        }),
+        journal: rawDays.slice(-2).map(function (day) {
+          return { id: day, key: 'life/raw/journal/' + day + '.md', size: 4000, uploaded: day + 'T12:00:00Z' };
+        }),
+      },
+      generatedAt: '2026-10-18T12:00:00Z',
+    };
+  }
+
+  // 两条固定端点之间来回一趟，和真实轨迹一样覆盖“家 ↔ 工作”走廊。
+  function rawEvents(day) {
+    var home = [31.1567, 121.1027];
+    var work = [31.315, 121.4787];
+    var path = [];
+    var i;
+    for (i = 0; i < 60; i += 1) {
+      var t = i / 59;
+      path.push([
+        home[0] + (work[0] - home[0]) * t + (i % 3) * 0.00002,
+        home[1] + (work[1] - home[1]) * t + (i % 2) * 0.00003,
+      ]);
+    }
+    for (i = 58; i >= 0; i -= 1) {
+      var u = i / 59;
+      path.push([
+        home[0] + (work[0] - home[0]) * u,
+        home[1] + (work[1] - home[1]) * u,
+      ]);
+    }
+    return {
+      v: 1,
+      kind: 'events',
+      id: day,
+      format: 'json',
+      data: [
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'tracked_points',
+          value_num: path.length,
+          value_text: 'Yingpu, Qingpu, Shanghai, CN',
+          source: 'dawarich',
+          meta: { lat_center: 31.23, lon_center: 121.29, span_km: 42 },
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'track_path',
+          value_num: path.length,
+          value_text: '',
+          source: 'dawarich',
+          meta: { path: path },
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'visit',
+          value_num: 240,
+          value_text: 'Yingpu, Qingpu, Shanghai, CN',
+          source: 'dawarich',
+          meta: { lat: home[0], lon: home[1] },
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'visit',
+          value_num: 120,
+          value_text: 'Zhabei, Pudong, Shanghai, CN',
+          source: 'dawarich',
+          meta: { lat: work[0], lon: work[1] },
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'transport',
+          value_num: 18.4,
+          value_text: 'driving',
+          source: 'dawarich',
+          meta: {},
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'transport',
+          value_num: 3.4,
+          value_text: 'cycling',
+          source: 'dawarich',
+          meta: {},
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'location',
+          metric: 'transport',
+          value_num: 2.1,
+          value_text: 'walking',
+          source: 'dawarich',
+          meta: {},
+        },
+        {
+          ts_utc: day + 'T00:00:00Z',
+          domain: 'screen',
+          metric: 'unlocks',
+          value_num: 42,
+          value_text: '',
+          source: 'phone',
+          meta: {},
+        },
+      ],
+    };
+  }
+
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (mode === 'error' && url.indexOf('/api/life') >= 0) {
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }
+    if (url.indexOf('/api/life/raw/index') >= 0) {
+      return jsonResponse(rawIndex());
+    }
+    var ev = url.match(/\\/api\\/life\\/raw\\/events\\/([^/?]+)/);
+    if (ev) {
+      return jsonResponse(rawEvents(decodeURIComponent(ev[1])));
+    }
     if (url.indexOf('/api/life') >= 0) {
       window.__lifeFetches++;
-      if (mode === 'error') return Promise.reject(new TypeError('Failed to fetch'));
       var body = mode === 'sparse' ? SPARSE : mode === 'empty' ? EMPTY : FULL;
       return Promise.resolve(new Response(body, { status: 200, headers: { 'Content-Type': 'application/json' } }));
     }
@@ -278,6 +422,16 @@ const LIFE_STATE = `(function () {
     fetches: window.__lifeFetches,
     cards: q('.stat-card').length,
     panels: q('.life-panel').length,
+    means: q('.life-mean').length,
+    weekdayRows: q('.life-weekday-row').length,
+    weekdaySegs: q('.life-weekday-bar .life-seg').length,
+    mapTracks: q('[data-chart="places"] .life-map-track').length,
+    mapDots: q('[data-chart="places"] .life-map-dot').length,
+    mapLabels: q('[data-chart="places"] .life-map-labels text').length,
+    mapDays: q('.life-map-day').length,
+    mapActive: q('.life-map-day.is-active').length,
+    mapReadout: (document.querySelector('.life-map-readout') || {}).textContent || '',
+    transportRows: q('.life-map-rail .life-rail-group .life-row').length,
     numbers: Array.prototype.map.call(q('.sn-sr'), function (e) { return e.textContent; }),
     titleChars: title ? title.querySelectorAll('.stats-char').length : 0,
     rhythmCols: rhythm ? rhythm.querySelectorAll('.life-col').length : 0,
@@ -310,9 +464,12 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
 
   if (state.path !== '/life') throw new Error('not on /life');
   if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
-  if (state.panels !== 5) throw new Error(`expected 5 panels, got ${state.panels}`);
+  if (state.panels !== 7) throw new Error(`expected 7 panels, got ${state.panels}`);
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
   if (state.numbers.length !== 5) throw new Error(`expected 5 odometers, got ${state.numbers.length}`);
+  if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
+  if (state.weekdayRows !== 7) throw new Error(`expected 7 weekday rows, got ${state.weekdayRows}`);
+  if (state.weekdaySegs < 7) throw new Error('weekday stacks not rendered');
   if (state.rhythmCols !== 30) throw new Error(`expected 30 rhythm columns, got ${state.rhythmCols}`);
   if (state.rhythmMissing < 1) throw new Error('missing day not rendered as dashed baseline');
   if (state.rhythmSegs < 30) throw new Error('category stacks not rendered');
@@ -324,6 +481,33 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (state.aiMissing < 2) throw new Error('null AI day not treated as missing');
   if (!state.aiSource.includes('MIXED')) throw new Error(`AI source should be MIXED, got ${state.aiSource}`);
   await shot('top');
+
+  // 彩色模式：分类色块/堆叠柱换成各自的色相，再切回黑白
+  await evalJs("document.querySelector('.life-color-toggle').click()");
+  await sleep(250);
+  const color = JSON.parse(await evalJs(`(function () {
+    var swatch = document.querySelector('[data-chart="rhythm"] .life-swatch.cat-0');
+    var seg = document.querySelector('[data-chart="rhythm"] .life-seg.cat-0');
+    var bar = document.querySelector('[data-chart="motion"] .life-bar');
+    return JSON.stringify({
+      on: document.querySelector('.life-section').classList.contains('is-color'),
+      swatch: swatch ? getComputedStyle(swatch).backgroundColor : '',
+      seg: seg ? getComputedStyle(seg).backgroundColor : '',
+      bar: bar ? getComputedStyle(bar).backgroundColor : '',
+      pressed: document.querySelector('.life-color-toggle').getAttribute('aria-pressed'),
+    });
+  })()`));
+  console.log('  color mode:', color);
+  if (!color.on || color.pressed !== 'true') throw new Error('color mode did not turn on');
+  if (!/rgb\(59, 130, 246\)/.test(color.swatch)) throw new Error(`category swatch not colored: ${color.swatch}`);
+  if (!/rgb\(59, 130, 246\)/.test(color.seg)) throw new Error(`stack segment not colored: ${color.seg}`);
+  if (!/rgb\(20, 184, 166\)/.test(color.bar)) throw new Error(`motion bars not colored: ${color.bar}`);
+  await shot('color');
+  await evalJs("document.querySelector('.life-color-toggle').click()");
+  await sleep(200);
+  if (await evalJs("document.querySelector('.life-section').classList.contains('is-color')")) {
+    throw new Error('color mode did not turn off');
+  }
 
   // 滚动到 01，等揭示 + 柱体动画
   await evalJs(`(function () {
@@ -360,6 +544,51 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   }
   await shot('tooltip');
 
+  // 单日详情：点柱子打开，Escape 关闭
+  await evalJs(`document.querySelectorAll('[data-chart="rhythm"] .life-col')[15].click()`);
+  await sleep(400);
+  const dayModal = JSON.parse(await evalJs(`(function () {
+    var m = document.querySelector('.life-day-modal');
+    return JSON.stringify({
+      open: !!m,
+      text: m ? m.textContent.replace(/\\s+/g, ' ').trim() : '',
+      locked: document.body.classList.contains('no-scroll'),
+    });
+  })()`));
+  console.log('  day modal:', { open: dayModal.open, locked: dayModal.locked, text: dayModal.text.slice(0, 90) });
+  if (!dayModal.open) throw new Error('day modal did not open');
+  if (!dayModal.locked) throw new Error('day modal did not lock body scroll');
+  if (!/CATEGORIES/.test(dayModal.text)) throw new Error('day modal missing categories');
+  if (!/TRACKED/.test(dayModal.text)) throw new Error('day modal missing overview');
+  await shot('day');
+  await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(800);
+  const closed = JSON.parse(await evalJs(`(function () {
+    return JSON.stringify({
+      modal: !!document.querySelector('.life-day-modal'),
+      locked: document.body.classList.contains('no-scroll'),
+    });
+  })()`));
+  console.log('  day modal closed:', closed);
+  if (closed.modal) throw new Error('day modal did not close on Escape');
+  if (closed.locked) throw new Error('body scroll stayed locked');
+
+  // 键盘 Enter 也能打开
+  const enterOpened = await evalJs(`(function () {
+    var col = document.querySelectorAll('[data-chart="motion"] .life-col')[12];
+    col.focus();
+    col.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    return new Promise(function (resolve) {
+      setTimeout(function () {
+        resolve(!!document.querySelector('.life-day-modal'));
+      }, 300);
+    });
+  })()`, true);
+  console.log('  day modal via Enter:', enterOpened);
+  if (!enterOpened) throw new Error('keyboard Enter did not open the day modal');
+  await evalJs("document.querySelector('.life-day-close').click()");
+  await sleep(700);
+
   // 运动面板的折线真的画出来了
   await evalJs(`(function () {
     var el = document.querySelector('[data-chart="motion"]');
@@ -374,13 +603,64 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   console.log('  line:', line);
   if (!line.d || line.d.length < 10) throw new Error('rolling mean line missing');
 
-  // 滚到底：所有面板 + 页脚揭示
+  // 02 的悬浮提示（和新加的分面板 tooltip 共用同一套逻辑）
+  const mrect = JSON.parse(await evalJs(`(function () {
+    var cols = document.querySelectorAll('[data-chart="motion"] .life-col');
+    var b = cols[12].getBoundingClientRect();
+    return JSON.stringify({ x: b.left + b.width / 2, y: b.top + b.height - 40 });
+  })()`));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: mrect.x - 2, y: mrect.y - 2 });
+  await sleep(120);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: mrect.x, y: mrect.y });
+  await sleep(500);
+  const mtip = JSON.parse(await evalJs(`(function () {
+    var t = document.querySelector('[data-chart="motion"] .life-tooltip');
+    return JSON.stringify({ opacity: getComputedStyle(t).opacity, text: t.textContent.replace(/\\s+/g, ' ').trim() });
+  })()`));
+  console.log('  motion tooltip:', mtip);
+  if (Number(mtip.opacity) < 0.8) throw new Error('motion tooltip did not appear');
+  if (!/STEPS/.test(mtip.text)) throw new Error('motion tooltip missing steps');
+
+  // 滚到底：所有面板 + 页脚揭示；地图在这附近懒加载
   await evalJs('window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" })');
+  let mapReady = false;
+  for (let i = 0; i < 40 && !mapReady; i += 1) {
+    mapReady = await evalJs(`document.querySelectorAll('[data-chart="places"] .life-map-track').length > 0`);
+    if (!mapReady) await sleep(150);
+  }
   await sleep(1600);
   const lower = JSON.parse(await evalJs(LIFE_STATE));
-  console.log('  lower:', { opacity: lower.panelOpacity, foot: lower.foot });
+  console.log('  lower:', {
+    opacity: lower.panelOpacity,
+    foot: lower.foot,
+    mapTracks: lower.mapTracks,
+    mapDots: lower.mapDots,
+    mapDays: lower.mapDays,
+    transportRows: lower.transportRows,
+  });
   if (lower.panelOpacity.some((o) => Number(o) < 0.99)) throw new Error('lower panels not revealed');
   if (Number(lower.foot) < 0.99) throw new Error('footer not revealed');
+  if (lower.mapTracks < 1) throw new Error('route map tracks missing');
+  if (lower.mapDots < 2) throw new Error('map stay clusters missing');
+  if (lower.mapLabels < 1) throw new Error('map place labels missing');
+  if (lower.mapDays !== lower.mapTracks + 1) throw new Error('map day tabs mismatch');
+  if (lower.mapActive !== 1) throw new Error('no selected map day');
+  if (lower.transportRows < 1) throw new Error('transport breakdown missing');
+
+  // 地图日期按钮：切换后高亮与读数跟着走
+  const daySwitch = JSON.parse(await evalJs(`(function () {
+    var days = document.querySelectorAll('.life-map-day');
+    days[2].focus();
+    return JSON.stringify({
+      active: document.querySelectorAll('.life-map-day.is-active').length,
+      text: (document.querySelector('.life-map-day.is-active') || {}).textContent || '',
+    });
+  })()`));
+  await sleep(200);
+  const readout = await evalJs("(document.querySelector('.life-map-readout') || {}).textContent || ''");
+  console.log('  map day switch:', daySwitch, readout.replace(/\\s+/g, ' ').trim());
+  if (daySwitch.active !== 1) throw new Error('map day switch lost active state');
+  if (!/km/i.test(readout)) throw new Error('map readout missing distance');
   await shot('bottom');
 
   // keep-alive：离开再回来，重播且重新拉数据
@@ -417,6 +697,8 @@ await withPage({ width: 1440, height: 1000, label: 'reduced', reduced: true }, a
   if (!/matrix\(1, 0, 0, 1,/.test(state.stackTransform)) throw new Error('reduced: stacks hidden');
   if (state.lineDash && state.lineDash !== 'none') throw new Error('reduced: line still dashed');
   if (state.panelOpacity.some((o) => Number(o) < 0.99)) throw new Error('reduced: panels hidden');
+  if (state.means !== 3) throw new Error('reduced: mean lines missing');
+  if (state.weekdayRows !== 7) throw new Error('reduced: weekday rows missing');
   await shot('top');
 });
 
@@ -431,8 +713,23 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile' }, async
   await evalJs('window.scrollTo({ top: 900, behavior: "instant" })');
   await sleep(1200);
   await shot('rhythm');
+  // 手机先滚到 PLACES（不要从 01 直接跳到页尾，地图会整段掠过观察区）
+  await evalJs(`(function () {
+    var el = document.querySelector('[data-chart="places"]');
+    var y = el.getBoundingClientRect().top + window.scrollY - 200;
+    window.scrollTo({ top: y, behavior: 'instant' });
+  })()`);
+  let mapReady = false;
+  for (let i = 0; i < 40 && !mapReady; i += 1) {
+    mapReady = await evalJs(`document.querySelectorAll('[data-chart="places"] .life-map-track').length > 0`);
+    if (!mapReady) await sleep(150);
+  }
   await evalJs('window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" })');
-  await sleep(1400);
+  await sleep(1200);
+  const lower = JSON.parse(await evalJs(LIFE_STATE));
+  console.log('  lower:', { mapTracks: lower.mapTracks, overflow: lower.overflow });
+  if (lower.mapTracks < 1) throw new Error('mobile: route map tracks missing');
+  if (lower.overflow > 1) throw new Error(`mobile: overflow after map ${lower.overflow}px`);
   await shot('bottom');
   await evalJs('window.scrollTo({ top: 0, behavior: "instant" })');
   await sleep(300);
@@ -454,7 +751,7 @@ await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, asy
   console.log('  state:', { cards: state.cards, numbers: state.numbers.length, panels: state.panels });
   if (state.cards !== 5) throw new Error('empty: KPI cards missing');
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
-  if (state.panels !== 5) throw new Error('empty: panels missing');
+  if (state.panels !== 7) throw new Error('empty: panels missing');
   await shot('top');
 });
 

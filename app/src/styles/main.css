@@ -5386,6 +5386,13 @@
             color: var(--text-secondary);
         }
 
+        .stats-panel-head-right {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px 22px;
+        }
+
         .stats-legend {
             display: flex;
             align-items: center;
@@ -6466,6 +6473,753 @@
             background: var(--text-primary);
         }
 
+        /* ---- 彩色模式 ----
+           默认是黑白灰阶（站点原本的语言）；打开后每个分类拿到自己的色相，
+           堆叠柱、图例色块、单序列柱、地图轨迹同步换色。
+           颜色取中间明度，浅色和深色主题下都能分辨。 */
+        .is-color {
+            --cat-0: #3B82F6; /* Work */
+            --cat-1: #8B5CF6; /* Study */
+            --cat-2: #10B981; /* Life */
+            --cat-3: #F59E0B; /* Transport */
+            --cat-4: #EF4444; /* Leisure */
+            --cat-5: #14B8A6; /* Health */
+            --cat-6: #EC4899; /* Social */
+            --cat-7: #9CA3AF; /* Other */
+        }
+
+        .is-color .life-seg.cat-0,
+        .is-color .life-swatch.cat-0 { background: var(--cat-0); opacity: 1; }
+        .is-color .life-seg.cat-1,
+        .is-color .life-swatch.cat-1 { background: var(--cat-1); opacity: 1; }
+        .is-color .life-seg.cat-2,
+        .is-color .life-swatch.cat-2 { background: var(--cat-2); opacity: 1; }
+        .is-color .life-seg.cat-3,
+        .is-color .life-swatch.cat-3 { background: var(--cat-3); opacity: 1; }
+        .is-color .life-seg.cat-4,
+        .is-color .life-swatch.cat-4 { background: var(--cat-4); opacity: 1; }
+        .is-color .life-seg.cat-5,
+        .is-color .life-swatch.cat-5 { background: var(--cat-5); opacity: 1; }
+        .is-color .life-seg.cat-6,
+        .is-color .life-swatch.cat-6 { background: var(--cat-6); opacity: 1; }
+        .is-color .life-seg.cat-7,
+        .is-color .life-swatch.cat-7 { background: var(--cat-7); opacity: 1; }
+
+        .is-color [data-chart="motion"] .life-bar { background: var(--cat-5); }
+        .is-color [data-chart="phone"] .life-bar { background: var(--cat-1); }
+        .is-color [data-chart="ai"] .life-bar { background: var(--cat-3); }
+
+        .life-color-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .life-color-toggle:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .life-color-toggle.is-on {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-color-toggle:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 2px;
+        }
+
+        .life-color-dots {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .life-color-dots i {
+            display: block;
+            width: 5px;
+            height: 5px;
+            background: var(--text-secondary);
+            transition: background 0.2s ease;
+        }
+
+        .life-color-toggle.is-on .life-color-dots i:nth-child(1) { background: #3B82F6; }
+        .life-color-toggle.is-on .life-color-dots i:nth-child(2) { background: #10B981; }
+        .life-color-toggle.is-on .life-color-dots i:nth-child(3) { background: #F59E0B; }
+        .life-color-toggle.is-on .life-color-dots i:nth-child(4) { background: #EC4899; }
+
+        /* ---- 单日详情 ---- */
+        .life-day-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 9000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(8, 8, 8, 0.62);
+            backdrop-filter: blur(3px);
+        }
+
+        .life-day-modal {
+            width: min(980px, 100%);
+            max-height: 88vh;
+            overflow: auto;
+            background: var(--bg);
+            color: var(--text-primary);
+            border: 1px solid var(--text-primary);
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.4);
+            /* 单日详情内部滚动，但不要右侧那条滚动条 */
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .life-day-modal::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
+        .life-day-head {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 20px 24px 18px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .life-day-kicker {
+            display: block;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-head h3 {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            color: var(--text-primary);
+        }
+
+        .life-day-close {
+            flex: none;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.14em;
+            cursor: pointer;
+        }
+
+        .life-day-close:hover {
+            border-color: var(--text-primary);
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-day-close:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 2px;
+        }
+
+        .life-day-stats {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-day-stats span {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+            padding: 14px 18px;
+            border-right: 1px solid var(--border);
+        }
+
+        .life-day-stats span:last-child {
+            border-right: none;
+        }
+
+        .life-day-stats em {
+            font-style: normal;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-stats b {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .life-day-body {
+            padding: 4px 24px 22px;
+        }
+
+        .life-day-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0 36px;
+        }
+
+        .life-day-block {
+            min-width: 0;
+            padding: 16px 0 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-day-block h4 {
+            padding-bottom: 8px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            font-weight: 400;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-block h5 {
+            margin: 12px 0 4px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            font-weight: 400;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-row {
+            display: grid;
+            grid-template-columns: 20px minmax(0, 1fr) auto;
+            column-gap: 10px;
+            row-gap: 6px;
+            align-items: baseline;
+            padding: 8px 0 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-day-row:last-child {
+            border-bottom: none;
+        }
+
+        .life-day-row .life-swatch {
+            align-self: center;
+            justify-self: start;
+        }
+
+        .life-day-row .life-track {
+            grid-column: 2 / 4;
+        }
+
+        .life-day-kv-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.06em;
+        }
+
+        .life-day-kv-row:last-child {
+            border-bottom: none;
+        }
+
+        .life-day-kv-row span {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .life-day-kv-row b {
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .life-day-foot {
+            margin-top: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-empty {
+            padding: 30px 24px 42px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-day-enter-active,
+        .life-day-leave-active {
+            transition: opacity 0.24s ease;
+        }
+
+        .life-day-enter-active .life-day-modal,
+        .life-day-leave-active .life-day-modal {
+            transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+
+        .life-day-enter-from,
+        .life-day-leave-to {
+            opacity: 0;
+        }
+
+        .life-day-enter-from .life-day-modal,
+        .life-day-leave-to .life-day-modal {
+            transform: translateY(18px);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .life-day-enter-active,
+            .life-day-leave-active,
+            .life-day-enter-active .life-day-modal,
+            .life-day-leave-active .life-day-modal {
+                transition: none;
+            }
+        }
+
+        /* ---- 周期均值线 ---- */
+        .lg-mean {
+            position: relative;
+            display: inline-block;
+            width: 16px;
+            height: 1px;
+            background: repeating-linear-gradient(
+                90deg,
+                var(--text-secondary) 0 3px,
+                transparent 3px 6px
+            );
+            opacity: 0.85;
+        }
+
+        .life-mean {
+            position: absolute;
+            left: 0;
+            right: 0;
+            z-index: 2;
+            border-top: 1px dashed var(--text-secondary);
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .life-mean span {
+            position: absolute;
+            right: 0;
+            top: -14px;
+            padding-left: 6px;
+            background: var(--bg);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* ---- 轨迹地图 ---- */
+        .life-map-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.7fr) minmax(220px, 1fr);
+            gap: 34px;
+            align-items: start;
+            padding: 26px 28px 0;
+        }
+
+        .life-map-col {
+            min-width: 0;
+        }
+
+        .life-map {
+            position: relative;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        .life-map-head,
+        .life-map-readout {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-map-head {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-map-readout {
+            position: absolute;
+            top: 43px;
+            left: 14px;
+            right: 14px;
+            z-index: 2;
+            justify-content: flex-start;
+            gap: 16px;
+            pointer-events: none;
+        }
+
+        .life-map-readout span + span::before {
+            content: '/';
+            margin-right: 16px;
+            opacity: 0.35;
+        }
+
+        .life-map-svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .life-map-grid line {
+            stroke: var(--border);
+            stroke-width: 1;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .life-map-watermark {
+            font-family: 'Oswald', sans-serif;
+            font-size: 64px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            fill: var(--text-primary);
+            opacity: 0.035;
+        }
+
+        .life-map-track {
+            fill: none;
+            stroke: var(--text-primary);
+            stroke-width: 1;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vector-effect: non-scaling-stroke;
+            opacity: 0.42;
+            transition: opacity 0.28s ease, stroke-width 0.28s ease;
+        }
+
+        .life-map-track.is-latest {
+            opacity: 0.72;
+        }
+
+        .life-map-track.is-active {
+            opacity: 1;
+            stroke-width: 1.8;
+        }
+
+        .life-map.is-hovering .life-map-track:not(.is-active) {
+            opacity: 0.12;
+        }
+
+        .life-map-visit-ring {
+            fill: none;
+            stroke: var(--text-primary);
+            stroke-width: 1;
+            opacity: 0.22;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .life-map-dot {
+            fill: var(--text-primary);
+            opacity: 0.8;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+
+        .life-map-labels text {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            fill: var(--text-secondary);
+            paint-order: stroke;
+            stroke: var(--bg);
+            stroke-width: 3px;
+            stroke-linejoin: round;
+        }
+
+        .life-map-scale line {
+            stroke: var(--text-secondary);
+            stroke-width: 1;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .life-map-scale text {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            fill: var(--text-secondary);
+        }
+
+        .life-map-compass line,
+        .life-map-compass path {
+            stroke: var(--text-secondary);
+            fill: none;
+            stroke-width: 1;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .life-map-compass text {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            fill: var(--text-secondary);
+        }
+
+        .life-map-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            min-height: 300px;
+            padding: 26px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .life-map-skeleton {
+            display: flex;
+            gap: 7px;
+            width: 100%;
+            max-width: 320px;
+            height: 110px;
+        }
+
+        .life-map-skeleton i {
+            flex: 1;
+            background: var(--border);
+            opacity: 0.55;
+            animation: life-map-pulse 1.4s ease-in-out infinite;
+        }
+
+        .life-map-skeleton i:nth-child(2) {
+            animation-delay: 0.18s;
+        }
+
+        .life-map-skeleton i:nth-child(3) {
+            animation-delay: 0.36s;
+        }
+
+        @keyframes life-map-pulse {
+            0%, 100% { opacity: 0.28; }
+            50% { opacity: 0.75; }
+        }
+
+        .life-map-retry {
+            padding: 8px 16px;
+            border: 1px solid var(--text-primary);
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.14em;
+            cursor: pointer;
+        }
+
+        .life-map-retry:hover {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-map-days {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .life-map-days::-webkit-scrollbar {
+            display: none;
+        }
+
+        .life-map-day {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 7px;
+            flex: none;
+            padding: 7px 9px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .life-map-day b {
+            font-weight: 500;
+            font-size: 0.48rem;
+            opacity: 0.7;
+        }
+
+        .life-map-day:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .life-map-day.is-active {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-map-day.is-active b {
+            opacity: 0.75;
+        }
+
+        .life-map-day:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 2px;
+        }
+
+        .life-map-rail {
+            min-width: 0;
+        }
+
+        .life-map-rail .life-rail-head + .life-row {
+            border-top: none;
+        }
+
+        /* ---- 星期轮廓 ---- */
+        .life-weekday {
+            padding-bottom: 2px;
+        }
+
+        .life-weekday-rows {
+            display: flex;
+            flex-direction: column;
+            padding: 14px 28px 10px;
+        }
+
+        .life-weekday-row {
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) 62px 34px;
+            align-items: center;
+            gap: 14px;
+            padding: 8px 8px;
+            border-bottom: 1px solid var(--border);
+            outline: none;
+            transition: background 0.2s ease;
+        }
+
+        .life-weekday-row:last-child {
+            border-bottom: none;
+        }
+
+        .life-weekday-row.is-hover {
+            background: var(--background-secondary);
+        }
+
+        .life-weekday-row:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: -1px;
+        }
+
+        .life-weekday-label {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.74rem;
+            letter-spacing: 0.16em;
+            color: var(--text-primary);
+        }
+
+        .life-weekday-track {
+            display: flex;
+            height: 14px;
+            background: var(--border);
+            opacity: 0.95;
+        }
+
+        .life-weekday-bar {
+            display: flex;
+            height: 100%;
+            transform-origin: left center;
+        }
+
+        .life-weekday-bar .life-seg {
+            min-height: 0;
+        }
+
+        .life-weekday-value {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            color: var(--text-primary);
+        }
+
+        .life-weekday-count {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.04em;
+            text-align: right;
+            color: var(--text-secondary);
+        }
+
+        .life-weekday-row.is-empty .life-weekday-track {
+            background: transparent;
+            border-top: 1px dashed var(--text-secondary);
+            opacity: 0.45;
+        }
+
+        .life-weekday-row.is-empty .life-weekday-label,
+        .life-weekday-row.is-empty .life-weekday-value {
+            opacity: 0.4;
+        }
+
+        .life-chip-live {
+            margin-left: auto;
+        }
+
         /* ---- 平板 ---- */
         @media (max-width: 1024px) {
             .life-cards {
@@ -6473,6 +7227,11 @@
             }
 
             .life-split {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+
+            .life-map-grid {
                 grid-template-columns: 1fr;
                 gap: 24px;
             }
@@ -6518,6 +7277,51 @@
                 margin-right: 20px;
             }
 
+            .life-map-grid {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .life-weekday-rows {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .life-weekday-row {
+                grid-template-columns: 40px minmax(0, 1fr) 56px 30px;
+                gap: 10px;
+            }
+
+            .life-day-backdrop {
+                padding: 12px;
+            }
+
+            .life-day-modal {
+                max-height: 92vh;
+            }
+
+            .life-day-head {
+                padding: 16px 18px 14px;
+            }
+
+            .life-day-stats {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .life-day-stats span {
+                padding: 12px 14px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .life-day-body {
+                padding: 2px 18px 18px;
+            }
+
+            .life-day-grid {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
             .life-name {
                 font-size: 0.72rem;
             }
@@ -6543,6 +7347,38 @@
 
             .life-xaxis {
                 padding-right: 0;
+            }
+
+            .life-map-placeholder {
+                min-height: 210px;
+            }
+
+            .life-map-watermark {
+                font-size: 42px;
+            }
+
+            .life-weekday-row {
+                grid-template-columns: 34px minmax(0, 1fr) 52px;
+            }
+
+            .life-weekday-count {
+                display: none;
+            }
+
+            .life-weekday-track {
+                height: 12px;
+            }
+
+            .life-day-stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .life-day-stats span:nth-child(2n) {
+                border-right: none;
+            }
+
+            .life-day-head h3 {
+                font-size: 1.2rem;
             }
 
             .life-loading {
