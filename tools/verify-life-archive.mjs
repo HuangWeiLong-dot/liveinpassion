@@ -29,6 +29,11 @@ const INDEX = {
     events: DAYS.map((id) => ({ id, size: 190000, uploaded: '2026-10-20T04:00:00Z' })),
     blocks: DAYS.map((id) => ({ id, size: 7000, uploaded: '2026-10-20T04:00:00Z' })),
     weekly: [],
+    vault: [
+      { id: 'tasks-master', size: 2100, uploaded: '2026-10-20T04:00:00Z' },
+      { id: 'review-2026-w42', size: 1200, uploaded: '2026-10-20T04:00:00Z' },
+      { id: 'ai-session-2026-10-19', size: 900, uploaded: '2026-10-20T04:00:00Z' },
+    ],
   },
   generatedAt: '2026-10-20T04:00:00Z',
 };
@@ -136,6 +141,29 @@ const BLOCKS = [
   },
 ];
 
+const VAULT_HTML = `
+<h1>Tasks</h1>
+<h2>Open</h2>
+<ul>
+  <li><input type="checkbox" disabled> Finish the city.aep edit against the reference clip</li>
+  <li><input type="checkbox" disabled> Decide on the part-time job</li>
+</ul>
+<h2>Done</h2>
+<ul>
+  <li><input type="checkbox" checked disabled> Deploy the life-logging system</li>
+</ul>
+`;
+const VAULT_RAW = `# Tasks
+
+## Open
+
+- [ ] Finish the city.aep edit against the reference clip
+
+## Done
+
+- [x] Deploy the life-logging system
+`;
+
 const DOCS = {
   journal: { v: 1, kind: 'journal', id: '2026-10-19', format: 'md', html: JOURNAL_HTML, raw: JOURNAL_RAW },
   notes: { v: 1, kind: 'notes', id: '2026-10-19', format: 'json', data: NOTES },
@@ -144,6 +172,7 @@ const DOCS = {
   events: { v: 1, kind: 'events', id: '2026-10-19', format: 'json', data: EVENTS },
   blocks: { v: 1, kind: 'blocks', id: '2026-10-19', format: 'json', data: BLOCKS },
   weekly: { v: 1, kind: 'weekly', id: '2026-10-19', format: 'json', data: null },
+  vault: { v: 1, kind: 'vault', id: 'tasks-master', format: 'md', html: VAULT_HTML, raw: VAULT_RAW },
 };
 
 const AGG = {
@@ -312,7 +341,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   })()`));
   console.log('  state:', state);
   if (state.path !== '/life/archive/journal') throw new Error('not on journal archive');
-  if (state.tabs !== 7) throw new Error(`tabs ${state.tabs}`);
+  if (state.tabs !== 8) throw new Error(`tabs ${state.tabs}`);
   if (state.activeTab.indexOf('JOURNAL') < 0) throw new Error('journal tab not active');
   if (state.days !== 2) throw new Error(`days ${state.days}`);
   if (state.title !== 'ARCHIVE') throw new Error('title missing');
@@ -475,6 +504,32 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   console.log('  weekly:', weekly);
   if (!weekly.empty.includes('No entries')) throw new Error('weekly empty state missing');
 
+  // VAULT（主任务清单 / 周回顾 / AI 会话）
+  await evalJs("document.querySelector('.life-archive-tab[href=\"/life/archive/vault\"]').click()");
+  await sleep(1500);
+  const vault = JSON.parse(await evalJs(`(function(){
+    return JSON.stringify({
+      path: location.pathname,
+      days: document.querySelectorAll('.life-day').length,
+      labels: [...document.querySelectorAll('.life-day')].map(e=>e.textContent.trim()),
+      active: document.querySelector('.life-day.is-active')?.textContent.trim(),
+      day: document.querySelector('.life-doc-day')?.textContent.trim(),
+      h1: document.querySelector('.life-doc h1')?.textContent.trim(),
+      checks: document.querySelectorAll('.life-doc input[type=checkbox]').length,
+      raw: !!document.querySelector('.life-raw-details'),
+    });
+  })()`));
+  console.log('  vault:', vault);
+  if (vault.path !== '/life/archive/vault') throw new Error('vault route');
+  if (vault.days !== 3) throw new Error(`vault days ${vault.days}`);
+  if (vault.labels[0] !== 'MASTER TASKS') throw new Error(`vault labels ${vault.labels}`);
+  if (vault.active !== 'MASTER TASKS') throw new Error('vault default not master tasks');
+  if (vault.day !== 'MASTER TASKS') throw new Error('vault header');
+  if (vault.h1 !== 'Tasks') throw new Error(`vault h1 ${vault.h1}`);
+  if (vault.checks !== 3) throw new Error(`vault checkboxes ${vault.checks}`);
+  if (!vault.raw) throw new Error('vault raw missing');
+  await shot('vault');
+
   // keep-alive：回首页再进归档
   const fetchesBefore = await evalJs('window.__archiveFetches');
   await evalJs("document.querySelectorAll('nav a')[0].click()");
@@ -491,7 +546,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   })()`));
   console.log('  life overview:', lifeState, 'fetchesBefore:', fetchesBefore);
   if (lifeState.path !== '/life') throw new Error('did not return to life');
-  if (lifeState.cards !== 7) throw new Error(`archive cards ${lifeState.cards}`);
+  if (lifeState.cards !== 8) throw new Error(`archive cards ${lifeState.cards}`);
   if (lifeState.fetches <= fetchesBefore) throw new Error('raw index not refetched on life');
   await shot('overview');
 
@@ -508,7 +563,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
     });
   })()`));
   console.log('  archive cards:', cardState);
-  if (cardState.cards !== 7) throw new Error(`archive links ${cardState.cards}`);
+  if (cardState.cards !== 8) throw new Error(`archive links ${cardState.cards}`);
   if (Number(cardState.opacity) < 0.99) throw new Error('archive panel not revealed');
   await shot('archive-links');
 });
@@ -524,7 +579,7 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile', routeUr
     });
   })()`));
   console.log('  state:', state);
-  if (state.tabs !== 7) throw new Error('mobile tabs');
+  if (state.tabs !== 8) throw new Error('mobile tabs');
   if (state.days !== 2) throw new Error('mobile days');
   if (state.overflow > 1) throw new Error(`mobile overflow ${state.overflow}`);
   await shot('journal');

@@ -11,6 +11,17 @@
 
 ---
 
+## fix: 34.1 — 2026-10-20
+
+### VAULT：主任务 / 周回顾 / AI 会话
+- 归档新增第八个视图 **VAULT**：`vault/04-Tasks/Tasks.md`（主任务清单）、
+  `vault/07-Reviews/*.md`（周回顾、成本台账）、`vault/06-AI-Sessions/*.md`
+  （每次 AI 会话日志）。Markdown 渲染，任务复选框只读。
+- `publish_life_raw.py` 同时发布这些 vault 文档；原始接口新增 `vault` kind
+  （id 为安全 slug，`.md` 渲染与日记同一条路径）。
+- 归档入口卡片变为 8 张；VAULT 默认选中 MASTER TASKS，按
+  主任务 → 周回顾 → 成本台账 → AI 会话排序。
+
 ## update: 34 — 2026-10-20
 
 ### LIFE 全量归档（/life/archive）

@@ -18,9 +18,10 @@ import { renderMarkdown } from '../lib/markdown.js';
 export const lifeRawRoutes = new Hono();
 
 const PREFIX = 'life/raw/';
-const KINDS = new Set(['journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly']);
+const KINDS = new Set(['journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly', 'vault']);
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const WEEK_RE = /^\d{4}-W\d{2}$/;
+const VAULT_ID_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_DOC_BYTES = 4 * 1024 * 1024;
 const MAX_DOCS = 200;
@@ -72,13 +73,17 @@ lifeRawRoutes.post('/life/raw/ingest', async (c) => {
   for (const doc of body.docs) {
     if (!doc || typeof doc !== 'object') return c.json({ error: 'invalid doc' }, 400);
     if (!KINDS.has(doc.kind)) return c.json({ error: 'invalid kind' }, 400);
-    const idOk = doc.kind === 'weekly' ? WEEK_RE.test(doc.id) : DAY_RE.test(doc.id);
+    const idOk = doc.kind === 'weekly'
+      ? WEEK_RE.test(doc.id)
+      : doc.kind === 'vault'
+        ? VAULT_ID_RE.test(doc.id)
+        : DAY_RE.test(doc.id);
     if (!idOk) return c.json({ error: 'invalid id', kind: doc.kind }, 400);
     if (doc.format !== 'md' && doc.format !== 'json') {
       return c.json({ error: 'invalid format', kind: doc.kind, id: doc.id }, 400);
     }
-    if (doc.format === 'md' && doc.kind !== 'journal') {
-      return c.json({ error: 'md only allowed for journal' }, 400);
+    if (doc.format === 'md' && doc.kind !== 'journal' && doc.kind !== 'vault') {
+      return c.json({ error: 'md only allowed for journal/vault' }, 400);
     }
     if (typeof doc.content !== 'string') {
       return c.json({ error: 'invalid content', kind: doc.kind, id: doc.id }, 400);
@@ -151,10 +156,14 @@ lifeRawRoutes.get('/life/raw/:kind/:id', async (c) => {
   const kind = c.req.param('kind');
   const id = c.req.param('id');
   if (!KINDS.has(kind)) return c.json({ error: 'invalid kind' }, 400);
-  const idOk = kind === 'weekly' ? WEEK_RE.test(id) : DAY_RE.test(id);
+  const idOk = kind === 'weekly'
+    ? WEEK_RE.test(id)
+    : kind === 'vault'
+      ? VAULT_ID_RE.test(id)
+      : DAY_RE.test(id);
   if (!idOk) return c.json({ error: 'invalid id' }, 400);
 
-  const format = kind === 'journal' ? 'md' : 'json';
+  const format = kind === 'journal' || kind === 'vault' ? 'md' : 'json';
   const key = objectKey(kind, id, format);
 
   let obj;
@@ -169,7 +178,7 @@ lifeRawRoutes.get('/life/raw/:kind/:id', async (c) => {
   const text = await obj.text();
   c.header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
 
-  if (kind === 'journal') {
+  if (kind === 'journal' || kind === 'vault') {
     // 去掉 Obsidian frontmatter 再渲染；原文一并返回，归档页可切换查看
     const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
     return c.json({ v: 1, kind, id, format: 'md', html: renderMarkdown(body), raw: text });

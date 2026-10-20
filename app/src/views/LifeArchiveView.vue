@@ -22,6 +22,7 @@ const KINDS = [
   { kind: 'events', label: 'EVENTS', blurb: 'Raw event stream' },
   { kind: 'blocks', label: 'BLOCKS', blurb: 'Classified time blocks' },
   { kind: 'weekly', label: 'REVIEWS', blurb: 'Weekly summaries' },
+  { kind: 'vault', label: 'VAULT', blurb: 'Master tasks, reviews and AI sessions' },
 ];
 const KIND_MAP = Object.fromEntries(KINDS.map((k) => [k.kind, k]));
 const EVENT_PAGE = 120;
@@ -46,7 +47,32 @@ const visibleEvents = ref(EVENT_PAGE);
 let requestSeq = 0;
 let firstActivation = true;
 
-const days = computed(() => index.value?.kinds?.[kind.value] || []);
+function vaultRank(id) {
+  if (id === 'tasks-master') return 0;
+  if (id.startsWith('review-') && id !== 'review-cost-ledger') return 1;
+  if (id === 'review-cost-ledger') return 2;
+  if (id.startsWith('ai-session-')) return 3;
+  return 9;
+}
+
+function vaultLabel(id) {
+  if (!id) return '—';
+  if (id === 'tasks-master') return 'MASTER TASKS';
+  if (id === 'review-cost-ledger') return 'COST LEDGER';
+  if (id.startsWith('review-')) return `REVIEW · ${id.slice(7).replace(/-/g, ' ').toUpperCase()}`;
+  if (id.startsWith('ai-session-')) return `AI SESSION · ${id.slice(11)}`;
+  return id.toUpperCase().replace(/-/g, ' ');
+}
+
+function dayLabel(id) {
+  return kind.value === 'vault' ? vaultLabel(id) : id;
+}
+
+const days = computed(() => {
+  const items = index.value?.kinds?.[kind.value] || [];
+  if (kind.value !== 'vault') return items;
+  return [...items].sort((a, b) => vaultRank(a.id) - vaultRank(b.id) || b.id.localeCompare(a.id));
+});
 const totalByKind = computed(() => index.value?.kinds || {});
 const latest = computed(() => days.value[0]?.id || '—');
 
@@ -90,7 +116,7 @@ const weeklyFacts = computed(() => (
 ));
 
 const itemCount = computed(() => {
-  if (kind.value === 'journal') return data.value?.html ? 1 : 0;
+  if (kind.value === 'journal' || kind.value === 'vault') return data.value?.html ? 1 : 0;
   if (kind.value === 'notes') return notes.value.length;
   if (kind.value === 'tasks') return taskItems.value.length;
   if (kind.value === 'qa') return qaPairs.value.length;
@@ -270,7 +296,7 @@ onActivated(() => {
           <i aria-hidden="true"></i>
           <span>{{ days.length }} entries</span>
           <i aria-hidden="true"></i>
-          <span>Latest {{ latest }}</span>
+          <span>Latest {{ dayLabel(latest) }}</span>
         </div>
       </div>
 
@@ -307,7 +333,7 @@ onActivated(() => {
             :aria-selected="d.id === day"
             @click="selectDay(d.id)"
           >
-            {{ d.id }}
+            {{ dayLabel(d.id) }}
           </button>
         </div>
 
@@ -322,12 +348,12 @@ onActivated(() => {
         <div v-else class="life-doc-panel">
           <div class="life-doc-head">
             <span class="life-doc-kind">{{ kindMeta.label }}</span>
-            <span class="life-doc-day">{{ day }}</span>
-            <span class="life-doc-count">{{ itemCount }} {{ kind === 'journal' ? 'ENTRY' : 'ITEMS' }}</span>
+            <span class="life-doc-day">{{ dayLabel(day) }}</span>
+            <span class="life-doc-count">{{ itemCount }} {{ kind === 'journal' || kind === 'vault' ? 'ENTRY' : 'ITEMS' }}</span>
           </div>
 
-          <!-- JOURNAL -->
-          <template v-if="kind === 'journal'">
+          <!-- JOURNAL / VAULT（都是 Markdown 文档） -->
+          <template v-if="kind === 'journal' || kind === 'vault'">
             <div v-if="data?.html" class="life-doc" v-html="data.html"></div>
             <p v-else class="stats-panel-empty">No journal for this day.</p>
             <details v-if="data?.raw" class="life-raw-details">

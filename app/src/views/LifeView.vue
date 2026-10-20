@@ -598,6 +598,7 @@ const ARCHIVE_TABS = [
   { kind: 'events', label: 'EVENTS', note: 'Raw event stream' },
   { kind: 'blocks', label: 'BLOCKS', note: 'Window titles and URLs' },
   { kind: 'weekly', label: 'REVIEWS', note: 'Weekly summaries' },
+  { kind: 'vault', label: 'VAULT', note: 'Tasks, reviews and AI sessions' },
 ];
 
 const archiveTabs = computed(() => ARCHIVE_TABS.map((t) => {
