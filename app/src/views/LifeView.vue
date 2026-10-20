@@ -294,7 +294,10 @@ const kpis = computed(() => {
 
   const tracked = sum(list.map((p) => p.trackedHours).filter((v) => v != null));
   const steps = sum(list.map((p) => p.health?.steps).filter((v) => v != null));
-  const movingMinutes = sum(list.map((p) => p.location?.movingMinutes).filter((v) => v != null));
+  // 优先用 transitMinutes（实测 + 停留空档推断）；旧数据回退到 movingMinutes
+  const movingMinutes = sum(list
+    .map((p) => p.location?.transitMinutes ?? p.location?.movingMinutes)
+    .filter((v) => v != null));
   const unlocks = sum(list.map((p) => p.phone?.unlocks).filter((v) => v != null));
   const aiCost = sum(list.map((p) => p.ai?.cost).filter((v) => v != null));
 
@@ -322,9 +325,9 @@ const kpis = computed(() => {
     },
     {
       key: 'moving',
-      label: 'HOURS MOVING',
+      label: 'HOURS IN TRANSIT',
       value: locationDays ? round(movingMinutes / 60, 1) : null,
-      note: `${locationDays} ${daysWord(locationDays)} with location`,
+      note: `${locationDays} ${daysWord(locationDays)} · measured + inferred`,
       delay: 0.2,
     },
     {
@@ -486,7 +489,9 @@ const runSummary = computed(() => {
 const places = computed(() => {
   const agg = {};
   const cityMinutes = {};
-  let moving = 0;
+  let measured = 0;
+  let inferred = 0;
+  let transit = 0;
   let stay = 0;
   let span = 0;
   let points = 0;
@@ -500,7 +505,11 @@ const places = computed(() => {
     (l.districts || []).forEach(([name, hours]) => {
       agg[name] = (agg[name] || 0) + Number(hours || 0);
     });
-    moving += Number(l.movingMinutes || 0);
+    const m = Number(l.movingMinutes || 0);
+    const i = Number(l.inferredMinutes || 0);
+    measured += m;
+    inferred += i;
+    transit += l.transitMinutes != null ? Number(l.transitMinutes) : m + i;
     stay += Number(l.stayMinutes || 0);
     span = Math.max(span, Number(l.spanKm || 0));
     points += Number(l.points || 0);
@@ -521,7 +530,9 @@ const places = computed(() => {
       pct: Math.max((hours / max) * 100, 2),
     })),
     chips: [
-      { label: 'MOVING', value: `${round(moving / 60, 1)} h` },
+      { label: 'TRANSIT', value: `${round(transit / 60, 1)} h` },
+      { label: 'MEASURED', value: `${round(measured / 60, 1)} h` },
+      { label: 'INFERRED', value: `${round(inferred / 60, 1)} h` },
       { label: 'STAYING', value: `${round(stay / 60, 1)} h` },
       { label: 'MAX SPAN', value: span ? `${round(span, 1)} km` : '—' },
       { label: 'GPS POINTS', value: points ? fmt(Math.round(points)) : '—' },
@@ -2405,8 +2416,12 @@ onBeforeUnmount(() => {
                   <b>{{ dayView.payload.health?.steps == null ? '—' : fmt(dayView.payload.health.steps) }}</b>
                 </span>
                 <span>
-                  <em>MOVING</em>
-                  <b>{{ dayView.payload.location?.movingMinutes == null ? '—' : minutesLabel(dayView.payload.location.movingMinutes) }}</b>
+                  <em>TRANSIT</em>
+                  <b>{{
+                    (dayView.payload.location?.transitMinutes ?? dayView.payload.location?.movingMinutes) == null
+                      ? '—'
+                      : minutesLabel(dayView.payload.location.transitMinutes ?? dayView.payload.location.movingMinutes)
+                  }}</b>
                 </span>
                 <span>
                   <em>UNLOCKS</em>

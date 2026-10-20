@@ -33,7 +33,8 @@ const HEALTH_KEYS = new Set([
   'steps', 'hrAvg', 'hrMin', 'runs', 'runKm', 'runMinutes', 'runPaceS', 'vo2max',
 ]);
 const LOCATION_KEYS = new Set([
-  'city', 'districts', 'movingMinutes', 'stayMinutes', 'spanKm', 'points',
+  'city', 'districts', 'movingMinutes', 'inferredMinutes', 'transitMinutes',
+  'stayMinutes', 'spanKm', 'points',
 ]);
 const PHONE_KEYS = new Set([
   'unlocks', 'screenOn', 'screenOff', 'screenMinutes', 'appSwitches', 'topApps',
@@ -124,6 +125,8 @@ function validateDay(d) {
     if (l.city !== null && !isName(l.city, 64)) return 'location.city';
     if (l.districts !== null && !isPairs(l.districts, 64, 24)) return 'location.districts';
     if (!isOptNum(l.movingMinutes, 0, 1440)) return 'location.movingMinutes';
+    if (!isOptNum(l.inferredMinutes, 0, 1440)) return 'location.inferredMinutes';
+    if (!isOptNum(l.transitMinutes, 0, 1440)) return 'location.transitMinutes';
     if (!isOptNum(l.stayMinutes, 0, 1440)) return 'location.stayMinutes';
     if (!isOptNum(l.spanKm, 0, 5000)) return 'location.spanKm';
     if (!isOptNum(l.points, 0, 10000000)) return 'location.points';

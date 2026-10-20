@@ -11,6 +11,18 @@
 
 ---
 
+## fix: 35.1 — 2026-10-20
+
+### HOURS IN TRANSIT：实测 + 推断通勤
+- LIFE 的 **HOURS MOVING → HOURS IN TRANSIT**：不再只算 Dawarich 识别到的
+  步行/骑行/开车段；把两次停留之间 **4–180min、相距 ≥1km** 的空档补进来，
+  并扣除空档里已识别的 transport 段（地铁/地下没有 GPS 点，原来完全漏掉）。
+  8 天示例：实测 3.6h + 推断 14.4h = **约 18.0h**。
+- PLACES 的 chips 改为 **TRANSIT / MEASURED / INFERRED / STAYING / MAX SPAN /
+  GPS POINTS**；单日详情里的 MOVING 也改成 TRANSIT。
+- Worker `location` 字段白名单增加 `inferredMinutes` / `transitMinutes`。
+- 旧数据没有新字段时前端回退到 `movingMinutes`。
+
 ## update: 35 — 2026-10-20
 
 ### LIFE 页：轨迹地图 · 单日详情 · 彩色模式
