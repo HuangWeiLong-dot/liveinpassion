@@ -20,6 +20,7 @@ const SECTIONS = {
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
   stats: 'STATS',
+  life: 'LIFE',
   'not-found': 'NOT FOUND',
 };
 

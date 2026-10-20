@@ -59,6 +59,7 @@ watch(() => route.fullPath, () => {
       <router-link to="/">HOME</router-link>
       <router-link to="/blogs">BLOGS</router-link>
       <router-link to="/stats">STATS</router-link>
+      <router-link to="/life">LIFE</router-link>
       <router-link to="/me" id="meNavLink">{{ virtue }}</router-link>
     </nav>
     <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu" @click="navOpen = !navOpen">

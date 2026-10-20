@@ -13,6 +13,7 @@ import MeView from '../views/MeView.vue';
 import MeGalleryView from '../views/MeGalleryView.vue';
 import GalleryView from '../views/GalleryView.vue';
 import StatsView from '../views/StatsView.vue';
+import LifeView from '../views/LifeView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 
 const routes = [
@@ -23,6 +24,7 @@ const routes = [
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },
   { path: '/stats', name: 'stats', component: StatsView },
+  { path: '/life', name: 'life', component: LifeView },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ];
 

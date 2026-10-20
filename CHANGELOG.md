@@ -5,9 +5,93 @@
 - `update: N` —— 一批功能更新
 - `fix: N.M` —— 同一批里的修复
 
-从 `update: 29` 起，每个版本都在这里写清具体改了什么。`update: 16–28` 按 git 历史补录；
+从 `update: 29` 起，每个版本都在这里写清具体改了什么；**此后每次 update/fix 提交都必须在文件顶部追加一条记录**。`update: 16–28` 按 git 历史补录；
 `update: 1–15` 是旧站（单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容
 补主要节点。每个条目的日期与 commit 一一对应。
+
+---
+
+## update: 33 — 2026-10-20
+
+### LIFE 页（/life）
+- 新增公开 LIFE 页：电脑使用分类、步数/心率/跑步、城市级位置、手机使用、
+  AI 花费。数据来自 LifeLogging 每晚发布的脱敏日汇总，前台 60 秒轮询。
+- `LifeView.vue` + 路由 / `pageLabels` / 导航项；CSS 复用 STATS 的
+  hero / card / panel 骨架，新增分类堆叠柱、7 日滚动均线、区级横条、
+  AI 模型/项目双分组。
+- 窗口按实际数据跨度显示；中间缺日保留虚线基线，不补空白柱。
+- 新增 `tools/verify-life.mjs`：30 列 / 缺日 / 悬浮提示 / 滚动揭示 /
+  keep-alive / reduced-motion / 手机 / 稀疏 / 空数据 / 请求失败。
+
+### Worker
+- D1 `life_days(day, payload, updated_at)`（`migrations/0003_life.sql`）。
+- `GET /api/life?days=30`：公开只读，按天升序返回，30 秒缓存。
+- `POST /api/life/ingest`：Bearer token（`LIFE_INGEST_TOKEN`），字段白名单
+  校验；未知字段、负步数、Android 包名一律 400。
+- 隐私边界：不接受/不返回坐标、轨迹、窗口标题、URL、包名、余额。
+
+## fix: 32.2 — 2026-10-19
+
+### 窗户墙入场焦点居中
+- 修复从已滚动页面进入 GALLERY / MY GALLERY 时，首屏焦点窗不在屏幕正中的问题。
+  根因是 `prime()` 在 `onActivated` 的 `nextTick` 里早于路由 `scrollBehavior`
+  测量墙面，拿到的还是上一页的滚动位置；Windows 上 `innerWidth` 还包含滚动条宽度。
+- 居中目标改用 `document.documentElement.clientWidth / clientHeight`；
+  测量改到 `requestAnimationFrame`，并在真正开演前再 `reset → prime → play` 一次。
+- `GalleryView.vue`、`MeGalleryView.vue`、`useWallEntry.js`；构建时顺带刷新
+  `app/src/data/content/blogPosts.json` CMS 快照。
+
+## fix: 32.1 — 2026-10-19
+
+- 桌面端人物整体放大：ME 人物 `min(72vh, 720px, 50vw)`，GALLERY 人物
+  `min(66vh, 660px, 48vw)`；FRIENDS 群像保持与卡片同比例，不调整。
+- `MeView.vue` 新增 `@media (min-width: 901px)`，手机布局不变。
+
+## update: 32 — 2026-10-19
+
+### ME 页滚动体验
+- 开场改为 EXPLORE 门禁：首次进入显示 EXPLORE（自动缓慢巡游）与 SKIP TO CARDS；
+  进入后滚动解锁。反复进入 ME 不再弹门禁。
+- 「无限纵深」照片隧道：30 张照片各用一张不同图，3D 深度一次性推进 14000px，
+  全部飞出镜头后不再循环重置；照片卡片有稳定的 3:4 占位框，加载中/失败不会只剩顶边。
+- ME / GALLERY / FRIENDS 三张卡片为三个独立窗口，依次滚入；卡片先飞入、人物随后
+  从相反方向进入，滚动 scrub（`top 75% → top 0%`）+ 慢缓动；人物完整显示、不裁剪、
+  无边框，蓝/红外套定时交叉切换。
+- FRIENDS 群像与卡片同比例 1193×731，右半屏展示，边缘羽化 + 底部渐隐蒙版。
+- 左侧悬浮导航：ME / GALLERY / FRIENDS，滚动自动高亮，点击跳转。
+- ME 页去掉全局页脚；GitHub Activity 图完整 `contain`、深色模式反相；卡片阴影改为
+  带偏移的硬边阴影。
+- 新增 `tools/verify-me-scroll.mjs`（门禁、隧道、导航、红蓝切换、无页脚等 20 项断言）。
+
+### 全站
+- 首屏 ENTER 下新增 **ENTER WITHOUT MUSIC**：进入时取消首次交互自动起播；
+  播放器手动播放仍然可用。
+
+### 素材与工具
+- `me/` 重组为 `cutouts/`（蓝/红抠图 + `_selective` 图层）、`personas/`、
+  `posters/`、`individuation.jpg`；删除 `hero_compressed/`，引用同步更新。
+- 新增 `tools/build-cutouts.mjs`：去白边、压暗轮廓、生成蓝/红 selective 图层；
+  `tools/build-personas.mjs` 输出改为语义文件名。
+- 红色人物抠图接入，selective 图层按红外套键控。
+
+## update: 31 — 2026-10-18
+
+### 窗户墙
+- GALLERY / MY GALLERY 重做为窗户墙：新增 `window-wall.css`、`useWallPuzzle`、
+  `useWallMotion`、窗格入场；网格布局、华容道换位、筛选与月份切换。
+- 新增 `useThumbnails`：fetch → `createImageBitmap` 缩放 → canvas → blob URL，
+  密集网格按可见性加载小图。
+- 群组 / 好友照片页并入同一套墙面；移除 `FriendMarquee`、`PhotoTimeline`、
+  `FriendDetailView`、`GroupPhotosView` 及对应路由。
+
+### STATS
+- `StatsView` 大改：GSAP 入场、逐字标题、数字滚轮、30 天柱线、滚动揭示、
+  keep-alive 重播与 reduced-motion；新增 `OdometerNumber` 与 `tools/verify-stats.mjs`。
+
+### 首页 / ME
+- `HeroConcept` 与 `main.css` 大量调整；ME 页改为浏览器窗口式叙事，
+  引入 `me/hero_compressed/HuangWeiLong_*.webp`。
+- 博客 CMS 快照更新。
 
 ---
 

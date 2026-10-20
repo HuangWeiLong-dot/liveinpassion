@@ -5,6 +5,7 @@ import { albumsRoutes } from './routes/albums.js';
 import { uploadsRoutes } from './routes/uploads.js';
 import { publicRoutes } from './routes/public.js';
 import { statsRoutes } from './routes/stats.js';
+import { lifeRoutes } from './routes/life.js';
 import {
   getAuthUser,
   checkPassword,
@@ -186,6 +187,7 @@ app.route('/api/admin/albums', albumsRoutes);
 app.route('/api/admin/uploads', uploadsRoutes);
 app.route('/api', statsRoutes);
 app.route('/api', publicRoutes);
+app.route('/api', lifeRoutes);
 
 // 管理后台静态资源（Workers Assets）
 // admin 构建时 base='/admin/'，产物在 admin-dist/ 下
