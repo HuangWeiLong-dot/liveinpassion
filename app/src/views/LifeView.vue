@@ -19,6 +19,12 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
+import {
+  latestIdFor,
+  getDocCache,
+  setDocCache,
+  setIndexCache,
+} from '../data/lifeArchiveCache.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -626,11 +632,38 @@ const revealTriggers = [];
 async function loadRawIndex() {
   try {
     const res = await fetch(`${CMS_BASE}/api/life/raw/index`, { cache: 'no-store' });
-    if (res.ok) rawIndex.value = await res.json();
+    if (res.ok) {
+      const json = await res.json();
+      rawIndex.value = json;
+      // 归档页复用它，避免进去再等一次 R2 list
+      setIndexCache(json);
+    }
   } catch {
     /* 归档计数是附加信息，失败不影响总览 */
   }
 }
+
+// 归档是 LIFE 的延续：不演整屏板子。悬停时预取默认文档，点下去直接出内容。
+const prefetching = new Set();
+
+async function prefetchArchive(kind) {
+  const id = latestIdFor(rawIndex.value, kind);
+  if (!id || getDocCache(kind, id)) return;
+  const key = `${kind}/${id}`;
+  if (prefetching.has(key)) return;
+  prefetching.add(key);
+  try {
+    const res = await fetch(`${CMS_BASE}/api/life/raw/${kind}/${encodeURIComponent(id)}`, {
+      cache: 'no-store',
+    });
+    if (res.ok) setDocCache(kind, id, await res.json());
+  } catch {
+    /* 预取失败不影响点击；点击时归档页会自己再拉 */
+  } finally {
+    prefetching.delete(key);
+  }
+}
+
 
 async function load() {
   if (abortCtl) abortCtl.abort();
@@ -1479,6 +1512,8 @@ onBeforeUnmount(() => {
               :key="t.kind"
               :to="`/life/archive/${t.kind}`"
               class="life-archive-card"
+              @pointerenter="prefetchArchive(t.kind)"
+              @focus="prefetchArchive(t.kind)"
             >
               <span class="life-archive-index">{{ String(i + 1).padStart(2, '0') }}</span>
               <span class="life-archive-name">{{ t.label }}</span>

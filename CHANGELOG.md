@@ -11,6 +11,22 @@
 
 ---
 
+## fix: 34.2 — 2026-10-20
+
+### 归档页：去掉重复/缓慢的转场，首屏即时出内容
+- `life ↔ life-archive` 在 `router.beforeEach` 里直接跳过整屏转场板子。
+  之前从 LIFE 点归档卡、或在归档内切 tab 都会再演一遍 ARCHIVE 板子，
+  守卫里 700–900ms 的等待 + 板子 1.5s，看起来既重复又慢。
+  **不要**改成组件里的 `@click` + `skipNextPageTransition` —— router-link
+  内部 click 与组件 @click 的先后不稳定，可能来不及置位。
+- 新增 `data/lifeArchiveCache.js`：会话内缓存 raw index 与文档。LIFE 总览
+  已经拉过的索引归档页直接复用；归档 tab/日期悬停时预取默认文档，点下去
+  不再等 R2 list + R2 get 两段网络。
+- 归档加载态加了明确文案（`Loading archive…` / `Loading JOURNAL…`），
+  不再是退场后一块无说明的空白骨架。
+- `verify-life-archive.mjs` 增加断言：从 LIFE 点归档卡后 160ms 内
+  不得出现 `.transition-panel`，且归档 section 已挂载。
+
 ## fix: 34.1 — 2026-10-20
 
 ### VAULT：主任务 / 周回顾 / AI 会话

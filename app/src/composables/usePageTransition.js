@@ -177,6 +177,14 @@ export function installPageTransition(router) {
     if (to.fullPath === from.fullPath) return true;
     if (prefersReducedMotion()) return true;
 
+    // LIFE ↔ 归档是同一条阅读流：从总览点归档卡片、或在归档内切 tab 都不演
+    // 整屏板子。归档页自己有即时反馈（缓存 + 悬停预取），再盖一层 ARCHIVE
+    // 板子只会显得重复；守卫里那 700–900ms 的等待还会让它看起来像"打不开"。
+    // ⚠ 放在路由层而不是组件的 @click 里：router-link 的内部 click 与 @click
+    //   谁先跑并不稳定，靠 skipNextPageTransition 有可能来不及置位。
+    const readingFlow = ['life', 'life-archive'];
+    if (readingFlow.includes(to.name) && readingFlow.includes(from.name)) return true;
+
     // 字和方向都要在开演之前定下来 —— 组件的 watcher 是同步的，runId 一加它就开演。
     transitionLabel.value = sectionLabelFor(to);
     transitionIn.value = pickDir();

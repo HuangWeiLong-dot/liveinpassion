@@ -566,6 +566,22 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   if (cardState.cards !== 8) throw new Error(`archive links ${cardState.cards}`);
   if (Number(cardState.opacity) < 0.99) throw new Error('archive panel not revealed');
   await shot('archive-links');
+
+  // 从 LIFE 点归档卡：不应再出现整屏 ARCHIVE 转场板子（重复/慢的根因）
+  await evalJs("document.querySelector('.life-archive-card').click()");
+  await sleep(160);
+  const cardNav = JSON.parse(await evalJs(`(function(){
+    return JSON.stringify({
+      path: location.pathname,
+      board: !!document.querySelector('.transition-panel'),
+      archive: !!document.querySelector('.life-archive-section'),
+    });
+  })()`));
+  console.log('  card nav:', cardNav);
+  if (cardNav.path !== '/life/archive/journal') throw new Error(`card nav path ${cardNav.path}`);
+  if (cardNav.board) throw new Error('page transition board still appears on archive card click');
+  if (!cardNav.archive) throw new Error('archive section not mounted after card click');
+  await sleep(900);
 });
 
 console.log('LIFE archive mobile');

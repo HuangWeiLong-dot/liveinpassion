@@ -1,15 +1,27 @@
 <script setup>
 // LIFE 归档页：全量原始数据（不脱敏，只由上游遮盖凭证参数）。
 //
-// 一个组件按路由参数 kind 切换六种视图：
-//   journal / notes / tasks / qa / events / weekly
+// 一个组件按路由参数 kind 切换八种视图：
+//   journal / notes / tasks / qa / events / blocks / weekly / vault
 //
 // 索引来自 /api/life/raw/index（R2 里的 key 列表），内容按天通过
-// /api/life/raw/:kind/:id 取。日记由 Worker 用 marked 渲染成 HTML；
+// /api/life/raw/:kind/:id 取。日记与 vault 由 Worker 用 marked 渲染成 HTML；
 // 其余 kind 返回解析后的 JSON。事件一天约 1000 条，默认只渲染前 120 条，
 // 其余用 LOAD MORE 追加，避免一次挂几千个 DOM 节点。
+//
+// 归档是 LIFE 的延续：从总览卡片进入、或在归档内切 tab，都跳过全局转场板子
+// （skipNextPageTransition），并用 lifeArchiveCache 复用总览已拉过的索引 +
+// 悬停预取的文档，避免"板子退场后还在等 R2"的空白感。
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import {
+  getIndexCache,
+  setIndexCache,
+  getDocCache,
+  setDocCache,
+  sortedItems,
+  latestIdFor,
+} from '../data/lifeArchiveCache.js';
 
 const CMS_BASE =
   import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
@@ -47,14 +59,6 @@ const visibleEvents = ref(EVENT_PAGE);
 let requestSeq = 0;
 let firstActivation = true;
 
-function vaultRank(id) {
-  if (id === 'tasks-master') return 0;
-  if (id.startsWith('review-') && id !== 'review-cost-ledger') return 1;
-  if (id === 'review-cost-ledger') return 2;
-  if (id.startsWith('ai-session-')) return 3;
-  return 9;
-}
-
 function vaultLabel(id) {
   if (!id) return '—';
   if (id === 'tasks-master') return 'MASTER TASKS';
@@ -68,11 +72,7 @@ function dayLabel(id) {
   return kind.value === 'vault' ? vaultLabel(id) : id;
 }
 
-const days = computed(() => {
-  const items = index.value?.kinds?.[kind.value] || [];
-  if (kind.value !== 'vault') return items;
-  return [...items].sort((a, b) => vaultRank(a.id) - vaultRank(b.id) || b.id.localeCompare(a.id));
-});
+const days = computed(() => sortedItems(index.value, kind.value));
 const totalByKind = computed(() => index.value?.kinds || {});
 const latest = computed(() => days.value[0]?.id || '—');
 
@@ -187,17 +187,52 @@ function setDomain(domain) {
   visibleEvents.value = EVENT_PAGE;
 }
 
-async function loadIndex() {
-  indexLoading.value = true;
+const prefetching = new Set();
+
+async function prefetchDoc(k, id) {
+  if (!id || getDocCache(k, id)) return;
+  const key = `${k}/${id}`;
+  if (prefetching.has(key)) return;
+  prefetching.add(key);
   try {
-    const res = await fetch(`${CMS_BASE}/api/life/raw/index`, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`index ${res.status}`);
-    index.value = await res.json();
-    error.value = false;
+    const res = await fetch(`${CMS_BASE}/api/life/raw/${k}/${encodeURIComponent(id)}`, {
+      cache: 'no-store',
+    });
+    if (res.ok) setDocCache(k, id, await res.json());
   } catch {
-    error.value = true;
+    /* 预取失败不影响点击；真正需要时还会再拉 */
   } finally {
+    prefetching.delete(key);
+  }
+}
+
+function prefetchKind(k) {
+  prefetchDoc(k, latestIdFor(index.value, k));
+}
+
+async function fetchIndex() {
+  const res = await fetch(`${CMS_BASE}/api/life/raw/index`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`index ${res.status}`);
+  const json = await res.json();
+  index.value = json;
+  setIndexCache(json);
+  error.value = false;
+}
+
+async function loadIndex() {
+  const cached = getIndexCache();
+  if (cached) {
+    index.value = cached;
     indexLoading.value = false;
+  } else {
+    indexLoading.value = true;
+    try {
+      await fetchIndex();
+    } catch {
+      error.value = true;
+    } finally {
+      indexLoading.value = false;
+    }
   }
 
   const ids = days.value.map((d) => d.id);
@@ -208,6 +243,20 @@ async function loadIndex() {
     loading.value = false;
     data.value = null;
   }
+
+  if (cached) {
+    // 后台刷新索引；不挡首屏。只有当前日期消失时才切默认项。
+    fetchIndex()
+      .then(() => {
+        const fresh = days.value.map((d) => d.id);
+        if (!fresh.includes(day.value)) {
+          day.value = fresh[0] || '';
+          if (day.value) loadDoc();
+          else loading.value = false;
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 async function loadDoc() {
@@ -217,8 +266,16 @@ async function loadDoc() {
     return;
   }
 
-  loading.value = true;
-  error.value = false;
+  const cached = getDocCache(kind.value, day.value);
+  if (cached) {
+    data.value = cached;
+    loading.value = false;
+    error.value = false;
+  } else {
+    loading.value = true;
+    error.value = false;
+  }
+
   const seq = ++requestSeq;
 
   try {
@@ -228,10 +285,12 @@ async function loadDoc() {
     const json = await res.json();
     if (seq !== requestSeq) return;
     data.value = json;
+    setDocCache(kind.value, day.value, json);
     domainFilter.value = 'all';
     visibleEvents.value = EVENT_PAGE;
+    error.value = false;
   } catch {
-    if (seq === requestSeq) {
+    if (seq === requestSeq && !cached) {
       data.value = null;
       error.value = true;
     }
@@ -247,7 +306,6 @@ function selectDay(id) {
 }
 
 watch(kind, async () => {
-  data.value = null;
   const ids = days.value.map((d) => d.id);
   day.value = ids[0] || '';
   if (!index.value) {
@@ -258,6 +316,7 @@ watch(kind, async () => {
   else {
     loading.value = false;
     error.value = false;
+    data.value = null;
   }
 });
 
@@ -307,14 +366,19 @@ onActivated(() => {
           :to="`/life/archive/${t.kind}`"
           class="life-archive-tab"
           :class="{ 'is-active': t.kind === kind }"
+          @pointerenter="prefetchKind(t.kind)"
+          @focus="prefetchKind(t.kind)"
         >
           {{ t.label }}
           <span class="life-archive-tab-count">{{ (totalByKind[t.kind] || []).length }}</span>
         </router-link>
       </nav>
 
-      <div v-if="indexLoading" class="stats-loading life-archive-loading" aria-label="Loading archive">
-        <span v-for="n in 3" :key="n"></span>
+      <div v-if="indexLoading" class="life-archive-loading-wrap">
+        <div class="stats-loading life-archive-loading" aria-label="Loading archive">
+          <span v-for="n in 3" :key="n"></span>
+        </div>
+        <p class="life-archive-loading-label">Loading archive…</p>
       </div>
 
       <div v-else-if="error" class="stats-empty">
@@ -332,13 +396,18 @@ onActivated(() => {
             role="tab"
             :aria-selected="d.id === day"
             @click="selectDay(d.id)"
+            @pointerenter="prefetchDoc(kind, d.id)"
+            @focus="prefetchDoc(kind, d.id)"
           >
             {{ dayLabel(d.id) }}
           </button>
         </div>
 
-        <div v-if="loading" class="stats-loading life-archive-loading">
-          <span v-for="n in 3" :key="n"></span>
+        <div v-if="loading" class="life-archive-loading-wrap">
+          <div class="stats-loading life-archive-loading">
+            <span v-for="n in 3" :key="n"></span>
+          </div>
+          <p class="life-archive-loading-label">Loading {{ kindMeta.label }}…</p>
         </div>
 
         <div v-else-if="!day" class="stats-empty">

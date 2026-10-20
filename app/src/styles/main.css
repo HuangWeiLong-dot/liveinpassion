@@ -7266,10 +7266,24 @@
             background: var(--text-secondary);
         }
 
+        .life-archive-loading-wrap {
+            margin-top: 22px;
+        }
+
         .life-archive-loading {
             grid-template-columns: repeat(3, 1fr);
             height: 180px;
-            margin-top: 22px;
+            margin-top: 0;
+        }
+
+        .life-archive-loading-label {
+            margin-top: 10px;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
         }
 
         @media (max-width: 1024px) {
