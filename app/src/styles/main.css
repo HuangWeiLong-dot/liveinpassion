@@ -570,10 +570,14 @@
             width: 100%;
             overflow-x: hidden;
             /* 页面内容是一块不透明的"抽屉"，盖住固定在底部的全局 footer；
-               滚到页尾、进入 footer 的占位时，footer 才露出来（见 AppFooter.vue） */
+               滚到页尾、进入 footer 的占位时，footer 才露出来（见 AppFooter.vue）。
+               min-height 不能省：内容比一屏短的归档/空状态页如果只按内容高度撑，
+               footer 会从页面下方露出几十像素，首屏底部就挂着一条反色条。 */
             position: relative;
             z-index: 1;
             background: var(--bg);
+            min-height: 100vh;
+            min-height: 100dvh;
         }
 
         .page.active {

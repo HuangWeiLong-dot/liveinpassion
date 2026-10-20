@@ -350,6 +350,24 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   if (state.tables !== 1) throw new Error('journal table missing');
   if (!state.raw) throw new Error('raw markdown toggle missing');
   if (state.overflow > 1) throw new Error('desktop overflow');
+
+  // 内容不满一屏时，.page 也要撑满视口，否则固定 footer 会从底部漏一条反色边
+  const footerTop = JSON.parse(await evalJs(`(function(){
+    var main = document.querySelector('main.page.active');
+    var foot = document.querySelector('.site-footer__fixed');
+    var b = main ? main.getBoundingClientRect() : null;
+    return JSON.stringify({
+      hasFooter: !!foot,
+      pageBottom: b ? Math.round(b.bottom) : 0,
+      vh: window.innerHeight,
+      scrollY: Math.round(window.scrollY),
+    });
+  })()`));
+  console.log('  footer (top):', footerTop);
+  if (!footerTop.hasFooter) throw new Error('global footer missing on archive');
+  if (footerTop.scrollY === 0 && footerTop.pageBottom < footerTop.vh - 1) {
+    throw new Error(`page shorter than viewport (${footerTop.pageBottom} < ${footerTop.vh}): footer peeks through`);
+  }
   await shot('journal');
 
   // 切换日期
@@ -582,6 +600,28 @@ await withPage({ width: 1440, height: 1000, label: 'desk', routeUrl: '/life/arch
   if (cardNav.board) throw new Error('page transition board still appears on archive card click');
   if (!cardNav.archive) throw new Error('archive section not mounted after card click');
   await sleep(900);
+
+  // 滚到页尾：footer 抽屉要完整露出，且不能压住归档声明
+  await evalJs('window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" })');
+  await sleep(900);
+  const footerBottom = JSON.parse(await evalJs(`(function(){
+    var foot = document.querySelector('.site-footer__fixed');
+    var disc = document.querySelector('.life-archive-disclaimer');
+    var f = foot ? foot.getBoundingClientRect() : null;
+    var d = disc ? disc.getBoundingClientRect() : null;
+    return JSON.stringify({
+      footTop: f ? Math.round(f.top) : null,
+      vh: window.innerHeight,
+      discBottom: d ? Math.round(d.bottom) : null,
+    });
+  })()`));
+  console.log('  footer (bottom):', footerBottom);
+  if (footerBottom.footTop == null || footerBottom.footTop >= footerBottom.vh) {
+    throw new Error('footer not revealed at document end');
+  }
+  if (footerBottom.discBottom != null && footerBottom.discBottom > footerBottom.footTop + 1) {
+    throw new Error('archive disclaimer is hidden behind the footer');
+  }
 });
 
 console.log('LIFE archive mobile');
@@ -598,6 +638,19 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile', routeUr
   if (state.tabs !== 8) throw new Error('mobile tabs');
   if (state.days !== 2) throw new Error('mobile days');
   if (state.overflow > 1) throw new Error(`mobile overflow ${state.overflow}`);
+  const mFooter = JSON.parse(await evalJs(`(function(){
+    var main = document.querySelector('main.page.active');
+    var b = main ? main.getBoundingClientRect() : null;
+    return JSON.stringify({
+      pageBottom: b ? Math.round(b.bottom) : 0,
+      vh: window.innerHeight,
+      scrollY: Math.round(window.scrollY),
+    });
+  })()`));
+  console.log('  footer (mobile top):', mFooter);
+  if (mFooter.scrollY === 0 && mFooter.pageBottom < mFooter.vh - 1) {
+    throw new Error('mobile: footer peeks through short archive page');
+  }
   await shot('journal');
   await evalJs("document.querySelector('.life-archive-tab[href=\"/life/archive/events\"]').click()");
   await sleep(1600);

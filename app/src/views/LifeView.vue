@@ -1756,7 +1756,7 @@ onBeforeUnmount(() => {
                   :style="{ bottom: motionMeanPct + '%' }"
                   aria-hidden="true"
                 >
-                  <span>MEAN {{ compact(Math.round(motionMean)) }}</span>
+                  <span>MEAN {{ compact(Math.round(motionMean)) }} STEPS</span>
                 </div>
 
                 <div class="life-bars" :class="{ 'is-hovering': motionHover >= 0 }">
@@ -2078,7 +2078,7 @@ onBeforeUnmount(() => {
                       :style="{ bottom: phoneMeanPct + '%' }"
                       aria-hidden="true"
                     >
-                      <span>MEAN {{ compact(Math.round(phoneMean)) }}</span>
+                      <span>MEAN {{ compact(Math.round(phoneMean)) }} UNLOCKS</span>
                     </div>
 
                     <div class="life-bars" :class="{ 'is-hovering': phoneHover >= 0 }">
