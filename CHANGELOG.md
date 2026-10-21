@@ -11,6 +11,93 @@
 
 ---
 
+## update: 37 — 2026-10-21
+
+### LIFE：WHAT I'M DOING NOW（实时状态）
+- 新增 `app/src/components/LifeNow.vue`，放在 LIFE 顶部 KPI 上方：位置 + 坐标（OSM 链接）、
+  实时问答的问题与回答、电脑当前窗口、手机最后应用/解锁数、手表步数/心率。组件自己每 30 秒
+  轮询 `/api/life/now`，与 `/api/life` 的 60 秒轮询无关。
+- Worker 新路由 `POST/GET /api/life/now`（R2 `life/now.json`，公开读、no-store、64 KiB 上限、
+  顶层字段白名单）；已部署。LifeLogging 新增 `scripts/publish_live_now.py`，在 `run_live.ps1`
+  每轮采集之后发布一份快照：位置来自 events.db，电脑/手表来自 phone_relay 的 `/desktop`/`/watch`，
+  问答来自 `/qa`；**发布前用 Translator 翻成英文**（问答原文、窗口标题、地名），
+  `max_calls=6` + 本地缓存控制成本。
+- `run_live.ps1` 补上 `normalize.py --date today`：之前只采集不归一化，blocks 不动，站点聚合
+  的分类时长会停在上一次；现在每轮回写 blocks，再发聚合与 now。
+- 验收：新增 `tools/verify-life-now.mjs`（桌面/手机/404 无快照），并已用真实 CMS 数据
+  确认五张卡片、坐标、问答、电脑/手机/手表与更新时间。
+
+### 数字入场
+- LIFE 与 STATS 的 KPI 卡片不再作为一个整块 `autoAlpha: 0` 隐藏后统一滑入；卡片保持可见，
+  由 `OdometerNumber` 从 0 逐位滚到目标值。首次加载、keep-alive 重进都保留滚动入场。
+- `tools/verify-stats.mjs` 的卡片可见性断言继续通过。
+
+## fix: 36.1 — 2026-10-21
+
+### ENTER WITHOUT MUSIC
+- 之前只有鼠标单独点击有效：键盘 Enter 会先触发 document 的 keydown 自动起播；先点过页面背景
+  再点它也不会停掉已经开始的音乐。
+- 现在 `data-no-music` + `tryAutoPlay` 目标检查 + `@click.stop` / `@keydown.enter.stop`：
+  从该按钮发出的 click/touch/keydown 都不起播；`cancelAutoPlay()` 会同时暂停已播放的音频、
+  清 `isPlaying`、抑制本次会话后续的自动起播（手动播放键不受影响）。
+- 新增 `tools/verify-enter-no-music.mjs`：鼠标、键盘、已起播后点击三条路径全部断言。
+
+## update: 36 — 2026-10-21
+
+### LIFE：可交互 3D 神经图（NEURAL CORE）
+- 新增 `app/src/components/LifeBrain.vue`（three 场景、镜头与交互）和
+  `app/src/data/lifeBrain.js`（确定性图布局 + 日聚合映射）。挂在 LIFE 的 00 号面板，
+  数据仍然只来自 `/api/life` 的夜间聚合，不读 raw 坐标或日记。
+- 视觉改成 Obsidian 图 / 量子纠缠那种点对点网络：8 个分类枢纽 + 每天一颗节点，
+  发光细线 + 相似日之间的长弧“纠缠”；脉冲成对出现（一颗 A→B、一颗 B→A）。
+  脑壳只留一层很暗的尘埃做剪影，陀螺环 / 日期环 / 中央核心继续当机械外框。
+- 日期节点按「相对该分类自身平均占比有多突出」聚类到 8 个枢纽，而不是简单按
+  当天时长最多 —— 否则 Work 占 55% 时 30 天会全挤在一个点上；跑步日会落进
+  Health 簇、社交日进 Social 簇。悬停/选中会点亮该节点及其邻居并压暗其余节点。
+- 镜头改成绕 target 的球面轨道：点节点 → 1.5s 缓动推近并平移；再点另一个 →
+  从当前位置直接飞到新节点（点对点切换）；点空白 / RESET 回全局；选中节点有
+  矢量选中环（`RingGeometry`，逐帧朝向相机，放大不糊）。方向键旋转、`DAY ›` /
+  单日 HUD 的 ‹ › 逐日切换、Enter 打开当天、双击日期节点也直接开单日详情。
+- 标签不再“乱飘”：固定偏移、不做径向推挤或每帧碰撞位移；拖拽 / 推镜 / 滚轮缩放
+  期间标签整体淡出，停下再淡入；指针在画布内时自动环绕暂停。投影重叠时只保留
+  时长更大的标签，且不移动位置。
+- 鼠标与选中状态显式可见：画布内改用 difference 混合的四向准星（压在白色节点上会
+  变黑）和光标旁的节点名 + 时长提示；进入画布时临时隐藏全站方块光标。左上角读数
+  固定显示 **SELECTED** 项，悬停别的节点只做图上高亮和光标提示，不会再把你选中的
+  那一项顶掉；选中的分类标签与日期标签反色。
+- 全屏交互：FULL 进全屏（原生 Fullscreen，失败时退化为 CSS 覆盖层），全屏内
+  `+ / −` 和滚轮缩放；普通面板里滚轮不缩放、不抢页面滚动。全屏时临时抬高
+  `.page` 的 stacking context，避免头部盖在 3D 层上；退出全屏恢复面板高度。
+- 性能与降级：three 动态 import，只在面板接近视口时下载；离屏 / keep-alive
+  失活 / 标签页隐藏都停 RAF；`prefers-reduced-motion` 下不自动旋转、不跑脉冲，
+  推镜直接落位。窄屏（竖屏）按图本身而不是外框取景，手机全屏不会把图缩成一小团。
+- 日期节点不再借用聚类分类的颜色，改用独立的“时间色”：暗色主题 `#E8C15A` 暖金、
+  亮色主题 `#A47C1E` 深铜金；8 个分类枢纽继续用各自的分类色。日→分类的连线用分类色，
+  分类↔分类用两色混合，日↔日纠缠线用时间色（`DAY_COLOR`，同时写成 CSS 变量
+  `--life-day-color` 给标签/图例用）。日期节点的核心改成小菱形（黑白模式下也能和
+  圆形分类枢纽区分），底部图例增加 `DAYS n` 的菱形色键。
+- 新增 `tools/verify-life-brain.mjs`：节点/连线数量、悬停、枢纽点击推镜、点对点切换、
+  逐日切换、OPEN DAY、图例联动、彩色、全屏 + 滚轮缩放、浅色、reduced-motion、手机
+  与空数据、拖拽时标签让路，零控制台报错。`tools/verify-life.mjs` 的面板断言从 7 改为 8。
+
+### LIFE：实时聚合（每 2 分钟）
+- LifeLogging 新增 `scripts/run_live.ps1` 和 `scripts/setup_live_task.ps1`：注册
+  `LifeLogging-Live` 任务，每 2 分钟采集电脑活动 / 手机使用事件，并只把**今天**这一天的
+  脱敏聚合 upsert 到 `/api/life`；Dawarich 位置、Gadgetbridge 手表、AI 平台账单每 15 分钟重采。
+  不推进水位线、不调 AI 写日记，23:00 的 `LifeLogging-Daily` 仍是正式闭环。
+- raw 归档默认不实时发：`publish_life_raw.py` 会调 LLM 翻译，而且实时发布会公开当前坐标。
+  需要时给 live 任务加 `-RawMinutes 30`。
+- 前端：最新一天是今天时显示 `TODAY · LIVE`，柱状 tooltip 追加 `· SO FAR`，单日详情标
+  `TODAY · IN PROGRESS`；ticker 改成「Live aggregate every 2 minutes / Today is partial until
+  the 23:00 close」。页面仍每 60 秒轮询。
+- 实时数据会频繁改图：`LifeBrain` 重建加 90 秒节流，重建时保留当前选中的节点和镜头距离，
+  拖拽 / 推镜期间不重建。
+- `tools/verify-life.mjs` 的数据日期改成「上海今天」，并断言 `TODAY · LIVE` 与今天的
+  tooltip 含 `SO FAR`。
+- 已在本机验证：`LifeLogging-Live` 每 2 分钟运行，API 的 `updatedAt` 随之更新；
+  用真实 CMS 数据截图确认页面显示 `TODAY · LIVE`、最后一天 `OCT 21: 3.8h`、tooltip
+  `OCT 21 · SO FAR`，控制台零报错。
+
 ## fix: 35.2 — 2026-10-20
 
 ### 归档页：内容不满一屏时底部漏出 footer 反色条

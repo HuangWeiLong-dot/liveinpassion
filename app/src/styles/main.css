@@ -5140,6 +5140,33 @@
             display: inline-block;
         }
 
+        .life-live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-primary);
+            letter-spacing: 0.14em;
+        }
+
+        .life-live-badge > i {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            animation: life-live-blink 1.5s steps(2, end) infinite;
+        }
+
+        @keyframes life-live-blink {
+            0%, 55% { opacity: 1; }
+            56%, 100% { opacity: 0.18; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .life-live-badge > i {
+                animation: none;
+            }
+        }
+
         /* ---- 系统信息跑马灯 ---- */
         .stats-ticker {
             margin-top: 46px;
@@ -6189,6 +6216,797 @@
 
         .life-panel {
             margin-top: 32px;
+        }
+
+        /* ---------- LIFE · 3D 神经网络大脑 ---------- */
+
+        .life-brain-panel .stats-panel-head {
+            padding-top: 18px;
+            padding-bottom: 18px;
+        }
+
+        .life-brain {
+            position: relative;
+            height: 470px;
+            overflow: hidden;
+            outline: none;
+            background:
+                radial-gradient(110% 80% at 50% 46%,
+                    color-mix(in srgb, var(--text-primary) 5%, transparent) 0%,
+                    transparent 62%);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .life-brain:focus-visible {
+            box-shadow: inset 0 0 0 2px var(--text-primary);
+        }
+
+        .life-brain-canvas {
+            position: absolute;
+            inset: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+            /* 竖向滑动交给页面，横向拖拽才转场景 */
+            touch-action: pan-y;
+            cursor: grab;
+            opacity: 0;
+            transition: opacity 0.7s ease;
+        }
+
+        .life-brain.is-ready .life-brain-canvas {
+            opacity: 1;
+        }
+
+        .life-brain.is-grabbing .life-brain-canvas {
+            cursor: grabbing;
+        }
+
+        .life-brain-top,
+        .life-brain-readout,
+        .life-brain-hint {
+            position: absolute;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .life-brain-top {
+            top: 18px;
+            left: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .life-brain-kicker {
+            color: var(--text-secondary);
+        }
+
+        /* 面板头已经有 NEURAL CORE，画布里的同名标题只在全屏时出现 */
+        .life-brain-title {
+            display: none;
+        }
+
+        .life-brain-labels {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-brain-label {
+            position: absolute;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 5px;
+            white-space: nowrap;
+            padding: 2px 5px;
+            transform: translate(10px, -50%);
+            background: color-mix(in srgb, var(--bg) 78%, transparent);
+            opacity: 0;
+            visibility: hidden;
+            transition: color 0.2s ease;
+            will-change: left, top;
+        }
+
+        .life-brain-label i {
+            display: none;
+            font-style: normal;
+            opacity: 0.55;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-brain-label.is-active {
+            color: var(--text-primary);
+        }
+
+        .life-brain-label.is-selected {
+            color: var(--bg);
+            background: var(--text-primary);
+        }
+
+        .life-brain-label.is-selected i {
+            color: var(--bg);
+            opacity: 0.72;
+        }
+
+        .life-brain.is-cam-moving .life-brain-labels {
+            opacity: 0;
+        }
+
+        .life-brain-label.is-day {
+            color: var(--text-primary);
+            transform: translate(-50%, -160%);
+            padding: 3px 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 0.52rem;
+        }
+
+        .life-brain-label.is-day.is-selected {
+            color: var(--bg);
+            border-color: var(--text-primary);
+            background: var(--text-primary);
+        }
+
+        .life-brain-label.is-day.is-selected i {
+            color: var(--bg);
+            opacity: 0.72;
+        }
+
+        .life-brain-label .life-brain-day-dot {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            flex: none;
+            background: var(--life-day-color);
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+            opacity: 1;
+        }
+
+        .life-brain-label.is-day.is-selected .life-brain-day-dot {
+            background: var(--life-day-color);
+        }
+
+        .life-brain-label.is-day i {
+            display: inline;
+            opacity: 0.75;
+        }
+
+        .life-brain-meta {
+            color: var(--text-secondary);
+            opacity: 0.62;
+        }
+
+        .life-brain-meta--narrow {
+            display: none;
+        }
+
+        .life-brain-readout {
+            top: 48px;
+            left: 22px;
+            width: min(262px, 42%);
+            min-height: 116px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            line-height: 1.6;
+        }
+
+        .life-brain-value {
+            display: block;
+            margin-top: 8px;
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(1.7rem, 2.4vw, 2.3rem);
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            line-height: 1;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-brain-value em {
+            font-style: normal;
+            font-size: 0.4em;
+            letter-spacing: 0.08em;
+            margin-left: 3px;
+            color: var(--text-secondary);
+        }
+
+        .life-brain-value.is-empty {
+            opacity: 0.35;
+        }
+
+        .life-brain-note {
+            display: block;
+            margin-top: 9px;
+            color: var(--text-secondary);
+            max-width: 248px;
+        }
+
+        .life-brain-action {
+            display: block;
+            margin-top: 7px;
+            color: var(--text-primary);
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+        }
+
+        .life-brain-day-actions {
+            display: flex;
+            align-items: stretch;
+            gap: 4px;
+            margin-top: 8px;
+            pointer-events: auto;
+        }
+
+        .life-brain-open-day,
+        .life-brain-step {
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            line-height: 1;
+            padding: 7px 9px;
+            cursor: pointer;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .life-brain-open-day:hover,
+        .life-brain-open-day:focus-visible,
+        .life-brain-step:hover,
+        .life-brain-step:focus-visible {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg);
+            outline: none;
+        }
+
+        .life-brain-step {
+            min-width: 28px;
+            font-size: 0.7rem;
+            padding: 5px 7px 7px;
+        }
+
+        .life-brain-actions {
+            position: absolute;
+            top: 16px;
+            right: 18px;
+            z-index: 3;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 5px;
+            max-width: 62%;
+        }
+
+        .life-brain-btn {
+            min-width: 34px;
+            padding: 7px 9px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.1em;
+            line-height: 1;
+            cursor: pointer;
+            transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+        }
+
+        .life-brain-btn:hover:not(:disabled),
+        .life-brain-btn:focus-visible {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-brain-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .life-brain-btn--icon {
+            font-size: 0.72rem;
+            padding: 5px 9px 6px;
+        }
+
+        /* 光标准星：difference 混合，压在白色节点上会变黑 */
+        .life-brain-pointer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 6;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 1.5px solid #fff;
+            border-radius: 50%;
+            /* 四向准星刻度，让“这里是指针”和“这里是节点环”区分开 */
+            background:
+                linear-gradient(#fff, #fff) top center / 1px 5px no-repeat,
+                linear-gradient(#fff, #fff) bottom center / 1px 5px no-repeat,
+                linear-gradient(#fff, #fff) left center / 5px 1px no-repeat,
+                linear-gradient(#fff, #fff) right center / 5px 1px no-repeat;
+            opacity: 0;
+            pointer-events: none;
+            mix-blend-mode: difference;
+            filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+            transition: opacity 0.12s ease, width 0.12s ease, height 0.12s ease,
+                margin 0.12s ease;
+        }
+
+        .life-brain-pointer i {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 4px;
+            height: 4px;
+            margin: -2px 0 0 -2px;
+            border-radius: 50%;
+            background: #fff;
+        }
+
+        .life-brain-pointer.is-on {
+            width: 26px;
+            height: 26px;
+            margin: -13px 0 0 -13px;
+        }
+
+        .life-brain.is-pointer .life-brain-pointer {
+            opacity: 1;
+        }
+
+        .life-brain.is-grabbing .life-brain-pointer {
+            width: 14px;
+            height: 14px;
+            margin: -7px 0 0 -7px;
+        }
+
+        .life-brain-cursor-tip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 7;
+            display: flex;
+            align-items: baseline;
+            gap: 7px;
+            padding: 4px 7px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.52rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .life-brain-tip-dot {
+            width: 6px;
+            height: 6px;
+            flex: none;
+            background: var(--life-day-color);
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+            align-self: center;
+        }
+
+        .life-brain-cursor-tip b {
+            font-weight: 400;
+        }
+
+        .life-brain-cursor-tip span {
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 脑图里用准星，别让全站方块光标和节点混在一起 */
+        html.brain-pointer .block-cursor {
+            opacity: 0 !important;
+        }
+
+        @media (hover: none) {
+            .life-brain-pointer,
+            .life-brain-cursor-tip {
+                display: none;
+            }
+        }
+
+        .life-brain-legend {
+            position: absolute;
+            left: 20px;
+            bottom: 16px;
+            z-index: 3;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            max-width: calc(100% - 300px);
+        }
+
+        .life-brain-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 7px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.08em;
+            line-height: 1;
+            cursor: default;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .life-brain-chip b {
+            font-weight: 400;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-brain-chip.is-empty b {
+            color: var(--text-secondary);
+        }
+
+        .life-brain-chip.is-selected {
+            color: var(--text-primary);
+            border-color: var(--text-primary);
+            background: var(--bg);
+        }
+
+        .life-brain-chip.is-selected .life-brain-chip-dot {
+            background: var(--text-primary);
+            opacity: 1;
+        }
+
+        .life-brain-chip.is-active,
+        .life-brain-chip:hover,
+        .life-brain-chip:focus-visible {
+            color: var(--text-primary);
+            border-color: var(--border);
+            background: var(--bg);
+            outline: none;
+        }
+
+        .life-brain-chip-dot {
+            width: 6px;
+            height: 6px;
+            flex: none;
+            background: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        .life-brain-day-key {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 7px;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.08em;
+            line-height: 1;
+            cursor: default;
+        }
+
+        .life-brain-day-key b {
+            font-weight: 400;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-brain-day-key-dot {
+            width: 7px;
+            height: 7px;
+            flex: none;
+            background: var(--life-day-color);
+            clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+        }
+
+        .life-brain-chip.is-active .life-brain-chip-dot {
+            background: var(--text-primary);
+            opacity: 1;
+        }
+
+        .life-brain-chip.is-empty .life-brain-chip-dot {
+            background: transparent;
+            box-shadow: inset 0 0 0 1px var(--text-secondary);
+            opacity: 0.55;
+        }
+
+        .life-brain-hint {
+            right: 20px;
+            bottom: 19px;
+            max-width: 40%;
+            text-align: right;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            opacity: 0.55;
+        }
+
+        .life-brain-poster {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 24px;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            background: var(--bg);
+        }
+
+        .life-brain-poster.is-note b {
+            color: var(--text-primary);
+            font-weight: 400;
+            letter-spacing: 0.16em;
+        }
+
+        .life-brain-poster span {
+            max-width: 360px;
+            line-height: 1.7;
+        }
+
+        .life-brain-poster b + span {
+            margin-top: 2px;
+        }
+
+        .life-brain-poster span::after {
+            content: '';
+            display: inline-block;
+            width: 5px;
+            height: 9px;
+            margin-left: 7px;
+            background: var(--text-primary);
+            vertical-align: -1px;
+            animation: life-brain-blink 1.1s steps(2, end) infinite;
+        }
+
+        .life-brain-poster.is-note span::after {
+            content: none;
+        }
+
+        @keyframes life-brain-blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0.15; }
+        }
+
+        /* ---- 全屏交互 ---- */
+        .life-brain.is-expanded {
+            position: fixed;
+            inset: 0;
+            z-index: 8800;
+            width: 100vw;
+            height: 100dvh;
+            background: var(--bg);
+        }
+
+        .life-brain.is-expanded .life-brain-title {
+            display: block;
+            font-size: 0.62rem;
+            letter-spacing: 0.16em;
+            color: var(--text-primary);
+        }
+
+        .life-brain.is-expanded .life-brain-top {
+            top: 22px;
+            left: 28px;
+        }
+
+        .life-brain.is-expanded .life-brain-readout {
+            top: 82px;
+            left: 28px;
+            width: 300px;
+            font-size: 0.58rem;
+        }
+
+        .life-brain.is-expanded .life-brain-value {
+            font-size: clamp(2rem, 3vw, 3rem);
+        }
+
+        .life-brain.is-expanded .life-brain-actions {
+            top: 20px;
+            right: 26px;
+        }
+
+        .life-brain.is-expanded .life-brain-legend {
+            left: 26px;
+            bottom: 22px;
+            max-width: 64%;
+        }
+
+        .life-brain.is-expanded .life-brain-hint {
+            bottom: 24px;
+            right: 26px;
+        }
+
+        .life-brain.is-expanded .life-brain-label {
+            font-size: 0.64rem;
+        }
+
+        .life-brain.is-expanded .life-brain-label i {
+            display: inline;
+        }
+
+        /* GSAP 在面板上留了 transform，会让 position: fixed 变成相对面板定位。
+           全屏期间把这些祖先的 transform 清掉（原生全屏走 top layer，不受影响）。 */
+        html.brain-expanded .page,
+        html.brain-expanded .stats-section,
+        html.brain-expanded .stats-panel {
+            transform: none !important;
+            will-change: auto !important;
+        }
+
+        /* .page 自带 z-index: 1，会把它里面的 position: fixed 全关进这个
+           stacking context，于是头部（z 999）反而盖在 3D 全屏上面。 */
+        html.brain-expanded .page {
+            z-index: 9000 !important;
+        }
+
+        @media (max-width: 1024px) {
+            .life-brain {
+                height: 430px;
+            }
+
+            .life-brain-hint {
+                display: none;
+            }
+
+            .life-brain-legend {
+                max-width: calc(100% - 40px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .life-brain {
+                height: 400px;
+            }
+
+            .life-brain-top {
+                top: 14px;
+                left: 16px;
+            }
+
+            .life-brain-meta--wide {
+                display: none;
+            }
+
+            .life-brain-meta--narrow {
+                display: block;
+            }
+
+            .life-brain-readout.is-idle {
+                display: none;
+            }
+
+            .life-brain-readout:not(.is-idle) {
+                top: 44px;
+                width: min(240px, 66%);
+                min-height: 0;
+                padding: 10px 11px;
+                border: 1px solid var(--border);
+                background: var(--bg);
+            }
+
+            .life-brain-labels .life-brain-label:not(.is-day):not(.is-active) {
+                display: none;
+            }
+
+            .life-brain-label {
+                font-size: 0.46rem;
+            }
+
+            .life-brain-label.is-day {
+                font-size: 0.5rem;
+            }
+
+            .life-brain-actions {
+                max-width: 70%;
+            }
+
+            .life-brain.is-expanded .life-brain-readout {
+                top: 78px;
+                left: 16px;
+                width: min(280px, 78%);
+            }
+
+            .life-brain-readout:not(.is-idle) .life-brain-value {
+                font-size: 1.6rem;
+            }
+
+            .life-brain-readout {
+                top: 50px;
+                left: 16px;
+                width: 54%;
+                min-height: 100px;
+                font-size: 0.5rem;
+            }
+
+            .life-brain-value {
+                font-size: 1.85rem;
+            }
+
+            .life-brain-note {
+                max-width: 100%;
+            }
+
+            .life-brain-actions {
+                top: 12px;
+                right: 12px;
+            }
+
+            .life-brain-btn {
+                padding: 6px 7px;
+                font-size: 0.48rem;
+            }
+
+            .life-brain-legend {
+                left: 12px;
+                right: 12px;
+                bottom: 10px;
+                max-width: none;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding-bottom: 2px;
+                scrollbar-width: none;
+                -webkit-mask-image: linear-gradient(to right, #000 88%, transparent);
+                mask-image: linear-gradient(to right, #000 88%, transparent);
+            }
+
+            .life-brain-legend::-webkit-scrollbar {
+                display: none;
+            }
+
+            .life-brain-chip {
+                flex: none;
+                padding: 4px 5px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .life-brain {
+                height: 380px;
+            }
+
+            .life-brain-readout {
+                width: 60%;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .life-brain-canvas {
+                transition: none;
+            }
+
+            .life-brain-poster span::after {
+                animation: none;
+            }
         }
 
         .life-chart {

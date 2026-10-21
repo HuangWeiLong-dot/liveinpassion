@@ -54,6 +54,12 @@ const isScrubbing = ref(false);
 
 let audioEl = null;
 let interactionBound = false;
+// 用户点了「ENTER WITHOUT MUSIC」之后，本次会话不再自动起播。
+// 手动按播放键不受影响。
+let autoPlaySuppressed = false;
+// 每次播放 / 暂停都 +1；旧的 play() promise 回来时如果 token 变了，
+// 就不能再把 isPlaying 拨回去（否则「无音乐进入」后 UI 会又亮成暂停态）。
+let playToken = 0;
 
 // ── 频谱分析 ────────────────────────────────────────────────────────────────
 // <audio> → MediaElementSource → Analyser → destination。必须在用户交互里创建
@@ -136,15 +142,18 @@ function playTrack() {
   if (!audioEl) return;
   // 第一次播放（通常就是首屏 ENTER 那一下）时在用户手势里搭好分析图
   ensureAudioGraph();
+  const token = ++playToken;
   audioEl.play().then(
-    () => { isPlaying.value = true; },
+    () => {
+      if (token === playToken) isPlaying.value = true;
+    },
     () => { /* 被自动播放策略或加载失败挡住：保持暂停态，等用户按播放键 */ }
   );
 }
 
 function pauseTrack() {
-  if (!audioEl) return;
-  audioEl.pause();
+  playToken += 1;
+  if (audioEl) audioEl.pause();
   isPlaying.value = false;
 }
 
@@ -245,8 +254,15 @@ function endScrub(percent) {
 
 // 首次用户交互后开始播放一次（自动播放策略的绕行方案）。
 // 走 playTrack 而不是自己 play()，播放状态才会跟着一起置上。
-function tryAutoPlay() {
-  if (!audioEl) return;
+function tryAutoPlay(event) {
+  // 键盘 Enter 落在「ENTER WITHOUT MUSIC」上时，document 的 keydown 会先于
+  // click 到达这里。按目标元素判断，直接取消，不能让这声 Enter 起播。
+  const target = event?.target;
+  const noMusic = !!(target && target.closest && target.closest('[data-no-music]'));
+  if (noMusic || !audioEl || autoPlaySuppressed) {
+    cancelAutoPlay();
+    return;
+  }
   playTrack();
   document.removeEventListener('click', tryAutoPlay);
   document.removeEventListener('touchstart', tryAutoPlay);
@@ -254,13 +270,19 @@ function tryAutoPlay() {
   interactionBound = false;
 }
 
-// 「ENTER WITHOUT MUSIC」：直接取消首次交互自动起播。
-// 之后用户仍然可以自己点播放键。
+// 「ENTER WITHOUT MUSIC」：取消首次交互自动起播，并且把**已经因为别处的
+// 点击而起播**的那一首真正暂停掉。之后用户仍然可以自己点播放键。
 function cancelAutoPlay() {
   document.removeEventListener('click', tryAutoPlay);
   document.removeEventListener('touchstart', tryAutoPlay);
   document.removeEventListener('keydown', tryAutoPlay);
   interactionBound = false;
+  autoPlaySuppressed = true;
+  playToken += 1;
+  if (audioEl) {
+    try { audioEl.pause(); } catch { /* 还没加载好 */ }
+  }
+  isPlaying.value = false;
 }
 
 export function useMusicPlayer() {
@@ -276,7 +298,7 @@ export function useMusicPlayer() {
     isMuted.value = false;
     updatePlaylistUI();
 
-    if (!interactionBound) {
+    if (!interactionBound && !autoPlaySuppressed) {
       interactionBound = true;
       document.addEventListener('click', tryAutoPlay);
       document.addEventListener('touchstart', tryAutoPlay);

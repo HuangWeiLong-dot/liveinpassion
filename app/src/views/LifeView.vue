@@ -18,6 +18,8 @@ import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMoun
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
+import LifeBrain from '../components/LifeBrain.vue';
+import LifeNow from '../components/LifeNow.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import {
   latestIdFor,
@@ -260,6 +262,13 @@ const rows = computed(() => {
 });
 
 const payloads = computed(() => rows.value.map((r) => r.payload).filter(Boolean));
+
+// 实时发布链路上线后，“最新一天”可能就是今天；此时数字是当天到目前的，
+// 不是完整一天。用它给页面加一个明确的 TODAY / 部分数据提示。
+const latestIsToday = computed(() => {
+  const last = rows.value[rows.value.length - 1];
+  return !!last && !last.missing && last.day === todayRef.value;
+});
 
 const city = computed(() => {
   for (let i = payloads.value.length - 1; i >= 0; i -= 1) {
@@ -879,7 +888,8 @@ watch(colorMode, (v) => {
 });
 
 const tickerItems = computed(() => [
-  'Aggregated nightly at 23:00',
+  'Live aggregate every 2 minutes',
+  'Today is partial until the 23:00 close',
   'Click any bar for a single-day view',
   'Full raw archive below',
   'Journals · notes · tasks · events',
@@ -1128,6 +1138,8 @@ async function playIntro(replay) {
   gsap.set([...kickers, ...subtitle, ...meta, ...ticker, ...cardsEls], {
     clearProps: 'opacity,visibility,transform',
   });
+  // 数字卡片不做整块隐藏：卡片保持可见，入场交给 OdometerNumber 从 0 滚上来。
+  gsap.set(cardsEls, { autoAlpha: 1, y: 0 });
   gsap.set([...chars, ...ruleFill], { clearProps: 'opacity,visibility,transform' });
 
   startTicker();
@@ -1147,10 +1159,7 @@ async function playIntro(replay) {
     .fromTo(ruleFill, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'power3.inOut' }, 0.36)
     .fromTo(subtitle, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.8 }, 0.5)
     .fromTo(meta, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.75 }, 0.62)
-    .fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0.7)
-    .fromTo(cardsEls, { autoAlpha: 0, y: 48 }, {
-      autoAlpha: 1, y: 0, duration: 0.85, stagger: 0.08,
-    }, 0.64);
+    .fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0.7);
 
   if (!replay) {
     prepareCharts();
@@ -1545,6 +1554,12 @@ onBeforeUnmount(() => {
           <span>{{ city }}</span>
           <i aria-hidden="true"></i>
           <span>Updated {{ lastUpdated }}</span>
+          <template v-if="latestIsToday">
+            <i aria-hidden="true"></i>
+            <span class="life-live-badge" title="Today's figures are partial until the 23:00 close">
+              <i aria-hidden="true"></i>TODAY · LIVE
+            </span>
+          </template>
           <i aria-hidden="true"></i>
           <button
             class="life-color-toggle"
@@ -1578,6 +1593,9 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- 现在在干嘛（独立轮询 /api/life/now） -->
+        <LifeNow />
+
         <!-- KPI -->
         <div class="stats-cards life-cards">
           <article v-for="(card, i) in kpis" :key="card.key" class="stat-card">
@@ -1602,6 +1620,25 @@ onBeforeUnmount(() => {
               <span class="stat-note">{{ card.note }}</span>
             </div>
           </article>
+        </div>
+
+        <!-- 00 神经网络大脑（交互 3D） -->
+        <div class="stats-panel life-panel life-brain-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">00</span>
+              <h2>NEURAL CORE</h2>
+            </div>
+            <div class="stats-panel-head-right">
+              <span class="stats-panel-sub">8 REGIONS · {{ rows.length }} DAYS · LIVE GRAPH</span>
+            </div>
+          </div>
+          <LifeBrain
+            :rows="rows"
+            :color-mode="colorMode"
+            :reduced="REDUCED"
+            @select-day="openDay"
+          />
         </div>
 
         <!-- 01 每日节奏 -->
@@ -1672,7 +1709,7 @@ onBeforeUnmount(() => {
                       aria-hidden="true"
                       :style="{ left: rhythmHoverRow ? rhythmHoverRow.tipPct + '%' : '0%' }"
                     >
-                      <span class="stats-tip-date">{{ rhythmHoverRow ? fullDay(rhythmHoverRow.day) : '' }}</span>
+                      <span class="stats-tip-date">{{ rhythmHoverRow ? fullDay(rhythmHoverRow.day) : '' }}<template v-if="rhythmHoverRow?.isToday"> · SO FAR</template></span>
                       <span class="stats-tip-row">
                         <b>{{ rhythmHoverRow?.total == null ? '—' : hoursLabel(rhythmHoverRow.total) }}</b>
                         <em>TRACKED</em>
@@ -1794,7 +1831,7 @@ onBeforeUnmount(() => {
                   aria-hidden="true"
                   :style="{ left: motionHoverRow ? motionHoverRow.tipPct + '%' : '0%' }"
                 >
-                  <span class="stats-tip-date">{{ motionHoverRow ? fullDay(motionHoverRow.day) : '' }}</span>
+                  <span class="stats-tip-date">{{ motionHoverRow ? fullDay(motionHoverRow.day) : '' }}<template v-if="motionHoverRow?.isToday"> · SO FAR</template></span>
                   <span class="stats-tip-row">
                     <b>{{ motionHoverRow?.steps == null ? '—' : fmt(motionHoverRow.steps) }}</b>
                     <em>STEPS</em>
@@ -2116,7 +2153,7 @@ onBeforeUnmount(() => {
                       aria-hidden="true"
                       :style="{ left: phoneHoverRow ? phoneHoverRow.tipPct + '%' : '0%' }"
                     >
-                      <span class="stats-tip-date">{{ phoneHoverRow ? fullDay(phoneHoverRow.day) : '' }}</span>
+                      <span class="stats-tip-date">{{ phoneHoverRow ? fullDay(phoneHoverRow.day) : '' }}<template v-if="phoneHoverRow?.isToday"> · SO FAR</template></span>
                       <span class="stats-tip-row">
                         <b>{{ phoneHoverRow?.unlocks == null ? '—' : fmt(phoneHoverRow.unlocks) }}</b>
                         <em>UNLOCKS</em>
@@ -2228,7 +2265,7 @@ onBeforeUnmount(() => {
                       aria-hidden="true"
                       :style="{ left: aiHoverRow ? aiHoverRow.tipPct + '%' : '0%' }"
                     >
-                      <span class="stats-tip-date">{{ aiHoverRow ? fullDay(aiHoverRow.day) : '' }}</span>
+                      <span class="stats-tip-date">{{ aiHoverRow ? fullDay(aiHoverRow.day) : '' }}<template v-if="aiHoverRow?.isToday"> · SO FAR</template></span>
                       <span class="stats-tip-row">
                         <b>{{ aiHoverRow?.cost == null ? '—' : `¥${aiHoverRow.cost.toFixed(2)}` }}</b>
                         <em>SPEND</em>
@@ -2394,7 +2431,10 @@ onBeforeUnmount(() => {
           >
             <div class="life-day-head">
               <div>
-                <span class="life-day-kicker">Single day · {{ weekdayName(dayDetail) }}</span>
+                <span class="life-day-kicker">
+                  Single day · {{ weekdayName(dayDetail) }}
+                  <template v-if="dayDetail === todayRef"> · TODAY · IN PROGRESS</template>
+                </span>
                 <h3>{{ fullDay(dayDetail) }}</h3>
               </div>
               <button

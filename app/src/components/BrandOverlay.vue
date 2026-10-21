@@ -145,7 +145,9 @@ onBeforeUnmount(() => {
       <button
         class="brand__enter brand__enter--quiet"
         type="button"
-        @click="enterNoMusic"
+        data-no-music
+        @click.stop="enterNoMusic"
+        @keydown.enter.stop
       >
         ENTER WITHOUT MUSIC
       </button>

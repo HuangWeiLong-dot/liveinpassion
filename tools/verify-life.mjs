@@ -17,7 +17,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- 固定数据 ----------
 const CATS = ['Work', 'Study', 'Life', 'Transport', 'Leisure', 'Health', 'Social', 'Other'];
-const END = new Date('2026-10-18T12:00:00Z');
+const SHANGHAI_TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+const END = new Date(`${SHANGHAI_TODAY}T12:00:00Z`);
 const iso = (d) => d.toISOString().slice(0, 10);
 
 function buildFull() {
@@ -266,6 +267,14 @@ const STUB = `
     if (url.indexOf('/api/life/raw/index') >= 0) {
       return jsonResponse(rawIndex());
     }
+    // 「我现在在干嘛」是独立轮询；测试里让它返回 404，面板走等待态，
+    // 不要被下面的 /api/life 兜底当成一天的数据。
+    if (url.indexOf('/api/life/now') >= 0) {
+      return Promise.resolve(new Response(JSON.stringify({ error: 'no snapshot yet' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }));
+    }
     var ev = url.match(/\\/api\\/life\\/raw\\/events\\/([^/?]+)/);
     if (ev) {
       return jsonResponse(rawEvents(decodeURIComponent(ev[1])));
@@ -463,8 +472,11 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   console.log('  state:', state);
 
   if (state.path !== '/life') throw new Error('not on /life');
+  const liveBadge = await evalJs("(function () { var b = document.querySelector('.life-live-badge'); return b ? b.textContent.replace(/\s+/g, ' ').trim() : ''; })()");
+  console.log('  live badge:', liveBadge);
+  if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
-  if (state.panels !== 7) throw new Error(`expected 7 panels, got ${state.panels}`);
+  if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
   if (state.numbers.length !== 5) throw new Error(`expected 5 odometers, got ${state.numbers.length}`);
   if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
@@ -543,6 +555,20 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
     throw new Error('tooltip missing category breakdown');
   }
   await shot('tooltip');
+
+  // 今天那根柱子的提示必须标明是“到目前为止”
+  const lastCol = JSON.parse(await evalJs(`(function () {
+    var cols = document.querySelectorAll('[data-chart="rhythm"] .life-col');
+    var b = cols[cols.length - 1].getBoundingClientRect();
+    return JSON.stringify({ x: b.left + b.width / 2, y: b.top + b.height - 60 });
+  })()`));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: lastCol.x - 2, y: lastCol.y - 2 });
+  await sleep(120);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: lastCol.x, y: lastCol.y });
+  await sleep(400);
+  const todayTip = await evalJs("(document.querySelector('.life-tooltip') || {}).textContent?.replace(/\s+/g, ' ').trim() || ''");
+  console.log('  today tooltip:', todayTip);
+  if (!/SO FAR/.test(todayTip)) throw new Error(`today tooltip missing SO FAR: ${todayTip}`);
 
   // 单日详情：点柱子打开，Escape 关闭
   await evalJs(`document.querySelectorAll('[data-chart="rhythm"] .life-col')[15].click()`);
@@ -751,7 +777,7 @@ await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, asy
   console.log('  state:', { cards: state.cards, numbers: state.numbers.length, panels: state.panels });
   if (state.cards !== 5) throw new Error('empty: KPI cards missing');
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
-  if (state.panels !== 7) throw new Error('empty: panels missing');
+  if (state.panels !== 8) throw new Error('empty: panels missing');
   await shot('top');
 });
 

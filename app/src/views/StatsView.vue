@@ -353,6 +353,8 @@ async function playIntro(replay) {
 
   // 上一次可能演到一半就离开了：先把内联状态清掉再重排
   gsap.set([...kickers, ...subtitle, ...meta, ...ticker, ...cardsEls], { clearProps: 'opacity,visibility,transform' });
+  // 数字卡片不做整块隐藏：卡片保持可见，入场交给 OdometerNumber 从 0 滚上来。
+  gsap.set(cardsEls, { autoAlpha: 1, y: 0 });
   gsap.set([...chars, ...ruleFill], { clearProps: 'opacity,visibility,transform' });
 
   startTicker();
@@ -373,10 +375,7 @@ async function playIntro(replay) {
     .fromTo(ruleFill, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'power3.inOut' }, 0.36)
     .fromTo(subtitle, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.8 }, 0.5)
     .fromTo(meta, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.75 }, 0.62)
-    .fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0.7)
-    .fromTo(cardsEls, { autoAlpha: 0, y: 48 }, {
-      autoAlpha: 1, y: 0, duration: 0.85, stagger: 0.08,
-    }, 0.64);
+    .fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0.7);
 
   // 第一次进来才铺滚动揭示；重进时已经看过的面板保持原样，只补没揭示过的
   if (!replay) {

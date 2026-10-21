@@ -7,6 +7,7 @@ import { publicRoutes } from './routes/public.js';
 import { statsRoutes } from './routes/stats.js';
 import { lifeRoutes } from './routes/life.js';
 import { lifeRawRoutes } from './routes/life_raw.js';
+import { lifeNowRoutes } from './routes/life_now.js';
 import {
   getAuthUser,
   checkPassword,
@@ -190,6 +191,7 @@ app.route('/api', statsRoutes);
 app.route('/api', publicRoutes);
 app.route('/api', lifeRoutes);
 app.route('/api', lifeRawRoutes);
+app.route('/api', lifeNowRoutes);
 
 // 管理后台静态资源（Workers Assets）
 // admin 构建时 base='/admin/'，产物在 admin-dist/ 下
