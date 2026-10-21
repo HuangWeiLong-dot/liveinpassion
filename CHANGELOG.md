@@ -11,6 +11,33 @@
 
 ---
 
+## update: 38 — 2026-10-21
+
+### 24h 服务器侧实时快照（笔记本关机也继续更新）
+- 新增 `server/live-now/live_now_server.py` + systemd service/timer：每 2 分钟在
+  24h 服务器上组装 `/api/life/now`，来源是 Dawarich（位置/坐标）、中继 `/events`
+  （手机）、中继 `/qa`（实时问答）、中继上的 `gadgetbridge.db`（手表 steps/HR）。
+- 发布前先 GET 当前快照；**电脑和手表只保留两边里更新的一份**，所以笔记本开着时
+  不会被服务器上的旧中继快照覆盖；笔记本关掉后服务器才接管。电脑窗口只能停在
+  最后一份 `/desktop`（ActivityWatch 在本机），这一点无法搬走。
+- 手表 `pushedAt` 现在始终展示：卡片显示 `UPDATED HH:MM · Xm AGO`，来源可以是
+  本机 ingest、中继 `/watch`，或服务器直接解析的 `gadgetbridge.db`。
+- 站点英文不变：服务器这条同样用 `translate.Translator` 翻问答/窗口标题/地名。
+- 部署见 `server/live-now/README.md`（需要服务器上设置 `LIFE_INGEST_TOKEN`；
+  `DEEPSEEK_API_KEY` 复用 close-day.env）。
+
+## fix: 37.1 — 2026-10-21
+
+### WATCH 卡停在昨天（明明手表数据已经到了）
+- 根因：`publish_live_now.py` 总是优先取中继 `/watch`，而 `push_health.py` 只在
+  `run_daily.ps1` 里跑；中继那份停在 10/20。其实本机 `events.db` 已经有 10/21 的
+  steps / HR，只是没被用上。
+- 修复：`watch_now` 同时读本地和中继，取 `day` 更新的一份（同一天优先本地，
+  `ingested_at` 更新）；`run_live.ps1` 的重采集里补上 `push_health.py`，中继
+  `/watch` 也会跟着走。
+- 验证：`/api/life/now` 返回 `2026-10-21`、7,822 steps、HR 83.2、`synced: true`；
+  页面 WATCH 卡显示 `21.10.2026 · SYNCED`，`NOT TODAY` 消失；KPI STEPS 也包含今天。
+
 ## update: 37 — 2026-10-21
 
 ### LIFE：WHAT I'M DOING NOW（实时状态）

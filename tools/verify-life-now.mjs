@@ -221,6 +221,7 @@ await withPage({ width: 1440, height: 1100, label: 'desk' }, async ({ shot, stat
   if (!/VS Code/.test(state.text) || !/CHANGELOG/.test(state.text)) throw new Error('desktop snapshot missing');
   if (!/WeChat/.test(state.text) || !/88 UNLOCKS/.test(state.text)) throw new Error('phone snapshot missing');
   if (!/4,426/.test(state.text) || !/NOT TODAY/.test(state.text)) throw new Error('watch snapshot missing');
+  if (!/UPDATED/.test(state.text)) throw new Error('watch last-update time missing');
   if (!/UPDATED/.test(state.header)) throw new Error(`updated line missing: ${state.header}`);
   if (!/openstreetmap\.org/.test(state.href) || !/mlat=31\.15676/.test(state.href)) {
     throw new Error(`map link wrong: ${state.href}`);

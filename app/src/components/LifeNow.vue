@@ -270,7 +270,8 @@ onBeforeUnmount(() => {
           <div class="life-now-meta">
             <span v-if="watch.hrAvg != null">HR {{ num(watch.hrAvg, 1) }} BPM</span>
             <span v-if="watch.day">{{ dayLabel(watch.day) }}</span>
-            <span v-if="watch.synced">SYNCED</span>
+            <span v-if="watch.pushedAt">UPDATED {{ hhmm(watch.pushedAt) }} · {{ watchAge }}</span>
+            <span v-else-if="watch.synced">SYNCED</span>
             <span v-else>LAST SYNC · {{ watchAge }}</span>
           </div>
         </template>
