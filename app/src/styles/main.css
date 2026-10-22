@@ -8534,6 +8534,17 @@
             stroke-width: 1.8;
         }
 
+        .life-map-track.is-watch {
+            stroke: var(--text-primary);
+            stroke-width: 1.6;
+            stroke-dasharray: 6 4;
+            opacity: 0.9;
+        }
+
+        .life-map-track.is-watch.is-active {
+            stroke-width: 2.2;
+        }
+
         .life-map.is-hovering .life-map-track:not(.is-active) {
             opacity: 0.12;
         }

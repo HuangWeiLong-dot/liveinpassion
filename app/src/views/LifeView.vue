@@ -573,10 +573,25 @@ const watchSummary = computed(() => {
   const paceDays = days.filter(
     (p) => p.health.runPaceS != null && p.health.runPaceS > 0,
   );
-  const bestPaceDay = paceDays.length
+  const winBestPaceDay = paceDays.length
     ? paceDays.reduce((a, b) => (b.health.runPaceS < a.health.runPaceS ? b : a))
     : null;
-  const bestPace = bestPaceDay?.health.runPaceS ?? null;
+  const winLongest = days.reduce(
+    (best, p) => ((p.health.runKm || 0) > (best?.health.runKm || 0) ? p : best),
+    null,
+  );
+
+  // 全历史统计来自 Gadgetbridge DB，不只看 30 天窗口。旧 payload 没有
+  // allTime 时退回窗口内的最佳/最长。
+  const allTime = [...payloads.value].reverse().find((p) => p.allTime)?.allTime || null;
+  const bestPace = allTime?.bestPaceS ?? winBestPaceDay?.health.runPaceS ?? null;
+  const bestPaceDay = allTime?.bestPaceDay || winBestPaceDay?.day || null;
+  const bestPaceKm = allTime?.bestPaceKm ?? null;
+  const longestKm = allTime?.longestKm ?? winLongest?.health.runKm ?? null;
+  const longestDay = allTime?.longestDay || winLongest?.day || null;
+  const longestName = allTime?.longestName || null;
+  const allRuns = allTime?.runs ?? runs;
+  const allKm = allTime?.km ?? km;
   const vo2 = [...days].reverse().find((p) => p.health.vo2max != null)?.health?.vo2max ?? null;
 
   // 每次锻炼的明细（aggregate 的 workouts 数组）；最新的在前。
@@ -604,8 +619,15 @@ const watchSummary = computed(() => {
     latestRunRuns: latestRun?.runs ?? null,
     latestRunAge: dayAgeLabel(latestRunDay?.day),
     bestPace,
-    bestPaceDay: bestPaceDay?.day || null,
-    bestPaceAge: dayAgeLabel(bestPaceDay?.day),
+    bestPaceDay,
+    bestPaceAge: dayAgeLabel(bestPaceDay),
+    bestPaceKm,
+    longestKm,
+    longestDay,
+    longestAge: dayAgeLabel(longestDay),
+    longestName,
+    allRuns,
+    allKm,
     vo2,
     workouts,
   };
@@ -2231,10 +2253,11 @@ onBeforeUnmount(() => {
                       <circle cx="12" cy="9" r="2" />
                     </svg>
                   </span>
-                  <span class="life-watch-metric-label">BEST PACE</span>
+                  <span class="life-watch-metric-label">BEST PACE · ALL TIME</span>
                   <b>{{ watchSummary.bestPace ? paceLabel(watchSummary.bestPace) : '—' }}</b>
                   <em v-if="watchSummary.bestPaceDay">
                     {{ watchSummary.bestPaceAge }} · {{ fullDay(watchSummary.bestPaceDay) }}
+                    <template v-if="watchSummary.bestPaceKm != null"> · {{ watchSummary.bestPaceKm }} km</template>
                   </em>
                   <em v-else>NO RUNS</em>
                 </div>
@@ -2248,6 +2271,36 @@ onBeforeUnmount(() => {
                   <span class="life-watch-metric-label">VO2MAX</span>
                   <b>{{ watchSummary.vo2 ?? '—' }}</b>
                   <em>ESTIMATE</em>
+                </div>
+
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 18c3-6 5-9 8-9s5 3 8 9" />
+                      <path d="M4 18h16" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">LONGEST · ALL TIME</span>
+                  <b>
+                    {{ watchSummary.longestKm != null ? Number(watchSummary.longestKm).toFixed(1) : '—' }}<small>km</small>
+                  </b>
+                  <em v-if="watchSummary.longestDay">
+                    {{ watchSummary.longestAge }} · {{ fullDay(watchSummary.longestDay) }}
+                    <template v-if="watchSummary.longestName"> · {{ watchSummary.longestName }}</template>
+                  </em>
+                  <em v-else>NO RUNS</em>
+                </div>
+
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="8" />
+                      <path d="M12 7v5l3 2" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">ALL TIME</span>
+                  <b>{{ Math.round(watchSummary.allRuns || 0) }}<small>runs</small></b>
+                  <em>{{ Number(watchSummary.allKm || 0).toFixed(1) }} km total</em>
                 </div>
               </div>
 
@@ -2353,6 +2406,7 @@ onBeforeUnmount(() => {
                   <span v-if="w.avgHr != null">AVG HR {{ w.avgHr }}</span>
                   <span v-if="w.maxHr != null">MAX HR {{ w.maxHr }}</span>
                   <span v-if="w.calories != null">CAL {{ w.calories }}</span>
+                  <span v-if="w.cadence != null">CADENCE {{ w.cadence }} spm</span>
                   <span v-if="w.ascentM != null">ASCENT {{ w.ascentM }} m</span>
                   <span v-if="w.vo2max != null">VO2MAX {{ w.vo2max }}</span>
                   <span v-if="w.trainingEffect != null">TE {{ w.trainingEffect }}</span>
@@ -2496,7 +2550,7 @@ onBeforeUnmount(() => {
 
                   <div v-if="mapHoverTrack" class="life-map-readout">
                     <span>{{ fullDay(mapHoverTrack.day) }}</span>
-                    <span>{{ minutesLabel(mapHoverTrack.minutes) }}</span>
+                    <span>{{ minutesLabel(mapHoverTrack.minutes || mapHoverTrack.watchMinutes) }}</span>
                     <span>{{ fmt(mapHoverTrack.points) }} pts</span>
                   </div>
 
@@ -2603,6 +2657,16 @@ onBeforeUnmount(() => {
                       />
                     </g>
 
+                    <g v-if="geoMap.watchPaths.length" class="life-map-watch-routes" aria-hidden="true">
+                      <path
+                        v-for="(p, i) in geoMap.watchPaths"
+                        :key="'watch' + i"
+                        class="life-map-track is-watch"
+                        :class="{ 'is-active': p.day === mapHover }"
+                        :d="p.d"
+                      />
+                    </g>
+
                     <g class="life-map-labels" aria-hidden="true">
                       <text
                         v-for="(l, i) in geoMap.labels"
@@ -2683,13 +2747,13 @@ onBeforeUnmount(() => {
                     :class="{ 'is-active': t.day === mapHover }"
                     role="tab"
                     :aria-selected="t.day === mapHover"
-                    :aria-label="`${fullDay(t.day)}: ${minutesLabel(t.minutes)}`"
+                    :aria-label="`${fullDay(t.day)}: ${minutesLabel(t.minutes || t.watchMinutes)}`"
                     @pointerenter="mapHover = t.day"
                     @focus="mapHover = t.day"
                     @click="mapHover = t.day"
                   >
                     <span>{{ shortDay(t.day) }}</span>
-                    <b>{{ t.minutes ? Math.round(t.minutes) : '·' }}</b>
+                    <b>{{ (t.minutes || t.watchMinutes) ? Math.round(t.minutes || t.watchMinutes) : '·' }}</b>
                   </button>
                 </div>
 
@@ -3294,6 +3358,7 @@ onBeforeUnmount(() => {
                   <span v-if="w.avgHr != null">AVG HR {{ w.avgHr }}</span>
                   <span v-if="w.maxHr != null">MAX HR {{ w.maxHr }}</span>
                   <span v-if="w.calories != null">CAL {{ w.calories }}</span>
+                  <span v-if="w.cadence != null">CADENCE {{ w.cadence }} spm</span>
                   <span v-if="w.ascentM != null">ASCENT {{ w.ascentM }} m</span>
                   <span v-if="w.vo2max != null">VO2MAX {{ w.vo2max }}</span>
                   <span v-if="w.trainingEffect != null">TE {{ w.trainingEffect }}</span>

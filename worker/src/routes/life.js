@@ -27,14 +27,18 @@ const COST_SOURCES = new Set(['platform', 'claude-estimate', 'ledger']);
 
 const DAY_KEYS = new Set([
   'v', 'day', 'categories', 'trackedHours', 'topApps',
-  'health', 'location', 'phone', 'ai', 'workouts', 'dimensions',
+  'health', 'location', 'phone', 'ai', 'workouts', 'allTime', 'dimensions',
+]);
+const ALL_TIME_KEYS = new Set([
+  'runs', 'km', 'bestPaceS', 'bestPaceKm', 'bestPaceName', 'bestPaceDay',
+  'bestPaceStart', 'longestKm', 'longestName', 'longestDay', 'longestStart',
 ]);
 const DIMENSION_KEYS = new Set([
   'Work', 'Study', 'Transport', 'Leisure', 'Health', 'Life', 'Social',
 ]);
 const WORKOUT_KEYS = new Set([
   'start', 'end', 'name', 'kind', 'minutes', 'km', 'avgHr', 'maxHr', 'paceS',
-  'ascentM', 'calories', 'vo2max', 'trainingEffect', 'recoveryHours',
+  'cadence', 'ascentM', 'calories', 'vo2max', 'trainingEffect', 'recoveryHours',
 ]);
 const HEALTH_KEYS = new Set([
   'steps', 'hrAvg', 'hrMin', 'hrMax', 'runs', 'runKm', 'runMinutes', 'runPaceS',
@@ -114,6 +118,26 @@ function validateDay(d) {
   if (!isOptNum(d.trackedHours, 0, 24.5)) return 'trackedHours';
   if (d.topApps !== null && !isAppPairs(d.topApps, 20, 24)) return 'topApps';
 
+  if (d.allTime !== undefined && d.allTime !== null) {
+    const a = d.allTime;
+    if (!isObj(a) || !onlyKeys(a, ALL_TIME_KEYS)) return 'allTime';
+    if (!isOptNum(a.runs, 0, 1000000)) return 'allTime.runs';
+    if (!isOptNum(a.km, 0, 10000000)) return 'allTime.km';
+    if (!isOptNum(a.bestPaceS, 0, 3600)) return 'allTime.bestPaceS';
+    if (!isOptNum(a.bestPaceKm, 0, 1000)) return 'allTime.bestPaceKm';
+    if (a.bestPaceName !== null && !isName(a.bestPaceName, 40)) return 'allTime.bestPaceName';
+    if (a.bestPaceDay !== null && !DAY_RE.test(a.bestPaceDay)) return 'allTime.bestPaceDay';
+    if (a.bestPaceStart !== null && (typeof a.bestPaceStart !== 'string' || a.bestPaceStart.length > 32)) {
+      return 'allTime.bestPaceStart';
+    }
+    if (!isOptNum(a.longestKm, 0, 1000)) return 'allTime.longestKm';
+    if (a.longestName !== null && !isName(a.longestName, 40)) return 'allTime.longestName';
+    if (!DAY_RE.test(a.longestDay)) return 'allTime.longestDay';
+    if (a.longestStart !== null && (typeof a.longestStart !== 'string' || a.longestStart.length > 32)) {
+      return 'allTime.longestStart';
+    }
+  }
+
   if (d.workouts !== undefined && d.workouts !== null) {
     if (!Array.isArray(d.workouts) || d.workouts.length > 50) return 'workouts';
     for (const w of d.workouts) {
@@ -131,6 +155,7 @@ function validateDay(d) {
       if (!isOptNum(w.avgHr, 0, 300)) return 'workouts.avgHr';
       if (!isOptNum(w.maxHr, 0, 300)) return 'workouts.maxHr';
       if (!isOptNum(w.paceS, 0, 3600)) return 'workouts.paceS';
+      if (!isOptNum(w.cadence, 0, 300)) return 'workouts.cadence';
       if (!isOptNum(w.ascentM, 0, 20000)) return 'workouts.ascentM';
       if (!isOptNum(w.calories, 0, 100000)) return 'workouts.calories';
       if (!isOptNum(w.vo2max, 0, 100)) return 'workouts.vo2max';

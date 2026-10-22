@@ -100,6 +100,19 @@ function buildFull() {
         trainingEffect: 3.2,
         recoveryHours: 24,
       }] : null,
+      allTime: {
+        runs: 87,
+        km: 312.5,
+        bestPaceS: 210,
+        bestPaceKm: 0.8,
+        bestPaceName: 'Running',
+        bestPaceDay: '2026-09-01',
+        bestPaceStart: '2026-09-01T10:00:00Z',
+        longestKm: 12.3,
+        longestName: 'Running',
+        longestDay: '2026-08-15',
+        longestStart: '2026-08-15T10:00:00Z',
+      },
       location: {
         city: idx === 3 ? 'Suzhou' : 'Shanghai',
         districts: idx === 3
@@ -262,6 +275,20 @@ const STUB = `
           value_text: 'walking',
           source: 'dawarich',
           meta: {},
+        },
+        {
+          ts_utc: day + 'T10:00:00Z',
+          domain: 'fitness',
+          metric: 'watch_track',
+          value_num: 25,
+          value_text: 'test.gpx',
+          source: 'gadgetbridge-gpx',
+          meta: {
+            path: [[31.1567, 121.1027], [31.16, 121.11], [31.17, 121.12]],
+            distance_km: 2.2,
+            start_utc: day + 'T10:00:00Z',
+            end_utc: day + 'T10:25:00Z',
+          },
         },
         {
           ts_utc: day + 'T00:00:00Z',
@@ -467,6 +494,10 @@ const LIFE_STATE = `(function () {
     heartHero: q('[data-chart="motion"] .life-heart-hero').length,
     heartBig: (document.querySelector('[data-chart="motion"] .life-heart-big') || {}).textContent || '',
     watchMetrics: q('[data-chart="motion"] .life-watch-metric').length,
+    watchText: Array.prototype.map.call(
+      q('[data-chart="motion"] .life-watch-metric'),
+      function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); },
+    ).join(' | '),
     watchHrCols: q('[data-chart="motion"] .life-hr-col').length,
     runRows: q('[data-chart="motion"] .life-run').length,
     liveStatus: q('[data-chart="motion"] .life-status').length,
@@ -474,7 +505,8 @@ const LIFE_STATE = `(function () {
       q('[data-chart="motion"] .life-status'),
       function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); },
     ).join(' | '),
-    mapTracks: q('[data-chart="places"] .life-map-track').length,
+    mapTracks: q('[data-chart="places"] .life-map-track:not(.is-watch)').length,
+    watchTracks: q('[data-chart="places"] .life-map-track.is-watch').length,
     mapDots: q('[data-chart="places"] .life-map-dot').length,
     mapLabels: q('[data-chart="places"] .life-map-labels text').length,
     mapDays: q('.life-map-day').length,
@@ -519,7 +551,10 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
   if (state.heartHero !== 1) throw new Error(`expected 1 heart hero, got ${state.heartHero}`);
   if (!/bpm/i.test(state.heartBig)) throw new Error(`heart readout missing bpm: ${state.heartBig}`);
-  if (state.watchMetrics !== 4) throw new Error(`expected 4 watch metrics, got ${state.watchMetrics}`);
+  if (state.watchMetrics !== 6) throw new Error(`expected 6 watch metrics, got ${state.watchMetrics}`);
+  if (!/3:30 \/km/.test(state.watchText)) throw new Error('all-time best pace missing');
+  if (!/12.3/.test(state.watchText)) throw new Error('all-time longest distance missing');
+  if (!/87/.test(state.watchText) || !/312.5/.test(state.watchText)) throw new Error('all-time totals missing');
   if (state.watchHrCols !== 30) throw new Error(`expected 30 HR columns, got ${state.watchHrCols}`);
   if (state.runRows < 1) throw new Error(`expected run rows, got ${state.runRows}`);
   if (state.liveStatus !== 4) throw new Error(`expected 4 live status cells, got ${state.liveStatus}`);
@@ -745,6 +780,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (lower.panelOpacity.some((o) => Number(o) < 0.99)) throw new Error('lower panels not revealed');
   if (Number(lower.foot) < 0.99) throw new Error('footer not revealed');
   if (lower.mapTracks < 1) throw new Error('route map tracks missing');
+  if (lower.watchTracks < 1) throw new Error('watch GPX tracks missing');
   if (lower.mapDots < 2) throw new Error('map stay clusters missing');
   if (lower.mapLabels < 1) throw new Error('map place labels missing');
   if (lower.mapDays !== lower.mapTracks + 1) throw new Error('map day tabs mismatch');
@@ -864,7 +900,7 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile' }, async
   if (state.cards !== 5) throw new Error('mobile: expected 5 KPI cards');
   if (state.rhythmCols !== 30) throw new Error('mobile: expected 30 columns');
   if (state.heartHero !== 1) throw new Error(`mobile: expected 1 heart hero, got ${state.heartHero}`);
-  if (state.watchMetrics !== 4) throw new Error(`mobile: expected 4 watch metrics, got ${state.watchMetrics}`);
+  if (state.watchMetrics !== 6) throw new Error(`mobile: expected 6 watch metrics, got ${state.watchMetrics}`);
   if (state.watchHrCols !== 30) throw new Error(`mobile: expected 30 HR columns, got ${state.watchHrCols}`);
   if (state.liveStatus !== 4) throw new Error(`mobile: expected 4 live status cells, got ${state.liveStatus}`);
   if (state.overflow > 1) throw new Error(`mobile: horizontal overflow ${state.overflow}px`);

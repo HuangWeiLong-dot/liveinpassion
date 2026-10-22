@@ -11,6 +11,20 @@
 
 ---
 
+## update: 42 — 2026-10-22
+
+### 全历史 Best Pace / Longest + GPX 路线
+- 聚合新增 `allTime`：直接读 Gadgetbridge `BASE_ACTIVITY_SUMMARY` 的**全部**
+  锻炼历史（不是 30 天窗口），给出全历史最快配速、最长单次距离、总次数/总公里。
+  `BEST PACE` 卡改为全历史，并显示来自哪天、多久之前、那次跑了多少公里；
+  新增 `LONGEST` 与 `ALL TIME` 两张卡。
+- 新增 `scripts/import_gpx.py`：把 Gadgetbridge 导出的 GPX 写成
+  `domain=fitness / metric=watch_track`，地图用虚线画出**手表路线**，
+  与手机 Dawarich 的实线轨迹区分；文件按 path+mtime 去重。
+- 聚合 workouts 增加 `cadence`；Worker 校验 `allTime` / `cadence`；
+  旧 Worker 继续走“去掉新字段再重试”的兼容路径。
+- 心率带、RUNNING 详情弹层、BPM 区间条（update 41 的延续）保持。
+
 ## update: 41 — 2026-10-22
 
 ### MOTION · RUNNING 明细 / 心率带

@@ -31,6 +31,7 @@ export function parseLocationEvents(doc) {
   const track = {
     day: String(doc?.id || ''),
     path: [],
+    watchPaths: [],
     visits: [],
     transports: [],
     center: null,
@@ -38,10 +39,37 @@ export function parseLocationEvents(doc) {
     points: 0,
     minutes: 0,
     km: 0,
+    watchMinutes: 0,
+    watchKm: 0,
   };
 
   for (const e of events) {
-    if (!e || e.domain !== 'location') continue;
+    if (!e) continue;
+    // 手表 GPX 路线：domain=fitness / metric=watch_track，meta.path 和
+    // Dawarich 的 track_path 同形。它是虚线，和手机的实线轨迹区分。
+    if (e.domain === 'fitness' && e.metric === 'watch_track') {
+      const meta = e.meta || {};
+      const path = Array.isArray(meta.path)
+        ? meta.path
+          .filter((p) => Array.isArray(p) && n(p[0]) != null && n(p[1]) != null)
+          .map((p) => [n(p[0]), n(p[1])])
+        : [];
+      if (path.length) {
+        const km = n(meta.distance_km);
+        const minutes = n(e.value_num);
+        track.watchPaths.push({
+          path,
+          km,
+          minutes,
+          start: meta.start_utc || e.ts_utc || '',
+          end: meta.end_utc || '',
+        });
+        track.watchKm += km || 0;
+        track.watchMinutes += minutes || 0;
+      }
+      continue;
+    }
+    if (e.domain !== 'location') continue;
     const meta = e.meta || {};
 
     if (e.metric === 'track_path' && Array.isArray(meta.path)) {
@@ -136,7 +164,9 @@ export async function loadLifeTracks(days, { base, signal, concurrency = 3 } = {
   );
   await Promise.all(workers);
 
-  return out.filter((t) => t && (t.path.length || t.visits.length));
+  return out.filter(
+    (t) => t && (t.path.length || t.visits.length || (t.watchPaths || []).length),
+  );
 }
 
 // ---------- 投影 ----------
@@ -174,6 +204,7 @@ export function buildGeoMap(tracks, { width = 1000, height = 560 } = {}) {
   const coords = [];
   list.forEach((t) => {
     (t.path || []).forEach((p) => coords.push(p));
+    (t.watchPaths || []).forEach((w) => (w.path || []).forEach((p) => coords.push(p)));
     (t.visits || []).forEach((v) => coords.push([v.lat, v.lon]));
   });
   if (!coords.length) return null;
@@ -232,6 +263,24 @@ export function buildGeoMap(tracks, { width = 1000, height = 560 } = {}) {
       center: t.center,
     };
   }).filter((t) => t.d);
+
+  // ---- 手表 GPX 路线（虚线，和手机实线区分） ----
+  const watchPaths = [];
+  list.forEach((t) => {
+    (t.watchPaths || []).forEach((w, i) => {
+      const pts = simplify((w.path || []).map(([lat, lon]) => project(lat, lon)), 1.1);
+      if (!pts.length) return;
+      watchPaths.push({
+        day: t.day,
+        d: `M${pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' L')}`,
+        km: w.km,
+        minutes: w.minutes,
+        start: w.start,
+        end: w.end,
+        index: i,
+      });
+    });
+  });
 
   // ---- 停留点聚类（≈100 m 一格），跨天累加时长 ----
   const cells = new Map();
@@ -294,6 +343,7 @@ export function buildGeoMap(tracks, { width = 1000, height = 560 } = {}) {
     width,
     height,
     paths,
+    watchPaths,
     visits,
     labels,
     gridX,
