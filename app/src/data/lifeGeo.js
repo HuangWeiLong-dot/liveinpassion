@@ -8,12 +8,14 @@
 //   tracked_points 当天中心点与跨度
 //
 // 一天 events 约 100–250 KB，其他 domain（808 条手机事件）解析后马上丢弃。
-// 只在 PLACES 面板接近视口时拉取，最多 7 天，模块内缓存 5 分钟；
-// 归档页也有同样的 5 分钟口径，刷新时两边一起过期。
+// 只在 PLACES 面板接近视口时先拉一批，之后由「LOAD MORE」按需追加；
+// 模块内缓存 5 分钟，归档页也有同样的 5 分钟口径，刷新时两边一起过期。
 //
 // 这里不做任何网络之外的副作用：投影与聚合都是纯函数，便于单独验证。
 
-export const MAP_MAX_DAYS = 7;
+// 每次加载多少天。不是总上限 —— 「LOAD MORE」会继续往后取，直到窗口内的
+// raw events 用完。
+export const MAP_BATCH_DAYS = 7;
 
 const TTL = 5 * 60 * 1000;
 const trackCache = new Map(); // day -> { at, track }
@@ -34,6 +36,7 @@ export function parseLocationEvents(doc) {
     center: null,
     spanKm: null,
     points: 0,
+    minutes: 0,
     km: 0,
   };
 
@@ -71,16 +74,21 @@ export function parseLocationEvents(doc) {
     }
 
     if (e.metric === 'transport') {
-      const km = n(e.value_num);
-      if (km == null || km <= 0) continue;
+      // ⚠️ Dawarich 的 mode_timeline 每段只有**分钟数**（value_num），没有距离；
+      //    distance 只挂在整条 track 上。旧版兜底事件才会在 meta 里带
+      //    distance_km。所以这里以分钟为准，km 只作为可选补充。
+      const minutes = n(e.value_num);
+      if (minutes == null || minutes <= 0) continue;
       track.transports.push({
         mode: String(e.value_text || 'other').toLowerCase(),
-        km,
+        minutes,
+        km: n(meta.distance_km),
       });
     }
   }
 
-  track.km = track.transports.reduce((a, x) => a + x.km, 0);
+  track.minutes = track.transports.reduce((a, x) => a + x.minutes, 0);
+  track.km = track.transports.reduce((a, x) => a + (x.km || 0), 0);
   if (!track.points) track.points = track.path.length;
   return track;
 }
@@ -217,6 +225,7 @@ export function buildGeoMap(tracks, { width = 1000, height = 560 } = {}) {
     return {
       day: t.day,
       d,
+      minutes: t.minutes || 0,
       km: Math.round((t.km || 0) * 10) / 10,
       points: t.points || t.path.length,
       spanKm: t.spanKm,

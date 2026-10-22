@@ -1,6 +1,19 @@
 {
   "posts": [
     {
+      "slug": "sky-does-not-fall-tears-in-my-eye",
+      "cardTitle": "SKY DOES NOT FALL, TEARS IN MY EYE",
+      "cardDate": "OCTOBER 22, 2026 · 9:05 PM",
+      "title": "Sky Does Not Fall, Tears in My Eye",
+      "date": "October 22, 2026 · 9:05 PM",
+      "readTime": "1 min read",
+      "image": {
+        "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/6c446fc2.jpg",
+        "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/833c01db.png"
+      },
+      "body": "<p>Why is there always something on my face?<br />Pimples turning into scar tissue. Eyes glittering with unshed tears.</p>\n<p>I wish there was a rain heavy enough to wash away my scars.<br />So that my tears could just disappear in the rain.</p>\n"
+    },
+    {
       "slug": "no-surprises",
       "cardTitle": "NO SURPRISES",
       "cardDate": "OCTOBER 21, 2026 · 5:38 PM",

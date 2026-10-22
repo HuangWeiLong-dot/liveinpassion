@@ -5427,7 +5427,9 @@
         .stats-legend {
             display: flex;
             align-items: center;
-            gap: 22px;
+            flex-wrap: wrap;
+            gap: 6px 22px;
+            min-width: 0;
             font-family: 'JetBrains Mono', ui-monospace, monospace;
             font-size: 0.56rem;
             letter-spacing: 0.1em;
@@ -5439,6 +5441,10 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .stats-legend span.is-zero {
+            opacity: 0.3;
         }
 
         .lg-swatch {
@@ -7192,12 +7198,7 @@
             column-gap: 10px;
             row-gap: 7px;
             align-items: baseline;
-            padding: 10px 0 8px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .life-row:last-child {
-            border-bottom: none;
+            padding: 11px 0 12px;
         }
 
         .life-rank {
@@ -7286,6 +7287,374 @@
             font-weight: 500;
             letter-spacing: 0.12em;
             color: var(--text-primary);
+        }
+
+        /* ---- 心率条带（MOTION 面板） ---- */
+        .life-hr {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-hr-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px 18px;
+            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-hr-track {
+            display: flex;
+            gap: 4px;
+            height: 66px;
+            padding-right: 46px;
+        }
+
+        .life-hr-col {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+            height: 100%;
+        }
+
+        .life-hr-range {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            transform: translateX(-50%);
+            background: var(--text-primary);
+            opacity: 0.42;
+        }
+
+        .life-hr-col.is-today .life-hr-range {
+            opacity: 0.82;
+        }
+
+        .life-hr-avg {
+            position: absolute;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            transform: translate(-50%, 50%);
+        }
+
+        .life-hr-col.is-missing::after {
+            content: '';
+            position: absolute;
+            left: 22%;
+            right: 22%;
+            top: 50%;
+            border-top: 1px dashed var(--border);
+        }
+
+        /* ---- MOTION 里的手表 / 心率 ---- */
+        .life-motion-watch {
+            display: grid;
+            grid-template-columns: minmax(300px, 1fr) minmax(0, 1.25fr);
+            gap: 1px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+            background: var(--border);
+        }
+
+        .life-heart-hero {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            min-width: 0;
+            padding: 24px 28px;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        .life-heart-stage {
+            position: relative;
+            flex: 0 0 auto;
+            width: 128px;
+            height: 128px;
+            display: grid;
+            place-items: center;
+        }
+
+        .life-heart-ring {
+            position: absolute;
+            z-index: 0;
+            inset: 8px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            animation: life-heart-ring 2.6s ease-out infinite;
+        }
+
+        @keyframes life-heart-ring {
+            0% { transform: scale(0.72); opacity: 0; }
+            18% { opacity: 1; }
+            100% { transform: scale(1.18); opacity: 0; }
+        }
+
+        .life-heart-ecg {
+            position: absolute;
+            z-index: 1;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .life-heart-ecg path {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 1.8;
+            stroke-linejoin: round;
+            stroke-linecap: round;
+            stroke-dasharray: 18 9;
+            animation: life-heart-ecg 2.2s linear infinite;
+        }
+
+        @keyframes life-heart-ecg {
+            /* 27 = 18 + 9（一个 dash 周期）× 2，循环点图案完全重合，不再跳。 */
+            to { stroke-dashoffset: -54; }
+        }
+
+        .life-heart-icon {
+            position: relative;
+            z-index: 2;
+            width: 92px;
+            height: 92px;
+            fill: var(--text-primary);
+            opacity: 0.92;
+            transform-origin: center;
+            animation: life-heart-beat 1.6s ease-in-out infinite;
+        }
+
+        @keyframes life-heart-beat {
+            0%, 100% { transform: scale(1); }
+            10% { transform: scale(1.09); }
+            20% { transform: scale(1); }
+            30% { transform: scale(1.05); }
+            40% { transform: scale(1); }
+        }
+
+        .life-heart-readout {
+            min-width: 0;
+        }
+
+        .life-heart-label {
+            display: block;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-heart-big {
+            display: block;
+            margin-top: 8px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 3.8rem;
+            font-weight: 500;
+            line-height: 0.95;
+            letter-spacing: 0.01em;
+            color: var(--text-primary);
+        }
+
+        .life-heart-big em {
+            margin-left: 8px;
+            font-style: normal;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.3em;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-heart-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 14px;
+            margin-top: 12px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-watch-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            background: var(--border);
+        }
+
+        .life-watch-metric {
+            min-width: 0;
+            padding: 18px 20px 19px;
+            background: var(--bg);
+        }
+
+        .life-watch-metric-icon {
+            display: inline-flex;
+            color: var(--text-primary);
+            opacity: 0.8;
+        }
+
+        .life-watch-metric-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .life-watch-metric-label {
+            display: block;
+            margin-top: 10px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-watch-metric b {
+            display: block;
+            margin-top: 6px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 500;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .life-watch-metric b small {
+            margin-left: 5px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46em;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        .life-watch-metric em {
+            display: block;
+            margin-top: 6px;
+            font-style: normal;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        .life-live-status {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1px;
+            background: var(--border);
+        }
+
+        .life-status {
+            min-width: 0;
+            padding: 14px 18px 15px;
+            background: var(--bg);
+        }
+
+        .life-status-head {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-status-dot {
+            width: 6px;
+            height: 6px;
+            flex: 0 0 auto;
+            border: 1px solid var(--text-secondary);
+            border-radius: 50%;
+        }
+
+        .life-status.is-on .life-status-dot {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            animation: life-status-pulse 1.6s steps(2, end) infinite;
+        }
+
+        .life-status.is-off .life-status-dot {
+            background: var(--text-secondary);
+            border-color: var(--text-secondary);
+            opacity: 0.55;
+        }
+
+        .life-status b {
+            display: block;
+            margin-top: 9px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 500;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .life-status em {
+            display: block;
+            margin-top: 6px;
+            font-style: normal;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.06em;
+            line-height: 1.45;
+            color: var(--text-secondary);
+            overflow-wrap: anywhere;
+        }
+
+        .life-status-updated b {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+        }
+
+        .life-status-updated.is-live .life-status-dot {
+            background: var(--text-primary);
+            border-color: var(--text-primary);
+            animation: life-status-pulse 1.6s steps(2, end) infinite;
+        }
+
+        @keyframes life-status-pulse {
+            0%, 55% { opacity: 1; }
+            56%, 100% { opacity: 0.2; }
+        }
+
+        .life-motion-hr {
+            margin: 14px 0 20px;
+            padding-top: 0;
+            border-top: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .life-heart-icon,
+            .life-heart-ring,
+            .life-heart-ecg path,
+            .life-status.is-on .life-status-dot,
+            .life-status-updated.is-live .life-status-dot {
+                animation: none;
+            }
         }
 
         .life-swatch {
@@ -7737,6 +8106,90 @@
             height: auto;
         }
 
+        .life-map-svg.is-zoomed {
+            cursor: grab;
+        }
+
+        .life-map-svg.is-dragging {
+            cursor: grabbing;
+        }
+
+        .life-map-zoom {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            z-index: 3;
+            display: flex;
+            gap: 4px;
+        }
+
+        .life-map-zoom button {
+            min-width: 26px;
+            height: 26px;
+            padding: 0 7px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.62rem;
+            line-height: 1;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+        }
+
+        .life-map-zoom button:hover:not(:disabled) {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-map-zoom button:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .life-map-zoom button.is-reset {
+            font-size: 0.44rem;
+            letter-spacing: 0.1em;
+        }
+
+        .life-map-more-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 10px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-map-more-btn {
+            padding: 9px 14px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.14em;
+            cursor: pointer;
+        }
+
+        .life-map-more-btn:hover:not(:disabled) {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-map-more-btn:disabled {
+            opacity: 0.45;
+            cursor: wait;
+        }
+
+        .life-map-more-done {
+            opacity: 0.55;
+        }
+
         .life-map-grid line {
             stroke: var(--border);
             stroke-width: 1;
@@ -8085,8 +8538,13 @@
                 height: 210px;
             }
 
-            .life-xaxis {
+            .life-xaxis,
+            .life-hr-track {
                 padding-right: 34px;
+            }
+
+            .life-motion-watch {
+                grid-template-columns: 1fr;
             }
 
             .life-rows {
@@ -8167,8 +8625,54 @@
                 height: 180px;
             }
 
-            .life-xaxis {
+            .life-xaxis,
+            .life-hr-track {
                 padding-right: 0;
+            }
+
+            .life-map-zoom button {
+                min-width: 36px;
+                height: 36px;
+            }
+
+            .life-map-more-btn {
+                min-height: 44px;
+                padding: 0 16px;
+            }
+
+            .life-heart-hero {
+                gap: 16px;
+                padding: 20px;
+            }
+
+            .life-heart-stage {
+                width: 104px;
+                height: 104px;
+            }
+
+            .life-heart-icon {
+                width: 76px;
+                height: 76px;
+            }
+
+            .life-heart-big {
+                font-size: 3rem;
+            }
+
+            .life-watch-metric {
+                padding: 15px 16px 16px;
+            }
+
+            .life-live-status {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .life-status {
+                padding: 13px 15px 14px;
+            }
+
+            .life-motion-hr {
+                margin-bottom: 18px;
             }
 
             .life-map-placeholder {
@@ -8325,6 +8829,7 @@
         /* ==================== LIFE 归档页 ==================== */
         .life-archive-section {
             padding-top: 128px;
+            overflow-x: clip;
         }
 
         .life-archive-title {
@@ -8441,12 +8946,48 @@
             margin-left: auto;
         }
 
+        .life-doc-panel {
+            min-width: 0;
+            max-width: 100%;
+        }
+
         .life-doc {
             padding: 24px 28px 30px;
             color: var(--text-primary);
             font-family: var(--font-sans);
             font-size: 0.92rem;
             line-height: 1.75;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        /* Markdown 里的长 URL / 无空格字符串 / 宽表格不能把整页撑出屏幕。 */
+        .life-doc * {
+            min-width: 0;
+        }
+
+        .life-doc p,
+        .life-doc li,
+        .life-doc a,
+        .life-doc code,
+        .life-doc blockquote,
+        .life-doc th,
+        .life-doc td {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .life-doc pre,
+        .life-doc img,
+        .life-doc video,
+        .life-doc iframe {
+            max-width: 100%;
+        }
+
+        .life-doc table {
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
         }
 
         .life-doc h1 {
@@ -8564,6 +9105,7 @@
         }
 
         .life-raw-details pre {
+            max-width: 100%;
             max-height: 420px;
             margin-top: 14px;
             padding: 16px;
@@ -8606,6 +9148,20 @@
             color: var(--text-primary);
             font-size: 0.92rem;
             line-height: 1.75;
+        }
+
+        .life-note-text,
+        .life-qa-question,
+        .life-qa-answer,
+        .life-qa-note,
+        .life-task-text,
+        .life-block-title,
+        .life-block-url,
+        .life-prose,
+        .life-weekly-facts,
+        .life-archive-disclaimer {
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .life-qa-question {
@@ -8770,6 +9326,7 @@
         }
 
         .life-event-meta pre {
+            max-width: 100%;
             max-height: 260px;
             margin-top: 8px;
             padding: 12px;

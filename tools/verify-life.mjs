@@ -77,6 +77,7 @@ function buildFull() {
         steps,
         hrAvg: 70 + (idx % 20),
         hrMin: 55,
+        hrMax: 145 + (idx % 20),
         runs: idx % 7 === 0 ? 1 : 0,
         runKm: idx % 7 === 0 ? 5.06 : 0,
         runMinutes: idx % 7 === 0 ? 29.6 : 0,
@@ -140,7 +141,7 @@ const STUB = `
   var rawDays = (source().days || [])
     .filter(function (d) { return d.location; })
     .map(function (d) { return d.day; })
-    .slice(-7);
+    .slice(-9);
 
   function rawIndex() {
     return {
@@ -267,13 +268,26 @@ const STUB = `
     if (url.indexOf('/api/life/raw/index') >= 0) {
       return jsonResponse(rawIndex());
     }
-    // 「我现在在干嘛」是独立轮询；测试里让它返回 404，面板走等待态，
-    // 不要被下面的 /api/life 兜底当成一天的数据。
+    // 「我现在在干嘛」是独立轮询；给它一份固定快照，验证 MOTION 里的实时状态行。
     if (url.indexOf('/api/life/now') >= 0) {
-      return Promise.resolve(new Response(JSON.stringify({ error: 'no snapshot yet' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      }));
+      var nowIso = new Date().toISOString();
+      return jsonResponse({
+        v: 1,
+        ts_utc: nowIso,
+        location: {
+          mode: 'stationary', district: 'Qingpu', city: 'Shanghai',
+          lat: 31.15665, lon: 121.10278, stayMinutes: 320,
+          lastSeen: nowIso, stale: false,
+        },
+        desktop: {
+          running: true, afk: false, app: 'VS Code', category: 'Work',
+          title: 'LifeView.vue', since: '20:10', lastSeen: nowIso,
+        },
+        phone: {
+          screenOn: true, app: 'WeChat', unlocks: 87, lastSeen: nowIso,
+        },
+        qa: null,
+      });
     }
     var ev = url.match(/\\/api\\/life\\/raw\\/events\\/([^/?]+)/);
     if (ev) {
@@ -434,6 +448,15 @@ const LIFE_STATE = `(function () {
     means: q('.life-mean').length,
     weekdayRows: q('.life-weekday-row').length,
     weekdaySegs: q('.life-weekday-bar .life-seg').length,
+    heartHero: q('[data-chart="motion"] .life-heart-hero').length,
+    heartBig: (document.querySelector('[data-chart="motion"] .life-heart-big') || {}).textContent || '',
+    watchMetrics: q('[data-chart="motion"] .life-watch-metric').length,
+    watchHrCols: q('[data-chart="motion"] .life-hr-col').length,
+    liveStatus: q('[data-chart="motion"] .life-status').length,
+    liveStatusText: Array.prototype.map.call(
+      q('[data-chart="motion"] .life-status'),
+      function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); },
+    ).join(' | '),
     mapTracks: q('[data-chart="places"] .life-map-track').length,
     mapDots: q('[data-chart="places"] .life-map-dot').length,
     mapLabels: q('[data-chart="places"] .life-map-labels text').length,
@@ -477,6 +500,14 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
   if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
+  if (state.heartHero !== 1) throw new Error(`expected 1 heart hero, got ${state.heartHero}`);
+  if (!/bpm/.test(state.heartBig)) throw new Error(`heart readout missing bpm: ${state.heartBig}`);
+  if (state.watchMetrics !== 4) throw new Error(`expected 4 watch metrics, got ${state.watchMetrics}`);
+  if (state.watchHrCols !== 30) throw new Error(`expected 30 HR columns, got ${state.watchHrCols}`);
+  if (state.liveStatus !== 4) throw new Error(`expected 4 live status cells, got ${state.liveStatus}`);
+  if (!/SCREEN ON/.test(state.liveStatusText)) throw new Error(`live phone status wrong: ${state.liveStatusText}`);
+  if (!/RUNNING/.test(state.liveStatusText)) throw new Error(`live desktop status wrong: ${state.liveStatusText}`);
+  if (!/STAYING/.test(state.liveStatusText)) throw new Error(`live location status wrong: ${state.liveStatusText}`);
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
   if (state.numbers.length !== 5) throw new Error(`expected 5 odometers, got ${state.numbers.length}`);
   if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
@@ -686,7 +717,58 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   const readout = await evalJs("(document.querySelector('.life-map-readout') || {}).textContent || ''");
   console.log('  map day switch:', daySwitch, readout.replace(/\\s+/g, ' ').trim());
   if (daySwitch.active !== 1) throw new Error('map day switch lost active state');
-  if (!/km/i.test(readout)) throw new Error('map readout missing distance');
+  if (!/\d+m/i.test(readout)) throw new Error('map readout missing transit minutes');
+
+  // 无限天数 + 按需加载：首屏只取 MAP_BATCH_DAYS 天，LOAD MORE 再追加。
+  const beforeMore = JSON.parse(await evalJs(`(function () {
+    var btn = document.querySelector('.life-map-more-btn');
+    return JSON.stringify({
+      tracks: document.querySelectorAll('[data-chart="places"] .life-map-track').length,
+      more: btn ? btn.textContent.replace(/\\s+/g, ' ').trim() : '',
+      total: (document.querySelector('.life-map-more-row > span') || {}).textContent || '',
+    });
+  })()`));
+  console.log('  map before load more:', beforeMore);
+  if (!/LOAD MORE/.test(beforeMore.more)) throw new Error('map load-more button missing');
+  if (!/^2$/.test((beforeMore.more.match(/(\d+)$/) || [])[1] || '')) {
+    throw new Error(`map load-more count wrong: ${beforeMore.more}`);
+  }
+  await evalJs("document.querySelector('.life-map-more-btn').click()");
+  await sleep(1200);
+  const afterMore = JSON.parse(await evalJs(`(function () {
+    return JSON.stringify({
+      tracks: document.querySelectorAll('[data-chart="places"] .life-map-track').length,
+      moreBtn: !!document.querySelector('.life-map-more-btn'),
+      done: (document.querySelector('.life-map-more-done') || {}).textContent || '',
+    });
+  })()`));
+  console.log('  map after load more:', afterMore);
+  if (afterMore.tracks <= beforeMore.tracks) throw new Error('map load more added no tracks');
+  if (afterMore.moreBtn) throw new Error('map load-more button did not disappear');
+  if (!/ALL LOADED/.test(afterMore.done)) throw new Error('map all-loaded marker missing');
+
+  // 缩放：点 + 后 viewport 的 transform 必须真的变化，RESET 回到 1。
+  await evalJs("document.querySelector('.life-map-zoom button').click()");
+  await sleep(180);
+  const zoom = JSON.parse(await evalJs(`(function () {
+    var g = document.querySelector('.life-map-viewport');
+    return JSON.stringify({
+      transform: g.getAttribute('transform') || '',
+      resetVisible: !!document.querySelector('.life-map-zoom .is-reset'),
+    });
+  })()`));
+  console.log('  map zoom:', zoom);
+  if (!/scale\(1\.5\)/.test(zoom.transform)) throw new Error(`map zoom transform wrong: ${zoom.transform}`);
+  if (!zoom.resetVisible) throw new Error('map reset button missing after zoom');
+  await evalJs("document.querySelector('.life-map-zoom .is-reset').click()");
+  await sleep(180);
+  const reset = JSON.parse(await evalJs(`(function () {
+    return JSON.stringify({
+      transform: document.querySelector('.life-map-viewport').getAttribute('transform') || '',
+    });
+  })()`));
+  if (!/scale\(1\)/.test(reset.transform)) throw new Error(`map reset wrong: ${reset.transform}`);
+
   await shot('bottom');
 
   // keep-alive：离开再回来，重播且重新拉数据
@@ -734,6 +816,10 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile' }, async
   console.log('  state:', { cards: state.cards, cols: state.rhythmCols, overflow: state.overflow });
   if (state.cards !== 5) throw new Error('mobile: expected 5 KPI cards');
   if (state.rhythmCols !== 30) throw new Error('mobile: expected 30 columns');
+  if (state.heartHero !== 1) throw new Error(`mobile: expected 1 heart hero, got ${state.heartHero}`);
+  if (state.watchMetrics !== 4) throw new Error(`mobile: expected 4 watch metrics, got ${state.watchMetrics}`);
+  if (state.watchHrCols !== 30) throw new Error(`mobile: expected 30 HR columns, got ${state.watchHrCols}`);
+  if (state.liveStatus !== 4) throw new Error(`mobile: expected 4 live status cells, got ${state.liveStatus}`);
   if (state.overflow > 1) throw new Error(`mobile: horizontal overflow ${state.overflow}px`);
   await shot('top');
   await evalJs('window.scrollTo({ top: 900, behavior: "instant" })');

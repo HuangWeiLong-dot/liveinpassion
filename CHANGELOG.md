@@ -11,6 +11,30 @@
 
 ---
 
+## update: 39 — 2026-10-22
+
+### LIFE MOTION / WATCH / PLACES / 归档
+- MOTION 里加入手表面板：大心跳爱心（爱心压在波纹上、心跳线无限循环不跳）、
+  HR AVG/MIN/MAX、最近一次跑步（日期/多久之前/当天次数/距离/时长）、
+  BEST PACE 的日期与年龄、VO2MAX、每天心率 MIN–MAX 条带。
+- MOTION 底部新增实时状态：PHONE SCREEN ON/OFF、DESKTOP RUNNING/AFK/IDLE、
+  LOCATION MOVING/STAYING、LIVE SNAPSHOT 年龄；NOW 卡同步显示这些旗标。
+- `push_desktop.py` 并入 2 分钟实时循环，桌面 AFK/当前窗口不再最多旧 10 分钟。
+- PLACES 取消 7 天上限：首屏 7 天，`LOAD MORE` 按需追加；地图支持滚轮/按钮缩放、
+  拖拽平移、双击放大、RESET。
+- Transport 改为按 **分钟** 显示（Dawarich `mode_timeline` 的 `value_num` 是分钟，
+  旧代码误当 km）；标签映射 walking / E-BIKE / SUBWAY / RUNNING。
+- 归档页修复长 URL / 宽表格 / 原始 Markdown 的横向溢出；`verify-life-archive`
+  加长 URL 回归。
+- RHYTHM / WEEKDAY 图例列出全部 Work/Study/Life/Transport/Leisure/Health/Social/Other，
+  当天为 0 的维度变暗而不是消失。
+- Worker 接受 `health.hrMax`；`publish_life_site.py` 可从 `heart_rate_avg` 的 meta
+  补出历史 hrMax，并对旧 Worker 做去掉 hrMax 的兼容重试。
+
+### 验收
+- `verify-life`、`verify-life-now`、`verify-life-archive` 全过（MOTION 状态行、
+  地图 LOAD MORE / 缩放、手机无溢出、NOW 旗标）。
+
 ## update: 38 — 2026-10-21
 
 ### 24h 服务器侧实时快照（笔记本关机也继续更新）

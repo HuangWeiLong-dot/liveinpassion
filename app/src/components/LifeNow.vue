@@ -11,6 +11,8 @@
 // 这个组件自己轮询，不依赖 LIFE 的 /api/life；60 秒的页面轮询和它是两条线。
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
 
+const emit = defineEmits(['snapshot']);
+
 const CMS_BASE = import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
 const POLL_MS = 30000;
 const TICK_MS = 5000;
@@ -105,12 +107,14 @@ async function load() {
       offline.value = true;
       error.value = false;
       snap.value = null;
+      emit('snapshot', null);
       return;
     }
     if (!res.ok) throw new Error(`now ${res.status}`);
     snap.value = await res.json();
     offline.value = false;
     error.value = false;
+    emit('snapshot', snap.value);
   } catch (err) {
     if (err?.name === 'AbortError') return;
     error.value = true;
@@ -177,7 +181,14 @@ onBeforeUnmount(() => {
 
     <div class="life-now-grid">
       <article class="life-now-card life-now-location">
-        <div class="life-now-label"><span>01</span> LOCATION</div>
+        <div class="life-now-label">
+          <span>01</span> LOCATION
+          <span
+            v-if="loc?.mode"
+            class="life-now-flag"
+            :class="{ 'is-on': loc.mode !== 'stationary' }"
+          >{{ loc.mode === 'stationary' ? 'STAYING' : 'MOVING' }}</span>
+        </div>
         <template v-if="loc">
           <strong class="life-now-place">
             {{ loc.district || loc.city || '—' }}
@@ -192,7 +203,6 @@ onBeforeUnmount(() => {
           >{{ Number(loc.lat).toFixed(5) }}, {{ Number(loc.lon).toFixed(5) }}</a>
           <span v-else class="life-now-coords is-muted">NO COORDINATES</span>
           <div class="life-now-meta">
-            <span>{{ loc.mode === 'stationary' ? 'STAYING' : String(loc.mode || '').toUpperCase() }}</span>
             <span v-if="loc.stayMinutes">{{ minutes(loc.stayMinutes) }}</span>
             <span>SEEN {{ hhmm(loc.lastSeen) }} · {{ locAge }}</span>
             <span v-if="loc.stale">NOT TODAY</span>
@@ -220,7 +230,9 @@ onBeforeUnmount(() => {
       <article class="life-now-card">
         <div class="life-now-label">
           <span>03</span> DESKTOP
-          <span v-if="desk?.afk" class="life-now-flag">AFK</span>
+          <span v-if="desk?.running" class="life-now-flag is-on">RUNNING</span>
+          <span v-else-if="desk?.afk" class="life-now-flag">AFK</span>
+          <span v-else-if="desk" class="life-now-flag">IDLE</span>
         </div>
         <template v-if="desk">
           <template v-if="desk.running">
@@ -246,7 +258,9 @@ onBeforeUnmount(() => {
       <article class="life-now-card">
         <div class="life-now-label">
           <span>04</span> PHONE
-          <span v-if="phone?.screenOn === false" class="life-now-flag">SCREEN OFF</span>
+          <span v-if="phone?.screenOn === true" class="life-now-flag is-on">SCREEN ON</span>
+          <span v-else-if="phone?.screenOn === false" class="life-now-flag">SCREEN OFF</span>
+          <span v-else-if="phone" class="life-now-flag">SCREEN —</span>
         </div>
         <template v-if="phone">
           <strong class="life-now-app">{{ phone.app || '—' }}</strong>
@@ -359,6 +373,12 @@ onBeforeUnmount(() => {
   font-size: 0.44rem;
   letter-spacing: 0.08em;
   white-space: nowrap;
+}
+
+.life-now-flag.is-on {
+  border-color: var(--text-primary);
+  background: var(--text-primary);
+  color: var(--bg);
 }
 
 .life-now-place,

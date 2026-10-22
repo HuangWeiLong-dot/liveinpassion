@@ -30,7 +30,8 @@ const DAY_KEYS = new Set([
   'health', 'location', 'phone', 'ai',
 ]);
 const HEALTH_KEYS = new Set([
-  'steps', 'hrAvg', 'hrMin', 'runs', 'runKm', 'runMinutes', 'runPaceS', 'vo2max',
+  'steps', 'hrAvg', 'hrMin', 'hrMax', 'runs', 'runKm', 'runMinutes', 'runPaceS',
+  'vo2max',
 ]);
 const LOCATION_KEYS = new Set([
   'city', 'districts', 'movingMinutes', 'inferredMinutes', 'transitMinutes',
@@ -112,6 +113,7 @@ function validateDay(d) {
     if (!isOptNum(h.steps, 0, 200000)) return 'health.steps';
     if (!isOptNum(h.hrAvg, 0, 300)) return 'health.hrAvg';
     if (!isOptNum(h.hrMin, 0, 300)) return 'health.hrMin';
+    if (!isOptNum(h.hrMax, 0, 300)) return 'health.hrMax';
     if (!isOptNum(h.runs, 0, 50)) return 'health.runs';
     if (!isOptNum(h.runKm, 0, 1000)) return 'health.runKm';
     if (!isOptNum(h.runMinutes, 0, 1440)) return 'health.runMinutes';

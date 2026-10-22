@@ -28,7 +28,7 @@ import {
   setIndexCache,
 } from '../data/lifeArchiveCache.js';
 import {
-  MAP_MAX_DAYS,
+  MAP_BATCH_DAYS,
   buildGeoMap,
   loadLifeTracks,
 } from '../data/lifeGeo.js';
@@ -67,6 +67,8 @@ const rawIndex = ref(null);
 const error = ref(false);
 const loading = ref(true);
 const clock = ref('--:--:--');
+const nowMs = ref(Date.now());
+const nowSnap = ref(null);
 const lastUpdated = ref('—');
 const todayRef = ref('');
 const numbersRun = ref(0);
@@ -101,6 +103,21 @@ let dayLocked = false;
 const mapState = ref('idle'); // idle | loading | ready | empty | error
 const mapTracks = ref([]);
 const mapHover = ref('');
+const mapDays = ref([]); // 窗口内所有有 raw events 的日子
+const mapCursor = ref(0); // 已经请求过多少天（含失败的天）
+const mapLoadingMore = ref(false);
+const mapAllLoaded = computed(() => mapCursor.value >= mapDays.value.length);
+const mapRemaining = computed(() => Math.max(0, mapDays.value.length - mapCursor.value));
+
+const MAP_ZOOM_MIN = 1;
+const MAP_ZOOM_MAX = 8;
+const mapZoom = ref(1);
+const mapPan = ref({ x: 0, y: 0 });
+const mapDragging = ref(false);
+const mapIsZoomed = computed(() => mapZoom.value > 1.001);
+const mapTransform = computed(
+  () => `translate(${mapPan.value.x} ${mapPan.value.y}) scale(${mapZoom.value})`,
+);
 
 // ── 格式化 ──────────────────────────────────────────────────────────────
 
@@ -203,6 +220,7 @@ function formatWhen(value) {
 }
 
 function tickClock() {
+  nowMs.value = Date.now();
   try {
     clock.value = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Shanghai',
@@ -389,9 +407,14 @@ const rhythmRows = computed(() => rows.value.map((r, i) => {
   };
 }));
 
-const rhythmLegend = computed(() => CATEGORY_ORDER.filter((c) => payloads.value.some(
-  (p) => p.categories && (p.categories[c] || 0) > 0,
-)));
+// 七个维度 + Other 全部列出来；当天为 0 的维度变暗，而不是从图例里消失。
+// 这样前端能一眼看到 Work/Study/Transport/Leisure/Health/Life/Social 的完整结构，
+// 也避免“只显示四维”被误解成数据没记录。
+const rhythmLegend = computed(() => CATEGORY_ORDER.map((c) => ({
+  name: c,
+  index: CATEGORY_INDEX[c],
+  zero: !payloads.value.some((p) => p.categories && (p.categories[c] || 0) > 0),
+})));
 
 const rhythmHoverRow = computed(() => rhythmRows.value[rhythmHover.value] || null);
 const motionHoverRow = computed(() => motionRows.value[motionHover.value] || null);
@@ -425,14 +448,35 @@ const stepsMax = computed(() => Math.max(
 
 const motionRows = computed(() => rows.value.map((r, i) => {
   const base = decorate(r, i);
-  const steps = r.payload?.health?.steps ?? null;
+  const health = r.payload?.health;
+  const steps = health?.steps ?? null;
   return {
     ...base,
     steps,
+    hrMin: health?.hrMin ?? null,
+    hrAvg: health?.hrAvg ?? null,
+    hrMax: health?.hrMax ?? null,
     missing: steps == null,
     pct: steps != null && steps > 0 ? Math.max((steps / stepsMax.value) * 100, 1.2) : 0,
   };
 }));
+
+// 心率条带的纵轴范围：按窗口内实际 min/max 取整，留一点余量。
+const hrScale = computed(() => {
+  const vals = motionRows.value
+    .flatMap((r) => [r.hrMin, r.hrMax])
+    .filter((v) => v != null);
+  if (!vals.length) return null;
+  const lo = Math.max(30, Math.floor(Math.min(...vals) / 10) * 10 - 10);
+  const hi = Math.min(220, Math.ceil(Math.max(...vals) / 10) * 10 + 10);
+  return { lo, hi: Math.max(hi, lo + 40) };
+});
+
+function hrPct(value) {
+  if (hrScale.value == null || value == null) return null;
+  const { lo, hi } = hrScale.value;
+  return ((value - lo) / (hi - lo)) * 100;
+}
 
 // 7 日滚动均值：只平均窗口内有效的步数；缺失日不出点。
 const rollingMean = computed(() => {
@@ -473,27 +517,150 @@ const rollingAreaPath = computed(() => {
   return `${rollingPath.value} L${x1.toFixed(2)},100 L${x0.toFixed(2)},100 Z`;
 });
 
-const runSummary = computed(() => {
-  const list = payloads.value;
-  const runs = sum(list.map((p) => p.health?.runs).filter((v) => v != null));
-  const km = sum(list.map((p) => p.health?.runKm).filter((v) => v != null));
-  const minutes = sum(list.map((p) => p.health?.runMinutes).filter((v) => v != null));
-  const paces = list.map((p) => p.health?.runPaceS).filter((v) => v != null && v > 0);
-  const bestPace = paces.length ? Math.min(...paces) : null;
-  const hrs = list.map((p) => p.health?.hrAvg).filter((v) => v != null);
-  const vo2 = [...list].reverse().find((p) => p.health?.vo2max != null)?.health?.vo2max ?? null;
+// ── 手表（并入 MOTION） ────────────────────────────────────────────────
+function dayAgeLabel(day) {
+  if (!day || !todayRef.value) return '';
+  const a = new Date(`${day}T00:00:00`);
+  const b = new Date(`${todayRef.value}T00:00:00`);
+  const n = Math.round((b - a) / 86400000);
+  if (n <= 0) return 'TODAY';
+  if (n === 1) return 'YESTERDAY';
+  return `${n}D AGO`;
+}
 
-  return [
-    { label: 'RUNS', value: runs ? String(Math.round(runs)) : '—' },
-    { label: 'DISTANCE', value: km ? `${km.toFixed(1)} km` : '—' },
-    { label: 'TIME', value: minutes ? minutesLabel(minutes) : '—' },
-    { label: 'BEST PACE', value: paceLabel(bestPace) },
-    { label: 'AVG HR', value: hrs.length ? `${Math.round(sum(hrs) / hrs.length)} bpm` : '—' },
-    { label: 'VO2MAX', value: vo2 != null ? String(vo2) : '—' },
-  ];
+const watchSummary = computed(() => {
+  const days = payloads.value.filter((p) => p.health);
+  const latest = [...days].reverse().find(
+    (p) => p.health.hrAvg != null || p.health.steps != null,
+  ) || null;
+  const h = latest?.health || {};
+  const stepDays = days.filter((p) => p.health.steps != null).length;
+  const hrDays = days.filter((p) => p.health.hrAvg != null).length;
+  const stepsAvg = mean(days.map((p) => p.health.steps).filter((v) => v != null));
+  const hrAvgMean = mean(days.map((p) => p.health.hrAvg).filter((v) => v != null));
+  const runs = sum(days.map((p) => p.health.runs).filter((v) => v != null));
+  const km = sum(days.map((p) => p.health.runKm).filter((v) => v != null));
+  const minutes = sum(days.map((p) => p.health.runMinutes).filter((v) => v != null));
+
+  // 「最近一次跑步」和「窗口内最佳配速」分开：最佳配速可能来自很久以前，
+  // 必须把日期/多久之前一起显示，不能拿它冒充今天的配速。
+  const runDays = days.filter((p) => (p.health.runs || 0) > 0);
+  const latestRunDay = runDays[runDays.length - 1] || null;
+  const latestRun = latestRunDay?.health || null;
+  const paceDays = days.filter(
+    (p) => p.health.runPaceS != null && p.health.runPaceS > 0,
+  );
+  const bestPaceDay = paceDays.length
+    ? paceDays.reduce((a, b) => (b.health.runPaceS < a.health.runPaceS ? b : a))
+    : null;
+  const bestPace = bestPaceDay?.health.runPaceS ?? null;
+  const vo2 = [...days].reverse().find((p) => p.health.vo2max != null)?.health?.vo2max ?? null;
+
+  return {
+    day: latest?.day || null,
+    steps: h.steps ?? null,
+    hrAvg: h.hrAvg ?? null,
+    hrMin: h.hrMin ?? null,
+    hrMax: h.hrMax ?? null,
+    stepDays,
+    hrDays,
+    stepsAvg,
+    hrAvgMean,
+    runs,
+    km,
+    minutes,
+    latestRunDay: latestRunDay?.day || null,
+    latestRunKm: latestRun?.runKm ?? null,
+    latestRunMinutes: latestRun?.runMinutes ?? null,
+    latestRunRuns: latestRun?.runs ?? null,
+    latestRunAge: dayAgeLabel(latestRunDay?.day),
+    bestPace,
+    bestPaceDay: bestPaceDay?.day || null,
+    bestPaceAge: dayAgeLabel(bestPaceDay?.day),
+    vo2,
+  };
 });
 
-// ── 03 地点 ─────────────────────────────────────────────────────────────
+// ── 实时状态（来自 LifeNow 的 /api/life/now 快照） ─────────────────────
+function liveAge(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  const sec = Math.max(0, (nowMs.value - d.getTime()) / 1000);
+  if (sec < 45) return 'JUST NOW';
+  if (sec < 3600) return `${Math.max(1, Math.round(sec / 60))}M AGO`;
+  if (sec < 86400) return `${Math.round(sec / 3600)}H AGO`;
+  return `${Math.round(sec / 86400)}D AGO`;
+}
+
+function onNowSnapshot(snap) {
+  nowSnap.value = snap;
+}
+
+const liveStatus = computed(() => {
+  const s = nowSnap.value;
+  const p = s?.phone || null;
+  const d = s?.desktop || null;
+  const l = s?.location || null;
+
+  let phone;
+  if (!p) {
+    phone = { label: '—', note: 'NO PHONE DATA', tone: 'unknown' };
+  } else if (p.screenOn === true) {
+    phone = { label: 'SCREEN ON', note: p.app ? `APP · ${p.app}` : 'UNLOCKED', tone: 'on' };
+  } else if (p.screenOn === false) {
+    phone = { label: 'SCREEN OFF', note: p.app ? `LAST · ${p.app}` : 'LOCKED', tone: 'off' };
+  } else {
+    phone = { label: 'SCREEN —', note: p.app ? `LAST · ${p.app}` : 'NO SCREEN EVENT', tone: 'unknown' };
+  }
+
+  let desktop;
+  if (!d) {
+    desktop = { label: '—', note: 'NO DESKTOP DATA', tone: 'unknown' };
+  } else if (d.running) {
+    desktop = {
+      label: 'RUNNING',
+      note: [d.app, d.category].filter(Boolean).join(' · ') || 'ACTIVE',
+      tone: 'on',
+    };
+  } else if (d.afk) {
+    desktop = { label: 'AFK', note: 'AWAY FROM DESK', tone: 'off' };
+  } else {
+    desktop = { label: 'IDLE', note: d.app ? `LAST · ${d.app}` : 'NO WINDOW', tone: 'off' };
+  }
+
+  let location;
+  if (!l) {
+    location = { label: '—', note: 'NO LOCATION DATA', tone: 'unknown' };
+  } else if (l.stale) {
+    location = {
+      label: 'STALE',
+      note: [l.district || l.city].filter(Boolean).join(' · ') || 'NOT TODAY',
+      tone: 'unknown',
+    };
+  } else if (l.mode === 'moving') {
+    location = {
+      label: 'MOVING',
+      note: [l.district || l.city].filter(Boolean).join(' · ') || 'IN TRANSIT',
+      tone: 'on',
+    };
+  } else {
+    location = {
+      label: 'STAYING',
+      note: [l.district || l.city, l.stayMinutes ? minutesLabel(l.stayMinutes) : '']
+        .filter(Boolean).join(' · ') || 'STATIONARY',
+      tone: 'off',
+    };
+  }
+
+  return {
+    live: !!s,
+    updated: s ? liveAge(s.ts_utc) : 'WAITING',
+    phone,
+    desktop,
+    location,
+  };
+});
 
 const places = computed(() => {
   const agg = {};
@@ -557,9 +724,9 @@ const geoMap = computed(() => (
     : null
 ));
 
-const mappedKm = computed(() => (
+const mappedMinutes = computed(() => (
   Math.round(mapTracks.value.reduce((a, t) => a + (t.transports || [])
-    .reduce((x, y) => x + y.km, 0), 0))
+    .reduce((x, y) => x + y.minutes, 0), 0))
 ));
 
 const mappedPoints = computed(() => sum(mapTracks.value.map((t) => t.points || 0)));
@@ -568,19 +735,126 @@ const mapHoverTrack = computed(() => (
   mapTracks.value.find((t) => t.day === mapHover.value) || null
 ));
 
+// ── 地图缩放 / 平移 ────────────────────────────────────────────────────
+// viewBox 始终是 1000×560；缩放只改 <g> 的 transform。轨迹/网格用
+// vector-effect: non-scaling-stroke，线宽不随缩放变粗；文字和圆点在模板里
+// 按 1/zoom 反算，保持屏幕上的可读尺寸。
+function clampMapPan(x, y, z = mapZoom.value) {
+  const w = geoMap.value?.width || 1000;
+  const h = geoMap.value?.height || 560;
+  return {
+    x: Math.min(0, Math.max(w * (1 - z), x)),
+    y: Math.min(0, Math.max(h * (1 - z), y)),
+  };
+}
+
+function setMapZoom(next, anchor) {
+  const target = Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, next));
+  if (target === mapZoom.value) return;
+  if (target === MAP_ZOOM_MIN) {
+    resetMapZoom();
+    return;
+  }
+  const w = geoMap.value?.width || 1000;
+  const h = geoMap.value?.height || 560;
+  const a = anchor || { x: w / 2, y: h / 2 };
+  const old = mapZoom.value;
+  const mx = (a.x - mapPan.value.x) / old;
+  const my = (a.y - mapPan.value.y) / old;
+  mapZoom.value = target;
+  mapPan.value = clampMapPan(a.x - target * mx, a.y - target * my, target);
+}
+
+function zoomMap(factor) {
+  setMapZoom(mapZoom.value * factor);
+}
+
+function resetMapZoom() {
+  mapZoom.value = 1;
+  mapPan.value = { x: 0, y: 0 };
+  mapDragging.value = false;
+}
+
+function svgPointFromEvent(evt) {
+  const svg = mapSvgRef.value;
+  if (!svg || !svg.getScreenCTM()) return null;
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX;
+  pt.y = evt.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: p.x, y: p.y };
+}
+
+function onMapWheel(evt) {
+  // 未缩放时把滚轮让给页面；已经放大后才接管，避免整页滚动被地图吃掉。
+  if (!mapIsZoomed.value && !evt.ctrlKey && !evt.metaKey) return;
+  const p = svgPointFromEvent(evt);
+  if (!p) return;
+  evt.preventDefault();
+  setMapZoom(mapZoom.value * (evt.deltaY < 0 ? 1.2 : 0.82), p);
+}
+
+let mapDrag = null;
+
+function onMapPointerDown(evt) {
+  if (!mapIsZoomed.value || evt.button !== 0) return;
+  const p = svgPointFromEvent(evt);
+  if (!p) return;
+  mapDrag = { x: p.x, y: p.y, pan: { ...mapPan.value } };
+  mapDragging.value = true;
+  evt.currentTarget.setPointerCapture?.(evt.pointerId);
+}
+
+function onMapPointerMove(evt) {
+  if (!mapDrag) return;
+  const p = svgPointFromEvent(evt);
+  if (!p) return;
+  evt.preventDefault();
+  mapPan.value = clampMapPan(
+    mapDrag.pan.x + (p.x - mapDrag.x),
+    mapDrag.pan.y + (p.y - mapDrag.y),
+  );
+}
+
+function onMapPointerUp(evt) {
+  if (!mapDrag) return;
+  mapDrag = null;
+  mapDragging.value = false;
+  evt.currentTarget.releasePointerCapture?.(evt.pointerId);
+}
+
+function onMapDoubleClick(evt) {
+  const p = svgPointFromEvent(evt);
+  if (!p) return;
+  evt.preventDefault();
+  setMapZoom(mapZoom.value * 1.6, p);
+}
+
+// 实际出行方式：走路 / 地铁 / 电瓶车，另外跑步单独保留。
+// Dawarich 把地铁记成 driving、电瓶车记成 cycling —— 这是使用者实际的
+// 出行方式，不是汽车 / 自行车。认不出的 moving(❓) 不猜，标成 MOVING。
+const TRANSPORT_LABELS = {
+  walking: 'WALKING',
+  cycling: 'E-BIKE',
+  driving: 'SUBWAY',
+  running: 'RUNNING',
+  'moving(❓)': 'MOVING',
+};
+
 const transportRows = computed(() => {
   const agg = {};
   mapTracks.value.forEach((t) => {
-    (t.transports || []).forEach(({ mode, km }) => {
-      agg[mode] = (agg[mode] || 0) + km;
+    (t.transports || []).forEach(({ mode, minutes }) => {
+      const label = TRANSPORT_LABELS[mode] || String(mode).toUpperCase();
+      agg[label] = (agg[label] || 0) + minutes;
     });
   });
   const list = Object.entries(agg).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const max = Math.max(...list.map(([, km]) => km), 0.0001);
-  return list.map(([name, km], i) => ({
+  const max = Math.max(...list.map(([, minutes]) => minutes), 0.0001);
+  return list.map(([name, minutes], i) => ({
     name,
-    km: round(km, 1),
-    pct: Math.max((km / max) * 100, 2),
+    minutes: round(minutes, 1),
+    pct: Math.max((minutes / max) * 100, 2),
     rank: String(i + 1).padStart(2, '0'),
   }));
 });
@@ -947,7 +1221,8 @@ async function loadRawIndex() {
   return null;
 }
 
-// 地图只拉窗口内最近 7 天；events 索引已经按日期倒序。
+// 窗口内**所有**有 raw events 的日子，最新的在前。加载由 mapCursor 控制：
+// 首屏先取 MAP_BATCH_DAYS 天，之后 LOAD MORE 再往后追加。
 function mapEventDays(index) {
   const ids = (index?.kinds?.events || []).map((x) => x.id).filter(Boolean);
   if (!ids.length || !rows.value.length) return [];
@@ -956,8 +1231,7 @@ function mapEventDays(index) {
   return ids
     .filter((id) => id >= from && id <= to)
     .sort()
-    .reverse()
-    .slice(0, MAP_MAX_DAYS);
+    .reverse();
 }
 
 let mapObserver = null;
@@ -965,9 +1239,16 @@ let mapAbort = null;
 let mapStarted = false;
 
 async function loadTracks(force = false) {
-  if (!activeNow || mapState.value === 'loading') return;
+  if (!activeNow || mapState.value === 'loading' || mapLoadingMore.value) return;
   if (mapStarted && !force) return;
   mapStarted = true;
+
+  if (force) {
+    mapTracks.value = [];
+    mapDays.value = [];
+    mapCursor.value = 0;
+    resetMapZoom();
+  }
   mapState.value = 'loading';
 
   if (mapAbort) mapAbort.abort();
@@ -976,12 +1257,15 @@ async function loadTracks(force = false) {
   try {
     const index = rawIndex.value || await loadRawIndex();
     const days = mapEventDays(index);
+    mapDays.value = days;
     if (!days.length) {
       mapState.value = 'empty';
       return;
     }
 
-    const tracks = await loadLifeTracks(days, {
+    const batch = days.slice(0, MAP_BATCH_DAYS);
+    mapCursor.value = batch.length;
+    const tracks = await loadLifeTracks(batch, {
       base: CMS_BASE,
       signal: mapAbort.signal,
       concurrency: 3,
@@ -999,6 +1283,38 @@ async function loadTracks(force = false) {
     if (err?.name === 'AbortError') return;
     mapState.value = 'error';
     mapStarted = false;
+  }
+}
+
+async function loadMoreTracks() {
+  if (!activeNow || mapLoadingMore.value || mapAllLoaded.value) return;
+  if (mapState.value !== 'ready' && mapState.value !== 'empty') return;
+  const batch = mapDays.value.slice(mapCursor.value, mapCursor.value + MAP_BATCH_DAYS);
+  if (!batch.length) return;
+
+  mapLoadingMore.value = true;
+  mapCursor.value += batch.length;
+  try {
+    const tracks = await loadLifeTracks(batch, {
+      base: CMS_BASE,
+      signal: mapAbort?.signal,
+      concurrency: 3,
+    });
+    if (!activeNow) return;
+    const byDay = new Map(mapTracks.value.map((t) => [t.day, t]));
+    tracks.forEach((t) => byDay.set(t.day, t));
+    mapTracks.value = [...byDay.values()].sort((a, b) => b.day.localeCompare(a.day));
+    if (mapTracks.value.length) mapState.value = 'ready';
+    // 投影范围会随着新日期扩大；缩放后的旧视口不再对得上，回到全局。
+    resetMapZoom();
+    await nextTick();
+    animateMap();
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      console.error('load more tracks failed', err);
+    }
+  } finally {
+    mapLoadingMore.value = false;
   }
 }
 
@@ -1594,7 +1910,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- 现在在干嘛（独立轮询 /api/life/now） -->
-        <LifeNow />
+        <LifeNow @snapshot="onNowSnapshot" />
 
         <!-- KPI -->
         <div class="stats-cards life-cards">
@@ -1649,8 +1965,8 @@ onBeforeUnmount(() => {
               <h2>DAILY RHYTHM</h2>
             </div>
             <div class="stats-legend">
-              <span v-for="c in rhythmLegend" :key="c">
-                <i class="life-swatch" :class="`cat-${CATEGORY_INDEX[c]}`"></i>{{ c }}
+              <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
+                <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
               </span>
             </div>
           </div>
@@ -1767,6 +2083,157 @@ onBeforeUnmount(() => {
           </div>
 
           <div v-if="motionRows.length" class="life-chart">
+            <!-- 手表数据并入 MOTION：大爱心 + 心率 + 跑步 / 步数 -->
+            <div v-if="watchSummary.stepDays || watchSummary.hrDays" class="life-motion-watch">
+              <div class="life-heart-hero">
+                <div class="life-heart-stage" aria-hidden="true">
+                  <span class="life-heart-ring"></span>
+                  <svg class="life-heart-icon" viewBox="0 0 24 24">
+                    <path d="M12 20.2 4.9 13.1a4.7 4.7 0 0 1 6.6-6.6l.5.5.5-.5a4.7 4.7 0 0 1 6.6 6.6Z" />
+                  </svg>
+                  <!-- 波形在爱心下面：爱心压住中间，两侧仍能看到心跳线 -->
+                  <svg class="life-heart-ecg" viewBox="0 0 320 80" preserveAspectRatio="none">
+                    <path d="M0 40H120l8-2 8-22 10 44 10-32 8 12H200l10-24 10 34 8-10H320" />
+                  </svg>
+                </div>
+                <div class="life-heart-readout">
+                  <span class="life-heart-label">
+                    HEART RATE · {{ watchSummary.day ? fullDay(watchSummary.day) : 'LATEST' }}
+                  </span>
+                  <strong class="life-heart-big">
+                    {{ watchSummary.hrAvg != null ? Math.round(watchSummary.hrAvg) : '—' }}<em>bpm</em>
+                  </strong>
+                  <div class="life-heart-meta">
+                    <span v-if="watchSummary.hrMin != null">MIN {{ Math.round(watchSummary.hrMin) }}</span>
+                    <span v-if="watchSummary.hrMax != null">MAX {{ Math.round(watchSummary.hrMax) }}</span>
+                    <span v-if="watchSummary.hrAvgMean != null">AVG {{ Math.round(watchSummary.hrAvgMean) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="life-watch-metrics">
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <rect x="7.5" y="7.5" width="9" height="9" rx="2" />
+                      <path d="M9.5 7.5V4.5h5v3M9.5 16.5v3h5v-3" />
+                      <path d="M12 10.5v2l1.2 1" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">STEPS</span>
+                  <b>{{ watchSummary.steps != null ? fmt(Math.round(watchSummary.steps)) : '—' }}</b>
+                  <em v-if="watchSummary.stepsAvg != null">
+                    AVG {{ fmt(Math.round(watchSummary.stepsAvg)) }} · {{ watchSummary.stepDays }}D
+                  </em>
+                </div>
+
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="15" cy="4.5" r="1.8" />
+                      <path d="M13.2 8.2 10.5 13l-3.8 1.2" />
+                      <path d="M13.2 8.2 16.6 10l2.4 3.6" />
+                      <path d="M10.5 13l3.2 2.6.8 4.9" />
+                      <path d="M10.5 13 8.2 17.2 5 19.5" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">RUNNING</span>
+                  <b>
+                    {{ watchSummary.latestRunKm != null ? Number(watchSummary.latestRunKm).toFixed(1) : '—' }}<small>km</small>
+                  </b>
+                  <em v-if="watchSummary.latestRunDay">
+                    {{ watchSummary.latestRunAge }} · {{ fullDay(watchSummary.latestRunDay) }}
+                    · {{ watchSummary.latestRunRuns ? Math.round(watchSummary.latestRunRuns) : '—' }} runs
+                    · {{ watchSummary.latestRunMinutes ? minutesLabel(watchSummary.latestRunMinutes) : '—' }}
+                  </em>
+                  <em v-if="watchSummary.runs != null">
+                    WINDOW · {{ Number(watchSummary.km || 0).toFixed(1) }} km · {{ Math.round(watchSummary.runs) }} runs
+                  </em>
+                </div>
+
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 18c3-6 5-9 8-9s5 3 8 9" />
+                      <circle cx="12" cy="9" r="2" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">BEST PACE</span>
+                  <b>{{ watchSummary.bestPace ? paceLabel(watchSummary.bestPace) : '—' }}</b>
+                  <em v-if="watchSummary.bestPaceDay">
+                    {{ watchSummary.bestPaceAge }} · {{ fullDay(watchSummary.bestPaceDay) }}
+                  </em>
+                  <em v-else>NO RUNS</em>
+                </div>
+
+                <div class="life-watch-metric">
+                  <span class="life-watch-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 12h4l2-6 4 12 2-6h4" />
+                    </svg>
+                  </span>
+                  <span class="life-watch-metric-label">VO2MAX</span>
+                  <b>{{ watchSummary.vo2 ?? '—' }}</b>
+                  <em>ESTIMATE</em>
+                </div>
+              </div>
+
+              <div class="life-live-status">
+                <div class="life-status" :class="`is-${liveStatus.phone.tone}`">
+                  <span class="life-status-head"><i class="life-status-dot"></i> PHONE</span>
+                  <b>{{ liveStatus.phone.label }}</b>
+                  <em>{{ liveStatus.phone.note }}</em>
+                </div>
+                <div class="life-status" :class="`is-${liveStatus.desktop.tone}`">
+                  <span class="life-status-head"><i class="life-status-dot"></i> DESKTOP</span>
+                  <b>{{ liveStatus.desktop.label }}</b>
+                  <em>{{ liveStatus.desktop.note }}</em>
+                </div>
+                <div class="life-status" :class="`is-${liveStatus.location.tone}`">
+                  <span class="life-status-head"><i class="life-status-dot"></i> LOCATION</span>
+                  <b>{{ liveStatus.location.label }}</b>
+                  <em>{{ liveStatus.location.note }}</em>
+                </div>
+                <div class="life-status life-status-updated" :class="{ 'is-live': liveStatus.live }">
+                  <span class="life-status-head"><i class="life-status-dot"></i> LIVE SNAPSHOT</span>
+                  <b>{{ liveStatus.updated }}</b>
+                  <em>PHONE · DESKTOP · GPS</em>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="hrScale" class="life-hr life-motion-hr">
+              <div class="life-hr-head">
+                <span>HEART RATE · LAST {{ watchSummary.hrDays }} DAYS</span>
+                <span>{{ hrScale.lo }}–{{ hrScale.hi }} BPM · DOT = AVG</span>
+              </div>
+              <div class="life-hr-track" aria-hidden="true">
+                <div
+                  v-for="r in motionRows"
+                  :key="r.day"
+                  class="life-hr-col"
+                  :class="{ 'is-missing': r.hrMax == null, 'is-today': r.isToday }"
+                  :title="r.hrMax == null
+                    ? `${r.day}: no HR`
+                    : `${r.day}: ${Math.round(r.hrMin)}–${Math.round(r.hrMax)} bpm · avg ${Math.round(r.hrAvg)}`"
+                >
+                  <span
+                    v-if="r.hrMin != null && r.hrMax != null"
+                    class="life-hr-range"
+                    :style="{
+                      bottom: hrPct(r.hrMin) + '%',
+                      height: Math.max(hrPct(r.hrMax) - hrPct(r.hrMin), 0.5) + '%',
+                    }"
+                  ></span>
+                  <span
+                    v-if="r.hrAvg != null"
+                    class="life-hr-avg"
+                    :style="{ bottom: hrPct(r.hrAvg) + '%' }"
+                  ></span>
+                </div>
+              </div>
+            </div>
+
             <div class="life-chart-main">
               <div class="life-plot">
                 <div class="stats-chart-grid" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -1840,6 +2307,16 @@ onBeforeUnmount(() => {
                     <b>{{ compact(Math.round(rollingMean[motionHover] ?? 0)) }}</b>
                     <em>7-DAY MEAN</em>
                   </span>
+                  <span v-if="motionHoverRow?.hrAvg != null" class="stats-tip-row">
+                    <b>{{ Math.round(motionHoverRow.hrAvg) }}</b><em>HR AVG</em>
+                  </span>
+                  <span
+                    v-if="motionHoverRow?.hrMin != null && motionHoverRow?.hrMax != null"
+                    class="stats-tip-row"
+                  >
+                    <b>{{ Math.round(motionHoverRow.hrMin) }}–{{ Math.round(motionHoverRow.hrMax) }}</b>
+                    <em>HR RANGE</em>
+                  </span>
                 </div>
               </div>
 
@@ -1854,11 +2331,6 @@ onBeforeUnmount(() => {
               <span v-for="r in motionRows" :key="r.day">{{ r.showLabel ? shortDay(r.day) : '' }}</span>
             </div>
 
-            <div class="life-chips">
-              <span v-for="c in runSummary" :key="c.label" class="life-chip">
-                <em>{{ c.label }}</em><b>{{ c.value }}</b>
-              </span>
-            </div>
           </div>
 
           <p v-else class="stats-panel-empty">No health data recorded yet.</p>
@@ -1873,7 +2345,9 @@ onBeforeUnmount(() => {
             </div>
             <span class="stats-panel-sub">
               {{ places.city }}<template v-if="places.cityCount > 1"> +{{ places.cityCount - 1 }}</template>
-              · {{ mapState === 'ready' ? `${mapTracks.length} days mapped` : 'city level' }}
+              · {{ (mapState === 'ready' || mapState === 'empty')
+                ? `${mapTracks.length} days mapped${mapRemaining ? ` · ${mapRemaining} more` : ''}`
+                : 'city level' }}
             </span>
           </div>
 
@@ -1885,28 +2359,63 @@ onBeforeUnmount(() => {
                     <span>ROUTE MAP</span>
                     <span v-if="mapState === 'loading'">LOADING TRACKS…</span>
                     <span v-else-if="mapState === 'ready'">
-                      {{ mapTracks.length }} DAYS · {{ fmt(mappedKm) }} KM · {{ fmt(mappedPoints) }} PTS
+                      {{ mapTracks.length }} DAYS · {{ fmt(mappedMinutes) }} MIN · {{ fmt(mappedPoints) }} PTS
                     </span>
                     <span v-else-if="mapState === 'error'">TRACK ARCHIVE UNAVAILABLE</span>
-                    <span v-else-if="mapState === 'empty'">NO TRACKS IN WINDOW</span>
+                    <span v-else-if="mapState === 'empty'">{{ mapRemaining ? 'NO TRACKS IN FIRST BATCH' : 'NO TRACKS IN WINDOW' }}</span>
                     <span v-else>PUBLIC TRACK ARCHIVE</span>
                   </div>
 
                   <div v-if="mapHoverTrack" class="life-map-readout">
                     <span>{{ fullDay(mapHoverTrack.day) }}</span>
-                    <span>{{ kmLabel(mapHoverTrack.km) }}</span>
+                    <span>{{ minutesLabel(mapHoverTrack.minutes) }}</span>
                     <span>{{ fmt(mapHoverTrack.points) }} pts</span>
+                  </div>
+
+                  <div v-if="geoMap" class="life-map-zoom" @pointerdown.stop @wheel.stop>
+                    <button
+                      type="button"
+                      :disabled="mapZoom >= MAP_ZOOM_MAX"
+                      aria-label="Zoom in"
+                      title="Zoom in · Ctrl + wheel"
+                      @click="zoomMap(1.5)"
+                    >+</button>
+                    <button
+                      type="button"
+                      :disabled="mapZoom <= MAP_ZOOM_MIN"
+                      aria-label="Zoom out"
+                      title="Zoom out · Ctrl + wheel"
+                      @click="zoomMap(1 / 1.5)"
+                    >−</button>
+                    <button
+                      v-if="mapIsZoomed"
+                      type="button"
+                      class="is-reset"
+                      aria-label="Reset zoom"
+                      title="Reset zoom"
+                      @click="resetMapZoom"
+                    >RESET</button>
                   </div>
 
                   <svg
                     v-if="geoMap"
                     ref="mapSvgRef"
                     class="life-map-svg"
+                    :class="{ 'is-zoomed': mapIsZoomed, 'is-dragging': mapDragging }"
                     :viewBox="`0 0 ${geoMap.width} ${geoMap.height}`"
                     preserveAspectRatio="xMidYMid meet"
+                    :style="{ touchAction: mapIsZoomed ? 'none' : 'auto' }"
                     role="img"
                     :aria-label="`Route map: ${mapTracks.length} days around ${places.city}`"
+                    @wheel="onMapWheel"
+                    @pointerdown="onMapPointerDown"
+                    @pointermove="onMapPointerMove"
+                    @pointerup="onMapPointerUp"
+                    @pointercancel="onMapPointerUp"
+                    @pointerleave="onMapPointerUp"
+                    @dblclick="onMapDoubleClick"
                   >
+                    <g class="life-map-viewport" :transform="mapTransform">
                     <g class="life-map-grid" aria-hidden="true">
                       <line
                         v-for="x in geoMap.gridX"
@@ -1930,6 +2439,7 @@ onBeforeUnmount(() => {
                       class="life-map-watermark"
                       :x="geoMap.width - 24"
                       :y="geoMap.height - 30"
+                      :style="{ fontSize: `${64 / mapZoom}px` }"
                       text-anchor="end"
                       aria-hidden="true"
                     >{{ places.city.toUpperCase() }}</text>
@@ -1940,13 +2450,13 @@ onBeforeUnmount(() => {
                           class="life-map-visit-ring"
                           :cx="v.x"
                           :cy="v.y"
-                          :r="v.r + 4"
+                          :r="(v.r + 4) / mapZoom"
                         />
                         <circle
                           class="life-map-dot"
                           :cx="v.x"
                           :cy="v.y"
-                          :r="v.r"
+                          :r="v.r / mapZoom"
                         />
                       </g>
                     </g>
@@ -1972,10 +2482,12 @@ onBeforeUnmount(() => {
                         :x="l.x + l.dx"
                         :y="l.y + 3"
                         :text-anchor="l.anchor"
+                        :style="{ fontSize: `${11 / mapZoom}px`, strokeWidth: `${3 / mapZoom}px` }"
                       >{{ l.text }}</text>
                     </g>
+                    </g>
 
-                    <g class="life-map-scale" aria-hidden="true">
+                    <g v-if="!mapIsZoomed" class="life-map-scale" aria-hidden="true">
                       <line
                         :x1="geoMap.scale.x"
                         :y1="geoMap.scale.y"
@@ -2014,7 +2526,7 @@ onBeforeUnmount(() => {
                         ? 'Reading public track archive…'
                         : mapState === 'error'
                           ? 'Tracks are temporarily unavailable.'
-                          : 'No track data in this window.' }}
+                          : (mapRemaining ? 'No tracks in the first batch. Load more below.' : 'No track data in this window.') }}
                     </span>
                     <button
                       v-if="mapState === 'error'"
@@ -2043,14 +2555,28 @@ onBeforeUnmount(() => {
                     :class="{ 'is-active': t.day === mapHover }"
                     role="tab"
                     :aria-selected="t.day === mapHover"
-                    :aria-label="`${fullDay(t.day)}: ${kmLabel(t.km)}`"
+                    :aria-label="`${fullDay(t.day)}: ${minutesLabel(t.minutes)}`"
                     @pointerenter="mapHover = t.day"
                     @focus="mapHover = t.day"
                     @click="mapHover = t.day"
                   >
                     <span>{{ shortDay(t.day) }}</span>
-                    <b>{{ t.km ? t.km.toFixed(0) : '·' }}</b>
+                    <b>{{ t.minutes ? Math.round(t.minutes) : '·' }}</b>
                   </button>
+                </div>
+
+                <div v-if="mapState === 'ready' || mapState === 'empty'" class="life-map-more-row">
+                  <span>{{ mapTracks.length }} / {{ mapDays.length }} DAYS</span>
+                  <button
+                    v-if="mapRemaining"
+                    type="button"
+                    class="life-map-more-btn"
+                    :disabled="mapLoadingMore"
+                    @click="loadMoreTracks"
+                  >
+                    {{ mapLoadingMore ? 'LOADING…' : `LOAD MORE · ${mapRemaining}` }}
+                  </button>
+                  <span v-else class="life-map-more-done">ALL LOADED</span>
                 </div>
               </div>
 
@@ -2069,7 +2595,7 @@ onBeforeUnmount(() => {
                   <div v-for="t in transportRows" :key="t.name" class="life-row">
                     <span class="life-rank">{{ t.rank }}</span>
                     <span class="life-name">{{ t.name }}</span>
-                    <span class="life-num">{{ kmLabel(t.km) }}</span>
+                    <span class="life-num">{{ minutesLabel(t.minutes) }}</span>
                     <span class="life-track"><span class="life-fill" :style="{ width: t.pct + '%' }"></span></span>
                   </div>
                 </div>
@@ -2320,8 +2846,8 @@ onBeforeUnmount(() => {
               <h2>WEEKDAY PROFILE</h2>
             </div>
             <div class="stats-legend">
-              <span v-for="c in rhythmLegend" :key="c">
-                <i class="life-swatch" :class="`cat-${CATEGORY_INDEX[c]}`"></i>{{ c }}
+              <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
+                <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
               </span>
             </div>
           </div>

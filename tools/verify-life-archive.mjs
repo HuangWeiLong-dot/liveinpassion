@@ -52,6 +52,7 @@ const JOURNAL_HTML = `
 </ul>
 <h2>Review</h2>
 <p>今天终于把聚合页和原始归档接上了，晚上又试了一遍手机端。</p>
+<p>Long URL regression: <a href="https://example.com/very/long/path/that/should/never/push/the/page/wider/than/the/viewport/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">https://example.com/very/long/path/that/should/never/push/the/page/wider/than/the/viewport/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</a></p>
 <table><thead><tr><th>指标</th><th>值</th></tr></thead><tbody><tr><td>步数</td><td>6,767</td></tr></tbody></table>
 `;
 const JOURNAL_RAW = `---
