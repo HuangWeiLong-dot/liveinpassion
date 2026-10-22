@@ -27,7 +27,10 @@ const COST_SOURCES = new Set(['platform', 'claude-estimate', 'ledger']);
 
 const DAY_KEYS = new Set([
   'v', 'day', 'categories', 'trackedHours', 'topApps',
-  'health', 'location', 'phone', 'ai',
+  'health', 'location', 'phone', 'ai', 'dimensions',
+]);
+const DIMENSION_KEYS = new Set([
+  'Work', 'Study', 'Transport', 'Leisure', 'Health', 'Life', 'Social',
 ]);
 const HEALTH_KEYS = new Set([
   'steps', 'hrAvg', 'hrMin', 'hrMax', 'runs', 'runKm', 'runMinutes', 'runPaceS',
@@ -106,6 +109,14 @@ function validateDay(d) {
   }
   if (!isOptNum(d.trackedHours, 0, 24.5)) return 'trackedHours';
   if (d.topApps !== null && !isAppPairs(d.topApps, 20, 24)) return 'topApps';
+
+  if (d.dimensions !== undefined && d.dimensions !== null) {
+    const dim = d.dimensions;
+    if (!isObj(dim) || !onlyKeys(dim, DIMENSION_KEYS)) return 'dimensions';
+    for (const key of DIMENSION_KEYS) {
+      if (!isNum(dim[key], 0, 24)) return `dimensions.${key}`;
+    }
+  }
 
   if (d.health !== null) {
     const h = d.health;

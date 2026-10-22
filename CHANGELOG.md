@@ -11,6 +11,18 @@
 
 ---
 
+## update: 40 — 2026-10-22
+
+### 七维向量（神经系统输入）
+- `/api/life` 每天新增 `dimensions`：`Work / Study / Life / Leisure` 来自桌面
+  ActivityWatch 分类；`Transport` 来自 GPS 通勤分钟；`Health` 来自手表跑步分钟；
+  `Social` 来自手机社交应用分钟。`Other` 不进入七维。
+- Worker 校验 `dimensions`（7 个 0–24 的数字）；`publish_life_site.py` 对旧 Worker
+  做“去掉 dimensions 再试”的兼容重试，23:00 不会整批失败。
+- `LifeBrain` 优先读 `dimensions`，旧 payload 回退 `categories`；
+  Health / Transport / Social 现在能真的长出日期簇，而不是永远为 0。
+- RHYTHM / WEEKDAY 图例同时列出全部 8 类（含 0，变暗）。
+
 ## update: 39 — 2026-10-22
 
 ### LIFE MOTION / WATCH / PLACES / 归档

@@ -201,11 +201,14 @@ export function buildBrainModel(rows = []) {
 
   for (const row of rows.slice(-30)) {
     const p = row?.payload || null;
+    // 新 payload 带 dimensions（桌面 + 手表 + GPS + 手机的七维）；
+    // 旧 payload 退回桌面 categories，保证历史数据仍能画。
+    const dims = p?.dimensions || p?.categories;
     const categories = {};
     let sum = 0;
 
     for (const cat of BRAIN_CATEGORY_ORDER) {
-      const v = Number(p?.categories?.[cat]);
+      const v = Number(dims?.[cat]);
       const hours = Number.isFinite(v) && v > 0 ? v : 0;
       categories[cat] = hours;
       sum += hours;
@@ -216,7 +219,9 @@ export function buildBrainModel(rows = []) {
     const tracked = Number(p?.trackedHours);
     const trackedHours = row?.missing || !p
       ? 0
-      : (Number.isFinite(tracked) && tracked > 0 ? tracked : sum);
+      : (p?.dimensions
+        ? sum
+        : (Number.isFinite(tracked) && tracked > 0 ? tracked : sum));
 
     let dominant = null;
     let best = 0;
