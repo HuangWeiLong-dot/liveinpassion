@@ -11,6 +11,15 @@
 
 ---
 
+## fix: 42.1 — 2026-10-22
+
+### DAILY RHYTHM / WEEKDAY PROFILE 补齐剩余三维
+- 两张图从桌面 `categories` 改为优先读 **`dimensions`**：Work/Study/Life/Leisure
+  来自桌面，Transport 来自 GPS，Health 来自手表，Social 来自手机——剩下的
+  Transport / Health / Social 不再只出现在图例里。
+- 柱子的总量、纵轴与悬停 `7D TOTAL` 都按七维之和；WORK SHARE 也按七维总量计算。
+- 面板标题加 `7D · DESKTOP + GPS + WATCH + PHONE` 说明。
+
 ## update: 42 — 2026-10-22
 
 ### 全历史 Best Pace / Longest + GPX 路线

@@ -39,6 +39,15 @@ function buildFull() {
       Other: 0.1,
     };
     const trackedHours = Number(Object.values(categories).reduce((a, b) => a + b, 0).toFixed(2));
+    const dimensions = {
+      Work: categories.Work,
+      Study: categories.Study,
+      Transport: idx % 4 === 0 ? 1.2 : 0.4,
+      Leisure: categories.Leisure,
+      Health: 0.3,
+      Life: categories.Life,
+      Social: 0.5,
+    };
 
     const steps = idx === 10 ? null : idx === 11 ? 0 : 5200 + ((idx * 937) % 9000);
     const phone = idx === 12 ? null : {
@@ -72,6 +81,7 @@ function buildFull() {
       day,
       categories,
       trackedHours,
+      dimensions,
       topApps: [['VS Code', Number((categories.Work * 0.6).toFixed(2))], ['Edge', Number((categories.Work * 0.4).toFixed(2))]],
       health: {
         steps,

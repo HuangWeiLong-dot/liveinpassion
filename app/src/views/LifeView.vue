@@ -377,32 +377,43 @@ const kpis = computed(() => {
 
 // ── 01 每日节奏 ─────────────────────────────────────────────────────────
 
+function rhythmDims(p) {
+  // 新的七维（桌面 + GPS + 手表 + 手机）；旧 payload 退回桌面 categories。
+  return p?.dimensions || p?.categories || null;
+}
+
+function rhythmTotal(d) {
+  return d
+    ? CATEGORY_ORDER.reduce((a, c) => a + Number(d[c] || 0), 0)
+    : 0;
+}
+
 const rhythmMax = computed(() => Math.max(
-  ...rows.value.map((r) => r.payload?.trackedHours || 0),
+  ...rows.value.map((r) => rhythmTotal(rhythmDims(r.payload))),
   1,
 ));
 
 const rhythmRows = computed(() => rows.value.map((r, i) => {
   const base = decorate(r, i);
   const p = r.payload;
-  const total = p?.trackedHours ?? null;
-  const cats = p?.categories;
+  const dims = rhythmDims(p);
+  const total = dims ? rhythmTotal(dims) : null;
 
-  const segments = cats
+  const segments = dims
     ? CATEGORY_ORDER
-      .filter((c) => (cats[c] || 0) > 0)
+      .filter((c) => (dims[c] || 0) > 0)
       .map((c) => ({
         name: c,
-        hours: cats[c],
+        hours: dims[c],
         cat: CATEGORY_INDEX[c],
-        pct: total > 0 ? (cats[c] / total) * 100 : 0,
+        pct: total > 0 ? (dims[c] / total) * 100 : 0,
       }))
     : [];
 
   return {
     ...base,
     total,
-    missing: !cats,
+    missing: !dims,
     pct: total > 0 ? Math.max((total / rhythmMax.value) * 100, 1) : 0,
     segments,
   };
@@ -1061,15 +1072,16 @@ const weekdayRows = computed(() => {
   }));
 
   payloads.value.forEach((p) => {
-    if (!p.categories || p.trackedHours == null) return;
+    const dims = p.dimensions || p.categories;
+    if (!dims) return;
     const d = new Date(`${p.day}T00:00:00Z`);
     if (Number.isNaN(d.getTime())) return;
     const idx = (d.getUTCDay() + 6) % 7;
     const b = buckets[idx];
     b.days += 1;
-    b.hours += p.trackedHours;
+    b.hours += rhythmTotal(dims);
     CATEGORY_ORDER.forEach((c) => {
-      b.cats[c] += Number(p.categories[c] || 0);
+      b.cats[c] += Number(dims[c] || 0);
     });
   });
 
@@ -1100,16 +1112,16 @@ const weekdayChips = computed(() => {
   const busiest = [...valid].sort((a, b) => b.total - a.total)[0];
   const quietest = [...valid].sort((a, b) => a.total - b.total)[0];
   const work = payloads.value.reduce((a, p) => (
-    p.categories ? a + Number(p.categories.Work || 0) : a
+    a + Number((p.dimensions || p.categories)?.Work || 0)
   ), 0);
-  const tracked = payloads.value.reduce((a, p) => (
-    p.categories && p.trackedHours != null ? a + p.trackedHours : a
+  const total = payloads.value.reduce((a, p) => (
+    a + rhythmTotal(p.dimensions || p.categories)
   ), 0);
 
   return [
     { label: 'BUSIEST', value: busiest ? busiest.label : '—' },
     { label: 'QUIETEST', value: quietest ? quietest.label : '—' },
-    { label: 'WORK SHARE', value: tracked ? `${Math.round((work / tracked) * 100)}%` : '—' },
+    { label: 'WORK SHARE', value: total ? `${Math.round((work / total) * 100)}%` : '—' },
     { label: 'SAMPLE', value: `${valid.reduce((a, d) => a + d.days, 0)} days` },
   ];
 });
@@ -2030,6 +2042,7 @@ onBeforeUnmount(() => {
               <span class="stats-panel-index">01</span>
               <h2>DAILY RHYTHM</h2>
             </div>
+            <span class="stats-panel-sub">7D · DESKTOP + GPS + WATCH + PHONE</span>
             <div class="stats-legend">
               <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
                 <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
@@ -2094,7 +2107,7 @@ onBeforeUnmount(() => {
                       <span class="stats-tip-date">{{ rhythmHoverRow ? fullDay(rhythmHoverRow.day) : '' }}<template v-if="rhythmHoverRow?.isToday"> · SO FAR</template></span>
                       <span class="stats-tip-row">
                         <b>{{ rhythmHoverRow?.total == null ? '—' : hoursLabel(rhythmHoverRow.total) }}</b>
-                        <em>TRACKED</em>
+                        <em>7D TOTAL</em>
                       </span>
                       <span
                         v-for="s in (rhythmHoverRow?.segments || []).slice(0, 4)"
@@ -3037,6 +3050,7 @@ onBeforeUnmount(() => {
               <span class="stats-panel-index">06</span>
               <h2>WEEKDAY PROFILE</h2>
             </div>
+            <span class="stats-panel-sub">7D · DESKTOP + GPS + WATCH + PHONE</span>
             <div class="stats-legend">
               <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
                 <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
