@@ -278,9 +278,15 @@ onBeforeUnmount(() => {
           <span v-if="watch && !watch.synced" class="life-now-flag">NOT TODAY</span>
         </div>
         <template v-if="watch">
-          <strong class="life-now-app">
-            {{ num(watch.steps) }}<em>steps</em>
-          </strong>
+          <div class="life-now-steps">
+            <svg class="life-now-steps-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8.5 20.5c-1.4 0-2.4-.9-2.4-2.3 0-1.9.9-3.3 1.4-5.2.5-1.9.5-3.8.5-5.7 0-1.6.9-2.8 2.4-2.8s2.4 1.1 2.4 2.8c0 1.9-.5 3.8-1 5.7-.5 1.9-1.4 3.3-1.4 5.2 0 1.4-1 2.3-2.4 2.3Z" />
+              <path d="M15.8 18.8c1.2.2 2-.5 2.2-1.7.3-1.7-.4-3.1-.7-4.9-.3-1.8-.2-3.6 0-5.4.2-1.5-.4-2.7-1.7-2.9-1.3-.2-2.2.8-2.4 2.3-.2 1.8-.1 3.6.1 5.4.3 1.8 1 3.2 1 4.9.1 1.3.5 2.1 1.5 2.3Z" />
+            </svg>
+            <strong class="life-now-app">
+              {{ num(watch.steps) }}<em>steps</em>
+            </strong>
+          </div>
           <div v-if="watch.hrAvg != null" class="life-now-heart">
             <svg class="life-now-heart-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 20.2 4.9 13.1a4.7 4.7 0 0 1 6.6-6.6l.5.5.5-.5a4.7 4.7 0 0 1 6.6 6.6Z" />
@@ -426,6 +432,25 @@ onBeforeUnmount(() => {
 
 .life-now-app.is-idle {
   color: var(--text-secondary);
+}
+
+.life-now-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.life-now-steps .life-now-app {
+  margin-top: 0;
+}
+
+.life-now-steps-icon {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  fill: var(--text-primary);
+  opacity: 0.9;
 }
 
 .life-now-heart {

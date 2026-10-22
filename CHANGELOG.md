@@ -11,6 +11,15 @@
 
 ---
 
+## fix: 42.2 — 2026-10-22
+
+### 七维图例 / NOW Steps icon
+- `rhythmLegend` 的 zero 判定以前只看桌面 `categories`，所以 Transport/
+  Health/Social 在柱子里已经有值、右上角图例却还是灰的。现在和柱子一样
+  优先看 `dimensions`，有数据就不再变暗。
+- WHAT I'M DOING NOW 的 WATCH 卡给 steps 加了脚印 icon，和 BPM 的心形 icon
+  对称。
+
 ## fix: 42.1 — 2026-10-22
 
 ### DAILY RHYTHM / WEEKDAY PROFILE 补齐剩余三维

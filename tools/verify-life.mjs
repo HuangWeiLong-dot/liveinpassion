@@ -515,6 +515,10 @@ const LIFE_STATE = `(function () {
       q('[data-chart="motion"] .life-status'),
       function (e) { return e.textContent.replace(/\s+/g, ' ').trim(); },
     ).join(' | '),
+    legendZero: Array.prototype.map.call(
+      q('[data-chart="rhythm"] .stats-legend span'),
+      function (e) { return e.classList.contains('is-zero'); },
+    ),
     mapTracks: q('[data-chart="places"] .life-map-track:not(.is-watch)').length,
     watchTracks: q('[data-chart="places"] .life-map-track.is-watch').length,
     mapDots: q('[data-chart="places"] .life-map-dot').length,
@@ -559,6 +563,9 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
   if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
+  if (state.legendZero.slice(0, 7).some(Boolean)) {
+    throw new Error(`legend dimmed a dimension that has data: ${JSON.stringify(state.legendZero)}`);
+  }
   if (state.heartHero !== 1) throw new Error(`expected 1 heart hero, got ${state.heartHero}`);
   if (!/bpm/i.test(state.heartBig)) throw new Error(`heart readout missing bpm: ${state.heartBig}`);
   if (state.watchMetrics !== 6) throw new Error(`expected 6 watch metrics, got ${state.watchMetrics}`);

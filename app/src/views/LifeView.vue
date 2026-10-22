@@ -425,7 +425,12 @@ const rhythmRows = computed(() => rows.value.map((r, i) => {
 const rhythmLegend = computed(() => CATEGORY_ORDER.map((c) => ({
   name: c,
   index: CATEGORY_INDEX[c],
-  zero: !payloads.value.some((p) => p.categories && (p.categories[c] || 0) > 0),
+  // 图例必须和柱子用同一份数据：优先 dimensions。否则 Transport/Health/
+  // Social 在柱子里有值，图例却因为桌面 categories 为 0 而一直是灰的。
+  zero: !payloads.value.some((p) => {
+    const d = p.dimensions || p.categories;
+    return d && (d[c] || 0) > 0;
+  }),
 })));
 
 const rhythmHoverRow = computed(() => rhythmRows.value[rhythmHover.value] || null);
