@@ -281,8 +281,14 @@ onBeforeUnmount(() => {
           <strong class="life-now-app">
             {{ num(watch.steps) }}<em>steps</em>
           </strong>
+          <div v-if="watch.hrAvg != null" class="life-now-heart">
+            <svg class="life-now-heart-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 20.2 4.9 13.1a4.7 4.7 0 0 1 6.6-6.6l.5.5.5-.5a4.7 4.7 0 0 1 6.6 6.6Z" />
+            </svg>
+            <strong>{{ num(watch.hrAvg, 0) }}</strong><em>BPM</em>
+            <span v-if="watch.hrMin != null">MIN {{ num(watch.hrMin) }}</span>
+          </div>
           <div class="life-now-meta">
-            <span v-if="watch.hrAvg != null">HR {{ num(watch.hrAvg, 1) }} BPM</span>
             <span v-if="watch.day">{{ dayLabel(watch.day) }}</span>
             <span v-if="watch.pushedAt">UPDATED {{ hhmm(watch.pushedAt) }} · {{ watchAge }}</span>
             <span v-else-if="watch.synced">SYNCED</span>
@@ -419,6 +425,45 @@ onBeforeUnmount(() => {
 }
 
 .life-now-app.is-idle {
+  color: var(--text-secondary);
+}
+
+.life-now-heart {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.life-now-heart-icon {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  align-self: center;
+  fill: var(--text-primary);
+}
+
+.life-now-heart strong {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.life-now-heart em {
+  font-style: normal;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.44rem;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.life-now-heart span {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.44rem;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
 }
 

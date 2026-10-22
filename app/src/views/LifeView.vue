@@ -98,6 +98,7 @@ try {
 }
 const dayDetail = ref('');
 let dayLocked = false;
+const runsOpen = ref(false);
 
 // ---- 地图（raw events 里的轨迹，懒加载） ----
 const mapState = ref('idle'); // idle | loading | ready | empty | error
@@ -418,6 +419,12 @@ const rhythmLegend = computed(() => CATEGORY_ORDER.map((c) => ({
 
 const rhythmHoverRow = computed(() => rhythmRows.value[rhythmHover.value] || null);
 const motionHoverRow = computed(() => motionRows.value[motionHover.value] || null);
+const hrHover = ref(-1);
+const hrHoverRow = computed(() => motionRows.value[hrHover.value] || null);
+const hrTipPct = computed(() => {
+  const n = Math.max(1, motionRows.value.length);
+  return Math.max(12, Math.min(88, ((hrHover.value + 0.5) / n) * 100));
+});
 const phoneHoverRow = computed(() => phoneRows.value[phoneHover.value] || null);
 const aiHoverRow = computed(() => aiRows.value[aiHover.value] || null);
 const weekdayHoverRow = computed(() => weekdayRows.value[weekdayHover.value] || null);
@@ -528,6 +535,22 @@ function dayAgeLabel(day) {
   return `${n}D AGO`;
 }
 
+function isoHhmm(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-GB', {
+    timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// 心率在 40–200 bpm 的固定刻度上的位置，用来画 MIN–MAX 区间条。
+function hrZonePct(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, ((n - 40) / 160) * 100));
+}
+
 const watchSummary = computed(() => {
   const days = payloads.value.filter((p) => p.health);
   const latest = [...days].reverse().find(
@@ -556,6 +579,11 @@ const watchSummary = computed(() => {
   const bestPace = bestPaceDay?.health.runPaceS ?? null;
   const vo2 = [...days].reverse().find((p) => p.health.vo2max != null)?.health?.vo2max ?? null;
 
+  // 每次锻炼的明细（aggregate 的 workouts 数组）；最新的在前。
+  const workouts = payloads.value
+    .flatMap((p) => (p.workouts || []).map((w) => ({ ...w, day: p.day })))
+    .sort((a, b) => String(b.start || '').localeCompare(String(a.start || '')));
+
   return {
     day: latest?.day || null,
     steps: h.steps ?? null,
@@ -572,12 +600,14 @@ const watchSummary = computed(() => {
     latestRunDay: latestRunDay?.day || null,
     latestRunKm: latestRun?.runKm ?? null,
     latestRunMinutes: latestRun?.runMinutes ?? null,
+    latestRunPace: latestRun?.runPaceS ?? null,
     latestRunRuns: latestRun?.runs ?? null,
     latestRunAge: dayAgeLabel(latestRunDay?.day),
     bestPace,
     bestPaceDay: bestPaceDay?.day || null,
     bestPaceAge: dayAgeLabel(bestPaceDay?.day),
     vo2,
+    workouts,
   };
 });
 
@@ -1149,8 +1179,22 @@ function closeDay() {
   }
 }
 
+function openRuns() {
+  if (!watchSummary.value.workouts.length) return;
+  runsOpen.value = true;
+  document.body.classList.add('no-scroll');
+}
+
+function closeRuns() {
+  if (!runsOpen.value) return;
+  runsOpen.value = false;
+  document.body.classList.remove('no-scroll');
+}
+
 function onDayKey(e) {
-  if (e.key === 'Escape') closeDay();
+  if (e.key !== 'Escape') return;
+  closeDay();
+  closeRuns();
 }
 
 watch(colorMode, (v) => {
@@ -2101,12 +2145,31 @@ onBeforeUnmount(() => {
                     HEART RATE · {{ watchSummary.day ? fullDay(watchSummary.day) : 'LATEST' }}
                   </span>
                   <strong class="life-heart-big">
-                    {{ watchSummary.hrAvg != null ? Math.round(watchSummary.hrAvg) : '—' }}<em>bpm</em>
+                    {{ watchSummary.hrAvg != null ? Math.round(watchSummary.hrAvg) : '—' }}<em>BPM</em>
                   </strong>
-                  <div class="life-heart-meta">
-                    <span v-if="watchSummary.hrMin != null">MIN {{ Math.round(watchSummary.hrMin) }}</span>
-                    <span v-if="watchSummary.hrMax != null">MAX {{ Math.round(watchSummary.hrMax) }}</span>
-                    <span v-if="watchSummary.hrAvgMean != null">AVG {{ Math.round(watchSummary.hrAvgMean) }}</span>
+                  <div
+                    v-if="watchSummary.hrMin != null && watchSummary.hrMax != null"
+                    class="life-heart-range"
+                    aria-hidden="true"
+                  >
+                    <span class="life-heart-range-track"></span>
+                    <span
+                      class="life-heart-range-fill"
+                      :style="{
+                        left: hrZonePct(watchSummary.hrMin) + '%',
+                        width: Math.max(hrZonePct(watchSummary.hrMax) - hrZonePct(watchSummary.hrMin), 0.8) + '%',
+                      }"
+                    ></span>
+                    <span
+                      v-if="watchSummary.hrAvg != null"
+                      class="life-heart-range-avg"
+                      :style="{ left: hrZonePct(watchSummary.hrAvg) + '%' }"
+                    ></span>
+                  </div>
+                  <div class="life-heart-range-labels">
+                    <span>MIN {{ watchSummary.hrMin != null ? Math.round(watchSummary.hrMin) : '—' }}</span>
+                    <span>AVG {{ watchSummary.hrAvg != null ? Math.round(watchSummary.hrAvg) : '—' }}</span>
+                    <span>MAX {{ watchSummary.hrMax != null ? Math.round(watchSummary.hrMax) : '—' }}</span>
                   </div>
                 </div>
               </div>
@@ -2127,7 +2190,15 @@ onBeforeUnmount(() => {
                   </em>
                 </div>
 
-                <div class="life-watch-metric">
+                <div
+                  class="life-watch-metric life-watch-run"
+                  role="button"
+                  tabindex="0"
+                  :aria-label="`Open running details, ${watchSummary.workouts.length} runs`"
+                  @click="openRuns"
+                  @keydown.enter.prevent="openRuns"
+                  @keydown.space.prevent="openRuns"
+                >
                   <span class="life-watch-metric-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
                       <circle cx="15" cy="4.5" r="1.8" />
@@ -2145,10 +2216,12 @@ onBeforeUnmount(() => {
                     {{ watchSummary.latestRunAge }} · {{ fullDay(watchSummary.latestRunDay) }}
                     · {{ watchSummary.latestRunRuns ? Math.round(watchSummary.latestRunRuns) : '—' }} runs
                     · {{ watchSummary.latestRunMinutes ? minutesLabel(watchSummary.latestRunMinutes) : '—' }}
+                    · {{ watchSummary.latestRunPace ? paceLabel(watchSummary.latestRunPace) : '—' }}
                   </em>
                   <em v-if="watchSummary.runs != null">
                     WINDOW · {{ Number(watchSummary.km || 0).toFixed(1) }} km · {{ Math.round(watchSummary.runs) }} runs
                   </em>
+                  <em class="life-watch-run-more">VIEW RUNS →</em>
                 </div>
 
                 <div class="life-watch-metric">
@@ -2204,34 +2277,89 @@ onBeforeUnmount(() => {
 
             <div v-if="hrScale" class="life-hr life-motion-hr">
               <div class="life-hr-head">
-                <span>HEART RATE · LAST {{ watchSummary.hrDays }} DAYS</span>
-                <span>{{ hrScale.lo }}–{{ hrScale.hi }} BPM · DOT = AVG</span>
+                <span>HEART RATE · LAST {{ motionRows.length }} DAYS · {{ watchSummary.hrDays }} WITH DATA</span>
+                <span>{{ hrScale.lo }}–{{ hrScale.hi }} BPM · DOT = AVG · HOVER FOR DETAILS</span>
               </div>
-              <div class="life-hr-track" aria-hidden="true">
-                <div
-                  v-for="r in motionRows"
-                  :key="r.day"
-                  class="life-hr-col"
-                  :class="{ 'is-missing': r.hrMax == null, 'is-today': r.isToday }"
-                  :title="r.hrMax == null
-                    ? `${r.day}: no HR`
-                    : `${r.day}: ${Math.round(r.hrMin)}–${Math.round(r.hrMax)} bpm · avg ${Math.round(r.hrAvg)}`"
-                >
-                  <span
-                    v-if="r.hrMin != null && r.hrMax != null"
-                    class="life-hr-range"
-                    :style="{
-                      bottom: hrPct(r.hrMin) + '%',
-                      height: Math.max(hrPct(r.hrMax) - hrPct(r.hrMin), 0.5) + '%',
-                    }"
-                  ></span>
-                  <span
-                    v-if="r.hrAvg != null"
-                    class="life-hr-avg"
-                    :style="{ bottom: hrPct(r.hrAvg) + '%' }"
-                  ></span>
+              <div class="life-hr-body">
+                <div class="life-hr-main">
+                  <div class="life-hr-track" @pointerleave="hrHover = -1">
+                    <div
+                      v-for="(r, i) in motionRows"
+                      :key="r.day"
+                      class="life-hr-col"
+                      :class="{ 'is-missing': r.hrMax == null, 'is-today': r.isToday }"
+                      @pointerenter="hrHover = i"
+                      @focus="hrHover = i"
+                      tabindex="0"
+                    >
+                      <span
+                        v-if="r.hrMin != null && r.hrMax != null"
+                        class="life-hr-range"
+                        :style="{
+                          bottom: hrPct(r.hrMin) + '%',
+                          height: Math.max(hrPct(r.hrMax) - hrPct(r.hrMin), 0.5) + '%',
+                        }"
+                      ></span>
+                      <span
+                        v-if="r.hrAvg != null"
+                        class="life-hr-avg"
+                        :style="{ bottom: hrPct(r.hrAvg) + '%' }"
+                      ></span>
+                    </div>
+
+                    <div
+                      v-if="hrHoverRow"
+                      class="life-hr-tip"
+                      :style="{ left: hrTipPct + '%' }"
+                    >
+                      <span>{{ fullDay(hrHoverRow.day) }}<template v-if="hrHoverRow.isToday"> · TODAY</template></span>
+                      <b v-if="hrHoverRow.hrAvg != null">
+                        {{ Math.round(hrHoverRow.hrMin) }}–{{ Math.round(hrHoverRow.hrMax) }}
+                        · AVG {{ Math.round(hrHoverRow.hrAvg) }}
+                      </b>
+                      <b v-else>NO HR DATA</b>
+                    </div>
+                  </div>
+                  <div class="life-hr-axis" aria-hidden="true">
+                    <span v-for="r in motionRows" :key="r.day">{{ r.showLabel ? shortDay(r.day) : '' }}</span>
+                  </div>
+                </div>
+                <div class="life-hr-yaxis" aria-hidden="true">
+                  <span>{{ hrScale.hi }}</span>
+                  <span>{{ Math.round((hrScale.lo + hrScale.hi) / 2) }}</span>
+                  <span>{{ hrScale.lo }}</span>
                 </div>
               </div>
+            </div>
+
+            <div v-if="watchSummary.workouts.length" class="life-runs">
+              <div class="life-runs-head">
+                <span>RUNS · {{ watchSummary.workouts.length }} IN WINDOW</span>
+                <span>CLICK A RUN FOR DETAILS</span>
+              </div>
+              <details
+                v-for="w in watchSummary.workouts"
+                :key="w.start"
+                class="life-run"
+              >
+                <summary>
+                  <span class="life-run-when">{{ fullDay(w.day) }} · {{ isoHhmm(w.start) }}</span>
+                  <span class="life-run-name">{{ w.name || 'RUN' }}</span>
+                  <span class="life-run-km">{{ w.km != null ? Number(w.km).toFixed(2) : '—' }} km</span>
+                  <span class="life-run-time">{{ w.minutes ? minutesLabel(w.minutes) : '—' }}</span>
+                  <span class="life-run-pace">{{ w.paceS ? paceLabel(w.paceS) : '—' }}</span>
+                </summary>
+                <div class="life-run-detail">
+                  <span v-if="w.avgHr != null">AVG HR {{ w.avgHr }}</span>
+                  <span v-if="w.maxHr != null">MAX HR {{ w.maxHr }}</span>
+                  <span v-if="w.calories != null">CAL {{ w.calories }}</span>
+                  <span v-if="w.ascentM != null">ASCENT {{ w.ascentM }} m</span>
+                  <span v-if="w.vo2max != null">VO2MAX {{ w.vo2max }}</span>
+                  <span v-if="w.trainingEffect != null">TE {{ w.trainingEffect }}</span>
+                  <span v-if="w.recoveryHours != null">RECOVERY {{ w.recoveryHours }} h</span>
+                  <span v-if="w.end">{{ isoHhmm(w.start) }}–{{ isoHhmm(w.end) }}</span>
+                </div>
+              </details>
             </div>
 
             <div class="life-chart-main">
@@ -3121,6 +3249,62 @@ onBeforeUnmount(() => {
             <p v-else class="life-day-empty">
               No aggregate data recorded for this day.
             </p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- 跑步详情：点 MOTION 里的 RUNNING 卡打开 -->
+    <Teleport to="body">
+      <Transition name="life-day">
+        <div v-if="runsOpen" class="life-day-backdrop" @click.self="closeRuns">
+          <div
+            class="life-day-modal life-runs-modal"
+            :class="{ 'is-color': colorMode }"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Running details"
+          >
+            <div class="life-day-head">
+              <div>
+                <span class="life-day-kicker">
+                  Running · {{ watchSummary.workouts.length }} runs in window
+                </span>
+                <h3>RUNNING</h3>
+              </div>
+              <button class="life-day-close" aria-label="Close running details" @click="closeRuns">
+                CLOSE <span aria-hidden="true">×</span>
+              </button>
+            </div>
+
+            <div class="life-runs-modal-body">
+              <article
+                v-for="w in watchSummary.workouts"
+                :key="w.start"
+                class="life-run-modal-item"
+              >
+                <div class="life-run-modal-head">
+                  <span class="life-run-modal-when">{{ fullDay(w.day) }} · {{ isoHhmm(w.start) }}</span>
+                  <span class="life-run-modal-name">{{ w.name || 'RUN' }}</span>
+                  <strong>{{ w.km != null ? Number(w.km).toFixed(2) : '—' }}<small>km</small></strong>
+                  <span>{{ w.minutes ? minutesLabel(w.minutes) : '—' }}</span>
+                  <span>{{ w.paceS ? paceLabel(w.paceS) : '—' }}</span>
+                </div>
+                <div class="life-run-modal-meta">
+                  <span v-if="w.avgHr != null">AVG HR {{ w.avgHr }}</span>
+                  <span v-if="w.maxHr != null">MAX HR {{ w.maxHr }}</span>
+                  <span v-if="w.calories != null">CAL {{ w.calories }}</span>
+                  <span v-if="w.ascentM != null">ASCENT {{ w.ascentM }} m</span>
+                  <span v-if="w.vo2max != null">VO2MAX {{ w.vo2max }}</span>
+                  <span v-if="w.trainingEffect != null">TE {{ w.trainingEffect }}</span>
+                  <span v-if="w.recoveryHours != null">RECOVERY {{ w.recoveryHours }} h</span>
+                  <span v-if="w.end">{{ isoHhmm(w.start) }}–{{ isoHhmm(w.end) }}</span>
+                </div>
+              </article>
+              <p v-if="!watchSummary.workouts.length" class="stats-panel-empty">
+                No individual workouts in this window yet.
+              </p>
+            </div>
           </div>
         </div>
       </Transition>

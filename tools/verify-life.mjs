@@ -84,6 +84,22 @@ function buildFull() {
         runPaceS: idx % 7 === 0 ? 351 : null,
         vo2max: 45.8,
       },
+      workouts: idx % 7 === 0 ? [{
+        start: `${day}T10:00:00Z`,
+        end: `${day}T10:30:00Z`,
+        name: 'Running',
+        kind: null,
+        minutes: 29.6,
+        km: 5.06,
+        avgHr: 162,
+        maxHr: 176,
+        paceS: 351,
+        ascentM: 20,
+        calories: 271,
+        vo2max: 45.8,
+        trainingEffect: 3.2,
+        recoveryHours: 24,
+      }] : null,
       location: {
         city: idx === 3 ? 'Suzhou' : 'Shanghai',
         districts: idx === 3
@@ -452,6 +468,7 @@ const LIFE_STATE = `(function () {
     heartBig: (document.querySelector('[data-chart="motion"] .life-heart-big') || {}).textContent || '',
     watchMetrics: q('[data-chart="motion"] .life-watch-metric').length,
     watchHrCols: q('[data-chart="motion"] .life-hr-col').length,
+    runRows: q('[data-chart="motion"] .life-run').length,
     liveStatus: q('[data-chart="motion"] .life-status').length,
     liveStatusText: Array.prototype.map.call(
       q('[data-chart="motion"] .life-status'),
@@ -501,13 +518,42 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
   if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
   if (state.heartHero !== 1) throw new Error(`expected 1 heart hero, got ${state.heartHero}`);
-  if (!/bpm/.test(state.heartBig)) throw new Error(`heart readout missing bpm: ${state.heartBig}`);
+  if (!/bpm/i.test(state.heartBig)) throw new Error(`heart readout missing bpm: ${state.heartBig}`);
   if (state.watchMetrics !== 4) throw new Error(`expected 4 watch metrics, got ${state.watchMetrics}`);
   if (state.watchHrCols !== 30) throw new Error(`expected 30 HR columns, got ${state.watchHrCols}`);
+  if (state.runRows < 1) throw new Error(`expected run rows, got ${state.runRows}`);
   if (state.liveStatus !== 4) throw new Error(`expected 4 live status cells, got ${state.liveStatus}`);
   if (!/SCREEN ON/.test(state.liveStatusText)) throw new Error(`live phone status wrong: ${state.liveStatusText}`);
   if (!/RUNNING/.test(state.liveStatusText)) throw new Error(`live desktop status wrong: ${state.liveStatusText}`);
   if (!/STAYING/.test(state.liveStatusText)) throw new Error(`live location status wrong: ${state.liveStatusText}`);
+
+  // 点 RUNNING 卡 → 打开逐次跑步详情；Escape 关闭
+  await evalJs("document.querySelector('[data-chart=\"motion\"] .life-watch-run').click()");
+  await sleep(400);
+  const runsModal = JSON.parse(await evalJs(`(function () {
+    var m = document.querySelector('.life-runs-modal');
+    return JSON.stringify({
+      open: !!m,
+      rows: document.querySelectorAll('.life-run-modal-item').length,
+      text: m ? m.textContent.replace(/\\s+/g, ' ').trim() : '',
+      locked: document.body.classList.contains('no-scroll'),
+    });
+  })()`));
+  console.log('  runs modal:', { open: runsModal.open, rows: runsModal.rows, locked: runsModal.locked });
+  if (!runsModal.open) throw new Error('runs modal did not open');
+  if (runsModal.rows !== state.runRows) throw new Error(`runs modal rows ${runsModal.rows} != ${state.runRows}`);
+  if (!/AVG HR/.test(runsModal.text) || !/km/i.test(runsModal.text)) throw new Error('runs modal missing details');
+  if (!runsModal.locked) throw new Error('runs modal did not lock body scroll');
+  await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(400);
+  const runsClosed = JSON.parse(await evalJs(`(function () {
+    return JSON.stringify({
+      modal: !!document.querySelector('.life-runs-modal'),
+      locked: document.body.classList.contains('no-scroll'),
+    });
+  })()`));
+  if (runsClosed.modal) throw new Error('runs modal did not close');
+  if (runsClosed.locked) throw new Error('runs modal left body locked');
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
   if (state.numbers.length !== 5) throw new Error(`expected 5 odometers, got ${state.numbers.length}`);
   if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
@@ -646,10 +692,11 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   await evalJs("document.querySelector('.life-day-close').click()");
   await sleep(700);
 
-  // 运动面板的折线真的画出来了
+  // 运动面板的折线真的画出来了（MOTION 顶部现在有手表/跑步列表，
+  // 要滚到 chart 本身，不然柱子会在视口外，悬浮事件落空）
   await evalJs(`(function () {
-    var el = document.querySelector('[data-chart="motion"]');
-    var y = el.getBoundingClientRect().top + window.scrollY - 100;
+    var el = document.querySelector('[data-chart="motion"] .life-plot');
+    var y = el.getBoundingClientRect().top + window.scrollY - 160;
     window.scrollTo({ top: y, behavior: 'instant' });
   })()`);
   await sleep(1400);

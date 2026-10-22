@@ -11,6 +11,25 @@
 
 ---
 
+## update: 41 — 2026-10-22
+
+### MOTION · RUNNING 明细 / 心率带
+- RUNNING 卡现在可点击（也支持 Enter/Space），打开逐次跑步弹层：日期/时间、
+  距离、时长、配速，以及 AVG/MAX HR、热量、爬升、VO2max、训练效果、恢复时间。
+- 聚合新增 `workouts` 数组（来自 `domain=fitness` 的每次锻炼），Worker 校验该字段；
+  每次跑步的明细不再被日汇总吞掉。
+- 心率带改为可读的小图：左侧日期轴、右侧 BPM 纵轴、MIN–MAX 区间 + AVG 点、
+  悬停显示当天详情；标题明确 `LAST 30 DAYS · N WITH DATA`。
+- 大爱心下的 BPM 增加 40–200 刻度区间条（MIN/AVG/MAX），单位 `BPM` 放大；
+  NOW 的 WATCH 卡也加了心形图标 + 大号 BPM。
+
+## fix: 40.1 — 2026-10-22
+
+### MOTION 跑步配速
+- RUNNING 卡补上**最近一次跑步的配速**；`BEST PACE` 仍然保留全窗口最佳，
+  但已经明确显示它来自哪一天、多久之前（例如 `9D AGO · OCT 13`），不再让
+  人误以为那是今天的配速。
+
 ## update: 40 — 2026-10-22
 
 ### 七维向量（神经系统输入）

@@ -7310,11 +7310,22 @@
             color: var(--text-secondary);
         }
 
+        .life-hr-body {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        .life-hr-main {
+            flex: 1;
+            min-width: 0;
+        }
+
         .life-hr-track {
+            position: relative;
             display: flex;
             gap: 4px;
             height: 66px;
-            padding-right: 46px;
         }
 
         .life-hr-col {
@@ -7322,6 +7333,73 @@
             flex: 1;
             min-width: 0;
             height: 100%;
+            cursor: crosshair;
+            outline: none;
+        }
+
+        .life-hr-col:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 2px;
+        }
+
+        .life-hr-yaxis {
+            width: 46px;
+            height: 66px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.04em;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-secondary);
+        }
+
+        .life-hr-axis {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .life-hr-axis span {
+            flex: 1;
+            min-width: 0;
+            text-align: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-secondary);
+        }
+
+        .life-hr-tip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            z-index: 3;
+            min-width: 130px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            transform: translateX(-50%);
+            pointer-events: none;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            line-height: 1.5;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+            color: var(--text-secondary);
+        }
+
+        .life-hr-tip span {
+            display: block;
+            color: var(--text-primary);
+        }
+
+        .life-hr-tip b {
+            display: block;
+            font-weight: 400;
         }
 
         .life-hr-range {
@@ -7473,18 +7551,51 @@
             margin-left: 8px;
             font-style: normal;
             font-family: 'JetBrains Mono', ui-monospace, monospace;
-            font-size: 0.3em;
+            font-size: 0.36em;
             letter-spacing: 0.1em;
+            text-transform: uppercase;
             color: var(--text-secondary);
         }
 
-        .life-heart-meta {
+        .life-heart-range {
+            position: relative;
+            height: 4px;
+            margin-top: 16px;
+            background: var(--border);
+        }
+
+        .life-heart-range-track {
+            position: absolute;
+            inset: 0;
+            background: var(--border);
+        }
+
+        .life-heart-range-fill {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            background: var(--text-secondary);
+            opacity: 0.55;
+        }
+
+        .life-heart-range-avg {
+            position: absolute;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 2px var(--bg);
+        }
+
+        .life-heart-range-labels {
             display: flex;
-            flex-wrap: wrap;
-            gap: 4px 14px;
-            margin-top: 12px;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 7px;
             font-family: 'JetBrains Mono', ui-monospace, monospace;
-            font-size: 0.5rem;
+            font-size: 0.46rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--text-secondary);
@@ -7555,6 +7666,26 @@
             font-size: 0.46rem;
             letter-spacing: 0.06em;
             color: var(--text-secondary);
+        }
+
+        .life-watch-metric.life-watch-run {
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .life-watch-metric.life-watch-run:hover {
+            background: var(--background-secondary);
+        }
+
+        .life-watch-metric.life-watch-run:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: -4px;
+        }
+
+        .life-watch-run-more {
+            color: var(--text-primary) !important;
+            margin-top: 9px !important;
+            letter-spacing: 0.12em !important;
         }
 
         .life-live-status {
@@ -7639,6 +7770,184 @@
         @keyframes life-status-pulse {
             0%, 55% { opacity: 1; }
             56%, 100% { opacity: 0.2; }
+        }
+
+        .life-runs {
+            margin-top: 18px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-runs-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            margin-bottom: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-run {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-run:last-child {
+            border-bottom: 0;
+        }
+
+        .life-run summary {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 5px 16px;
+            padding: 10px 0;
+            cursor: pointer;
+            list-style: none;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+        }
+
+        .life-run summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .life-run summary::after {
+            content: '+';
+            flex: 0 0 auto;
+            margin-left: auto;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+        }
+
+        .life-run[open] summary::after {
+            content: '−';
+        }
+
+        .life-run-when {
+            flex: 0 0 132px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-run-name {
+            flex: 1 1 120px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .life-run-km {
+            flex: 0 0 72px;
+            text-align: right;
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.9rem;
+            letter-spacing: 0.04em;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .life-run-time,
+        .life-run-pace {
+            flex: 0 0 62px;
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-run-detail {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            padding: 0 0 12px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-run[open] summary {
+            color: var(--text-primary);
+        }
+
+        .life-runs-modal {
+            width: min(760px, 100%);
+        }
+
+        .life-runs-modal-body {
+            padding: 8px 24px 24px;
+        }
+
+        .life-run-modal-item {
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-run-modal-item:last-child {
+            border-bottom: 0;
+        }
+
+        .life-run-modal-head {
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            color: var(--text-secondary);
+        }
+
+        .life-run-modal-when {
+            flex: 0 0 150px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-run-modal-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 0.88rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .life-run-modal-head strong {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            color: var(--text-primary);
+        }
+
+        .life-run-modal-head strong small {
+            margin-left: 4px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44em;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        .life-run-modal-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            margin-top: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
         }
 
         .life-motion-hr {
@@ -8530,6 +8839,10 @@
                 padding: 20px 20px 14px;
             }
 
+            .life-runs-modal-body {
+                padding: 6px 20px 20px;
+            }
+
             .life-chart-main {
                 gap: 12px;
             }
@@ -8538,9 +8851,12 @@
                 height: 210px;
             }
 
-            .life-xaxis,
-            .life-hr-track {
+            .life-xaxis {
                 padding-right: 34px;
+            }
+
+            .life-hr-yaxis {
+                width: 34px;
             }
 
             .life-motion-watch {
@@ -8625,9 +8941,12 @@
                 height: 180px;
             }
 
-            .life-xaxis,
-            .life-hr-track {
+            .life-xaxis {
                 padding-right: 0;
+            }
+
+            .life-hr-yaxis {
+                width: 30px;
             }
 
             .life-map-zoom button {

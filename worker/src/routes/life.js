@@ -27,10 +27,14 @@ const COST_SOURCES = new Set(['platform', 'claude-estimate', 'ledger']);
 
 const DAY_KEYS = new Set([
   'v', 'day', 'categories', 'trackedHours', 'topApps',
-  'health', 'location', 'phone', 'ai', 'dimensions',
+  'health', 'location', 'phone', 'ai', 'workouts', 'dimensions',
 ]);
 const DIMENSION_KEYS = new Set([
   'Work', 'Study', 'Transport', 'Leisure', 'Health', 'Life', 'Social',
+]);
+const WORKOUT_KEYS = new Set([
+  'start', 'end', 'name', 'kind', 'minutes', 'km', 'avgHr', 'maxHr', 'paceS',
+  'ascentM', 'calories', 'vo2max', 'trainingEffect', 'recoveryHours',
 ]);
 const HEALTH_KEYS = new Set([
   'steps', 'hrAvg', 'hrMin', 'hrMax', 'runs', 'runKm', 'runMinutes', 'runPaceS',
@@ -109,6 +113,31 @@ function validateDay(d) {
   }
   if (!isOptNum(d.trackedHours, 0, 24.5)) return 'trackedHours';
   if (d.topApps !== null && !isAppPairs(d.topApps, 20, 24)) return 'topApps';
+
+  if (d.workouts !== undefined && d.workouts !== null) {
+    if (!Array.isArray(d.workouts) || d.workouts.length > 50) return 'workouts';
+    for (const w of d.workouts) {
+      if (!isObj(w) || !onlyKeys(w, WORKOUT_KEYS)) return 'workouts';
+      if (typeof w.start !== 'string' || w.start.length < 10 || w.start.length > 32) {
+        return 'workouts.start';
+      }
+      if (w.end !== '' && (typeof w.end !== 'string' || w.end.length > 32)) {
+        return 'workouts.end';
+      }
+      if (!isName(w.name, 40)) return 'workouts.name';
+      if (w.kind !== null && w.kind !== '' && !isName(w.kind, 40)) return 'workouts.kind';
+      if (!isOptNum(w.minutes, 0, 1440)) return 'workouts.minutes';
+      if (!isOptNum(w.km, 0, 1000)) return 'workouts.km';
+      if (!isOptNum(w.avgHr, 0, 300)) return 'workouts.avgHr';
+      if (!isOptNum(w.maxHr, 0, 300)) return 'workouts.maxHr';
+      if (!isOptNum(w.paceS, 0, 3600)) return 'workouts.paceS';
+      if (!isOptNum(w.ascentM, 0, 20000)) return 'workouts.ascentM';
+      if (!isOptNum(w.calories, 0, 100000)) return 'workouts.calories';
+      if (!isOptNum(w.vo2max, 0, 100)) return 'workouts.vo2max';
+      if (!isOptNum(w.trainingEffect, 0, 10)) return 'workouts.trainingEffect';
+      if (!isOptNum(w.recoveryHours, 0, 240)) return 'workouts.recoveryHours';
+    }
+  }
 
   if (d.dimensions !== undefined && d.dimensions !== null) {
     const dim = d.dimensions;
