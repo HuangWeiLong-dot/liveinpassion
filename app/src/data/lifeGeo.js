@@ -140,17 +140,37 @@ export function parseLocationEvents(doc) {
   return track;
 }
 
+async function getJson(url, signal) {
+  const res = await fetch(url, { cache: 'no-store', signal });
+  if (!res.ok) throw new Error(`${res.status}`);
+  return res.json();
+}
+
 export async function fetchLifeTrack(day, base, signal) {
   const hit = trackCache.get(day);
   if (hit && Date.now() - hit.at < TTL) return hit.track;
 
-  const res = await fetch(`${base}/api/life/raw/events/${encodeURIComponent(day)}`, {
-    cache: 'no-store',
-    signal,
-  });
-  if (!res.ok) throw new Error(`events ${res.status}`);
-  const doc = await res.json();
-  const track = parseLocationEvents(doc);
+  // 两路数据源，各自都可能在、都可能不在：
+  //   events  笔记本发布的当天原始事件（含手机轨迹、停留点、交通，也可能含手表路线）
+  //   watch   服务器每 15 分钟发布的手表路线（GPX/FIT 解析结果），笔记本关机也有
+  // 合并成一个数组交给 parseLocationEvents，它按开始时间去重同一活动的两份文件。
+  const [events, watch] = await Promise.allSettled([
+    getJson(`${base}/api/life/raw/events/${encodeURIComponent(day)}`, signal),
+    getJson(`${base}/api/life/raw/watch/${encodeURIComponent(day)}`, signal),
+  ]);
+  if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+
+  const data = [];
+  if (events.status === 'fulfilled' && Array.isArray(events.value?.data)) {
+    data.push(...events.value.data);
+  }
+  if (watch.status === 'fulfilled' && Array.isArray(watch.value?.data?.events)) {
+    data.push(...watch.value.data.events);
+  }
+  // 两份都没取到才算这天失败（调用方会把它当作空天，不拖垮整张地图）。
+  if (!data.length && events.status === 'rejected') throw events.reason;
+
+  const track = parseLocationEvents({ id: day, data });
   if (!track.day) track.day = day;
   trackCache.set(day, { at: Date.now(), track });
   return track;

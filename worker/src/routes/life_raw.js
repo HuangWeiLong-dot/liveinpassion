@@ -18,7 +18,10 @@ import { renderMarkdown } from '../lib/markdown.js';
 export const lifeRawRoutes = new Hono();
 
 const PREFIX = 'life/raw/';
-const KINDS = new Set(['journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly', 'vault']);
+// watch：服务器侧单独发布的「手表路线」文档（GPX/FIT 解析结果）。
+// 笔记本关机时它仍然每 15 分钟更新一次，地图靠它画虚线；笔记本发布的那份
+// `events` 里也可能有同一批 watch_track，站点按开始时间去重，不会画两条。
+const KINDS = new Set(['journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly', 'vault', 'watch']);
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const WEEK_RE = /^\d{4}-W\d{2}$/;
 const VAULT_ID_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
@@ -131,6 +134,8 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
         if (slash < 0) continue;
         const kind = rest.slice(0, slash);
         if (!KINDS.has(kind)) continue;
+        // watch 是给地图读的内部文档，不进归档索引 —— 归档页只认那 8 个 kind。
+        if (kind === 'watch') continue;
         (kinds[kind] ||= []).push(metaOf(obj));
       }
       if (!res.truncated) break;
