@@ -4,7 +4,8 @@
 //   GET  /api/life         前台运行时读取近 N 天（公开只读）
 //
 // 隐私边界：这里只接受/返回**聚合数字**。Worker 侧做字段白名单校验，
-// 即使上游脚本改坏，坐标、轨迹、窗口标题、URL、应用包名也进不了 D1。
+// 即使上游脚本改坏，坐标、轨迹、窗口标题、完整 URL 也进不了 D1；
+// topApps 挡包名，topSites 只到域名一级（不带路径/查询/页面标题）。
 // 校验失败只回报字段名与日期，不回显提交的值（避免把敏感内容写进日志）。
 import { Hono } from 'hono';
 import { checkPassword } from '../lib/auth.js';
@@ -14,7 +15,9 @@ export const lifeRoutes = new Hono();
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_DAY_BYTES = 32 * 1024;
 const MAX_DAYS_PER_REQUEST = 90;
-const MAX_DAYS_QUERY = 90;
+// 读窗口要盖住前端雷达的 YEAR（365 天）。以前卡在 90 天，YEAR 其实只有 90 天的数据，
+// 标签却写着 YEAR —— 统计口径和展示对不上。按 400 天留余量。
+const MAX_DAYS_QUERY = 400;
 const DEFAULT_DAYS = 30;
 const BATCH_SIZE = 40;
 
@@ -26,8 +29,10 @@ const PACKAGE_RE = /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/;
 const COST_SOURCES = new Set(['platform', 'claude-estimate', 'ledger']);
 
 const DAY_KEYS = new Set([
-  'v', 'day', 'categories', 'trackedHours', 'topApps',
+  'v', 'day', 'categories', 'trackedHours', 'topApps', 'topSites',
   'health', 'location', 'phone', 'ai', 'workouts', 'allTime', 'dimensions',
+  // 七维之和会重复计时；collapsedHours 是同一天各来源区间的并集
+  'collapsedHours',
 ]);
 const ALL_TIME_KEYS = new Set([
   'runs', 'km', 'bestPaceS', 'bestPaceKm', 'bestPaceName', 'bestPaceDay',
@@ -116,7 +121,17 @@ function validateDay(d) {
     }
   }
   if (!isOptNum(d.trackedHours, 0, 24.5)) return 'trackedHours';
-  if (d.topApps !== null && !isAppPairs(d.topApps, 20, 24)) return 'topApps';
+  // 并集不可能超过一天；允许 null（只有手机/健康、没有区间来源的日子）
+  if (d.collapsedHours !== undefined && !isOptNum(d.collapsedHours, 0, 24.5)) {
+    return 'collapsedHours';
+  }
+  // 上限按「完整列表」放宽：单日详情要能展开当天所有应用/站点。
+  if (d.topApps !== null && !isAppPairs(d.topApps, 60, 24)) return 'topApps';
+  // 站点只到域名一级，单位是分钟。域名形状和应用包名相同，这里不额外
+  // 区分 —— 上游只从 web/site_usage 取，完整 URL 与页面标题不进聚合。
+  if (d.topSites !== undefined && d.topSites !== null && !isPairs(d.topSites, 60, 1440)) {
+    return 'topSites';
+  }
 
   if (d.allTime !== undefined && d.allTime !== null) {
     const a = d.allTime;
@@ -207,7 +222,7 @@ function validateDay(d) {
     if (!isOptNum(p.screenOff, 0, 1000000)) return 'phone.screenOff';
     if (!isOptNum(p.screenMinutes, 0, 1440)) return 'phone.screenMinutes';
     if (!isOptNum(p.appSwitches, 0, 1000000)) return 'phone.appSwitches';
-    if (p.topApps !== null && !isAppPairs(p.topApps, 20, 1440)) return 'phone.topApps';
+    if (p.topApps !== null && !isAppPairs(p.topApps, 40, 1440)) return 'phone.topApps';
   }
 
   if (d.ai !== null) {
@@ -220,8 +235,8 @@ function validateDay(d) {
     if (!isOptNum(a.estimatedCost, 0, 1000000)) return 'ai.estimatedCost';
     if (!isOptNum(a.calls, 0, 100000000)) return 'ai.calls';
     if (a.callsSource !== null && !COST_SOURCES.has(a.callsSource)) return 'ai.callsSource';
-    if (a.models !== null && !isPairs(a.models, 20, 1000000)) return 'ai.models';
-    if (a.projects !== null && !isPairs(a.projects, 20, 1000000)) return 'ai.projects';
+    if (a.models !== null && !isPairs(a.models, 30, 1000000)) return 'ai.models';
+    if (a.projects !== null && !isPairs(a.projects, 30, 1000000)) return 'ai.projects';
   }
 
   return null;

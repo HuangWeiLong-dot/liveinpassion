@@ -5,8 +5,9 @@
 // 小标签、1px 发丝线、方块；动效全部交给 GSAP。
 //
 // 数据形态见 LifeLogging 的 scripts/publish_life_site.py：
-//   每天一份**脱敏聚合**（分类时长、步数、城市级位置、手机计数、AI 花费）。
-// 页面只展示聚合数字，不展示坐标、轨迹、窗口标题、包名或余额。
+//   每天一份**脱敏聚合**（分类时长、桌面/手机应用、站点域名、步数、
+//   城市级位置、手机计数、AI 花费）。
+// 页面只展示聚合数字，不展示坐标、轨迹、窗口标题、完整 URL、包名或余额。
 //
 // 三个时序/数据上的坑（和 STATS 同源）：
 //  1. keep-alive：再次进入不会重跑 onMounted，重播走 onActivated；
@@ -19,7 +20,10 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
 import LifeBrain from '../components/LifeBrain.vue';
+import LifeRadar from '../components/LifeRadar.vue';
 import LifeNow from '../components/LifeNow.vue';
+import LifeToday from '../components/LifeToday.vue';
+import LifeDetailModal from '../components/LifeDetailModal.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import {
   latestIdFor,
@@ -33,6 +37,13 @@ import {
   buildRunRoute,
   loadLifeTracks,
 } from '../data/lifeGeo.js';
+import {
+  elevationStats,
+  gradeSeries,
+  hrZones,
+  linePath,
+  runSplits,
+} from '../data/runStats.js';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -100,6 +111,11 @@ try {
 const dayDetail = ref('');
 let dayLocked = false;
 const runsOpen = ref(false);
+
+// 七维雷达与 3D 神经核心共用「当前这一天」：雷达步进/下拉 → 神经核心里选节点，
+// 神经核心点日期节点 → 雷达切到单日。
+const radarFocusDay = ref('');
+const radarData = ref(null);
 
 // ---- 地图（raw events 里的轨迹，懒加载） ----
 const mapState = ref('idle'); // idle | loading | ready | empty | error
@@ -247,6 +263,16 @@ function minutesLabel(m) {
   return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, '0')}m`;
 }
 
+/** 秒 → m:ss（区间时长用）。超过一小时补成 h:mm:ss。 */
+function zoneTimeLabel(seconds) {
+  const s = Math.max(0, Math.round(Number(seconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
 function paceLabel(seconds) {
   const s = Math.round(Number(seconds));
   if (!Number.isFinite(s) || s <= 0) return '—';
@@ -281,13 +307,82 @@ const rows = computed(() => {
   return out;
 });
 
+// 雷达要更大窗口（年 / 完整），所以单独留一份长历史；30 天窗口仍供页面其余图表。
+// 长历史拉取失败时直接退回 30 天，雷达照常可用。
+const radarRows = computed(() => {
+  const days = [...(radarData.value?.days || data.value?.days || [])]
+    .filter((d) => d?.day)
+    .sort((a, b) => a.day.localeCompare(b.day));
+  if (!days.length) return [];
+  const latest = days[days.length - 1].day;
+  const start = addDays(latest, -364);
+  return days
+    .filter((d) => d.day >= start)
+    .map((d) => ({
+      day: d.day,
+      payload: d,
+      missing: false,
+      isToday: d.day === todayRef.value,
+    }));
+});
+
 const payloads = computed(() => rows.value.map((r) => r.payload).filter(Boolean));
+
+// 今天那份聚合：给了「今日统计」板块。今天的数字是当天到目前为止，
+// 由 LifeLogging 的 run_live 每 2 分钟 upsert。
+const todayPayload = computed(() => {
+  const row = rows.value.find((r) => r.day === todayRef.value);
+  return row?.payload || null;
+});
 
 // 实时发布链路上线后，“最新一天”可能就是今天；此时数字是当天到目前的，
 // 不是完整一天。用它给页面加一个明确的 TODAY / 部分数据提示。
 const latestIsToday = computed(() => {
   const last = rows.value[rows.value.length - 1];
   return !!last && !last.missing && last.day === todayRef.value;
+});
+
+// ── 屏幕亮起时间 ────────────────────────────────────────────────────────
+//
+// 口径（已确认）：电脑端用 trackedHours —— ActivityWatch 记到「有窗口在焦点」
+// 的时间，不含锁屏；手机端用 phone.screenMinutes —— Tasker 实测的
+// screen_on → screen_off 区间。两边都只算当天到目前的数字（今天的聚合是
+// 滚动 upsert 的），所以今天那行天然偏小。
+//
+// 弹窗里的逐日列表也用这份数据，缺日不出行（和图表里的虚线基线不是一回事）。
+const screenTotals = computed(() => {
+  const list = payloads.value;
+  const desktopDays = list.filter((p) => p.trackedHours != null).length;
+  const phoneDays = list.filter((p) => p.phone?.screenMinutes != null).length;
+
+  const desktopHours = sum(list.map((p) => p.trackedHours).filter((v) => v != null));
+  const phoneHours = sum(list.map((p) => p.phone?.screenMinutes).filter((v) => v != null)) / 60;
+
+  const today = todayPayload.value;
+  const todayDesktopMinutes = today?.trackedHours != null ? today.trackedHours * 60 : null;
+  const todayPhoneMinutes = today?.phone?.screenMinutes ?? null;
+
+  const perDay = [...list]
+    .sort((a, b) => b.day.localeCompare(a.day))
+    .map((p) => ({
+      day: p.day,
+      desktopHours: p.trackedHours ?? null,
+      phoneHours: p.phone?.screenMinutes != null ? p.phone.screenMinutes / 60 : null,
+    }));
+
+  return {
+    desktopDays,
+    phoneDays,
+    desktopHours: round(desktopHours, 1),
+    phoneHours: round(phoneHours, 1),
+    totalHours: round(desktopHours + phoneHours, 1),
+    todayDesktopMinutes,
+    todayPhoneMinutes,
+    todayMinutes: todayDesktopMinutes != null || todayPhoneMinutes != null
+      ? (todayDesktopMinutes || 0) + (todayPhoneMinutes || 0)
+      : null,
+    perDay,
+  };
 });
 
 const city = computed(() => {
@@ -320,6 +415,9 @@ const kpis = computed(() => {
   const phoneDays = list.filter((p) => p.phone != null).length;
   const locationDays = list.filter((p) => p.location != null).length;
   const aiDays = list.filter((p) => p.ai?.cost != null).length;
+  const screenDays = list.filter(
+    (p) => p.trackedHours != null || p.phone?.screenMinutes != null,
+  ).length;
 
   const tracked = sum(list.map((p) => p.trackedHours).filter((v) => v != null));
   const steps = sum(list.map((p) => p.health?.steps).filter((v) => v != null));
@@ -372,6 +470,13 @@ const kpis = computed(() => {
       value: aiDays ? round(aiCost, 2) : null,
       note: `CNY · ${aiSource}`,
       delay: 0.3,
+    },
+    {
+      key: 'screen',
+      label: 'SCREEN-ON HOURS',
+      value: screenDays ? screenTotals.value.totalHours : null,
+      note: `${screenTotals.value.desktopDays} desktop · ${screenTotals.value.phoneDays} phone`,
+      delay: 0.35,
     },
   ];
 });
@@ -683,6 +788,33 @@ function runKeyStart(value) {
 
 const watchRuns = computed(() => Object.values(watchRunsByDay.value).flat());
 
+/** 速度（m/s）→ 配速（秒/公里）。站着的点（<0.5 m/s）算缺测，别画成 30 分配速。 */
+function paceSeries(samples) {
+  if (!Array.isArray(samples?.v)) return null;
+  const out = samples.v.map((v) => (v != null && v > 0.5 ? 1000 / v : null));
+  return out.some((v) => v != null) ? out : null;
+}
+
+/** 一条跑步记录的全部派生量。模板里只读结果，重算都在这里做一次。 */
+function decorateRun(entry) {
+  const s = entry.samples;
+  if (!s) return { ...entry, splits: null, elev: null, zones: null, gradeArr: null };
+  const pace = paceSeries(s);
+  const grade = gradeSeries(s);
+  return {
+    ...entry,
+    paceArr: pace,
+    hrPath: Array.isArray(s.hr) ? linePath(s.hr, s.t) : '',
+    pacePath: pace ? linePath(pace, s.t, { invert: true }) : '',
+    altPath: Array.isArray(s.alt) ? linePath(s.alt, s.t) : '',
+    gradeArr: grade,
+    gradePath: grade ? linePath(grade, s.t) : '',
+    splits: runSplits(s, entry.maxHr),
+    elev: elevationStats(s),
+    zones: hrZones(s, entry.maxHr),
+  };
+}
+
 const runEntries = computed(() => {
   const pools = watchRuns.value.slice();
   const used = new Set();
@@ -694,16 +826,16 @@ const runEntries = computed(() => {
       return other != null && Math.abs(other - start) <= 120000;
     });
     if (hit) used.add(hit);
-    return {
+    return decorateRun({
       ...w,
       route: hit ? buildRunRoute(hit.path) : null,
       samples: hit?.samples || null,
       watchOnly: false,
-    };
+    });
   });
   pools.forEach((x) => {
     if (used.has(x)) return;
-    rows.push({
+    rows.push(decorateRun({
       start: x.start,
       end: x.end,
       day: x.day,
@@ -713,37 +845,15 @@ const runEntries = computed(() => {
       route: buildRunRoute(x.path),
       samples: x.samples || null,
       watchOnly: true,
-    });
+    }));
   });
   return rows.sort((a, b) => String(b.start || '').localeCompare(String(a.start || '')));
 });
 
-/** 采样数组 → SVG 折线。缺测的点直接断开，不要连成直线。 */
-function samplePath(values, tArr, { width = 240, height = 64, pad = 4 } = {}) {
-  if (!Array.isArray(values) || !Array.isArray(tArr) || values.length < 2) return '';
-  const nums = values.filter((v) => v != null);
-  if (nums.length < 2) return '';
-  const lo = Math.min(...nums);
-  const hi = Math.max(...nums);
-  const span = hi - lo || 1;
-  const tMax = tArr[tArr.length - 1] || 1;
-  const pts = [];
-  for (let i = 0; i < values.length; i += 1) {
-    const v = values[i];
-    pts.push(v == null ? null : [
-      pad + ((tArr[i] || 0) / tMax) * (width - pad * 2),
-      height - pad - ((v - lo) / span) * (height - pad * 2),
-    ]);
-  }
-  let d = '';
-  let pen = false;
-  pts.forEach((p) => {
-    if (!p) { pen = false; return; }
-    d += `${pen ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`;
-    pen = true;
-  });
-  return d;
-}
+/** MOTION 顶部那张「最近一跑」：挑最近的、且有手表轨迹或曲线的那条。 */
+const latestRun = computed(() => runEntries.value.find(
+  (w) => w.route || w.samples,
+) || runEntries.value[0] || null);
 
 function sampleRange(values) {
   const nums = (values || []).filter((v) => v != null);
@@ -751,12 +861,65 @@ function sampleRange(values) {
   return { lo: Math.min(...nums), hi: Math.max(...nums) };
 }
 
-/** 速度（m/s）→ 配速（秒/公里）。站着的点（<0.5 m/s）算缺测，别画成 30 分配速。 */
-function paceSeries(samples) {
-  if (!Array.isArray(samples?.v)) return null;
-  const out = samples.v.map((v) => (v != null && v > 0.5 ? 1000 / v : null));
-  return out.some((v) => v != null) ? out : null;
+/** 跑步卡片底部那排指标。缺的项直接不出现，不显示一堆「—」。 */
+function runStatList(w) {
+  const out = [];
+  const push = (label, value) => {
+    if (value == null || value === '') return;
+    out.push({ label, value });
+  };
+  push('DISTANCE', w.km != null ? `${Number(w.km).toFixed(2)} KM` : null);
+  push('TIME', w.minutes ? minutesLabel(w.minutes) : null);
+  const paceS = w.paceS || (w.km && w.minutes ? (w.minutes * 60) / w.km : null);
+  push('PACE', paceS ? paceLabel(paceS) : null);
+  push('AVG HR', w.avgHr != null ? `${Math.round(w.avgHr)} BPM` : null);
+  push('MAX HR', w.maxHr != null ? `${Math.round(w.maxHr)} BPM` : null);
+  const ascent = w.elev?.ascentM ?? w.ascentM;
+  push('ASCENT', ascent != null ? `${ascent} M` : null);
+  push('DESCENT', w.elev?.descentM != null ? `${w.elev.descentM} M` : null);
+  const g = sampleRange(w.gradeArr);
+  if (g) push('GRADE', `${g.lo > 0 ? '+' : ''}${g.lo.toFixed(0)}% … ${g.hi > 0 ? '+' : ''}${g.hi.toFixed(0)}%`);
+  push('CADENCE', w.cadence ? `${Math.round(w.cadence)} SPM` : null);
+  push('CALORIES', w.calories != null ? `${Math.round(w.calories)} KCAL` : null);
+  push('TRAINING EFFECT', w.trainingEffect != null ? String(w.trainingEffect) : null);
+  push('RECOVERY', w.recoveryHours != null ? `${w.recoveryHours} H` : null);
+  push('VO2MAX', w.vo2max != null ? String(w.vo2max) : null);
+  return out;
 }
+
+// 点开一块图表 → 放大看。图表本身已经是 SVG，放大只是换一个更大的容器，
+// 路径不用重算（stroke 用的是 non-scaling-stroke）。
+const zoomChart = ref(null);
+
+function openZoom(entry, kind) {
+  if (!entry) return;
+  zoomChart.value = { entry, kind };
+  document.body.classList.add('no-scroll');
+}
+
+function closeZoom() {
+  zoomChart.value = null;
+  if (!runsOpen.value) document.body.classList.remove('no-scroll');
+}
+
+const zoomPath = computed(() => {
+  const z = zoomChart.value;
+  if (!z || z.kind === 'route') return '';
+  if (z.kind === 'hr') return z.entry.hrPath;
+  if (z.kind === 'pace') return z.entry.pacePath;
+  if (z.kind === 'alt') return z.entry.altPath;
+  if (z.kind === 'grade') return z.entry.gradePath;
+  return '';
+});
+
+const zoomLabel = computed(() => {
+  const z = zoomChart.value;
+  if (!z) return '';
+  const map = {
+    route: 'ROUTE', hr: 'HEART RATE', pace: 'PACE', alt: 'ELEVATION', grade: 'GRADE',
+  };
+  return `${map[z.kind] || ''} · ${fullDay(z.entry.day)}`;
+});
 
 // ── 实时状态（来自 LifeNow 的 /api/life/now 快照） ─────────────────────
 function liveAge(value) {
@@ -1221,6 +1384,13 @@ const weekdayRows = computed(() => {
   });
 });
 
+// 副标题里的天数必须是真的样本量：星期轮廓按 30 天窗口统计，
+// 写死 7D 会让人以为只有一周。
+const weekdayDays = computed(() => payloads.value.filter((p) => {
+  const dims = p.dimensions || p.categories;
+  return dims && !Number.isNaN(new Date(`${p.day}T00:00:00Z`).getTime());
+}).length);
+
 const weekdayChips = computed(() => {
   const valid = weekdayRows.value.filter((d) => d.total != null);
   const busiest = [...valid].sort((a, b) => b.total - a.total)[0];
@@ -1273,6 +1443,15 @@ const dayView = computed(() => {
       }))
     : [];
 
+  // 桌面应用（小时）和浏览站点（分钟）都在聚合里，不额外拉 raw events。
+  // 这里不截断：单日详情就是「完整列表」，聚合侧也已放宽到当天全部条目。
+  const desktopApps = p.topApps?.length ? pairRows(p.topApps, 1) : [];
+  const sites = p.topSites?.length ? pairRows(p.topSites, 1) : [];
+
+  const workouts = Array.isArray(p.workouts)
+    ? p.workouts.filter((w) => w && w.start)
+    : [];
+
   const h = p.health;
   const healthRows = h ? [
     h.steps != null && ['STEPS', fmt(h.steps)],
@@ -1301,6 +1480,9 @@ const dayView = computed(() => {
     row,
     payload: p,
     categories,
+    desktopApps,
+    sites,
+    workouts,
     healthRows,
     districts,
     phoneApps,
@@ -1327,7 +1509,59 @@ function closeDay() {
   }
 }
 
+// ── 今日卡片的分类详情 ────────────────────────────────────────────────
+// 和单日详情是两条路：
+//   点 TODAY 的卡（desktop / phone / ai）→ 只看这一类，但列全，不截断
+//   点任意一天的柱子                    → 那一天的**全部**数据源
+// 两者互斥，且共用 body 的 no-scroll 锁。
+const detailKind = ref('');
+let detailLocked = false;
+let detailReturnFocus = null;
+
+function openTodayDetail(kind) {
+  if (!kind) return;
+  closeDay();
+  detailReturnFocus = document.activeElement;
+  detailKind.value = kind;
+  if (!document.body.classList.contains('no-scroll')) {
+    detailLocked = true;
+    document.body.classList.add('no-scroll');
+  }
+}
+
+function closeDetail() {
+  if (!detailKind.value) return;
+  detailKind.value = '';
+  if (detailLocked) {
+    detailLocked = false;
+    document.body.classList.remove('no-scroll');
+  }
+  // 关掉之后把焦点送回打开它的那张卡；卡片可能已经被轮询重渲染掉。
+  if (detailReturnFocus && document.contains(detailReturnFocus)) {
+    detailReturnFocus.focus();
+  }
+  detailReturnFocus = null;
+}
+
 const runsFetching = ref(false);
+
+// 最近几跑的轨迹要提前拉：MOTION 顶部的路线缩略图在 PLACES 地图之前，
+// 等地图那套「离视口 700px 再拉」的时机，缩略图会先空着好一会儿。
+const warmedRunDays = new Set();
+async function warmLatestRuns() {
+  if (!activeNow) return;
+  const days = [...new Set(
+    watchSummary.value.workouts.slice(0, 4).map((w) => w.day),
+  )].filter((d) => d && !watchRunsByDay.value[d] && !warmedRunDays.has(d));
+  if (!days.length) return;
+  days.forEach((d) => warmedRunDays.add(d));
+  try {
+    collectWatchRuns(await loadLifeTracks(days, { base: CMS_BASE, concurrency: 3 }));
+  } catch {
+    // 失败就交给 openRuns 再试，别让这里反复重发
+    days.forEach((d) => warmedRunDays.delete(d));
+  }
+}
 
 async function openRuns() {
   if (!watchSummary.value.workouts.length) return;
@@ -1352,11 +1586,21 @@ async function openRuns() {
 function closeRuns() {
   if (!runsOpen.value) return;
   runsOpen.value = false;
+  zoomChart.value = null;
   document.body.classList.remove('no-scroll');
 }
 
 function onDayKey(e) {
   if (e.key !== 'Escape') return;
+  // 放大层在最上面，Esc 先收它，别把整个弹窗一起关掉
+  if (zoomChart.value) {
+    closeZoom();
+    return;
+  }
+  if (detailKind.value) {
+    closeDetail();
+    return;
+  }
   closeDay();
   closeRuns();
 }
@@ -1366,6 +1610,21 @@ watch(colorMode, (v) => {
     localStorage.setItem('lifeColorMode', v ? '1' : '0');
   } catch {
     /* 存不了就只在本次会话生效 */
+  }
+});
+
+// 「最近一跑」这一块自己的配色开关，跟整页的 colorMode 互不影响
+const runColor = ref(false);
+try {
+  runColor.value = localStorage.getItem('lifeRunColor') === '1';
+} catch {
+  /* 隐私模式下 localStorage 可能不可用 */
+}
+watch(runColor, (v) => {
+  try {
+    localStorage.setItem('lifeRunColor', v ? '1' : '0');
+  } catch {
+    /* 同上 */
   }
 });
 
@@ -1576,6 +1835,35 @@ async function prefetchArchive(kind) {
 }
 
 
+// 长窗口（年 / 完整）只在拿到首屏数据后补一次，不拖慢首屏；
+// 失败时 5 分钟内不重试，雷达退回 30 天数据。
+let radarCtl = null;
+let radarTriedAt = 0;
+
+async function loadRadarWindow() {
+  if (radarData.value) return;
+  const now = Date.now();
+  if (now - radarTriedAt < 5 * 60 * 1000) return;
+  radarTriedAt = now;
+
+  if (radarCtl) radarCtl.abort();
+  radarCtl = new AbortController();
+  try {
+    // Worker 最多给 400 天；多要的部分会被截断，雷达按实际拿到的天数标注。
+    const res = await fetch(`${CMS_BASE}/api/life?days=365`, {
+      cache: 'no-store',
+      signal: radarCtl.signal,
+    });
+    if (!res.ok) return;
+    const json = await res.json();
+    if (Array.isArray(json.days) && json.days.length) radarData.value = json;
+  } catch (err) {
+    if (err?.name !== 'AbortError') {
+      /* 长历史失败不影响 30 天窗口 */
+    }
+  }
+}
+
 async function load() {
   if (abortCtl) abortCtl.abort();
   abortCtl = new AbortController();
@@ -1594,9 +1882,12 @@ async function load() {
     loading.value = false;
     lastUpdated.value = formatWhen(json.updatedAt || json.generatedAt);
     loadRawIndex();
+    // 首屏数据已经可用，长窗口在后台补；不 await，不挡入场动画。
+    loadRadarWindow();
 
     await nextTick();
     if (!activeNow) return;
+    warmLatestRuns();
     observeMap();
     if (!introStarted) {
       prepareCharts();
@@ -2039,6 +2330,7 @@ onBeforeUnmount(() => {
   activeNow = false;
   window.removeEventListener('keydown', onDayKey);
   closeDay();
+  closeDetail();
   stopPolling();
   stopClock();
   killIntro();
@@ -2048,6 +2340,7 @@ onBeforeUnmount(() => {
   teardownMap();
   if (stopBrandWatch) stopBrandWatch();
   if (abortCtl) abortCtl.abort();
+  if (radarCtl) radarCtl.abort();
 });
 </script>
 
@@ -2105,7 +2398,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="loading" class="stats-loading life-loading" aria-label="Loading life data">
-        <span v-for="n in 5" :key="n"></span>
+        <span v-for="n in 6" :key="n"></span>
       </div>
 
       <div v-else-if="error" class="stats-empty">
@@ -2127,9 +2420,29 @@ onBeforeUnmount(() => {
         <!-- 现在在干嘛（独立轮询 /api/life/now） -->
         <LifeNow @snapshot="onNowSnapshot" />
 
+        <!-- 今日统计：桌面 / 手机 / AI，跟随页面的 /api/life 轮询 -->
+        <LifeToday
+          :day="todayRef"
+          :payload="todayPayload"
+          :color-mode="colorMode"
+          :updated="lastUpdated"
+          @open="openTodayDetail"
+        />
+
         <!-- KPI -->
         <div class="stats-cards life-cards">
-          <article v-for="(card, i) in kpis" :key="card.key" class="stat-card">
+          <article
+            v-for="(card, i) in kpis"
+            :key="card.key"
+            class="stat-card"
+            :class="{ 'is-openable': card.key === 'screen' }"
+            :role="card.key === 'screen' ? 'button' : undefined"
+            :tabindex="card.key === 'screen' ? 0 : undefined"
+            :aria-label="card.key === 'screen' ? 'Open screen-on time details' : undefined"
+            @click="card.key === 'screen' && openTodayDetail('screen')"
+            @keydown.enter.prevent="card.key === 'screen' && openTodayDetail('screen')"
+            @keydown.space.prevent="card.key === 'screen' && openTodayDetail('screen')"
+          >
             <div class="stat-card-head">
               <span class="stat-index">{{ String(i + 1).padStart(2, '0') }}</span>
               <span class="stat-eyebrow">{{ card.label }}</span>
@@ -2149,15 +2462,35 @@ onBeforeUnmount(() => {
 
             <div class="stat-card-foot">
               <span class="stat-note">{{ card.note }}</span>
+              <span v-if="card.key === 'screen'" class="stat-trend stat-open">
+                VIEW <i aria-hidden="true">→</i>
+              </span>
             </div>
           </article>
         </div>
 
-        <!-- 00 神经网络大脑（交互 3D） -->
-        <div class="stats-panel life-panel life-brain-panel" data-reveal>
+        <!-- 00 七维雷达：桌面 + GPS + 手表 + 手机的七个维度（Other 不算） -->
+        <div class="stats-panel life-panel life-radar-panel" data-reveal data-chart="radar">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
               <span class="stats-panel-index">00</span>
+              <h2>SEVEN-DIMENSION PROFILE</h2>
+            </div>
+            <span class="stats-panel-sub">DAY / 7D / 30D / YEAR · TOTAL HOURS · OTHER EXCLUDED</span>
+          </div>
+          <LifeRadar
+            v-model:focus-day="radarFocusDay"
+            :rows="radarRows"
+            :color-mode="colorMode"
+            :cms-base="CMS_BASE"
+          />
+        </div>
+
+        <!-- 01 神经网络（交互 3D） -->
+        <div class="stats-panel life-panel life-brain-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">01</span>
               <h2>NEURAL CORE</h2>
             </div>
             <div class="stats-panel-head-right">
@@ -2168,18 +2501,20 @@ onBeforeUnmount(() => {
             :rows="rows"
             :color-mode="colorMode"
             :reduced="REDUCED"
+            :focus-day="radarFocusDay"
+            @focus-day="radarFocusDay = $event"
             @select-day="openDay"
           />
         </div>
 
-        <!-- 01 每日节奏 -->
+        <!-- 02 每日节奏 -->
         <div class="stats-panel life-panel" data-reveal data-chart="rhythm">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">01</span>
+              <span class="stats-panel-index">02</span>
               <h2>DAILY RHYTHM</h2>
             </div>
-            <span class="stats-panel-sub">7D · DESKTOP + GPS + WATCH + PHONE</span>
+            <span class="stats-panel-sub">{{ rhythmRows.length }}D · DESKTOP + GPS + WATCH + PHONE</span>
             <div class="stats-legend">
               <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
                 <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
@@ -2244,7 +2579,7 @@ onBeforeUnmount(() => {
                       <span class="stats-tip-date">{{ rhythmHoverRow ? fullDay(rhythmHoverRow.day) : '' }}<template v-if="rhythmHoverRow?.isToday"> · SO FAR</template></span>
                       <span class="stats-tip-row">
                         <b>{{ rhythmHoverRow?.total == null ? '—' : hoursLabel(rhythmHoverRow.total) }}</b>
-                        <em>7D TOTAL</em>
+                        <em>DAY TOTAL</em>
                       </span>
                       <span
                         v-for="s in (rhythmHoverRow?.segments || []).slice(0, 4)"
@@ -2284,11 +2619,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No desktop activity recorded yet.</p>
         </div>
 
-        <!-- 02 运动 -->
+        <!-- 03 运动 -->
         <div class="stats-panel life-panel" data-reveal data-chart="motion">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">02</span>
+              <span class="stats-panel-index">03</span>
               <h2>MOTION</h2>
             </div>
             <div class="stats-legend">
@@ -2299,6 +2634,144 @@ onBeforeUnmount(() => {
           </div>
 
           <div v-if="motionRows.length" class="life-chart">
+            <!-- 最近一跑：MOTION 的主视觉。数据来自 GPX/FIT（路线 + 逐秒曲线）
+                 和 Gadgetbridge 数据库（步频 / 卡路里 / 训练效果）。
+                 每块图都能点开：弹窗里再点一次就是放大。 -->
+            <section v-if="latestRun" class="life-latest" :class="{ 'is-run-color': runColor }">
+              <div class="life-latest-head">
+                <div class="life-latest-title">
+                  <span class="life-latest-kicker">LATEST RUN</span>
+                  <h3>{{ latestRun.name || 'RUN' }}</h3>
+                  <span class="life-latest-when">
+                    {{ fullDay(latestRun.day) }} · {{ isoHhmm(latestRun.start) }}
+                    <template v-if="latestRun.watchOnly"> · WATCH FILE ONLY</template>
+                  </span>
+                </div>
+                <div class="life-latest-numbers">
+                  <strong>
+                    {{ latestRun.km != null ? Number(latestRun.km).toFixed(2) : '—' }}<small>KM</small>
+                  </strong>
+                  <strong>
+                    {{ latestRun.minutes ? minutesLabel(latestRun.minutes) : '—' }}
+                  </strong>
+                  <strong>
+                    {{ latestRun.paceS ? paceLabel(latestRun.paceS)
+                      : (latestRun.km && latestRun.minutes ? paceLabel((latestRun.minutes * 60) / latestRun.km) : '—') }}
+                  </strong>
+                </div>
+                <div class="life-latest-actions">
+                  <!-- 这块单独配色：和整页的 COLOR 互不影响，只看这一跑的路线/曲线 -->
+                  <button
+                    type="button"
+                    class="life-latest-color"
+                    :class="{ 'is-on': runColor }"
+                    :aria-pressed="runColor"
+                    @click="runColor = !runColor"
+                  >
+                    <span class="life-color-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                    {{ runColor ? 'COLOR ON' : 'COLOR' }}
+                  </button>
+                  <button type="button" class="life-latest-open" @click="openRuns">
+                    FULL DETAIL <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 路线占左边一大块（和下面的 HEART RATE 大卡片同一量级），
+                   右侧竖排四条曲线：心率 / 配速 / 海拔 / 坡度。 -->
+              <div class="life-latest-body">
+                <button
+                  type="button"
+                  class="life-latest-chart is-zoomable is-route"
+                  :disabled="!latestRun.route"
+                  aria-label="Enlarge route"
+                  @click="openZoom(latestRun, 'route')"
+                >
+                  <span class="life-run-chart-label">ROUTE</span>
+                  <svg
+                    v-if="latestRun.route"
+                    class="life-run-route"
+                    :viewBox="`0 0 ${latestRun.route.width} ${latestRun.route.height}`"
+                    preserveAspectRatio="xMidYMid meet"
+                    aria-hidden="true"
+                  >
+                    <path :d="latestRun.route.d" class="life-run-route-line" />
+                    <circle :cx="latestRun.route.start.x" :cy="latestRun.route.start.y" r="2.6" class="life-run-route-dot is-start" />
+                    <circle :cx="latestRun.route.end.x" :cy="latestRun.route.end.y" r="2.6" class="life-run-route-dot is-end" />
+                  </svg>
+                  <span v-else class="life-run-chart-empty">NO ROUTE</span>
+                </button>
+
+                <div class="life-latest-strips">
+                  <button
+                    v-if="latestRun.hrPath"
+                    type="button"
+                    class="life-latest-chart is-zoomable is-hr"
+                    aria-label="Enlarge heart rate"
+                    @click="openZoom(latestRun, 'hr')"
+                  >
+                    <span class="life-run-chart-label">
+                      HEART RATE
+                      <b v-if="sampleRange(latestRun.samples?.hr)">
+                        {{ sampleRange(latestRun.samples.hr).lo }}–{{ sampleRange(latestRun.samples.hr).hi }}
+                      </b>
+                    </span>
+                    <svg class="life-run-curve" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="latestRun.hrPath" />
+                    </svg>
+                  </button>
+
+                  <button
+                    v-if="latestRun.pacePath"
+                    type="button"
+                    class="life-latest-chart is-zoomable is-pace"
+                    aria-label="Enlarge pace"
+                    @click="openZoom(latestRun, 'pace')"
+                  >
+                    <span class="life-run-chart-label">PACE</span>
+                    <svg class="life-run-curve is-pace" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="latestRun.pacePath" />
+                    </svg>
+                  </button>
+
+                  <button
+                    v-if="latestRun.altPath"
+                    type="button"
+                    class="life-latest-chart is-zoomable is-alt"
+                    aria-label="Enlarge elevation"
+                    @click="openZoom(latestRun, 'alt')"
+                  >
+                    <span class="life-run-chart-label">
+                      ELEVATION
+                      <b v-if="latestRun.elev">{{ Math.round(latestRun.elev.lo) }}–{{ Math.round(latestRun.elev.hi) }} M</b>
+                    </span>
+                    <svg class="life-run-curve is-alt" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="latestRun.altPath" />
+                    </svg>
+                  </button>
+
+                  <button
+                    v-if="latestRun.gradePath"
+                    type="button"
+                    class="life-latest-chart is-zoomable is-grade"
+                    aria-label="Enlarge grade"
+                    @click="openZoom(latestRun, 'grade')"
+                  >
+                    <span class="life-run-chart-label">GRADE</span>
+                    <svg class="life-run-curve is-grade" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="latestRun.gradePath" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="life-latest-stats">
+                <span v-for="s in runStatList(latestRun)" :key="s.label">
+                  <em>{{ s.label }}</em><b>{{ s.value }}</b>
+                </span>
+              </div>
+            </section>
+
             <!-- 手表数据并入 MOTION：大爱心 + 心率 + 跑步 / 步数 -->
             <div v-if="watchSummary.stepDays || watchSummary.hrDays" class="life-motion-watch">
               <div class="life-heart-hero">
@@ -2384,14 +2857,19 @@ onBeforeUnmount(() => {
                   <b>
                     {{ watchSummary.latestRunKm != null ? Number(watchSummary.latestRunKm).toFixed(1) : '—' }}<small>km</small>
                   </b>
+                  <!-- 只留一行概要：这格文案多一行，六格的等高行就整体抬高，
+                       STEPS 那边多出一片空白。 -->
                   <em v-if="watchSummary.latestRunDay">
                     {{ watchSummary.latestRunAge }} · {{ fullDay(watchSummary.latestRunDay) }}
-                    · {{ watchSummary.latestRunRuns ? Math.round(watchSummary.latestRunRuns) : '—' }} runs
-                    · {{ watchSummary.latestRunMinutes ? minutesLabel(watchSummary.latestRunMinutes) : '—' }}
-                    · {{ watchSummary.latestRunPace ? paceLabel(watchSummary.latestRunPace) : '—' }}
-                  </em>
-                  <em v-if="watchSummary.runs != null">
-                    WINDOW · {{ Number(watchSummary.km || 0).toFixed(1) }} km · {{ Math.round(watchSummary.runs) }} runs
+                    <template v-if="watchSummary.latestRunRuns">
+                      · {{ Math.round(watchSummary.latestRunRuns) }} RUNS
+                    </template>
+                    <template v-if="watchSummary.latestRunMinutes">
+                      · {{ minutesLabel(watchSummary.latestRunMinutes) }}
+                    </template>
+                    <template v-if="watchSummary.latestRunPace">
+                      · {{ paceLabel(watchSummary.latestRunPace) }}
+                    </template>
                   </em>
                   <em class="life-watch-run-more">VIEW RUNS →</em>
                 </div>
@@ -2668,11 +3146,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No health data recorded yet.</p>
         </div>
 
-        <!-- 03 地点：区级时长 + 轨迹地图 -->
+        <!-- 04 地点：区级时长 + 轨迹地图 -->
         <div class="stats-panel life-panel" data-reveal data-chart="places">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">03</span>
+              <span class="stats-panel-index">04</span>
               <h2>PLACES</h2>
             </div>
             <span class="stats-panel-sub">
@@ -2957,11 +3435,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No location data recorded yet.</p>
         </div>
 
-        <!-- 04 手机 -->
+        <!-- 05 手机 -->
         <div class="stats-panel life-panel" data-reveal data-chart="phone">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">04</span>
+              <span class="stats-panel-index">05</span>
               <h2>PHONE</h2>
             </div>
             <div class="stats-legend">
@@ -3066,11 +3544,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No phone data recorded yet.</p>
         </div>
 
-        <!-- 05 AI 花费 -->
+        <!-- 06 AI 花费 -->
         <div class="stats-panel life-panel" data-reveal data-chart="ai">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">05</span>
+              <span class="stats-panel-index">06</span>
               <h2>AI SPEND</h2>
             </div>
             <div class="stats-panel-head-right">
@@ -3180,14 +3658,14 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No AI spend recorded in this window.</p>
         </div>
 
-        <!-- 06 星期轮廓 -->
+        <!-- 07 星期轮廓 -->
         <div class="stats-panel life-panel" data-reveal data-chart="weekday">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">06</span>
+              <span class="stats-panel-index">07</span>
               <h2>WEEKDAY PROFILE</h2>
             </div>
-            <span class="stats-panel-sub">7D · DESKTOP + GPS + WATCH + PHONE</span>
+            <span class="stats-panel-sub">{{ weekdayDays }}D · AVERAGE PER WEEKDAY · DESKTOP + GPS + WATCH + PHONE</span>
             <div class="stats-legend">
               <span v-for="c in rhythmLegend" :key="c.name" :class="{ 'is-zero': c.zero }">
                 <i class="life-swatch" :class="`cat-${c.index}`"></i>{{ c.name }}
@@ -3242,11 +3720,11 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 07 归档：全量原始数据 -->
+        <!-- 08 归档：全量原始数据 -->
         <div class="stats-panel life-panel life-archive-panel" data-reveal>
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">07</span>
+              <span class="stats-panel-index">08</span>
               <h2>THE ARCHIVE</h2>
             </div>
             <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>
@@ -3362,10 +3840,70 @@ onBeforeUnmount(() => {
                     </div>
                   </section>
 
+                  <section
+                    v-if="dayView.desktopApps.length || dayView.sites.length"
+                    class="life-day-block"
+                  >
+                    <h4>DESKTOP</h4>
+
+                    <h5 v-if="dayView.desktopApps.length">
+                      APPLICATIONS · {{ dayView.desktopApps.length }}
+                    </h5>
+                    <div v-for="a in dayView.desktopApps" :key="a.name" class="life-day-row">
+                      <span class="life-rank">{{ a.rank }}</span>
+                      <span class="life-name">{{ a.name }}</span>
+                      <span class="life-num">{{ hoursLabel(a.value) }}</span>
+                      <span class="life-track">
+                        <span
+                          class="life-fill"
+                          :style="{
+                            width: a.pct + '%',
+                            background: colorMode ? 'var(--cat-0)' : null,
+                          }"
+                        ></span>
+                      </span>
+                    </div>
+
+                    <h5 v-if="dayView.sites.length">SITES · {{ dayView.sites.length }}</h5>
+                    <div v-for="s in dayView.sites" :key="s.name" class="life-day-row">
+                      <span class="life-rank">{{ s.rank }}</span>
+                      <span class="life-name">{{ s.name }}</span>
+                      <span class="life-num">{{ minutesLabel(s.value) }}</span>
+                      <span class="life-track">
+                        <span
+                          class="life-fill"
+                          :style="{
+                            width: s.pct + '%',
+                            background: colorMode ? 'var(--cat-2)' : null,
+                          }"
+                        ></span>
+                      </span>
+                    </div>
+                  </section>
+
                   <section v-if="dayView.healthRows.length" class="life-day-block">
                     <h4>HEALTH</h4>
                     <div v-for="r in dayView.healthRows" :key="r[0]" class="life-day-kv-row">
                       <span>{{ r[0] }}</span><b>{{ r[1] }}</b>
+                    </div>
+                  </section>
+
+                  <section v-if="dayView.workouts.length" class="life-day-block">
+                    <h4>WORKOUTS · {{ dayView.workouts.length }}</h4>
+                    <div v-for="(w, i) in dayView.workouts" :key="i" class="life-day-workout">
+                      <div class="life-day-workout-head">
+                        <span>{{ formatTime(w.start) }} · {{ w.name || 'WORKOUT' }}</span>
+                        <b>{{ w.km != null ? `${Number(w.km).toFixed(2)} KM` : '—' }}</b>
+                      </div>
+                      <div class="life-day-workout-meta">
+                        <span v-if="w.minutes != null">{{ minutesLabel(w.minutes) }}</span>
+                        <span v-if="w.paceS != null">{{ paceLabel(w.paceS) }}</span>
+                        <span v-if="w.avgHr != null">
+                          HR {{ Math.round(w.avgHr) }}<template v-if="w.maxHr != null">–{{ Math.round(w.maxHr) }}</template>
+                        </span>
+                        <span v-if="w.ascentM != null">{{ Math.round(w.ascentM) }} M ↑</span>
+                        <span v-if="w.calories != null">{{ Math.round(w.calories) }} KCAL</span>
+                      </div>
                     </div>
                   </section>
 
@@ -3456,7 +3994,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <p class="life-day-foot">
-                  Aggregated snapshot · raw events, window titles and coordinates live in THE ARCHIVE
+                  Aggregated snapshot · full URLs, page titles and coordinates live in THE ARCHIVE
                 </p>
               </div>
             </template>
@@ -3469,13 +4007,23 @@ onBeforeUnmount(() => {
       </Transition>
     </Teleport>
 
+    <!-- 今日卡片的分类详情：只看桌面 / 手机 / AI 其中一类，列全不截断 -->
+    <LifeDetailModal
+      :kind="detailKind"
+      :day="todayRef"
+      :payload="todayPayload"
+      :screen="screenTotals"
+      :color-mode="colorMode"
+      @close="closeDetail"
+    />
+
     <!-- 跑步详情：点 MOTION 里的 RUNNING 卡打开 -->
     <Teleport to="body">
       <Transition name="life-day">
         <div v-if="runsOpen" class="life-day-backdrop" @click.self="closeRuns">
           <div
             class="life-day-modal life-runs-modal"
-            :class="{ 'is-color': colorMode }"
+            :class="{ 'is-color': colorMode, 'is-run-color': runColor }"
             role="dialog"
             aria-modal="true"
             aria-label="Running details"
@@ -3520,8 +4068,18 @@ onBeforeUnmount(() => {
                   <span v-if="w.watchOnly" class="life-run-modal-tag">WATCH FILE ONLY</span>
                 </div>
 
-                <div v-if="w.route || w.samples" class="life-run-modal-charts">
-                  <div class="life-run-chart">
+                <div
+                  v-if="w.route || w.samples"
+                  class="life-run-modal-charts"
+                  :class="{ 'is-route': !!w.route }"
+                >
+                  <button
+                    type="button"
+                    class="life-run-chart is-zoomable is-route"
+                    :disabled="!w.route"
+                    aria-label="Enlarge route"
+                    @click="openZoom(w, 'route')"
+                  >
                     <span class="life-run-chart-label">ROUTE</span>
                     <svg
                       v-if="w.route"
@@ -3535,9 +4093,15 @@ onBeforeUnmount(() => {
                       <circle :cx="w.route.end.x" :cy="w.route.end.y" r="2.6" class="life-run-route-dot is-end" />
                     </svg>
                     <span v-else class="life-run-chart-empty">NO ROUTE</span>
-                  </div>
+                  </button>
 
-                  <div v-if="w.samples?.hr" class="life-run-chart">
+                  <button
+                    v-if="w.samples?.hr"
+                    type="button"
+                    class="life-run-chart is-zoomable is-hr"
+                    aria-label="Enlarge heart rate"
+                    @click="openZoom(w, 'hr')"
+                  >
                     <span class="life-run-chart-label">
                       HEART RATE
                       <b v-if="sampleRange(w.samples.hr)">
@@ -3546,36 +4110,111 @@ onBeforeUnmount(() => {
                       BPM
                     </span>
                     <svg class="life-run-curve" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
-                      <path :d="samplePath(w.samples.hr, w.samples.t)" />
+                      <path :d="w.hrPath" />
                     </svg>
-                  </div>
+                  </button>
                 </div>
 
-                <div v-if="paceSeries(w.samples) || w.samples?.alt" class="life-run-modal-charts is-second">
-                  <div v-if="paceSeries(w.samples)" class="life-run-chart">
+                <div v-if="w.pacePath || w.altPath" class="life-run-modal-charts is-second">
+                  <button
+                    v-if="w.pacePath"
+                    type="button"
+                    class="life-run-chart is-zoomable is-pace"
+                    aria-label="Enlarge pace"
+                    @click="openZoom(w, 'pace')"
+                  >
                     <span class="life-run-chart-label">
                       PACE
-                      <template v-if="sampleRange(paceSeries(w.samples))">
-                        {{ paceLabel(sampleRange(paceSeries(w.samples)).lo) }} –
-                        {{ paceLabel(sampleRange(paceSeries(w.samples)).hi) }}
+                      <template v-if="sampleRange(w.paceArr)">
+                        {{ paceLabel(sampleRange(w.paceArr).lo) }} –
+                        {{ paceLabel(sampleRange(w.paceArr).hi) }}
                       </template>
                     </span>
                     <svg class="life-run-curve is-pace" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
-                      <path :d="samplePath(paceSeries(w.samples), w.samples.t)" />
+                      <path :d="w.pacePath" />
                     </svg>
-                  </div>
+                  </button>
 
-                  <div v-if="w.samples?.alt" class="life-run-chart">
+                  <button
+                    v-if="w.altPath"
+                    type="button"
+                    class="life-run-chart is-zoomable is-alt"
+                    aria-label="Enlarge elevation"
+                    @click="openZoom(w, 'alt')"
+                  >
                     <span class="life-run-chart-label">
                       ELEVATION
-                      <b v-if="sampleRange(w.samples.alt)">
-                        {{ Math.round(sampleRange(w.samples.alt).lo) }}–{{ Math.round(sampleRange(w.samples.alt).hi) }}
-                      </b>
-                      M
+                      <b v-if="w.elev">{{ Math.round(w.elev.lo) }}–{{ Math.round(w.elev.hi) }} M</b>
                     </span>
                     <svg class="life-run-curve is-alt" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
-                      <path :d="samplePath(w.samples.alt, w.samples.t)" />
+                      <path :d="w.altPath" />
                     </svg>
+                  </button>
+                </div>
+
+                <div v-if="w.gradePath" class="life-run-modal-charts is-second">
+                  <button
+                    type="button"
+                    class="life-run-chart is-zoomable is-wide is-grade"
+                    aria-label="Enlarge grade"
+                    @click="openZoom(w, 'grade')"
+                  >
+                    <span class="life-run-chart-label">
+                      GRADE
+                      <template v-if="sampleRange(w.gradeArr)">
+                        {{ sampleRange(w.gradeArr).lo.toFixed(1) }}% … {{ sampleRange(w.gradeArr).hi.toFixed(1) }}%
+                      </template>
+                    </span>
+                    <svg class="life-run-curve is-grade" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="w.gradePath" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- 分段配速：每 100 m / 500 m / 1 km 一段，最后不满一格的标 "PART" -->
+                <div v-if="w.splits?.splits?.length" class="life-run-splits">
+                  <div class="life-run-splits-head">
+                    <span>SPLITS · EVERY {{ w.splits.unitKm < 1 ? `${Math.round(w.splits.unitKm * 1000)} M` : `${w.splits.unitKm} KM` }}</span>
+                    <span v-if="w.elev">↑ {{ w.elev.ascentM }} M · ↓ {{ w.elev.descentM }} M</span>
+                  </div>
+                  <div class="life-run-splits-grid">
+                    <div class="life-run-split is-head" aria-hidden="true">
+                      <span>#</span><span>DIST</span><span>PACE</span><span>HR</span><span>GRADE</span>
+                    </div>
+                    <div
+                      v-for="sp in w.splits.splits"
+                      :key="sp.index"
+                      class="life-run-split"
+                      :class="{ 'is-partial': sp.partial }"
+                    >
+                      <span>{{ String(sp.index).padStart(2, '0') }}</span>
+                      <span>{{ sp.partial ? 'PART' : (w.splits.unitKm < 1 ? `${Math.round(sp.meters)} M` : `${w.splits.unitKm} KM`) }}</span>
+                      <span>{{ paceLabel(sp.paceS) }}</span>
+                      <span>{{ sp.avgHr != null ? Math.round(sp.avgHr) : '—' }}</span>
+                      <span>{{ sp.grade != null ? `${sp.grade > 0 ? '+' : ''}${sp.grade.toFixed(1)}%` : '—' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 心率区间：按本次最大心率切，不猜年龄 -->
+                <div v-if="w.zones" class="life-run-zones">
+                  <span class="life-run-zones-head">
+                    TIME IN ZONE · PEAK {{ Math.round(w.zones[0].peak) }} BPM
+                  </span>
+                  <div class="life-run-zones-bar" aria-hidden="true">
+                    <i
+                      v-for="z in w.zones"
+                      :key="z.label"
+                      :style="{ width: `${z.pct}%` }"
+                      :title="`${z.label} ${Math.round(z.seconds / 60)} min`"
+                    ></i>
+                  </div>
+                  <div class="life-run-zones-legend">
+                    <span v-for="z in w.zones" :key="z.label">
+                      <b>{{ z.label }}</b>
+                      <em>{{ zoneTimeLabel(z.seconds) }}</em>
+                      <i>{{ z.pct.toFixed(0) }}%</i>
+                    </span>
                   </div>
                 </div>
               </article>
@@ -3584,6 +4223,56 @@ onBeforeUnmount(() => {
               <p v-if="!runEntries.length" class="stats-panel-empty">
                 No individual workouts in this window yet.
               </p>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- 放大查看。图表本身是 SVG，这里只是换一个更大的容器；
+           路径不重算，stroke 靠 non-scaling-stroke 保持 1 像素级。 -->
+      <Transition name="life-zoom">
+        <div v-if="zoomChart" class="life-zoom-backdrop" @click.self="closeZoom">
+          <div
+            class="life-zoom-panel"
+            :class="{ 'is-route': zoomChart.kind === 'route', 'is-run-color': runColor }"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="zoomLabel"
+          >
+            <div class="life-zoom-head">
+              <span>{{ zoomLabel }}</span>
+              <button type="button" class="life-day-close" aria-label="Close" @click="closeZoom">
+                CLOSE <span aria-hidden="true">×</span>
+              </button>
+            </div>
+
+            <svg
+              v-if="zoomChart.kind === 'route' && zoomChart.entry.route"
+              class="life-zoom-chart is-route"
+              :viewBox="`0 0 ${zoomChart.entry.route.width} ${zoomChart.entry.route.height}`"
+              preserveAspectRatio="xMidYMid meet"
+              aria-hidden="true"
+            >
+              <path :d="zoomChart.entry.route.d" class="life-run-route-line" />
+              <circle :cx="zoomChart.entry.route.start.x" :cy="zoomChart.entry.route.start.y" r="1.6" class="life-run-route-dot is-start" />
+              <circle :cx="zoomChart.entry.route.end.x" :cy="zoomChart.entry.route.end.y" r="1.6" class="life-run-route-dot is-end" />
+            </svg>
+            <svg
+              v-else-if="zoomPath"
+              class="life-zoom-chart"
+              :class="`is-${zoomChart.kind}`"
+              viewBox="0 0 240 64"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path :d="zoomPath" />
+            </svg>
+            <p v-else class="stats-panel-empty">No data for this chart.</p>
+
+            <div class="life-zoom-foot">
+              <span>{{ zoomChart.entry.km != null ? Number(zoomChart.entry.km).toFixed(2) : '—' }} KM</span>
+              <span>{{ zoomChart.entry.minutes ? minutesLabel(zoomChart.entry.minutes) : '—' }}</span>
+              <span>{{ zoomChart.entry.avgHr != null ? `AVG HR ${Math.round(zoomChart.entry.avgHr)}` : '' }}</span>
             </div>
           </div>
         </div>

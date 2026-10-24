@@ -1,9 +1,10 @@
 <script setup>
-// LIFE 页的 3D 神经网络（Obsidian 图 / 量子纠缠风格）。
+// LIFE 页的 3D 规则神经元（8 条主树突 + 每天一颗节点）。
 //
-// 视觉：8 个分类枢纽 + 每天一颗节点，节点之间是发光细线；相似日之间连“纠缠”
-// 长弧，脉冲成对出现（一颗从 A 跑向 B，另一颗从 B 跑向 A）。
-// 数据映射见 data/lifeBrain.js。这里只管 three 场景、镜头和交互。
+// 视觉：胞体 + 8 条等角主树突，树突再规则分出末梢；每天一颗节点挂在末梢上，
+// 节点之间是发光细线，相似日之间连“纠缠”长弧，脉冲成对出现。
+// 两种形态（放射状 / 锥体）用左上角按钮切换，骨架由 data/lifeBrain.js 计算。
+// 这里只管 three 场景、镜头和交互。
 //
 // 镜头模型：相机始终围绕一个 target 做球面轨道（不是转模型）。
 //   · 点节点 → target 平移到节点、距离拉近，1.5s 缓动，形成“推镜”
@@ -16,18 +17,20 @@ import { setBlockCursorHot } from '../composables/useBlockCursor.js';
 import {
   BRAIN_COLOR,
   DAY_COLOR,
-  buildBrainCloud,
   buildBrainGraph,
   buildBrainModel,
+  buildNeuronScaffold,
 } from '../data/lifeBrain.js';
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
   colorMode: { type: Boolean, default: false },
   reduced: { type: Boolean, default: false },
+  // 与七维雷达联动：雷达当前选中的日期（YYYY-MM-DD）
+  focusDay: { type: String, default: '' },
 });
 
-const emit = defineEmits(['select-day']);
+const emit = defineEmits(['select-day', 'focus-day']);
 
 const { isDark } = useTheme();
 
@@ -41,6 +44,8 @@ const pointerVisible = ref(false);
 const status = ref('idle');
 const auto = ref(!props.reduced);
 const expanded = ref(false);
+// 规则神经元的两种形态：放射状 / 锥体，按钮切换
+const morph = ref('radial');
 const hover = ref(null); // node id
 const selected = ref(null); // node id
 const grabbing = ref(false);
@@ -124,7 +129,8 @@ let assembly = null;
 let graphGroup = null;
 let rigGroup = null;
 let coreGroup = null;
-let dust = null;
+let scaffoldLines = null;
+let spines = null;
 let edgeLines = null;
 let pulseSprites = [];
 let gyroA = null;
@@ -139,8 +145,8 @@ const metalMats = [];
 const inkMats = [];
 const nodeViews = new Map(); // id -> { node, sprite, core, proxy, baseScale, baseCoreScale, isCat }
 
-let cloud = null;
 let graph = null;
+let scaffold = null;
 let edgeData = [];
 let adjacency = new Map();
 let pulsePairs = [];
@@ -257,8 +263,8 @@ function makeGlowTexture() {
 }
 
 function buildScene() {
-  cloud = buildBrainCloud({ count: 680, seed: 20261018 });
-  graph = buildBrainGraph(props.rows, cloud);
+  scaffold = buildNeuronScaffold(morph.value);
+  graph = buildBrainGraph(props.rows, scaffold);
   graphNodes.value = graph.nodes;
   graphEdges.value = graph.edges;
   counts.value = { nodes: graph.nodes.length, edges: graph.edges.length };
@@ -276,7 +282,8 @@ function buildScene() {
   assembly.add(graphGroup, rigGroup);
   scene.add(assembly);
 
-  buildDust();
+  buildScaffoldVisual();
+  buildNeuronAccents();
   buildEdges();
   buildNodes();
   // 矢量圆环：放大到全屏也不会像贴图那样糊
@@ -300,18 +307,81 @@ function buildScene() {
   dirty = true;
 }
 
-function buildDust() {
-  // 脑壳只剩一层很暗的尘埃，负责剪影，不再抢节点的注意力
-  const pts = cloud.positions.filter((_, i) => i % 2 === 0);
-  const pos = new Float32Array(pts.length * 3);
-  pts.forEach((p, i) => pos.set(p, i * 3));
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  dust = new THREE.Points(
-    geo,
+function normalize3([x, y, z]) {
+  const n = Math.hypot(x, y, z) || 1;
+  return [x / n, y / n, z / n];
+}
+
+function mixPoint3(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+function basisFor(n) {
+  const helper = Math.abs(n[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const t1 = normalize3([
+    n[1] * helper[2] - n[2] * helper[1],
+    n[2] * helper[0] - n[0] * helper[2],
+    n[0] * helper[1] - n[1] * helper[0],
+  ]);
+  const t2 = [
+    n[1] * t1[2] - n[2] * t1[1],
+    n[2] * t1[0] - n[0] * t1[2],
+    n[0] * t1[1] - n[1] * t1[0],
+  ];
+  return [t1, t2];
+}
+
+function buildScaffoldVisual() {
+  // 神经元骨架：主干 + 末梢 + 轴突都画成细线，负责剪影
+  const segs = [];
+  const addLine = (points) => {
+    for (let i = 0; i < points.length - 1; i += 1) {
+      segs.push(points[i], points[i + 1]);
+    }
+  };
+  scaffold.branches.forEach((branch) => addLine(branch.points));
+  addLine(scaffold.axon);
+
+  const linePos = new Float32Array(segs.length * 3);
+  segs.forEach((p, i) => linePos.set(p, i * 3));
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+  scaffoldLines = new THREE.LineSegments(lineGeo, inkLineMaterial(0.30));
+  graphGroup.add(scaffoldLines);
+
+  // 树突小刺：沿每段骨架等距采点，用切线的正交基做规则波纹，
+  // 所以点云长成「一条枝」，而不是一团随机噪点。
+  const spinePts = [];
+  scaffold.branches.forEach((branch) => {
+    for (let i = 0; i < branch.points.length - 1; i += 1) {
+      const a = branch.points[i];
+      const b = branch.points[i + 1];
+      const dir = normalize3([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+      const [t1, t2] = basisFor(dir);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+      const n = Math.max(2, Math.round(len / 0.038));
+      for (let k = 0; k < n; k += 1) {
+        const base = mixPoint3(a, b, (k + 0.5) / n);
+        const ph = (k + i * 7) * 1.7;
+        const r = 0.013;
+        spinePts.push([
+          base[0] + t1[0] * Math.cos(ph) * r + t2[0] * Math.sin(ph) * r,
+          base[1] + t1[1] * Math.cos(ph) * r + t2[1] * Math.sin(ph) * r,
+          base[2] + t1[2] * Math.cos(ph) * r + t2[2] * Math.sin(ph) * r,
+        ]);
+      }
+    }
+  });
+
+  const spinePos = new Float32Array(spinePts.length * 3);
+  spinePts.forEach((p, i) => spinePos.set(p, i * 3));
+  const spineGeo = new THREE.BufferGeometry();
+  spineGeo.setAttribute('position', new THREE.BufferAttribute(spinePos, 3));
+  spines = new THREE.Points(
+    spineGeo,
     new THREE.PointsMaterial({
       map: glowTex,
-      size: 0.04,
+      size: 0.042,
       transparent: true,
       opacity: 0.7,
       depthWrite: false,
@@ -320,7 +390,61 @@ function buildDust() {
       blending: isDark.value ? THREE.AdditiveBlending : THREE.NormalBlending,
     }),
   );
-  graphGroup.add(dust);
+  graphGroup.add(spines);
+}
+
+function buildNeuronAccents() {
+  // 主干用细圆柱加粗：神经元的主树突要比数据连线更「实」
+  const trunkMat = inkSolidMaterial(0.5);
+  scaffold.branches
+    .filter((branch) => branch.role === 'trunk')
+    .forEach((branch) => {
+      for (let i = 0; i < branch.points.length - 1; i += 1) {
+        graphGroup.add(tubeBetween(branch.points[i], branch.points[i + 1], 0.011, trunkMat));
+      }
+    });
+  for (let i = 0; i < scaffold.axon.length - 1; i += 1) {
+    graphGroup.add(tubeBetween(scaffold.axon[i], scaffold.axon[i + 1], 0.008, trunkMat));
+  }
+
+  if (scaffold.morph === 'pyramidal') {
+    // 髓鞘：轴突被等距的金属鞘段包住
+    for (let i = 0; i < scaffold.axon.length - 1; i += 1) {
+      const a = scaffold.axon[i];
+      const b = scaffold.axon[i + 1];
+      const dir = normalize3([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+      const mid = mixPoint3(a, b, 0.5);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) * 0.62;
+      const sheath = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.026, 0.026, len, 10),
+        metalMaterial(),
+      );
+      sheath.position.set(mid[0], mid[1], mid[2]);
+      sheath.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(dir[0], dir[1], dir[2]),
+      );
+      graphGroup.add(sheath);
+    }
+    return;
+  }
+
+  // 放射状：每条末梢尖端一颗金属突触小结
+  const tips = [];
+  scaffold.anchors.forEach((a) => a.twigs.forEach((tw) => tips.push(tw[tw.length - 1])));
+  const beads = new THREE.InstancedMesh(
+    new THREE.SphereGeometry(0.016, 6, 5),
+    metalMaterial(),
+    tips.length,
+  );
+  const dummy = new THREE.Object3D();
+  tips.forEach((p, i) => {
+    dummy.position.set(p[0], p[1], p[2]);
+    dummy.updateMatrix();
+    beads.setMatrixAt(i, dummy.matrix);
+  });
+  beads.instanceMatrix.needsUpdate = true;
+  graphGroup.add(beads);
 }
 
 function metalMaterial() {
@@ -341,6 +465,34 @@ function inkLineMaterial(opacity) {
   });
   inkMats.push(mat);
   return mat;
+}
+
+function inkSolidMaterial(opacity) {
+  const mat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(palette().ink),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+  });
+  inkMats.push(mat);
+  return mat;
+}
+
+// 用细圆柱给主干加粗：LineBasicMaterial 的 linewidth 在多数平台被忽略
+function tubeBetween(a, b, radius, material) {
+  const dir = normalize3([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+  const mid = mixPoint3(a, b, 0.5);
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  const tube = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, len, 6, 1, true),
+    material,
+  );
+  tube.position.set(mid[0], mid[1], mid[2]);
+  tube.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(dir[0], dir[1], dir[2]),
+  );
+  return tube;
 }
 
 function curveBetween(a, b, kind, seed) {
@@ -517,14 +669,23 @@ function buildRig() {
 }
 
 function buildCore() {
+  // 胞体：线框球 + 中心一点，位置跟着骨架的 soma 走
   coreGroup = new THREE.Group();
+  coreGroup.position.set(...scaffold.soma);
   coreGroup.add(new THREE.LineSegments(
-    new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.12, 1)),
-    inkLineMaterial(0.22),
+    new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(0.14, 1)),
+    inkLineMaterial(0.26),
   ));
   const dotMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(palette().ink) });
   inkMats.push(dotMat);
-  coreGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.03, 0), dotMat));
+  coreGroup.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.036, 0), dotMat));
+  // 胞体外的一圈金属轨道，和外面的陀螺环呼应
+  const somaRing = new THREE.Mesh(
+    new THREE.TorusGeometry(0.24, 0.005, 6, 72),
+    metalMaterial(),
+  );
+  somaRing.rotation.set(Math.PI / 2.7, 0.2, 0.35);
+  coreGroup.add(somaRing);
   graphGroup.add(coreGroup);
 }
 
@@ -635,7 +796,7 @@ function paintAll() {
   if (!nodeViews.size) return;
   paintEdges();
   paintNodes();
-  paintDust();
+  paintSpines();
   paintPulses();
   paintRig();
   dirty = true;
@@ -698,13 +859,13 @@ function paintNodes() {
   });
 }
 
-function paintDust() {
-  if (!dust) return;
+function paintSpines() {
+  if (!spines) return;
   const p = palette();
-  dust.material.color.set(p.dim);
-  dust.material.opacity = p.dark ? 0.7 : 0.4;
-  dust.material.blending = p.dark ? THREE.AdditiveBlending : THREE.NormalBlending;
-  dust.material.needsUpdate = true;
+  spines.material.color.set(p.dim);
+  spines.material.opacity = p.dark ? 0.6 : 0.4;
+  spines.material.blending = p.dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+  spines.material.needsUpdate = true;
 }
 
 function paintPulsePair(i) {
@@ -844,6 +1005,8 @@ function applyCamera() {
 function selectNode(id) {
   selected.value = id;
   const node = id ? nodeById.value.get(id) : null;
+  // 选中日期节点时通知雷达跟着切到这一天（雷达那边对同值不会回环）
+  if (node?.kind === 'day') emit('focus-day', node.day);
   if (!node) {
     tweenCamera(overviewState(), props.reduced ? 0 : 1200);
   } else {
@@ -857,6 +1020,18 @@ function selectNode(id) {
   lastInteract = performance.now();
   onActiveChange();
 }
+
+// 雷达的日期步进 / 下拉 → 推镜到对应日期节点
+function applyFocusDay(day) {
+  if (!ready || !day) return;
+  const node = graphNodes.value.find((n) => n.kind === 'day' && n.day === day);
+  if (!node || selected.value === node.id) return;
+  selectNode(node.id);
+}
+
+watch(() => props.focusDay, (day) => {
+  if (day) applyFocusDay(day);
+});
 
 function clearHoverForButton() {
   if (!hover.value) return;
@@ -896,6 +1071,8 @@ function resetView() {
   selected.value = null;
   hover.value = null;
   currentHover = '';
+  // 告诉雷达「神经核心这边已经没有选中」，避免数据刷新重建时又被 focusDay 选回去
+  emit('focus-day', '');
   tweenCamera(overviewState(), props.reduced ? 0 : 1200);
   lastInteract = performance.now();
   onActiveChange();
@@ -907,6 +1084,11 @@ function stepZoom(dir) {
   camDist = Math.max(0.85, Math.min(9, camDist * (dir > 0 ? 0.86 : 1.16)));
   lastInteract = performance.now();
   dirty = true;
+}
+
+function cycleMorph() {
+  morph.value = morph.value === 'radial' ? 'pyramidal' : 'radial';
+  lastInteract = performance.now();
 }
 
 function toggleAuto() {
@@ -1203,7 +1385,10 @@ function hitTest(clientX, clientY) {
   const proxies = [...nodeViews.values()].map((v) => v.proxy);
   const hits = raycaster.obj.intersectObjects(proxies, false);
   if (!hits.length) return null;
-  return hits[0].object.userData.nodeId || null;
+  // 分类枢纽优先：日期节点挂在枢纽外侧，偶尔会把枢纽投影挡住；
+  // 指针落在枢纽的命中范围内时，应当选中的是枢纽而不是前方那颗日期。
+  const catHit = hits.find((h) => nodeViews.get(h.object.userData.nodeId)?.isCat);
+  return (catHit || hits[0]).object.userData.nodeId || null;
 }
 
 function evaluateHover() {
@@ -1441,6 +1626,7 @@ function setupRenderer() {
     status.value = 'ready';
     resize();
     applyCamera();
+    applyFocusDay(props.focusDay);
     startLoop();
   } catch {
     ready = false;
@@ -1520,6 +1706,8 @@ function rebuild() {
   labelSizes.clear();
   edgeData = [];
   pulseSprites = [];
+  scaffoldLines = null;
+  spines = null;
   selectionRing = null;
   assembly = null;
   graphGroup = null;
@@ -1541,6 +1729,7 @@ function rebuild() {
     onActiveChange();
   } else {
     camDist = baseDist;
+    applyFocusDay(props.focusDay);
   }
   dirty = true;
 }
@@ -1577,6 +1766,11 @@ watch(camMoving, (moving) => {
 
 watch(() => props.colorMode, () => {
   if (ready) paintAll();
+});
+
+// 切换形态：整棵骨架重算，镜头和选中节点尽量保留
+watch(morph, () => {
+  if (ready && graphGroup) rebuild();
 });
 
 watch(() => props.rows, (rows) => {
@@ -1652,13 +1846,14 @@ onBeforeUnmount(() => {
       : 'var(--text-primary)' }"
     tabindex="0"
     role="group"
-    aria-label="Interactive 3D life graph. Eight category hubs and one node per day. Click a node to fly the camera in, click another node to move between them, drag to orbit, arrow keys to rotate, Enter to open a focused day."
+    aria-label="Interactive 3D life graph shaped as a regular neuron. Eight category hubs on the dendrites and one node per day. Switch between radial and pyramidal morphology with the first button. Click a node to fly the camera in, click another node to move between them, drag to orbit, arrow keys to rotate, Enter to open a focused day."
     :data-brain-status="status"
     :data-brain-hover="hoverAttr"
     :data-brain-selected="selectedAttr"
     :data-brain-auto="auto ? '1' : '0'"
     :data-brain-color="colorMode ? '1' : '0'"
     :data-brain-full="expanded ? '1' : '0'"
+    :data-brain-morph="morph"
     :data-brain-days="model.days.length"
     :data-brain-nodes="counts.nodes"
     :data-brain-edges="counts.edges"
@@ -1718,6 +1913,12 @@ onBeforeUnmount(() => {
         :title="reduced ? 'Disabled by preferred-reduced-motion' : (auto ? 'Pause auto-orbit' : 'Resume auto-orbit')"
         @click="toggleAuto"
       >{{ auto ? 'AUTO' : 'MANUAL' }}</button>
+      <button
+        type="button"
+        class="life-brain-btn"
+        :title="morph === 'radial' ? 'Switch to the pyramidal neuron' : 'Switch to the radial neuron'"
+        @click="cycleMorph"
+      >{{ morph === 'radial' ? 'RADIAL' : 'PYRAMID' }}</button>
       <button type="button" class="life-brain-btn" title="Select the next day" @click="nextDay">DAY ›</button>
       <button type="button" class="life-brain-btn" title="Reset the camera" @click="resetView">RESET</button>
       <template v-if="expanded">

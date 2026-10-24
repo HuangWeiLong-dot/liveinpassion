@@ -83,6 +83,7 @@ function buildFull() {
       trackedHours,
       dimensions,
       topApps: [['VS Code', Number((categories.Work * 0.6).toFixed(2))], ['Edge', Number((categories.Work * 0.4).toFixed(2))]],
+      topSites: idx === 12 ? null : [['chat.deepseek.com', 120 + idx], ['github.com', 40 + idx]],
       health: {
         steps,
         hrAvg: 70 + (idx % 20),
@@ -547,6 +548,25 @@ const LIFE_STATE = `(function () {
     retry: !!document.querySelector('.stats-retry'),
     aiSource: ai ? ai.querySelector('.stats-panel-sub')?.textContent || '' : '',
     foot: document.querySelector('.stats-foot') ? getComputedStyle(document.querySelector('.stats-foot')).opacity : null,
+    today: !!document.querySelector('.life-today'),
+    todayText: (document.querySelector('.life-today') || {}).textContent?.replace(/\\s+/g, ' ').trim() || '',
+    todayDesktopRows: q('.life-today .is-desktop .life-row').length,
+    todayPhoneRows: q('.life-today .life-today-card:nth-child(2) .life-row').length,
+    todayAiRows: q('.life-today .life-today-card:nth-child(3) .life-row').length,
+    radarControls: q('.life-radar-range').length,
+    radarAxes: q('.life-radar-axis').length,
+    radarRows: q('.life-radar-row').length,
+    radarActive: (document.querySelector('.life-radar-range.is-active') || {}).textContent?.trim() || '',
+    radarLegend: (document.querySelector('.life-radar-key') || {}).textContent?.replace(/\\s+/g, ' ').trim() || '',
+    radarCount: (document.querySelector('.life-radar-count') || {}).textContent?.trim() || '',
+    radarSelect: !!document.querySelector('.life-radar-select'),
+    radarFirst: (document.querySelector('.life-radar-value') || {}).textContent?.trim() || '',
+    radarToolbarH: (document.querySelector('.life-radar-toolbar') || {}).getBoundingClientRect
+      ? document.querySelector('.life-radar-toolbar').getBoundingClientRect().height
+      : 0,
+    radarCurrent: (document.querySelector('.life-radar-current') || {}).getAttribute
+      ? document.querySelector('.life-radar-current').getAttribute('points')
+      : '',
   });
 })()`;
 
@@ -561,8 +581,170 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   const liveBadge = await evalJs("(function () { var b = document.querySelector('.life-live-badge'); return b ? b.textContent.replace(/\s+/g, ' ').trim() : ''; })()");
   console.log('  live badge:', liveBadge);
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
-  if (state.cards !== 5) throw new Error(`expected 5 KPI cards, got ${state.cards}`);
-  if (state.panels !== 8) throw new Error(`expected 8 panels (brain + 7 charts), got ${state.panels}`);
+  if (state.cards !== 6) throw new Error(`expected 6 KPI cards, got ${state.cards}`);
+  if (state.panels !== 9) throw new Error(`expected 9 panels (radar + brain + 7 charts), got ${state.panels}`);
+
+  // 七维雷达：五档统计窗口，默认 7D；单日模式才出现日期步进 / 下拉
+  if (state.radarControls !== 5) throw new Error(`expected 5 radar ranges, got ${state.radarControls}`);
+  if (state.radarAxes !== 7) throw new Error(`expected 7 radar axes, got ${state.radarAxes}`);
+  if (state.radarRows !== 7) throw new Error(`expected 7 radar rows, got ${state.radarRows}`);
+  if (state.radarActive !== '7D') throw new Error(`radar default range should be 7D, got ${state.radarActive}`);
+  if (!/LAST 7D/.test(state.radarLegend)) throw new Error(`radar legend missing 7D: ${state.radarLegend}`);
+  // 日期控件常驻 DOM（占位防止页面跳动），可见性由后面的 dayHidden 断言检查
+  if ((state.radarCurrent.match(/,/g) || []).length !== 7) {
+    throw new Error(`radar polygon should have 7 vertices, got ${state.radarCurrent}`);
+  }
+
+  const radarState = () => evalJs(`(function () {
+    var key = document.querySelector('.life-radar-key');
+    var cur = document.querySelector('.life-radar-current');
+    var sel = document.querySelector('.life-radar-select');
+    return JSON.stringify({
+      active: (document.querySelector('.life-radar-range.is-active') || {}).textContent?.trim() || '',
+      legend: key ? key.textContent.replace(/\\s+/g, ' ').trim() : '',
+      count: (document.querySelector('.life-radar-count') || {}).textContent?.trim() || '',
+      day: sel ? sel.value : '',
+      options: sel ? sel.options.length : 0,
+      hasSelect: !!sel,
+      selectAlign: sel ? getComputedStyle(sel).textAlign : '',
+      points: cur ? cur.getAttribute('points') : '',
+      baselinePoints: (document.querySelector('.life-radar-baseline') || {}).getAttribute
+        ? document.querySelector('.life-radar-baseline').getAttribute('points')
+        : '',
+      firstValue: (document.querySelector('.life-radar-value') || {}).textContent?.trim() || '',
+      firstFill: (document.querySelector('.life-radar-fill') || {}).style?.width || '',
+      toolbarH: (document.querySelector('.life-radar-toolbar') || {}).getBoundingClientRect
+        ? document.querySelector('.life-radar-toolbar').getBoundingClientRect().height
+        : 0,
+      // 用类名判断，而不是 computed visibility：面板未滚动揭示时祖先也可能是 hidden
+      dayHidden: (function () {
+        var d = document.querySelector('.life-radar-day');
+        return d ? d.classList.contains('is-inactive') : 'missing';
+      })(),
+    });
+  })()`);
+  const clickRange = (label) => evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-radar-range'), function (e) {
+      return e.textContent.trim() === '${label}';
+    });
+    if (!b) return 'missing';
+    b.click();
+    return 'ok';
+  })()`);
+
+  const initialRadar = JSON.parse(await radarState());
+  if (initialRadar.dayHidden !== true) {
+    throw new Error(`day picker should be inactive outside DAY, got ${initialRadar.dayHidden}`);
+  }
+
+  if (await clickRange('YEAR') !== 'ok') throw new Error('YEAR range button missing');
+  await sleep(300);
+  const yearState = JSON.parse(await radarState());
+  if (yearState.active !== 'YEAR') throw new Error(`YEAR not active: ${yearState.active}`);
+  if (!/YEAR · 29D AVAILABLE/.test(yearState.legend)) {
+    throw new Error(`YEAR should label actual tracked days: ${yearState.legend}`);
+  }
+  if (!/29 TRACKED DAYS/.test(yearState.count)) throw new Error(`YEAR day count wrong: ${yearState.count}`);
+  if (yearState.points === state.radarCurrent) throw new Error('YEAR polygon did not change');
+  if (yearState.firstValue === state.radarFirst) {
+    throw new Error(`YEAR did not refresh the dimension values (${yearState.firstValue})`);
+  }
+
+  if (await clickRange('ALL') !== 'ok') throw new Error('ALL range button missing');
+  const allEarly = JSON.parse(await radarState());
+  await sleep(140);
+  const allMid = JSON.parse(await radarState());
+  await sleep(500);
+  const allState = JSON.parse(await radarState());
+  if (allState.active !== 'ALL') throw new Error(`ALL not active: ${allState.active}`);
+  if (!/ALL · 29D/.test(allState.legend)) throw new Error(`ALL legend wrong: ${allState.legend}`);
+  // 切换必须真的在缓动：至少有一个中间采样与终值不同
+  if (allEarly.firstValue === allState.firstValue && allMid.firstValue === allState.firstValue) {
+    throw new Error(`ALL switch did not animate (${allEarly.firstValue} → ${allState.firstValue})`);
+  }
+  if (allEarly.points === allState.points && allMid.points === allState.points) {
+    throw new Error('solid radar outline did not animate');
+  }
+  if (allEarly.baselinePoints === allState.baselinePoints
+    && allMid.baselinePoints === allState.baselinePoints) {
+    throw new Error('dashed baseline did not animate out');
+  }
+  if (Math.abs(allState.toolbarH - initialRadar.toolbarH) > 1) {
+    throw new Error(`switching to ALL moved the toolbar (${initialRadar.toolbarH} → ${allState.toolbarH})`);
+  }
+
+  if (await clickRange('DAY') !== 'ok') throw new Error('DAY range button missing');
+  await sleep(600);
+  const dayState = JSON.parse(await radarState());
+  if (dayState.dayHidden !== false) throw new Error('day picker should be active in DAY mode');
+  if (dayState.selectAlign !== 'center') {
+    throw new Error(`date should be centered in the picker, got ${dayState.selectAlign}`);
+  }
+  await shot('radar-day');
+  if (Math.abs(dayState.toolbarH - initialRadar.toolbarH) > 1) {
+    throw new Error(`switching to DAY moved the toolbar (${initialRadar.toolbarH} → ${dayState.toolbarH})`);
+  }
+  if (!dayState.hasSelect) throw new Error('DAY mode should show the date dropdown');
+  if (dayState.options !== 29) throw new Error(`date dropdown should list 29 tracked days, got ${dayState.options}`);
+  if (!/^DAY · /.test(dayState.legend)) throw new Error(`DAY legend wrong: ${dayState.legend}`);
+  if (!/1 TRACKED DAYS/.test(dayState.count)) throw new Error(`DAY count wrong: ${dayState.count}`);
+  if (!dayState.day) throw new Error('DAY mode should select a date by default');
+
+  // 日期步进：往前一天，图与下拉都要跟着动
+  await evalJs("document.querySelector('.life-radar-day .life-radar-step').click()");
+  await sleep(300);
+  const stepperState = JSON.parse(await radarState());
+  if (stepperState.day === dayState.day) throw new Error('date stepper did not move');
+  if (stepperState.legend === dayState.legend) throw new Error('date stepper did not refresh the radar');
+
+  // 下拉框：选更早的一天
+  await evalJs(`(function () {
+    var s = document.querySelector('.life-radar-select');
+    s.selectedIndex = 3;
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  await sleep(300);
+  const selectState = JSON.parse(await radarState());
+  if (selectState.day === stepperState.day) throw new Error('date dropdown did not change the day');
+  if (selectState.legend === stepperState.legend) throw new Error('date dropdown did not refresh the radar');
+
+  await clickRange('7D');
+  await sleep(300);
+
+  // 真实指针点击（不是 DOM .click()）：确认没有被浮层挡住
+  await evalJs(`document.querySelector('[data-chart="radar"]').scrollIntoView({ block: 'center' })`);
+  await sleep(600);
+  await shot('radar-7d');
+  const yearBtn = JSON.parse(await evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-radar-range'), function (n) {
+      return n.textContent.trim() === 'YEAR';
+    });
+    var r = b.getBoundingClientRect();
+    return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height });
+  })()`));
+  console.log('  radar YEAR button:', yearBtn);
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: yearBtn.x, y: yearBtn.y });
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: yearBtn.x, y: yearBtn.y, button: 'left', clickCount: 1 });
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: yearBtn.x, y: yearBtn.y, button: 'left', clickCount: 1 });
+  await sleep(500);
+  const realClick = JSON.parse(await radarState());
+  console.log('  radar after real click:', realClick.active);
+  if (realClick.active !== 'YEAR') {
+    throw new Error(`real pointer click did not switch the radar range (active=${realClick.active})`);
+  }
+  await shot('radar-year');
+  await clickRange('7D');
+  await sleep(300);
+  if (!state.today) throw new Error('today section missing under WHAT I AM DOING NOW');
+  if (!/TODAY/.test(state.todayText)) throw new Error('today section missing TODAY heading');
+  if (!/DESKTOP/.test(state.todayText) || !/PHONE/.test(state.todayText) || !/AI SPEND/.test(state.todayText)) {
+    throw new Error(`today section missing desktop/phone/AI: ${state.todayText.slice(0, 120)}`);
+  }
+  if (state.todayDesktopRows !== 4) {
+    throw new Error(`today desktop should list 2 apps + 2 sites, got ${state.todayDesktopRows}`);
+  }
+  if (state.todayPhoneRows !== 2) throw new Error(`today phone rows: ${state.todayPhoneRows}`);
+  if (state.todayAiRows !== 2) throw new Error(`today AI project rows: ${state.todayAiRows}`);
   if (state.legendZero.slice(0, 7).some(Boolean)) {
     throw new Error(`legend dimmed a dimension that has data: ${JSON.stringify(state.legendZero)}`);
   }
@@ -607,7 +789,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (runsClosed.modal) throw new Error('runs modal did not close');
   if (runsClosed.locked) throw new Error('runs modal left body locked');
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
-  if (state.numbers.length !== 5) throw new Error(`expected 5 odometers, got ${state.numbers.length}`);
+  if (state.numbers.length !== 6) throw new Error(`expected 6 odometers, got ${state.numbers.length}`);
   if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
   if (state.weekdayRows !== 7) throw new Error(`expected 7 weekday rows, got ${state.weekdayRows}`);
   if (state.weekdaySegs < 7) throw new Error('weekday stacks not rendered');
@@ -715,6 +897,12 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (!dayModal.locked) throw new Error('day modal did not lock body scroll');
   if (!/CATEGORIES/.test(dayModal.text)) throw new Error('day modal missing categories');
   if (!/TRACKED/.test(dayModal.text)) throw new Error('day modal missing overview');
+  if (!/DESKTOP/.test(dayModal.text) || !/APPLICATIONS/.test(dayModal.text)) {
+    throw new Error('day modal missing desktop apps');
+  }
+  if (!/SITES/.test(dayModal.text) || !/chat\.deepseek\.com/.test(dayModal.text)) {
+    throw new Error('day modal missing browsing sites');
+  }
   await shot('day');
   await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
   await sleep(800);
@@ -743,6 +931,111 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (!enterOpened) throw new Error('keyboard Enter did not open the day modal');
   await evalJs("document.querySelector('.life-day-close').click()");
   await sleep(700);
+
+  // 「今日统计」的卡片打开的是**分类详情**：只显示这一类、列全不截断，
+  // 不是整天的详情（整天留给柱子）。
+  await evalJs("document.querySelector('.life-today .is-desktop').click()");
+  await sleep(400);
+  const todayDetail = JSON.parse(await evalJs(`(function () {
+    var m = document.querySelector('.life-detail-modal');
+    return JSON.stringify({
+      open: !!m,
+      // 分类详情复用了 .life-day-modal 的皮，这里要排除它才算“整天详情”
+      dayOpen: !!document.querySelector('.life-day-modal:not(.life-detail-modal)'),
+      locked: document.body.classList.contains('no-scroll'),
+      text: m ? m.textContent.replace(/\\s+/g, ' ').trim() : '',
+      rows: m ? m.querySelectorAll('.life-day-row').length : 0,
+    });
+  })()`));
+  console.log('  today desktop detail:', {
+    open: todayDetail.open,
+    rows: todayDetail.rows,
+    text: todayDetail.text.slice(0, 90),
+  });
+  if (!todayDetail.open) throw new Error('today desktop card did not open the detail modal');
+  if (todayDetail.dayOpen) throw new Error('today desktop card opened the whole day modal');
+  if (!todayDetail.locked) throw new Error('today detail did not lock body scroll');
+  if (!/DESKTOP/.test(todayDetail.text)) throw new Error('today detail missing DESKTOP title');
+  if (!/APPLICATIONS/.test(todayDetail.text) || !/SITES/.test(todayDetail.text)) {
+    throw new Error('today detail missing applications/sites sections');
+  }
+  if (!/chat\.deepseek\.com/.test(todayDetail.text)) throw new Error('today detail missing full site list');
+  if (/CATEGORIES|HEALTH|PLACES|WORKOUTS/.test(todayDetail.text)) {
+    throw new Error('today detail leaked other day sections');
+  }
+  // 预览截到 6+5，详情必须是全部：stub 里今天正好 2 应用 + 2 站点
+  if (todayDetail.rows !== 4) throw new Error(`today detail should list all 2 apps + 2 sites, got ${todayDetail.rows}`);
+  await shot('today-detail');
+  await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(700);
+  const detailClosed = JSON.parse(await evalJs(`(function () {
+    return JSON.stringify({
+      modal: !!document.querySelector('.life-detail-modal'),
+      locked: document.body.classList.contains('no-scroll'),
+    });
+  })()`));
+  console.log('  today detail closed:', detailClosed);
+  if (detailClosed.modal) throw new Error('today detail did not close on Escape');
+  if (detailClosed.locked) throw new Error('today detail left body locked');
+
+  // PHONE 卡同理：只出手机自己的数据
+  await evalJs("document.querySelector('.life-today .life-today-card:nth-child(2)').click()");
+  await sleep(400);
+  const phoneDetail = await evalJs(`(function () {
+    var m = document.querySelector('.life-detail-modal');
+    return m ? m.textContent.replace(/\\s+/g, ' ').trim() : '';
+  })()`);
+  console.log('  today phone detail:', phoneDetail.slice(0, 90));
+  if (!/PHONE/.test(phoneDetail) || !/SCREEN TIME/.test(phoneDetail)) {
+    throw new Error('today phone card did not open phone detail');
+  }
+  if (!/WeChat/.test(phoneDetail)) throw new Error('phone detail missing app list');
+  if (/SITES|CATEGORIES|DESKTOP/.test(phoneDetail)) {
+    throw new Error('phone detail leaked desktop sections');
+  }
+  await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(600);
+
+  // 屏幕亮起时间：KPI 行最后一张卡可点开，弹窗同时给电脑和手机
+  await evalJs("document.querySelector('.life-cards .stat-card.is-openable').click()");
+  await sleep(400);
+  const screenDetail = JSON.parse(await evalJs(`(function () {
+    var m = document.querySelector('.life-detail-modal');
+    return JSON.stringify({
+      open: !!m,
+      locked: document.body.classList.contains('no-scroll'),
+      text: m ? m.textContent.replace(/\\s+/g, ' ').trim() : '',
+      rows: m ? m.querySelectorAll('.life-detail-day:not(.is-head)').length : 0,
+      today: m ? m.querySelectorAll('.life-day-row').length : 0,
+    });
+  })()`));
+  console.log('  screen detail:', { open: screenDetail.open, rows: screenDetail.rows, today: screenDetail.today });
+  if (!screenDetail.open) throw new Error('screen card did not open the detail modal');
+  if (!screenDetail.locked) throw new Error('screen detail did not lock body scroll');
+  if (!/SCREEN TIME/.test(screenDetail.text)) throw new Error('screen detail missing title');
+  if (!/DESKTOP/.test(screenDetail.text) || !/PHONE/.test(screenDetail.text)) {
+    throw new Error('screen detail missing desktop/phone breakdown');
+  }
+  // 逐日列表覆盖整个窗口（stub 里 29 天有数据，缺的那天不出行）
+  if (screenDetail.rows !== 29) throw new Error(`screen detail should list all 29 days, got ${screenDetail.rows}`);
+  if (screenDetail.today !== 2) throw new Error(`screen detail should show today's 2 devices, got ${screenDetail.today}`);
+  await shot('screen-detail');
+  await evalJs("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await sleep(600);
+
+  // 单日详情里的 WORKOUTS：点有锻炼的那一天
+  await evalJs(`document.querySelectorAll('[data-chart="rhythm"] .life-col')[14].click()`);
+  await sleep(400);
+  const workoutModal = await evalJs(`(function () {
+    var m = document.querySelector('.life-day-modal');
+    return m ? m.textContent.replace(/\\s+/g, ' ').trim() : '';
+  })()`);
+  console.log('  workout modal:', workoutModal.slice(0, 100));
+  if (!/WORKOUTS/.test(workoutModal) || !/5\.06 KM/.test(workoutModal)) {
+    throw new Error('day modal missing workout details');
+  }
+  await evalJs("document.querySelector('.life-day-close').click()");
+  await sleep(600);
 
   // 运动面板的折线真的画出来了（MOTION 顶部现在有手表/跑步列表，
   // 要滚到 chart 本身，不然柱子会在视口外，悬浮事件落空）
@@ -881,8 +1174,8 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   const returned = JSON.parse(await evalJs(LIFE_STATE));
   console.log('  returned:', { path: returned.path, fetches: returned.fetches, cards: returned.cards });
   if (returned.path !== '/life') throw new Error('did not return to life');
-  if (returned.cards !== 5) throw new Error('cards lost after keep-alive');
-  if (returned.numbers.length !== 5) throw new Error('odometers lost after keep-alive');
+  if (returned.cards !== 6) throw new Error('cards lost after keep-alive');
+  if (returned.numbers.length !== 6) throw new Error('odometers lost after keep-alive');
   if (returned.fetches <= fetchesBefore) throw new Error('no refresh fetch on re-activation');
   await shot('return');
 });
@@ -914,7 +1207,7 @@ console.log('LIFE mobile');
 await withPage({ width: 390, height: 844, mobile: true, label: 'mobile' }, async ({ evalJs, shot, sleep }) => {
   const state = JSON.parse(await evalJs(LIFE_STATE));
   console.log('  state:', { cards: state.cards, cols: state.rhythmCols, overflow: state.overflow });
-  if (state.cards !== 5) throw new Error('mobile: expected 5 KPI cards');
+  if (state.cards !== 6) throw new Error('mobile: expected 6 KPI cards');
   if (state.rhythmCols !== 30) throw new Error('mobile: expected 30 columns');
   if (state.heartHero !== 1) throw new Error(`mobile: expected 1 heart hero, got ${state.heartHero}`);
   if (state.watchMetrics !== 6) throw new Error(`mobile: expected 6 watch metrics, got ${state.watchMetrics}`);
@@ -925,6 +1218,12 @@ await withPage({ width: 390, height: 844, mobile: true, label: 'mobile' }, async
   await evalJs('window.scrollTo({ top: 900, behavior: "instant" })');
   await sleep(1200);
   await shot('rhythm');
+  await evalJs(`document.querySelector('[data-chart="radar"]').scrollIntoView({ block: 'center' })`);
+  await sleep(900);
+  await shot('radar');
+  const radarMobile = JSON.parse(await evalJs(LIFE_STATE));
+  if (radarMobile.overflow > 1) throw new Error(`mobile: radar overflow ${radarMobile.overflow}px`);
+  if (radarMobile.radarAxes !== 7) throw new Error('mobile: radar axes missing');
   // 手机先滚到 PLACES（不要从 01 直接跳到页尾，地图会整段掠过观察区）
   await evalJs(`(function () {
     var el = document.querySelector('[data-chart="places"]');
@@ -961,9 +1260,9 @@ console.log('LIFE empty response');
 await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, async ({ evalJs, shot }) => {
   const state = JSON.parse(await evalJs(LIFE_STATE));
   console.log('  state:', { cards: state.cards, numbers: state.numbers.length, panels: state.panels });
-  if (state.cards !== 5) throw new Error('empty: KPI cards missing');
+  if (state.cards !== 6) throw new Error('empty: KPI cards missing');
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
-  if (state.panels !== 8) throw new Error('empty: panels missing');
+  if (state.panels !== 9) throw new Error('empty: panels missing');
   await shot('top');
 });
 

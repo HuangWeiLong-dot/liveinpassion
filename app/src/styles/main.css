@@ -6195,16 +6195,43 @@
         /* 骨架复用 STATS：hero / card / panel / 发丝线 / 轴标签。
            这里只加 LIFE 专属的堆叠柱、双栏侧轨和横条。 */
 
+        /* KPI 从「一排五张」改成两行 bento：
+           4 列 × 2 行，01 和 06 各占 2 列，中间四张单列。
+           宽卡里数字放大一档 —— 首尾两张是全页最重要的读数（06 还能点开）。 */
         .life-cards {
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
         }
 
         .life-cards .stat-card {
             min-height: 178px;
         }
 
+        .life-cards .stat-card:nth-child(1),
+        .life-cards .stat-card:nth-child(6) {
+            grid-column: span 2;
+        }
+
         .life-cards .stat-number {
             font-size: clamp(1.9rem, 2.8vw, 3rem);
+        }
+
+        .life-cards .stat-card:nth-child(1) .stat-number,
+        .life-cards .stat-card:nth-child(6) .stat-number {
+            font-size: clamp(2.3rem, 3.6vw, 3.8rem);
+        }
+
+        /* 屏幕亮起时间那张卡可点开详情，其余 KPI 只读 */
+        .stat-card.is-openable {
+            cursor: pointer;
+        }
+
+        .stat-card.is-openable:focus-visible {
+            outline: 1px dashed var(--text-primary);
+            outline-offset: -6px;
+        }
+
+        .stat-open i {
+            font-style: normal;
         }
 
         .life-null {
@@ -6216,12 +6243,695 @@
             color: var(--bg);
         }
 
+        /* 骨架跟着 bento 走：宽卡的两格也要空出来，行高按卡片高度走 */
         .life-loading {
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: 178px;
+            height: auto;
+        }
+
+        .life-loading span:nth-child(1),
+        .life-loading span:nth-child(6) {
+            grid-column: span 2;
         }
 
         .life-panel {
             margin-top: 32px;
+        }
+
+        /* ---------- LIFE · 七维雷达 ---------- */
+
+        .life-radar {
+            display: grid;
+            grid-template-columns: minmax(300px, 0.95fr) minmax(280px, 1.05fr);
+            gap: clamp(18px, 4vw, 56px);
+            align-items: center;
+            padding: 24px 28px 26px;
+        }
+
+        /* 统计窗口：DAY / ALL / 7D / 30D / YEAR；单日模式多一组日期步进 + 下拉 */
+        .life-radar-toolbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-radar-ranges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0 2px;
+        }
+
+        .life-radar-range {
+            appearance: none;
+            border: 0;
+            border-bottom: 1px solid transparent;
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.12em;
+            padding: 5px 8px;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .life-radar-range:hover {
+            color: var(--text-primary);
+        }
+
+        .life-radar-range.is-active {
+            color: var(--text-primary);
+            border-bottom-color: var(--text-primary);
+        }
+
+        .life-radar-day {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 非单日模式仍然占位，只是不可见 / 不可点，避免切换时页面高度跳一下 */
+        .life-radar-day.is-inactive {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .life-radar-step {
+            width: 24px;
+            height: 24px;
+            display: inline-grid;
+            place-items: center;
+            border: 1px solid var(--border);
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1;
+            cursor: pointer;
+            transition: border-color 0.2s ease, opacity 0.2s ease;
+        }
+
+        .life-radar-step:hover:not(:disabled) {
+            border-color: var(--text-primary);
+        }
+
+        .life-radar-step:disabled {
+            opacity: 0.3;
+            cursor: default;
+        }
+
+        .life-radar-select {
+            appearance: none;
+            min-width: 132px;
+            padding: 5px 8px;
+            border: 1px solid var(--border);
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            letter-spacing: 0.08em;
+            text-align: center;
+            text-align-last: center;
+            cursor: pointer;
+        }
+
+        .life-radar-range:focus-visible,
+        .life-radar-step:focus-visible,
+        .life-radar-select:focus-visible {
+            outline: 1px solid var(--text-primary);
+            outline-offset: 2px;
+        }
+
+        .life-radar-count {
+            margin-left: auto;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-radar-figure {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .life-radar-svg {
+            display: block;
+            width: 100%;
+            max-width: 450px;
+            height: auto;
+            margin: 0 auto;
+            overflow: visible;
+            color: var(--text-primary);
+        }
+
+        .life-radar-grid polygon {
+            fill: none;
+            stroke: var(--border);
+            stroke-width: 1;
+        }
+
+        .life-radar-grid polygon:last-child {
+            stroke-opacity: 0.9;
+        }
+
+        .life-radar-spoke {
+            stroke: var(--border);
+            stroke-width: 1;
+            stroke-dasharray: 2 4;
+        }
+
+        .life-radar-baseline {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 1.3;
+            stroke-dasharray: 5 5;
+            transition: opacity 0.35s ease;
+        }
+
+        .life-radar-baseline.is-hidden {
+            opacity: 0;
+        }
+
+        .life-radar-current {
+            fill: currentColor;
+            fill-opacity: 0.08;
+            stroke: currentColor;
+            stroke-width: 1.7;
+            stroke-linejoin: round;
+        }
+
+        .life-radar-dot {
+            stroke: var(--bg);
+            stroke-width: 1.4;
+        }
+
+        .life-radar-axis {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 9px;
+            letter-spacing: 0.14em;
+            fill: var(--text-secondary);
+        }
+
+        .life-radar-key {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            margin-top: 6px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-radar-key span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .life-radar-key i {
+            width: 16px;
+            height: 0;
+            border-top: 1.5px solid var(--text-primary);
+        }
+
+        .life-radar-key i.is-baseline {
+            border-top-style: dashed;
+            border-color: var(--text-secondary);
+        }
+
+        .life-radar-key .life-radar-scale {
+            margin-left: auto;
+        }
+
+        .life-radar-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 10px;
+        }
+
+        .life-radar-row {
+            display: grid;
+            grid-template-columns: 8px 72px 46px 42px minmax(60px, 1fr);
+            align-items: center;
+            gap: 9px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.08em;
+        }
+
+        .life-radar-swatch {
+            width: 7px;
+            height: 7px;
+            background: var(--text-primary);
+        }
+
+        .life-radar-name {
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .life-radar-value {
+            font-weight: 600;
+        }
+
+        .life-radar-delta {
+            font-style: normal;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .life-radar-delta.is-up {
+            color: var(--text-primary);
+        }
+
+        .life-radar-delta.is-down {
+            opacity: 0.55;
+        }
+
+        .life-radar-track {
+            display: block;
+            height: 3px;
+            background: var(--border);
+        }
+
+        .life-radar-fill {
+            display: block;
+            height: 100%;
+            background: var(--text-primary);
+        }
+
+        .life-radar-empty {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        /* 维度可点：列表行、雷达轴标签、圆点 */
+        .life-radar-item {
+            margin: 0;
+            padding: 0;
+        }
+
+        button.life-radar-row {
+            width: 100%;
+            margin: 0;
+            padding: 4px 0;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            letter-spacing: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        button.life-radar-row:hover .life-radar-name {
+            color: var(--text-primary);
+        }
+
+        button.life-radar-row:hover .life-radar-track {
+            background: color-mix(in srgb, var(--text-primary) 22%, transparent);
+        }
+
+        button.life-radar-row:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: 3px;
+        }
+
+        .life-radar-axis.is-clickable,
+        .life-radar-dot.is-clickable {
+            cursor: pointer;
+        }
+
+        .life-radar-axis.is-clickable:hover,
+        .life-radar-axis.is-clickable:focus-visible {
+            fill: var(--text-primary);
+            outline: none;
+        }
+
+        .life-radar-dot.is-clickable:focus-visible {
+            outline: none;
+            stroke: var(--text-primary);
+            stroke-width: 2;
+        }
+
+        .life-radar-side {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .life-radar-hint {
+            margin: 0;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.12em;
+            color: var(--text-secondary);
+        }
+
+        /* 七维之和 vs 真实并集：数字并排，避免再被当成「一天只有 3.5 小时」 */
+        .life-radar-unique {
+            margin: 0;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 4px 14px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-radar-unique b {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .life-radar-unique em {
+            margin-left: auto;
+            font-style: normal;
+            opacity: 0.7;
+        }
+
+        /* ---- 七维详情弹窗 ---- */
+        .life-dim-modal {
+            width: min(900px, 100%);
+        }
+
+        /* 两维类名：`.life-day-modal` 的 border 简写在本文件更后面，单类会被覆盖 */
+        .life-day-modal.life-dim-modal {
+            border-top: 2px solid var(--dim-accent, var(--text-primary));
+        }
+
+        .life-dim-swatch {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            margin-right: 10px;
+            background: var(--dim-accent, var(--text-primary));
+            vertical-align: 0.08em;
+        }
+
+        .life-day-stats.life-dim-stats {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .life-day-stats.life-dim-stats span:first-child b {
+            color: var(--dim-accent, var(--text-primary));
+        }
+
+        .life-dim-timeline-wrap {
+            padding: 18px 0 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-dim-timeline {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 64px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .life-dim-timeline::-webkit-scrollbar {
+            display: none;
+        }
+
+        .life-dim-bar {
+            flex: 1 0 4px;
+            min-width: 4px;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .life-dim-bar i {
+            display: block;
+            width: 100%;
+            min-height: 0;
+            background: var(--dim-accent, var(--text-primary));
+            opacity: 0.78;
+        }
+
+        .life-dim-timeline-axis {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 7px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-dim-note {
+            margin: 14px 0 4px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-dim-columns {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0 36px;
+        }
+
+        .life-dim-section {
+            min-width: 0;
+            padding: 12px 0 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-dim-section h4 {
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.54rem;
+            font-weight: 400;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-dim-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .life-dim-list-row {
+            display: grid;
+            grid-template-columns: 24px minmax(0, 1fr) auto;
+            column-gap: 10px;
+            row-gap: 5px;
+            align-items: baseline;
+            padding: 7px 0 5px;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.06em;
+        }
+
+        .life-dim-list-row:last-child {
+            border-bottom: none;
+        }
+
+        .life-dim-rank {
+            color: var(--text-secondary);
+        }
+
+        .life-dim-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .life-dim-value {
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .life-dim-track {
+            grid-column: 2 / 4;
+            display: block;
+            height: 2px;
+            background: var(--border);
+        }
+
+        .life-dim-track i {
+            display: block;
+            height: 100%;
+            background: var(--dim-accent, var(--text-primary));
+        }
+
+        .life-dim-kv {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.06em;
+        }
+
+        .life-dim-kv:last-child {
+            border-bottom: none;
+        }
+
+        .life-dim-kv span {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .life-dim-kv b {
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+        }
+
+        .life-dim-workouts {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .life-dim-workout {
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-dim-workout:last-child {
+            border-bottom: none;
+        }
+
+        .life-dim-workout-head {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            letter-spacing: 0.08em;
+        }
+
+        .life-dim-workout-head span {
+            color: var(--text-secondary);
+        }
+
+        .life-dim-workout-head b {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+        }
+
+        .life-dim-workout-head em {
+            font-style: normal;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .life-dim-workout-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 14px;
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-dim-empty {
+            padding: 10px 0;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.55rem;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 900px) {
+            .life-radar {
+                grid-template-columns: 1fr;
+                gap: 18px;
+                padding: 20px 22px 22px;
+            }
+
+            .life-radar-svg {
+                max-width: 360px;
+            }
+
+            .life-radar-count {
+                margin-left: 0;
+            }
+
+            .life-dim-columns {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .life-day-stats.life-dim-stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .life-dim-timeline {
+                height: 52px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .life-radar-row {
+                grid-template-columns: 8px 64px 42px 38px minmax(40px, 1fr);
+                gap: 7px;
+                font-size: 0.52rem;
+            }
+
+            .life-radar-key .life-radar-scale {
+                margin-left: 0;
+            }
+
+            .life-radar {
+                padding: 16px 18px 20px;
+            }
+
+            .life-radar-toolbar {
+                gap: 8px 10px;
+            }
+
+            .life-radar-range {
+                padding: 5px 6px;
+            }
+
+            .life-radar-select {
+                min-width: 112px;
+            }
         }
 
         /* ---------- LIFE · 3D 神经网络大脑 ---------- */
@@ -7604,11 +8314,16 @@
         .life-watch-metrics {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            /* 三行等高：RUNNING 那格文案多，不锁行高的话它把自己这一行撑大，
+               同行的 STEPS 跟着变高、留一片空白。 */
+            grid-auto-rows: 1fr;
             gap: 1px;
             background: var(--border);
         }
 
         .life-watch-metric {
+            display: flex;
+            flex-direction: column;
             min-width: 0;
             padding: 18px 20px 19px;
             background: var(--bg);
@@ -7684,7 +8399,9 @@
 
         .life-watch-run-more {
             color: var(--text-primary) !important;
-            margin-top: 9px !important;
+            /* 卡片改成 flex 列之后，用 auto 把入口压在格底，和别的格对齐 */
+            margin-top: auto !important;
+            padding-top: 9px;
             letter-spacing: 0.12em !important;
         }
 
@@ -7990,12 +8707,27 @@
             color: var(--text-primary);
         }
 
+        /* 有路线时这一组改成单列：路线占满整行，下面的心率也整行画 */
+        .life-run-modal-charts.is-route {
+            grid-template-columns: 1fr;
+        }
+
         .life-run-chart svg,
         .life-run-chart-empty {
             display: block;
             width: 100%;
             height: 64px;
             border: 1px solid var(--border);
+        }
+
+        .life-run-chart.is-route svg {
+            /* 详情里路线是整行一条，150px 时窄跑道只剩中间一小块；
+               抬到 200 才和旁边那几组曲线有同样的分量。 */
+            height: 200px;
+        }
+
+        .life-run-chart.is-wide {
+            grid-column: 1 / -1;
         }
 
         .life-run-chart-empty {
@@ -8054,6 +8786,512 @@
         @media (max-width: 640px) {
             .life-run-modal-charts {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* 图表本身是 button：清掉按钮外观，只留下可点的语义 */
+        .life-run-chart.is-zoomable,
+        .life-latest-chart {
+            appearance: none;
+            padding: 0;
+            border: 0;
+            background: none;
+            color: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .life-run-chart.is-zoomable:hover svg,
+        .life-latest-chart:hover svg {
+            border-color: var(--text-primary);
+        }
+
+        .life-run-chart.is-zoomable:focus-visible,
+        .life-latest-chart:focus-visible {
+            outline: 1px solid var(--text-primary);
+            outline-offset: 2px;
+        }
+
+        .life-run-chart.is-zoomable:disabled {
+            cursor: default;
+        }
+
+        .life-run-curve.is-grade path {
+            opacity: 0.7;
+        }
+
+        /* ---- 分段配速 ---- */
+        .life-run-splits {
+            margin-top: 14px;
+        }
+
+        .life-run-splits-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-run-splits-grid {
+            margin-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-run-split {
+            display: grid;
+            grid-template-columns: 28px 1fr 1fr 1fr 1fr;
+            gap: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.04em;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-run-split.is-head {
+            color: var(--text-secondary);
+            font-size: 0.42rem;
+            letter-spacing: 0.1em;
+        }
+
+        .life-run-split.is-partial {
+            color: var(--text-secondary);
+        }
+
+        /* ---- 心率区间 ---- */
+        .life-run-zones {
+            margin-top: 14px;
+        }
+
+        .life-run-zones-head {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-run-zones-bar {
+            display: flex;
+            height: 8px;
+            margin: 6px 0 5px;
+            gap: 1px;
+            background: var(--border);
+        }
+
+        .life-run-zones-bar i {
+            display: block;
+            height: 100%;
+            background: var(--text-primary);
+            opacity: 0.85;
+        }
+
+        .life-run-zones-bar i:nth-child(2) { opacity: 0.66; }
+        .life-run-zones-bar i:nth-child(3) { opacity: 0.5; }
+        .life-run-zones-bar i:nth-child(4) { opacity: 0.34; }
+        .life-run-zones-bar i:nth-child(5) { opacity: 0.2; }
+
+        .life-run-zones-legend span {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 5px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-run-zones-legend b {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .life-run-zones-legend em {
+            font-style: normal;
+            color: var(--text-primary);
+        }
+
+        .life-run-zones-legend i {
+            font-style: normal;
+            color: var(--text-secondary);
+        }
+
+        .life-run-zones-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.42rem;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        /* ---- MOTION 顶部：最近一跑 ---- */
+        .life-latest {
+            margin: 0 0 26px;
+            padding: 18px 20px 16px;
+            border: 1px solid var(--border);
+        }
+
+        .life-latest-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+        }
+
+        .life-latest-title {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .life-latest-kicker {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44rem;
+            letter-spacing: 0.16em;
+            color: var(--text-secondary);
+        }
+
+        .life-latest-title h3 {
+            margin: 0;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .life-latest-when {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+        }
+
+        .life-latest-numbers {
+            display: flex;
+            align-items: baseline;
+            gap: 20px;
+        }
+
+        .life-latest-numbers strong {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .life-latest-numbers small {
+            margin-left: 4px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44em;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-latest-open {
+            appearance: none;
+            padding: 7px 14px;
+            border: 1px solid var(--border);
+            background: none;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.14em;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+
+        .life-latest-open:hover {
+            border-color: var(--text-primary);
+        }
+
+        /* ---- 最近一跑的单独配色 ----
+           和整页 COLOR 是两套开关：这里只给「这一跑」的路线/心率/配速/海拔/坡度上色，
+           其余面板仍是灰阶。色相沿用 LIFE 的分类色，明度在中段，两种主题都能读。 */
+        .life-latest-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .life-latest-color {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 9px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.44rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .life-latest-color:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .life-latest-color.is-on {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .life-latest-color.is-on .life-color-dots i:nth-child(1) { background: var(--run-hr); }
+        .life-latest-color.is-on .life-color-dots i:nth-child(2) { background: var(--run-pace); }
+        .life-latest-color.is-on .life-color-dots i:nth-child(3) { background: var(--run-alt); }
+        .life-latest-color.is-on .life-color-dots i:nth-child(4) { background: var(--run-route); }
+
+        .life-latest.is-run-color,
+        .life-runs-modal.is-run-color,
+        .life-zoom-panel.is-run-color {
+            --run-route: #14B8A6;
+            --run-hr: #EF4444;
+            --run-pace: #3B82F6;
+            --run-alt: #10B981;
+            --run-grade: #F59E0B;
+        }
+
+        .life-runs-modal.is-run-color .life-run-chart.is-route path { stroke: var(--run-route); opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-route-dot.is-start { fill: var(--run-route); }
+        .life-runs-modal.is-run-color .life-run-route-dot.is-end { stroke: var(--run-route); }
+        .life-runs-modal.is-run-color .life-run-chart.is-hr path { stroke: var(--run-hr); opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-chart.is-pace path { stroke: var(--run-pace); opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-chart.is-alt path { stroke: var(--run-alt); opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-chart.is-grade path { stroke: var(--run-grade); opacity: 1; }
+
+        /* 心率区间从蓝到红：只在配色打开时才有色相 */
+        .life-runs-modal.is-run-color .life-run-zones-bar i:nth-child(1) { background: #3B82F6; opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-zones-bar i:nth-child(2) { background: #10B981; opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-zones-bar i:nth-child(3) { background: #F59E0B; opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-zones-bar i:nth-child(4) { background: #F97316; opacity: 1; }
+        .life-runs-modal.is-run-color .life-run-zones-bar i:nth-child(5) { background: #EF4444; opacity: 1; }
+
+        .life-latest.is-run-color .life-latest-chart.is-route path { stroke: var(--run-route); opacity: 1; }
+        .life-latest.is-run-color .life-run-route-dot.is-start { fill: var(--run-route); }
+        .life-latest.is-run-color .life-run-route-dot.is-end { stroke: var(--run-route); }
+        .life-latest.is-run-color .life-latest-chart.is-hr path { stroke: var(--run-hr); opacity: 1; }
+        .life-latest.is-run-color .life-latest-chart.is-pace path { stroke: var(--run-pace); opacity: 1; }
+        .life-latest.is-run-color .life-latest-chart.is-alt path { stroke: var(--run-alt); opacity: 1; }
+        .life-latest.is-run-color .life-latest-chart.is-grade path { stroke: var(--run-grade); opacity: 1; }
+        .life-latest.is-run-color .life-run-chart-label b { color: var(--text-primary); }
+
+        .life-zoom-panel.is-run-color .life-zoom-chart.is-route path { stroke: var(--run-route); }
+        .life-zoom-panel.is-run-color .life-zoom-chart.is-hr path { stroke: var(--run-hr); }
+        .life-zoom-panel.is-run-color .life-zoom-chart.is-pace path { stroke: var(--run-pace); }
+        .life-zoom-panel.is-run-color .life-zoom-chart.is-alt path { stroke: var(--run-alt); }
+        .life-zoom-panel.is-run-color .life-zoom-chart.is-grade path { stroke: var(--run-grade); }
+
+        /* 左：一整块路线。右：四条曲线竖排，各自等分这一列的高度。 */
+        .life-latest-body {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+            gap: 12px 18px;
+            margin-top: 16px;
+        }
+
+        .life-latest-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .life-latest-strips {
+            display: grid;
+            grid-auto-rows: 1fr;
+            gap: 8px;
+            min-height: 0;
+        }
+
+        .life-latest-chart svg,
+        .life-latest-chart .life-run-chart-empty {
+            display: block;
+            width: 100%;
+            /* basis 用 0，不用 auto：auto 会拿 SVG 的固有比例算出 ~150px，
+               四条叠起来把整行撑到 700px，路线也跟着变成一张巨幕。 */
+            flex: 1 1 0;
+            height: 100%;
+            min-height: 44px;
+            /* 和弹窗里的小图同一条边线：没有它路线那块只是「画在背景上」，
+               右边四条也粘成一片；有边线才读得出是五块可点的图。 */
+            border: 1px solid var(--border);
+        }
+
+        /* 路线撑起这一行的高度，右侧四条曲线跟着一起长。
+           高度对齐下面 HEART RATE 大卡片的量级，别让小图缩在角上。 */
+        .life-latest-chart.is-route svg,
+        .life-latest-chart.is-route .life-run-chart-empty {
+            min-height: 380px;
+        }
+
+        .life-latest-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 22px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .life-latest-stats span {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .life-latest-stats em {
+            font-style: normal;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.42rem;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+        }
+
+        .life-latest-stats b {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.56rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            color: var(--text-primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ---- 放大查看 ---- */
+        .life-zoom-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 12000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(6px);
+        }
+
+        .life-zoom-panel {
+            width: min(1040px, 100%);
+            max-height: calc(100vh - 48px);
+            overflow: auto;
+            padding: 20px 24px 18px;
+            border: 1px solid var(--border);
+            /* 必须跟着主题走：原先写的是不存在的 --bg-primary / --surface，
+               永远落到 #0b0b0b —— 浅色主题下路线是深色描边画在近黑底上，
+               对比度低到几乎看不见。 */
+            background: var(--bg);
+            color: var(--text-primary);
+        }
+
+        .life-zoom-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .life-zoom-chart {
+            display: block;
+            width: 100%;
+            margin-top: 16px;
+            border: 1px solid var(--border);
+        }
+
+        /* 路线可以再宽再高一点：它没有坐标轴，留白全是浪费 */
+        .life-zoom-panel.is-route {
+            width: min(1240px, 100%);
+        }
+
+        .life-zoom-chart.is-route {
+            height: min(72vh, 720px);
+        }
+
+        .life-zoom-chart.is-route path {
+            stroke-width: 2;
+            opacity: 1;
+        }
+
+        .life-zoom-chart:not(.is-route) {
+            height: min(46vh, 380px);
+        }
+
+        .life-zoom-chart path {
+            fill: none;
+            stroke: var(--text-primary);
+            stroke-width: 1.4;
+            stroke-linejoin: round;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .life-zoom-chart.is-pace path {
+            stroke-dasharray: 4 3;
+            opacity: 0.75;
+        }
+
+        .life-zoom-chart.is-grade path {
+            opacity: 0.8;
+        }
+
+        .life-zoom-foot {
+            display: flex;
+            gap: 20px;
+            margin-top: 12px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.46rem;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        .life-zoom-enter-active,
+        .life-zoom-leave-active {
+            transition: opacity 0.18s ease;
+        }
+
+        .life-zoom-enter-from,
+        .life-zoom-leave-to {
+            opacity: 0;
+        }
+
+        @media (max-width: 720px) {
+            .life-latest-head {
+                align-items: flex-start;
+            }
+
+            .life-latest-numbers {
+                gap: 14px;
+            }
+
+            .life-latest-body {
+                grid-template-columns: 1fr;
+            }
+
+            .life-latest-chart.is-route svg,
+            .life-latest-chart.is-route .life-run-chart-empty {
+                min-height: 220px;
+            }
+
+            .life-run-split {
+                grid-template-columns: 22px 1fr 1fr 1fr 1fr;
+                font-size: 0.44rem;
             }
         }
 
@@ -8375,6 +9613,49 @@
             font-weight: 500;
             font-variant-numeric: tabular-nums;
             text-align: right;
+        }
+
+        /* 单日里的每次锻炼：一行标题 + 一行指标，不像 kv-row 那样占四行 */
+        .life-day-workout {
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .life-day-workout:last-child {
+            border-bottom: none;
+        }
+
+        .life-day-workout-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 14px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.06em;
+        }
+
+        .life-day-workout-head span {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .life-day-workout-head b {
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .life-day-workout-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 12px;
+            margin-top: 5px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.48rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
         }
 
         .life-day-foot {
@@ -8924,8 +10205,26 @@
 
         /* ---- 平板 ---- */
         @media (max-width: 1024px) {
+            /* 收掉 bento 的跨列，六张卡平铺成 3 × 2 */
             .life-cards {
                 grid-template-columns: repeat(3, 1fr);
+            }
+
+            .life-cards .stat-card:nth-child(1),
+            .life-cards .stat-card:nth-child(6),
+            .life-loading span:nth-child(1),
+            .life-loading span:nth-child(6) {
+                grid-column: auto;
+            }
+
+            .life-cards .stat-card:nth-child(1) .stat-number,
+            .life-cards .stat-card:nth-child(6) .stat-number {
+                font-size: clamp(1.9rem, 2.8vw, 3rem);
+            }
+
+            .life-loading {
+                grid-template-columns: repeat(3, 1fr);
+                grid-auto-rows: 170px;
             }
 
             .life-split {
@@ -8950,6 +10249,10 @@
         /* ---- 手机 ---- */
         @media (max-width: 768px) {
             .life-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .life-loading {
                 grid-template-columns: repeat(2, 1fr);
             }
 
@@ -9145,8 +10448,9 @@
             }
 
             .life-loading {
-                grid-template-columns: repeat(2, 1fr);
-                height: 300px;
+                grid-template-columns: 1fr;
+                grid-auto-rows: 148px;
+                height: auto;
             }
         }
 

@@ -11,6 +11,40 @@
 
 ---
 
+## update: 45 — 2026-10-24
+
+### 七维雷达：把「重复计时」摊开
+- 新增 `LifeRadar.vue`：Work / Study / Life / Transport / Leisure / Health / Social 七个维度，
+  支持 DAY / ALL / 7D / 30D / YEAR 切换、日期步进与下拉，并与 NEURAL CORE 双向联动。
+  点任一维度打开详情：桌面 blocks（应用 / 标题 / 站点）、GPS、手表、手机分列。
+- 七维是**按来源相加**的（电脑和手机同时在用会算两次）。新增 `collapsedHours`
+  = 桌面区块 + 交通 + 锻炼 + 手机区间的**并集**，雷达底部显示 `UNIQUE TRACKED / OVERLAP`。
+- 手机上的对话式 AI（DeepSeek / ChatGPT / Claude / Gemini / Copilot / Perplexity）并入 Study；
+  Study 详情里单列 PHONE AI，让维度总数和桌面明细对得上。
+
+### 数据窗口与展示口径
+- Worker 的 `/api/life?days=N` 上限从 90 提到 400：雷达的 YEAR 以前其实只有 90 天数据，
+  标签和实际窗口对不上。
+- DAILY RHYTHM 的副标题改成实际天数（原来写死 7D，画的是 30 天），
+  悬浮提示的 `7D TOTAL` 改成 `DAY TOTAL`；WEEKDAY PROFILE 改成动态天数 + `AVERAGE PER WEEKDAY`。
+
+### LIFE 页面
+- 新增「今日统计」（`LifeToday.vue`）：桌面 / 站点 / 手机 / AI 四类当天累计，
+  卡片可点开查看该类完整明细（`LifeDetailModal.vue`）。
+- KPI 改为 4 × 2 bento 共 6 张，`SCREEN-ON HOURS` 可点开逐日桌面 / 手机表。
+- 跑步弹窗补分段配速、爬升 / 坡度、心率区间（`data/runStats.js`，纯函数）；
+  路线缩略图改用独立包围盒，操场小圈不再缩成一个点。
+- NEURAL CORE 改成「规则神经元」：8 条主树突 + 每日节点挂在末梢上，
+  可切换 RADIAL / PYRAMID 形态；布局仍是确定性 seed，截图可比对。
+
+### 分类规则（LifeLogging）
+- 浏览器里没命中强信号 → Study（看资料）；PUBG / TslGame → Leisure；
+  Antigravity / Cursor 等编辑器助手 → Work。
+- 短切片不再跨应用改写区块分类或标题 —— 之前 PUBG 会被隔壁的 Code/msedge 切片带成 Work。
+
+### 其它
+- `docs/` 增加站点架构与 LIFE 数据链路图（drawio + png）。
+
 ## update: 44 — 2026-10-24
 
 ### 跑步弹窗接上了 GPX / FIT 的逐秒数据

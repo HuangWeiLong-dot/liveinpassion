@@ -1,13 +1,14 @@
-// 3D「机械神经网络大脑」的纯数据层。
+// 3D「规则神经元」的纯数据层。
 //
-// 这里**不 import three**：点云、连线、日期环都只是数组，组件负责把它们喂给
+// 这里**不 import three**：骨架、节点、连线都只是数组，组件负责把它们喂给
 // BufferGeometry；验收脚本也能直接在 Node 里调用这些函数做结构断言。
 //
-// 数据映射（全部来自 /api/life 已公开的日聚合，不碰 raw 坐标/日记）：
-//   · 皮层节点按 8 个功能区分布，区的亮度 = 该分类在窗口内的时长占比
-//   · 突触 = 同区近邻 + 跨区桥接；桥接数量固定，不随数据变
-//   · 日期环 = 窗口内每天一颗珠子（缺日更小更暗），珠子大小 = 当日追踪时长
-// 几何是确定性随机的（固定 seed），所以每次刷新形状一致，截图可逐帧比对。
+// 两种形态共用同一套数据映射（全部来自 /api/life 已公开的日聚合，不碰 raw 坐标/日记）：
+//   · 8 个分类 = 8 条主树突，分类节点长在主干的分叉点（hub）上
+//   · 每天一颗节点，按序号挂在所属分类的末梢（twig）上
+//   · 每条主树突固定分出 5 条等角末梢，这个分叉不随数据变
+//   · 日期节点用自己的时间色（DAY_COLOR），不跟随分类色
+// 形态是确定性计算的（固定 seed 只用于节点微抖），每次刷新形状一致，截图可逐帧比对。
 
 // 8 个分类的顺序必须与 LifeView.vue 的 CATEGORY_ORDER / main.css 的 .is-color
 // 保持一致：数组下标就是 cat-N 的 N。
@@ -29,20 +30,16 @@ export const BRAIN_COLOR = {
   Other: '#9CA3AF',
 };
 
-// dir 是单位球上的方向；deformSurface 会把它压成脑壳上的点。
-// side 用来防止左半球的点被分到右半球锚点。
-const REGION_SEEDS = [
-  { cat: 'Work', side: -1, dir: [-0.70, 0.46, 0.55] },
-  { cat: 'Study', side: -1, dir: [-0.80, 0.04, -0.32] },
-  { cat: 'Life', side: 1, dir: [0.70, 0.46, 0.55] },
-  { cat: 'Transport', side: -1, dir: [-0.55, -0.34, 0.12] },
-  { cat: 'Leisure', side: 1, dir: [0.80, 0.04, -0.32] },
-  { cat: 'Health', side: 1, dir: [0.55, -0.34, 0.12] },
-  { cat: 'Social', side: 1, dir: [0.62, -0.02, -0.86] },
-  { cat: 'Other', side: -1, dir: [-0.62, -0.02, -0.86] },
+// 8 个分类的顺序必须与 LifeView.vue 的 CATEGORY_ORDER / main.css 的 .is-color
+// 保持一致：数组下标就是 cat-N 的 N。
+export const BRAIN_CATEGORY_ORDER = [
+  'Work', 'Study', 'Life', 'Transport', 'Leisure', 'Health', 'Social', 'Other',
 ];
 
-export const BRAIN_CATEGORY_ORDER = REGION_SEEDS.map((r) => r.cat);
+// 两种可切换的神经元形态：
+//   radial    放射状 —— 8 条主干等角分布，像海胆 / 星形神经元
+//   pyramidal 锥体   —— 4 条顶树突 + 4 条基树突 + 垂直轴突，教科书形状
+export const NEURON_MORPHS = ['radial', 'pyramidal'];
 
 const TAU = Math.PI * 2;
 
@@ -64,130 +61,142 @@ function unit([x, y, z]) {
   return [x / n, y / n, z / n];
 }
 
-// 脑壳：左右半球 + 纵向裂沟 + 几条脑回起伏 + 压平的底面。
-// 只依赖方向，不随机 —— 锚点、节点、连线共用同一个表面。
-export function deformSurface([x, y, z]) {
-  const s = x >= 0 ? 1 : -1;
-  const ax = Math.abs(x);
-  const front = Math.max(0, z);
-  const phi = Math.atan2(z, x);
-  // 三组频率叠出脑回；只看正面时也必须能看出起伏，所以振幅给得比真实比例大
-  const ridge = 1
-    + 0.050 * Math.sin(5.5 * phi + 2.8 * y)
-    + 0.032 * Math.sin(9 * y - 3.2 * phi)
-    + 0.018 * Math.cos(13 * y + 4 * phi);
-
-  // 纵裂：上半部分再宽一点，正面才有一个清楚的“左右两半”
-  const fissure = 0.085 + 0.030 * Math.max(0, y);
-  let px = s * (fissure + ax * 1.02) * (1 - 0.17 * front) * ridge;
-  let py = y * 0.78 * ridge;
-  let pz = z * 1.18 * ridge;
-
-  // 颞叶：下半部两侧向外鼓，侧面剪影才不是一颗蛋
-  const temporal = Math.max(0, -y) * Math.max(0, 1 - Math.abs(z) * 0.55);
-  px *= 1 + 0.07 * temporal;
-
-  // 顶面稍平，底面压平
-  if (py > 0.55) py = 0.55 + (py - 0.55) * 0.72;
-  if (py < -0.44) py = -0.44 + (py + 0.44) * 0.42;
-  return [px, py, pz];
+function addScaled(a, b, s) {
+  return [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 }
 
-function fibonacciSphere(count) {
-  const out = [];
-  const ga = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < count; i += 1) {
-    const y = 1 - (i / Math.max(1, count - 1)) * 2;
-    const r = Math.sqrt(Math.max(0, 1 - y * y));
-    const th = ga * i;
-    out.push([Math.cos(th) * r, y, Math.sin(th) * r]);
-  }
-  return out;
+function mixPoint(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+// 给一个方向配正交切向量，用来把末梢均匀摊在主干周围
+function tangentBasis(n) {
+  const helper = Math.abs(n[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const t1 = unit([
+    n[1] * helper[2] - n[2] * helper[1],
+    n[2] * helper[0] - n[0] * helper[2],
+    n[0] * helper[1] - n[1] * helper[0],
+  ]);
+  const t2 = [
+    n[1] * t1[2] - n[2] * t1[1],
+    n[2] * t1[0] - n[0] * t1[2],
+    n[0] * t1[1] - n[1] * t1[0],
+  ];
+  return [t1, t2];
 }
 
 /**
- * 皮层点云 + 8 个功能区锚点。
- * @param {{ count?: number, seed?: number }} opts
+ * 从 hub 出发的 count 条末梢，等角均匀张开，每条都是三段折线。
+ * 这是“规则”的来源：枝条数量、角度、长度都不随数据变。
  */
-export function buildBrainCloud({ count = 680, seed = 20261018 } = {}) {
-  const rng = createRng(seed);
-  const positions = [];
-  const regions = [];
+export function buildTwigs(hub, dir, { count = 5, length = 0.54 } = {}) {
+  const d = unit(dir);
+  const [t1, t2] = tangentBasis(d);
+  const twigs = [];
+  for (let j = 0; j < count; j += 1) {
+    const th = (j / count) * TAU + 0.35;
+    const spread = addScaled(addScaled(d, t1, Math.cos(th) * 0.52), t2, Math.sin(th) * 0.52);
+    const dt = unit(spread);
+    twigs.push([
+      hub.slice(),
+      addScaled(hub, dt, length * 0.46),
+      addScaled(hub, dt, length),
+    ]);
+  }
+  return twigs;
+}
 
-  const anchors = REGION_SEEDS.map((seedDef) => {
-    const p = deformSurface(unit(seedDef.dir));
+const SOMA = {
+  radial: [0, 0, 0],
+  pyramidal: [0, -0.12, 0],
+};
+
+// 放射状：8 条主干每 45° 一条，高低交替，分类节点在主干末端。
+function radialAnchors() {
+  return BRAIN_CATEGORY_ORDER.map((cat, i) => {
+    const az = i * (TAU / 8) + Math.PI / 8;
+    const el = i % 2 === 0 ? 0.30 : -0.26;
+    const d = unit([
+      Math.cos(el) * Math.cos(az),
+      Math.sin(el),
+      Math.cos(el) * Math.sin(az),
+    ]);
+    const hub = d.map((v) => v * 0.84);
     return {
-      cat: seedDef.cat,
-      side: seedDef.side,
-      p,
-      // 稍往里收一点：射线更容易先打到近侧的锚点
-      probe: [p[0] * 0.94, p[1] * 0.94, p[2] * 0.94],
+      cat,
+      side: hub[0] >= 0 ? 1 : -1,
+      role: 'radial',
+      p: hub,
+      trunk: [d.map((v) => v * 0.16), d.map((v) => v * 0.50), hub],
+      twigs: buildTwigs(hub, d, { count: 5, length: 0.62 }),
     };
   });
+}
 
-  function regionFor(p) {
-    const side = p[0] >= 0 ? 1 : -1;
-    let best = 'Other';
-    let bestD = Infinity;
-    for (const a of anchors) {
-      if (a.side !== side && Math.abs(p[0]) > 0.06) continue;
-      const d = (p[0] - a.p[0]) ** 2
-        + (p[1] - a.p[1]) ** 2
-        + (p[2] - a.p[2]) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = a.cat;
-      }
-    }
-    return best;
+// 锥体：顶树突从主干分叉成冠（4 条），基树突向下摊开（4 条）。
+// 坐标写死而不是算出来 —— 这样镜头取景、标签位置在数据变化时保持稳定。
+function pyramidalAnchors() {
+  const defs = [
+    { cat: 'Work', hub: [-0.52, 0.74, 0.16], dir: [-0.62, 0.62, 0.30] },
+    { cat: 'Study', hub: [0.52, 0.74, 0.16], dir: [0.62, 0.62, 0.30] },
+    { cat: 'Life', hub: [-0.30, 0.92, -0.30], dir: [-0.30, 0.68, -0.60] },
+    { cat: 'Transport', hub: [0.30, 0.92, -0.30], dir: [0.30, 0.68, -0.60] },
+    { cat: 'Leisure', hub: [-0.66, -0.40, 0.22], dir: [-0.86, -0.32, 0.28] },
+    { cat: 'Health', hub: [0.66, -0.40, 0.22], dir: [0.86, -0.32, 0.28] },
+    { cat: 'Social', hub: [-0.50, -0.56, -0.30], dir: [-0.62, -0.48, -0.52] },
+    { cat: 'Other', hub: [0.50, -0.56, -0.30], dir: [0.62, -0.48, -0.52] },
+  ];
+  const topKnot = [0, 0.36, 0];
+  const bottomKnot = [0, -0.24, 0];
+  return defs.map((def, i) => {
+    const apical = i < 4;
+    const start = (apical ? topKnot : bottomKnot).slice();
+    const hub = def.hub.slice();
+    const mid = mixPoint(start, hub, 0.55);
+    mid[1] += apical ? 0.06 : -0.05;
+    return {
+      cat: def.cat,
+      side: hub[0] >= 0 ? 1 : -1,
+      role: apical ? 'apical' : 'basal',
+      p: hub,
+      trunk: [start, mid, hub],
+      twigs: buildTwigs(hub, def.dir, { count: 5, length: 0.55 }),
+    };
+  });
+}
+
+/**
+ * 规则神经元骨架：胞体 + 8 条主树突（含末梢）+ 轴突。
+ * 组件用它画线框 / 树突小刺 / 髓鞘，数据层用它给日期节点定位。
+ * @param {'radial'|'pyramidal'} morph
+ */
+export function buildNeuronScaffold(morph = 'radial') {
+  const mode = NEURON_MORPHS.includes(morph) ? morph : 'radial';
+  const soma = SOMA[mode].slice();
+  const anchors = mode === 'radial' ? radialAnchors() : pyramidalAnchors();
+  const branches = [];
+
+  if (mode === 'pyramidal') {
+    // 顶树突的主干：胞体 → 分叉点
+    branches.push({ role: 'trunk', cat: null, points: [soma.slice(), [0, 0.36, 0]] });
   }
-
-  const cortex = Math.max(120, Math.round(count * 0.84));
-  const cerebellum = Math.max(24, Math.round(count * 0.1));
-  const stem = Math.max(12, count - cortex - cerebellum);
-
-  fibonacciSphere(cortex).forEach((dir) => {
-    const p = deformSurface(dir);
-    // 壳厚：同一方向上的点略有内外偏移，读起来才有体积
-    const j = 0.965 + rng() * 0.07;
-    const q = [p[0] * j, p[1] * j, p[2] * j];
-    positions.push(q);
-    regions.push(regionFor(q));
+  anchors.forEach((a) => {
+    branches.push({ role: 'trunk', cat: a.cat, points: a.trunk });
+    a.twigs.forEach((points) => branches.push({ role: 'twig', cat: a.cat, points }));
   });
 
-  // 小脑：后下方的另一个椭球，只取下半部分
-  for (let i = 0; i < cerebellum; i += 1) {
-    let ux; let uy; let uz; let r2;
-    do {
-      ux = rng() * 2 - 1;
-      uy = rng() * 2 - 1;
-      uz = rng() * 2 - 1;
-      r2 = ux * ux + uy * uy + uz * uz;
-    } while (r2 > 1 || r2 < 0.04 || uy > 0.45 || uz > 0.4);
+  const axon = mode === 'pyramidal'
+    // 轴突垂直穿过日期环，末端再分两支
+    ? [[0, -0.26, 0], [0, -0.66, 0], [0, -1.06, 0.02], [0, -1.38, 0]]
+    : [[0, -0.14, 0], [0, -0.52, 0], [0, -0.92, 0]];
 
-    const fold = 1 + 0.045 * Math.sin(ux * 18) * Math.cos(uz * 14);
-    positions.push([
-      ux * 0.46 * fold,
-      -0.36 + uy * 0.27 * fold,
-      -0.62 + uz * 0.36 * fold,
-    ]);
-    regions.push('Other');
+  if (mode === 'pyramidal') {
+    const tip = axon[axon.length - 1];
+    branches.push({ role: 'axon', cat: null, points: [tip.slice(), [-0.16, -1.55, 0.02]] });
+    branches.push({ role: 'axon', cat: null, points: [tip.slice(), [0.16, -1.55, 0.02]] });
   }
 
-  // 脑干：从底面往下的一小段锥体，机械感主要靠它和日期环咬合
-  for (let i = 0; i < stem; i += 1) {
-    const t = i / Math.max(1, stem - 1);
-    const a = rng() * TAU;
-    const rad = (0.12 - t * 0.055) * (0.55 + rng() * 0.45);
-    positions.push([
-      Math.cos(a) * rad,
-      -0.38 - t * 0.62,
-      -0.30 + Math.sin(a) * rad,
-    ]);
-    regions.push('Other');
-  }
-
-  return { positions, regions, anchors };
+  return { morph: mode, soma, anchors, branches, axon };
 }
 
 /**
@@ -245,14 +254,14 @@ export function buildBrainModel(rows = []) {
   }
 
   const totalHours = BRAIN_CATEGORY_ORDER.reduce((a, cat) => a + totals[cat], 0);
-  const categories = REGION_SEEDS.map((seed) => {
-    const hours = totals[seed.cat];
+  const categories = BRAIN_CATEGORY_ORDER.map((name) => {
+    const hours = totals[name];
     return {
-      name: seed.cat,
-      color: BRAIN_COLOR[seed.cat],
+      name,
+      color: BRAIN_COLOR[name],
       hours,
       share: totalHours ? hours / totalHours : 0,
-      activeDays: activeDays[seed.cat],
+      activeDays: activeDays[name],
     };
   });
   const maxShare = Math.max(...categories.map((c) => c.share), 0);
@@ -278,19 +287,41 @@ export function shortDate(day) {
   return `${String(d).padStart(2, '0')} ${MONTHS[m - 1]}`;
 }
 
+// 折线上按弧长比例取点：日期节点就是沿末梢均匀挂上去的。
+function polylinePoint(points, t) {
+  const cumulative = [];
+  let total = 0;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    total += Math.hypot(
+      points[i + 1][0] - points[i][0],
+      points[i + 1][1] - points[i][1],
+      points[i + 1][2] - points[i][2],
+    );
+    cumulative.push(total);
+  }
+  if (!total) return points[0].slice();
+  const target = Math.max(0, Math.min(1, t)) * total;
+  let seg = 0;
+  while (seg < cumulative.length - 1 && cumulative[seg] < target) seg += 1;
+  const before = seg === 0 ? 0 : cumulative[seg - 1];
+  const span = cumulative[seg] - before || 1;
+  const f = Math.max(0, Math.min(1, (target - before) / span));
+  return mixPoint(points[seg], points[seg + 1], f);
+}
+
 /**
- * Obsidian 风格的 3D 图：8 个分类枢纽 + 每天一个节点。
+ * 规则神经元图：8 条主树突的 hub + 每天一个节点。
  *
  * 三种连线：
  *   flow     当天 → 时长最多的两个分类（每天最多 2 条）
- *   link     分类 ↔ 分类（按同一天共同出现的次数取前 12 条），形成思维导图的骨架
- *   entangle 两个“相似日”之间的长弧（同主分类、追踪时长最接近），量子纠缠那种跨远端的连线
+ *   link     分类 ↔ 分类（按同一天共同出现的次数取前 12 条），形成图的骨架
+ *   entangle 两个“相似日”之间的长弧（同主分类、追踪时长最接近）
  *
- * 节点位置是确定性的（固定 seed + 松弛），所以同一份数据每次进页面形状一致。
+ * 节点位置是确定性的（骨架固定 + 固定 seed 微抖），同一份数据每次进页面形状一致。
  */
-export function buildBrainGraph(rows = [], cloud) {
+export function buildBrainGraph(rows = [], scaffold) {
   const model = buildBrainModel(rows);
-  const anchors = new Map(cloud.anchors.map((a) => [a.cat, a]));
+  const anchors = new Map(scaffold.anchors.map((a) => [a.cat, a]));
   const rng = createRng(0x51a7c0de);
   const nodes = [];
 
@@ -302,7 +333,7 @@ export function buildBrainGraph(rows = [], cloud) {
       index: i,
       cat: c.name,
       label: c.name,
-      position: [a.p[0] * 1.02, a.p[1] * 1.02, a.p[2] * 1.02],
+      position: a.p.slice(),
       value: c.hours,
       weight: c.weight,
     });
@@ -333,58 +364,51 @@ export function buildBrainGraph(rows = [], cloud) {
     return best;
   }
 
+  // 缺日不上树，所以不占末梢上的槽位
   model.days.forEach((d) => {
+    if (d.missing) return;
     const primary = clusterOf(d);
     countByCat[primary] = (countByCat[primary] || 0) + 1;
   });
 
   model.days.forEach((d, i) => {
     const primary = clusterOf(d);
-    const k = rankByCat[primary] || 0;
-    rankByCat[primary] = k + 1;
+    // 缺日不占槽位：真实日期的序号在末梢上连续排开
+    let k = 0;
+    if (!d.missing) {
+      k = rankByCat[primary] || 0;
+      rankByCat[primary] = k + 1;
+    }
 
     let pos;
     if (d.missing) {
-      // 缺日：沿脑壳后侧放一圈暗点，不和数据节点抢位置
+      // 缺日：挂在日期环外圈，不上树，也不和真实节点抢位置
       const ang = (i / Math.max(1, model.days.length)) * TAU + 0.6;
       pos = [
-        Math.cos(ang) * 1.18,
-        -0.12 + rng() * 0.3,
-        Math.sin(ang) * 0.92 - 0.15,
+        Math.cos(ang) * 1.30,
+        -0.22 + rng() * 0.22,
+        Math.sin(ang) * 1.02 - 0.10,
       ];
     } else {
       const a = anchors.get(primary);
-      const secondary = BRAIN_CATEGORY_ORDER
-        .filter((c) => c !== primary)
-        .map((c) => [c, d.categories[c] || 0])
-        .sort((x, y) => y[1] - x[1])[0];
-      const b = secondary && secondary[1] > 0.05 ? anchors.get(secondary[0]) : a;
-
-      // 以主分类的锚点为圆心，在它的切平面上散开
-      const n = unit(a.p);
-      let t1 = unit([-n[2], 0, n[0]]);
-      if (t1[0] === 0 && t1[1] === 0 && t1[2] === 0) t1 = [1, 0, 0];
-      const t2 = unit([
-        n[1] * t1[2] - n[2] * t1[1],
-        n[2] * t1[0] - n[0] * t1[2],
-        n[0] * t1[1] - n[1] * t1[0],
-      ]);
-
       const cnt = countByCat[primary] || 1;
-      const spread = cnt > 1 ? 0.46 : 0.18;
-      const rad = 0.14 + spread * Math.sqrt((k + 0.5) / cnt) * (0.72 + 0.5 * rng());
-      const ang = k * 2.399963 + (rng() - 0.5) * 0.6;
-      const normalJitter = (rng() * 2 - 1) * 0.09;
 
-      // 0.82 把点从脑壳表面推进去一点；副分类只拉一点点
-      pos = [
-        a.p[0] * 0.82 + b.p[0] * 0.08
-          + t1[0] * Math.cos(ang) * rad + t2[0] * Math.sin(ang) * rad + n[0] * normalJitter,
-        a.p[1] * 0.82 + b.p[1] * 0.08
-          + t1[1] * Math.cos(ang) * rad + t2[1] * Math.sin(ang) * rad + n[1] * normalJitter,
-        a.p[2] * 0.82 + b.p[2] * 0.08
-          + t1[2] * Math.cos(ang) * rad + t2[2] * Math.sin(ang) * rad + n[2] * normalJitter,
-      ];
+      // 同一条末梢上按序号等距排开：同一根枝最多挂 ceil(cnt / twigs) 颗
+      const twig = a.twigs[k % a.twigs.length];
+      const slot = Math.floor(k / a.twigs.length);
+      const slots = Math.max(1, Math.ceil(cnt / a.twigs.length));
+      // 从 0.52 起挂：离 hub 留出 0.3+ 的空档，日期节点不会挡住枢纽的点击
+      const t = 0.52 + 0.46 * ((slot + 0.5) / slots);
+      pos = polylinePoint(twig, t);
+
+      // 侧向只给很小的确定性偏移，节点读起来仍然「长在枝上」
+      const tangent = unit([
+        twig[2][0] - twig[0][0],
+        twig[2][1] - twig[0][1],
+        twig[2][2] - twig[0][2],
+      ]);
+      const [t1] = tangentBasis(tangent);
+      pos = addScaled(pos, t1, (rng() - 0.5) * 0.05);
     }
 
     const node = {
@@ -405,8 +429,8 @@ export function buildBrainGraph(rows = [], cloud) {
     dayNodes.push(node);
   });
 
-  // 日期节点互相松弛一下，避免同一天主分类下的几颗叠在一起
-  const MIN_D = 0.17;
+  // 日期节点互相松弛一下，避免同一条末梢上相邻的几颗叠在一起
+  const MIN_D = 0.11;
   for (let iter = 0; iter < 28; iter += 1) {
     for (let i = 0; i < dayNodes.length; i += 1) {
       for (let j = i + 1; j < dayNodes.length; j += 1) {
@@ -427,11 +451,11 @@ export function buildBrainGraph(rows = [], cloud) {
       }
     }
   }
-  // 约束在脑壳里，别被松弛推到外面
+  // 约束在树突末梢的范围内，别被松弛推到外面
   dayNodes.forEach((n) => {
     const r = Math.hypot(n.position[0], n.position[1], n.position[2]);
-    if (r > 1.52) {
-      n.position = n.position.map((v) => (v / r) * 1.52);
+    if (r > 1.75) {
+      n.position = n.position.map((v) => (v / r) * 1.75);
     }
   });
 
@@ -500,12 +524,6 @@ export function buildBrainGraph(rows = [], cloud) {
       used.add(best.id);
       addEdge(n.id, best.id, 'entangle', 1 - bestScore / 2.6);
     }
-  });
-
-  // 整体放大一点：日期簇和 8 个枢纽占满脑壳内部，不要缩在中间
-  const spread = 1.14;
-  nodes.forEach((n) => {
-    n.position = n.position.map((v) => v * spread);
   });
 
   return { model, nodes, edges, dayNodes };

@@ -297,6 +297,7 @@ const BRAIN_STATE = `(function () {
     auto: el.dataset.brainAuto,
     color: el.dataset.brainColor,
     full: el.dataset.brainFull,
+    morph: el.dataset.brainMorph,
     days: Number(el.dataset.brainDays || 0),
     nodes: Number(el.dataset.brainNodes || 0),
     edges: Number(el.dataset.brainEdges || 0),
@@ -384,7 +385,99 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (state.labelCount < 8) throw new Error(`category labels missing (${state.labelCount})`);
   if (state.canvasW < 300 || state.canvasH < 200) throw new Error('canvas has no drawing buffer');
   if (state.overflow > 0) throw new Error(`horizontal overflow ${state.overflow}px`);
+  if (state.morph !== 'radial') throw new Error(`default morphology should be radial, got ${state.morph}`);
   await shot('graph');
+
+  // 七维雷达 ↔ 神经核心联动
+  // 雷达切到 DAY → 神经核心推到最新一天（day:29）
+  const clickRadarRange = (label) => evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-radar-range'), function (n) {
+      return n.textContent.trim() === '${label}';
+    });
+    if (!b) throw new Error('radar range ${label} not found');
+    b.click();
+  })()`);
+  await clickRadarRange('DAY');
+  await sleep(1800);
+  state = JSON.parse(await evalJs(BRAIN_STATE));
+  console.log('  radar→brain:', state.selected);
+  if (state.selected !== 'day:29') {
+    throw new Error(`radar DAY should select the latest day node, got ${state.selected}`);
+  }
+  const radarDay = JSON.parse(await evalJs(`(function () {
+    var s = document.querySelector('.life-radar-select');
+    var key = document.querySelector('.life-radar-key');
+    return JSON.stringify({
+      hasSelect: !!s,
+      value: s ? s.value : '',
+      last: s ? s.options[s.options.length - 1].value : '',
+      legend: key ? key.textContent.replace(/\\s+/g, ' ').trim() : '',
+    });
+  })()`));
+  if (!radarDay.hasSelect || !/^DAY · /.test(radarDay.legend)) {
+    throw new Error(`radar did not switch to DAY: ${radarDay.legend}`);
+  }
+
+  // 神经核心的 DAY › 从最后一天绕回第一天 → 雷达跟着切日期
+  await evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-brain-btn'), function (n) {
+      return n.textContent.trim() === 'DAY ›';
+    });
+    if (!b) throw new Error('DAY next button not found');
+    b.click();
+  })()`);
+  await sleep(1800);
+  state = JSON.parse(await evalJs(BRAIN_STATE));
+  const brainToRadar = JSON.parse(await evalJs(`(function () {
+    var s = document.querySelector('.life-radar-select');
+    var key = document.querySelector('.life-radar-key');
+    return JSON.stringify({
+      value: s ? s.value : '',
+      last: s ? s.options[s.options.length - 1].value : '',
+      legend: key ? key.textContent.replace(/\\s+/g, ' ').trim() : '',
+    });
+  })()`));
+  console.log('  brain→radar:', state.selected, brainToRadar.value);
+  if (state.selected !== 'day:0') {
+    throw new Error(`DAY › should wrap to day:0, got ${state.selected}`);
+  }
+  if (brainToRadar.value !== brainToRadar.last) {
+    throw new Error(`radar did not follow the brain day: ${brainToRadar.value} != ${brainToRadar.last}`);
+  }
+  if (!/^DAY · /.test(brainToRadar.legend)) throw new Error('radar left DAY mode after brain selection');
+
+  // 回到默认 7D 并清掉选中，后续形态 / 拖拽 / 悬停测试不受联动状态影响
+  await clickRadarRange('7D');
+  await evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-brain-btn'), function (n) {
+      return n.textContent.trim() === 'RESET';
+    });
+    if (b) b.click();
+  })()`);
+  await sleep(1200);
+  state = JSON.parse(await evalJs(BRAIN_STATE));
+  if (state.selected !== 'none') throw new Error(`RESET left a node selected: ${state.selected}`);
+
+  // 形态切换：放射状 → 锥体。节点/连线数量不变，只是骨架重排
+  const clickMorph = async (label) => evalJs(`(function () {
+    var b = Array.prototype.find.call(document.querySelectorAll('.life-brain-btn'), function (n) {
+      return n.textContent.trim() === '${label}';
+    });
+    if (!b) throw new Error('morph button ${label} not found');
+    b.click();
+  })()`);
+  await clickMorph('RADIAL');
+  await sleep(1400);
+  const pyrState = JSON.parse(await evalJs(BRAIN_STATE));
+  console.log('  morph:', pyrState.morph, 'nodes:', pyrState.nodes, 'edges:', pyrState.edges);
+  if (pyrState.morph !== 'pyramidal') throw new Error(`morph button did not switch: ${pyrState.morph}`);
+  if (pyrState.nodes !== 38) throw new Error(`pyramidal morphology lost nodes: ${pyrState.nodes}`);
+  if (pyrState.labelCount < 8) throw new Error('pyramidal morphology lost labels');
+  await shot('pyramidal');
+  await clickMorph('PYRAMID');
+  await sleep(1200);
+  state = JSON.parse(await evalJs(BRAIN_STATE));
+  if (state.morph !== 'radial') throw new Error(`morph button did not switch back: ${state.morph}`);
 
   // 拖拽旋转：镜头动的时候标签必须让路（不在屏幕上到处飘）
   const cx0 = state.rect.x + state.rect.w / 2;

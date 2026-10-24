@@ -257,7 +257,7 @@ function watchName(file, valueText) {
  * 单条跑步路线的迷你投影。**自成包围盒**：PLACES 大图是 30 天拼在一起，
  * 一次 1 km 的跑步在上面只有几个像素；弹窗里要给的是「这一跑长什么样」。
  */
-export function buildRunRoute(path, { width = 240, height = 120, pad = 10 } = {}) {
+export function buildRunRoute(path, { width = 240, height = 160, pad = 10 } = {}) {
   const pts = (path || []).filter((p) => Array.isArray(p) && n(p[0]) != null && n(p[1]) != null);
   if (pts.length < 2) return null;
 
@@ -274,8 +274,9 @@ export function buildRunRoute(path, { width = 240, height = 120, pad = 10 } = {}
 
   const midLat = (minLat + maxLat) / 2;
   const kx = Math.cos((midLat * Math.PI) / 180);
-  // 和大地图同一个下限：一次在学校操场绕圈也不该被放大成像素级抖动
-  const minSpan = 0.004;
+  // 下限只防 GPS 抖动，**不**沿用大地图的 0.004°（≈440 m）：操场上一圈才
+  // 一两百米，用大地图的下限会把整条路线挤成图中间一个小点。
+  const minSpan = 0.0006;
   if (maxLat - minLat < minSpan) {
     const c = (minLat + maxLat) / 2;
     minLat = c - minSpan / 2;
