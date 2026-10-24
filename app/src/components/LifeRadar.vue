@@ -922,9 +922,9 @@ onBeforeUnmount(() => {
       <p
         v-if="collapsedStats.has"
         class="life-radar-unique"
-        title="UNIQUE = union of desktop blocks, transport, workouts and phone apps. OVERLAP = the 7-DIM sum minus that union."
+        title="UNIQUE TIME = union of desktop blocks, transport, workouts and phone apps (no minute counted twice). OVERLAP = the 7-DIM sum minus that union; desktop «Other» sits inside the union but outside the seven dimensions, so this is a lower bound."
       >
-        <span>UNIQUE TRACKED <b>{{ hourFmt(collapsedStats.unique) }}</b></span>
+        <span>UNIQUE TIME <b>{{ hourFmt(collapsedStats.unique) }}</b></span>
         <span>OVERLAP <b>{{ hourFmt(collapsedStats.overlap) }}</b></span>
         <em v-if="collapsedStats.covered < collapsedStats.total">
           {{ collapsedStats.covered }}/{{ collapsedStats.total }} DAYS
