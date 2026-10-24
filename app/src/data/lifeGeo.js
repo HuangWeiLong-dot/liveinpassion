@@ -75,12 +75,23 @@ export function parseLocationEvents(doc) {
           minutes,
           start: meta.start_utc || e.ts_utc || '',
           end: meta.end_utc || '',
+          // 逐帧采样（心率/速度/海拔），只有部分来源有：FIT 有心率，
+          // GPX 只有速度和海拔。给跑步弹窗画曲线用。
+          samples: meta.samples && typeof meta.samples === 'object' ? meta.samples : null,
+          name: watchName(meta.file, e.value_text),
         };
         // 同一活动来了第二份文件：留点数多的那条路径（FIT 通常更密），
-        // 距离/时长跟着它的值走，不叠加。
+        // 距离/时长跟着它的值走，不叠加。**采样单独挑**：心率只有 FIT 有，
+        // 不能因为 GPX 恰好点数多就把曲线丢掉。
         if (seen < 0) track.watchPaths.push(next);
-        else if (path.length > track.watchPaths[seen].path.length) {
-          track.watchPaths[seen] = next;
+        else {
+          const cur = track.watchPaths[seen];
+          const keep = path.length > cur.path.length ? next : cur;
+          const other = keep === next ? cur : next;
+          const withHr = keep.samples?.hr?.length
+            ? keep.samples
+            : other.samples?.hr?.length ? other.samples : (keep.samples || other.samples);
+          track.watchPaths[seen] = { ...keep, samples: withHr || null };
         }
       }
       continue;
@@ -223,6 +234,81 @@ function simplify(points, minPx) {
   }
   if (out.length === 1) out.push(points[points.length - 1]);
   return out;
+}
+
+/**
+ * 从文件名里猜这次跑的名称。Gadgetbridge 导出的是
+ * `2026-10-23T08_54_12+08_00-running.gpx`；中继按内容 sha1 存文件时名字是哈希，
+ * 那就退回 value_text。两边都认不出就返回空串，界面显示 RUN。
+ */
+function watchName(file, valueText) {
+  const isHash = (s) => /^[0-9a-f]{40}$/i.test(s);
+  const clean = (s) => String(s || '')
+    .replace(/\.(gpx|fit)$/i, '')
+    .replace(/^\d{4}-\d{2}-\d{2}T[\d_+:-]+-/, '')
+    .trim();
+  for (const candidate of [clean(file), clean(valueText)]) {
+    if (candidate && !isHash(candidate)) return candidate.slice(0, 24);
+  }
+  return '';
+}
+
+/**
+ * 单条跑步路线的迷你投影。**自成包围盒**：PLACES 大图是 30 天拼在一起，
+ * 一次 1 km 的跑步在上面只有几个像素；弹窗里要给的是「这一跑长什么样」。
+ */
+export function buildRunRoute(path, { width = 240, height = 120, pad = 10 } = {}) {
+  const pts = (path || []).filter((p) => Array.isArray(p) && n(p[0]) != null && n(p[1]) != null);
+  if (pts.length < 2) return null;
+
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  for (const [lat, lon] of pts) {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  }
+
+  const midLat = (minLat + maxLat) / 2;
+  const kx = Math.cos((midLat * Math.PI) / 180);
+  // 和大地图同一个下限：一次在学校操场绕圈也不该被放大成像素级抖动
+  const minSpan = 0.004;
+  if (maxLat - minLat < minSpan) {
+    const c = (minLat + maxLat) / 2;
+    minLat = c - minSpan / 2;
+    maxLat = c + minSpan / 2;
+  }
+  if ((maxLon - minLon) * kx < minSpan) {
+    const c = (minLon + maxLon) / 2;
+    const half = minSpan / kx / 2;
+    minLon = c - half;
+    maxLon = c + half;
+  }
+
+  const spanX = (maxLon - minLon) * kx;
+  const spanY = maxLat - minLat;
+  const scale = Math.min((width - pad * 2) / spanX, (height - pad * 2) / spanY);
+  const offX = (width - spanX * scale) / 2;
+  const offY = (height - spanY * scale) / 2;
+  const project = ([lat, lon]) => [
+    offX + (lon - minLon) * kx * scale,
+    offY + (maxLat - lat) * scale,
+  ];
+
+  const projected = simplify(pts.map(project), 0.9);
+  const d = `M${projected.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' L')}`;
+  const start = project(pts[0]);
+  const end = project(pts[pts.length - 1]);
+  return {
+    width,
+    height,
+    d,
+    start: { x: start[0], y: start[1] },
+    end: { x: end[0], y: end[1] },
+  };
 }
 
 function niceKm(raw) {

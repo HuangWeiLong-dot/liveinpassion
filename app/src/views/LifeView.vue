@@ -30,6 +30,7 @@ import {
 import {
   MAP_BATCH_DAYS,
   buildGeoMap,
+  buildRunRoute,
   loadLifeTracks,
 } from '../data/lifeGeo.js';
 
@@ -649,6 +650,114 @@ const watchSummary = computed(() => {
   };
 });
 
+// ── 跑步明细：把数据库里的 workout 和手表文件里的轨迹/采样对上 ──────────
+//
+// 两边的来源不同、可用性也不同：
+//   · workouts  来自笔记本从 Gadgetbridge 数据库算的聚合，有名字、卡路里、
+//               恢复时间，但**没有路线和逐秒曲线**。
+//   · watchPaths 来自 GPX/FIT 解析（服务器每 15 分钟发布），有路线和心率/配速/
+//               海拔采样，但除了文件名什么元数据都没有。
+// 按开始时间配对（同一次锻炼两边逐秒相同）；配不上的单独成一条 ——
+// 笔记本关机那天就属于这种，聚合里根本没有它。
+
+const watchRunsByDay = ref({});
+const runsLoading = ref(false);
+
+function collectWatchRuns(tracks) {
+  const next = { ...watchRunsByDay.value };
+  (tracks || []).forEach((t) => {
+    if (!t?.day) return;
+    // 没有手表的日期也记成空数组：那是「查过了，没有」，
+    // 别让每次打开弹窗都重新请求一遍。
+    next[t.day] = (t.watchPaths || []).map((w) => ({ ...w, day: t.day }));
+  });
+  watchRunsByDay.value = next;
+}
+
+watch(mapTracks, (tracks) => collectWatchRuns(tracks));
+
+function runKeyStart(value) {
+  const ms = Date.parse(String(value || ''));
+  return Number.isNaN(ms) ? null : ms;
+}
+
+const watchRuns = computed(() => Object.values(watchRunsByDay.value).flat());
+
+const runEntries = computed(() => {
+  const pools = watchRuns.value.slice();
+  const used = new Set();
+  const rows = watchSummary.value.workouts.map((w) => {
+    const start = runKeyStart(w.start);
+    const hit = start == null ? null : pools.find((x) => {
+      if (used.has(x)) return false;
+      const other = runKeyStart(x.start);
+      return other != null && Math.abs(other - start) <= 120000;
+    });
+    if (hit) used.add(hit);
+    return {
+      ...w,
+      route: hit ? buildRunRoute(hit.path) : null,
+      samples: hit?.samples || null,
+      watchOnly: false,
+    };
+  });
+  pools.forEach((x) => {
+    if (used.has(x)) return;
+    rows.push({
+      start: x.start,
+      end: x.end,
+      day: x.day,
+      name: x.name || 'WATCH RUN',
+      minutes: x.minutes,
+      km: x.km,
+      route: buildRunRoute(x.path),
+      samples: x.samples || null,
+      watchOnly: true,
+    });
+  });
+  return rows.sort((a, b) => String(b.start || '').localeCompare(String(a.start || '')));
+});
+
+/** 采样数组 → SVG 折线。缺测的点直接断开，不要连成直线。 */
+function samplePath(values, tArr, { width = 240, height = 64, pad = 4 } = {}) {
+  if (!Array.isArray(values) || !Array.isArray(tArr) || values.length < 2) return '';
+  const nums = values.filter((v) => v != null);
+  if (nums.length < 2) return '';
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  const span = hi - lo || 1;
+  const tMax = tArr[tArr.length - 1] || 1;
+  const pts = [];
+  for (let i = 0; i < values.length; i += 1) {
+    const v = values[i];
+    pts.push(v == null ? null : [
+      pad + ((tArr[i] || 0) / tMax) * (width - pad * 2),
+      height - pad - ((v - lo) / span) * (height - pad * 2),
+    ]);
+  }
+  let d = '';
+  let pen = false;
+  pts.forEach((p) => {
+    if (!p) { pen = false; return; }
+    d += `${pen ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+    pen = true;
+  });
+  return d;
+}
+
+function sampleRange(values) {
+  const nums = (values || []).filter((v) => v != null);
+  if (!nums.length) return null;
+  return { lo: Math.min(...nums), hi: Math.max(...nums) };
+}
+
+/** 速度（m/s）→ 配速（秒/公里）。站着的点（<0.5 m/s）算缺测，别画成 30 分配速。 */
+function paceSeries(samples) {
+  if (!Array.isArray(samples?.v)) return null;
+  const out = samples.v.map((v) => (v != null && v > 0.5 ? 1000 / v : null));
+  return out.some((v) => v != null) ? out : null;
+}
+
 // ── 实时状态（来自 LifeNow 的 /api/life/now 快照） ─────────────────────
 function liveAge(value) {
   if (!value) return '—';
@@ -1218,10 +1327,26 @@ function closeDay() {
   }
 }
 
-function openRuns() {
+const runsFetching = ref(false);
+
+async function openRuns() {
   if (!watchSummary.value.workouts.length) return;
   runsOpen.value = true;
   document.body.classList.add('no-scroll');
+  // 弹窗要画路线和曲线，但这时 PLACES 面板可能还没进视口、地图一天都没拉。
+  // 只补「有 workout 的那几天」，不为一个弹窗把 30 天全拉一遍；
+  // 地图已经拉过的那天直接用缓存，不重复请求。
+  const days = [...new Set(watchSummary.value.workouts.map((w) => w.day))]
+    .filter((d) => d && !watchRunsByDay.value[d]);
+  if (!days.length) return;
+  runsFetching.value = true;
+  try {
+    collectWatchRuns(await loadLifeTracks(days, { base: CMS_BASE, concurrency: 3 }));
+  } catch {
+    /* 拿不到轨迹就只显示数据库里的数字，不该把弹窗卡住 */
+  } finally {
+    runsFetching.value = false;
+  }
 }
 
 function closeRuns() {
@@ -3369,16 +3494,17 @@ onBeforeUnmount(() => {
 
             <div class="life-runs-modal-body">
               <article
-                v-for="w in watchSummary.workouts"
+                v-for="w in runEntries"
                 :key="w.start"
                 class="life-run-modal-item"
+                :class="{ 'is-watch-only': w.watchOnly }"
               >
                 <div class="life-run-modal-head">
                   <span class="life-run-modal-when">{{ fullDay(w.day) }} · {{ isoHhmm(w.start) }}</span>
                   <span class="life-run-modal-name">{{ w.name || 'RUN' }}</span>
                   <strong>{{ w.km != null ? Number(w.km).toFixed(2) : '—' }}<small>km</small></strong>
                   <span>{{ w.minutes ? minutesLabel(w.minutes) : '—' }}</span>
-                  <span>{{ w.paceS ? paceLabel(w.paceS) : '—' }}</span>
+                  <span>{{ w.paceS ? paceLabel(w.paceS) : (w.km && w.minutes ? paceLabel((w.minutes * 60) / w.km) : '—') }}</span>
                 </div>
                 <div class="life-run-modal-meta">
                   <span v-if="w.avgHr != null">AVG HR {{ w.avgHr }}</span>
@@ -3390,9 +3516,72 @@ onBeforeUnmount(() => {
                   <span v-if="w.trainingEffect != null">TE {{ w.trainingEffect }}</span>
                   <span v-if="w.recoveryHours != null">RECOVERY {{ w.recoveryHours }} h</span>
                   <span v-if="w.end">{{ isoHhmm(w.start) }}–{{ isoHhmm(w.end) }}</span>
+                  <!-- 笔记本那天没跑出聚合，只剩手表文件：只有路线和时长是真的 -->
+                  <span v-if="w.watchOnly" class="life-run-modal-tag">WATCH FILE ONLY</span>
+                </div>
+
+                <div v-if="w.route || w.samples" class="life-run-modal-charts">
+                  <div class="life-run-chart">
+                    <span class="life-run-chart-label">ROUTE</span>
+                    <svg
+                      v-if="w.route"
+                      class="life-run-route"
+                      :viewBox="`0 0 ${w.route.width} ${w.route.height}`"
+                      preserveAspectRatio="xMidYMid meet"
+                      aria-hidden="true"
+                    >
+                      <path :d="w.route.d" class="life-run-route-line" />
+                      <circle :cx="w.route.start.x" :cy="w.route.start.y" r="2.6" class="life-run-route-dot is-start" />
+                      <circle :cx="w.route.end.x" :cy="w.route.end.y" r="2.6" class="life-run-route-dot is-end" />
+                    </svg>
+                    <span v-else class="life-run-chart-empty">NO ROUTE</span>
+                  </div>
+
+                  <div v-if="w.samples?.hr" class="life-run-chart">
+                    <span class="life-run-chart-label">
+                      HEART RATE
+                      <b v-if="sampleRange(w.samples.hr)">
+                        {{ sampleRange(w.samples.hr).lo }}–{{ sampleRange(w.samples.hr).hi }}
+                      </b>
+                      BPM
+                    </span>
+                    <svg class="life-run-curve" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="samplePath(w.samples.hr, w.samples.t)" />
+                    </svg>
+                  </div>
+                </div>
+
+                <div v-if="paceSeries(w.samples) || w.samples?.alt" class="life-run-modal-charts is-second">
+                  <div v-if="paceSeries(w.samples)" class="life-run-chart">
+                    <span class="life-run-chart-label">
+                      PACE
+                      <template v-if="sampleRange(paceSeries(w.samples))">
+                        {{ paceLabel(sampleRange(paceSeries(w.samples)).lo) }} –
+                        {{ paceLabel(sampleRange(paceSeries(w.samples)).hi) }}
+                      </template>
+                    </span>
+                    <svg class="life-run-curve is-pace" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="samplePath(paceSeries(w.samples), w.samples.t)" />
+                    </svg>
+                  </div>
+
+                  <div v-if="w.samples?.alt" class="life-run-chart">
+                    <span class="life-run-chart-label">
+                      ELEVATION
+                      <b v-if="sampleRange(w.samples.alt)">
+                        {{ Math.round(sampleRange(w.samples.alt).lo) }}–{{ Math.round(sampleRange(w.samples.alt).hi) }}
+                      </b>
+                      M
+                    </span>
+                    <svg class="life-run-curve is-alt" viewBox="0 0 240 64" preserveAspectRatio="none" aria-hidden="true">
+                      <path :d="samplePath(w.samples.alt, w.samples.t)" />
+                    </svg>
+                  </div>
                 </div>
               </article>
-              <p v-if="!watchSummary.workouts.length" class="stats-panel-empty">
+
+              <p v-if="runsFetching" class="life-run-modal-loading">LOADING TRACKS…</p>
+              <p v-if="!runEntries.length" class="stats-panel-empty">
                 No individual workouts in this window yet.
               </p>
             </div>
