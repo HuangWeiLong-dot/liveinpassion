@@ -11,6 +11,19 @@
 
 ---
 
+## fix: 42.3 — 2026-10-24
+
+### 手表路线：同一次活动的 FIT + GPX 不再重复计数
+- Gadgetbridge 对同一次锻炼会导出同名的一对 `.fit` 和 `.gpx`，两个导入脚本
+  各写一条 `watch_track`（`source` 不同，events.db 不会去重）。以前两条都算，
+  地图上画两条虚线、当天的手表时长翻倍。
+- `parseLocationEvents` 现在按**开始时间**认定「同一次活动」：只保留点数多的那条
+  路径，`watchMinutes` / `watchKm` 在去重后统一求和。两份事件**仍然都留在**
+  events.db 里。
+  不能按文件名去重 —— 中继按内容 sha1 存，笔记本拉到的是 `state/gpx/<sha1>.gpx`，
+  两份文件的 `value_text` 是两个不同的哈希。实测同一活动的 FIT / GPX 开始时间
+  逐秒相同，用它当键最可靠。
+
 ## fix: 42.2 — 2026-10-22
 
 ### 七维图例 / NOW Steps icon

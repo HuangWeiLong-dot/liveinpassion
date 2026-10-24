@@ -45,8 +45,17 @@ export function parseLocationEvents(doc) {
 
   for (const e of events) {
     if (!e) continue;
-    // 手表 GPX 路线：domain=fitness / metric=watch_track，meta.path 和
+    // 手表路线：domain=fitness / metric=watch_track，meta.path 和
     // Dawarich 的 track_path 同形。它是虚线，和手机的实线轨迹区分。
+    //
+    // Gadgetbridge 对**同一次锻炼**会同时导出 .fit 和 .gpx，两个导入脚本
+    // 各写一条 watch_track（source 不同，events.db 不会去重）。两份都入库是
+    // 有意的（FIT 带心率/步频、GPX 能直接看），但地图只该画一条、时长只该
+    // 算一次。
+    //
+    // 键用**开始时间**，不能用 value_text：中继按内容 sha1 存文件，笔记本拉下来
+    // 是 `state/gpx/<sha1>.gpx`，两份文件的 value_text 是两个不同的哈希。
+    // 实测同一活动的 FIT / GPX 解析出的开始时间逐秒相同，直接当键最可靠。
     if (e.domain === 'fitness' && e.metric === 'watch_track') {
       const meta = e.meta || {};
       const path = Array.isArray(meta.path)
@@ -57,15 +66,22 @@ export function parseLocationEvents(doc) {
       if (path.length) {
         const km = n(meta.distance_km);
         const minutes = n(e.value_num);
-        track.watchPaths.push({
+        const key = String(meta.start_utc || e.ts_utc || e.value_text || '');
+        const seen = track.watchPaths.findIndex((w) => w.key === key);
+        const next = {
+          key,
           path,
           km,
           minutes,
           start: meta.start_utc || e.ts_utc || '',
           end: meta.end_utc || '',
-        });
-        track.watchKm += km || 0;
-        track.watchMinutes += minutes || 0;
+        };
+        // 同一活动来了第二份文件：留点数多的那条路径（FIT 通常更密），
+        // 距离/时长跟着它的值走，不叠加。
+        if (seen < 0) track.watchPaths.push(next);
+        else if (path.length > track.watchPaths[seen].path.length) {
+          track.watchPaths[seen] = next;
+        }
       }
       continue;
     }
@@ -117,6 +133,9 @@ export function parseLocationEvents(doc) {
 
   track.minutes = track.transports.reduce((a, x) => a + x.minutes, 0);
   track.km = track.transports.reduce((a, x) => a + (x.km || 0), 0);
+  // 手表时长/距离按去重后的路线算 —— 同一活动的 FIT+GPX 只算一次。
+  track.watchMinutes = track.watchPaths.reduce((a, w) => a + (w.minutes || 0), 0);
+  track.watchKm = track.watchPaths.reduce((a, w) => a + (w.km || 0), 0);
   if (!track.points) track.points = track.path.length;
   return track;
 }
