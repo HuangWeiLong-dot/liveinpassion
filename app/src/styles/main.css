@@ -6553,7 +6553,8 @@
             border: 0;
             background: transparent;
             color: inherit;
-            font: inherit;
+            /* 不能写 font: inherit —— 它会把 .life-radar-row 的 0.58rem / 等宽
+               一起冲掉，按钮回落到 16px，TRANSPORT 就被省略号截断。 */
             letter-spacing: inherit;
             text-align: left;
             cursor: pointer;
