@@ -123,6 +123,9 @@ lifeRawRoutes.post('/life/raw/ingest', async (c) => {
 
 lifeRawRoutes.get('/life/raw/index', async (c) => {
   const kinds = {};
+  // watch 不进 `kinds`（归档页只认那 8 个），但**日期要能列出来**：
+  // 笔记本整天关机时，那天的原始数据只有 watch 一份，地图得知道有这一天。
+  const watchDays = [];
   let cursor = undefined;
 
   try {
@@ -135,7 +138,11 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
         const kind = rest.slice(0, slash);
         if (!KINDS.has(kind)) continue;
         // watch 是给地图读的内部文档，不进归档索引 —— 归档页只认那 8 个 kind。
-        if (kind === 'watch') continue;
+        // 只留日期，放在单独的 watchDays 里给地图发现用。
+        if (kind === 'watch') {
+          watchDays.push(metaOf(obj).id);
+          continue;
+        }
         (kinds[kind] ||= []).push(metaOf(obj));
       }
       if (!res.truncated) break;
@@ -151,8 +158,15 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
     kinds[kind] = kinds[kind].slice(0, MAX_INDEX_PER_KIND);
   }
 
+  watchDays.sort((a, b) => b.localeCompare(a));
+
   c.header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-  return c.json({ v: 1, kinds, generatedAt: new Date().toISOString() });
+  return c.json({
+    v: 1,
+    kinds,
+    watchDays: watchDays.slice(0, MAX_INDEX_PER_KIND),
+    generatedAt: new Date().toISOString(),
+  });
 });
 
 // ---------- GET /api/life/raw/:kind/:id ----------

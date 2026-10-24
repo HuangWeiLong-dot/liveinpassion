@@ -1307,11 +1307,18 @@ async function loadRawIndex() {
 // 窗口内**所有**有 raw events 的日子，最新的在前。加载由 mapCursor 控制：
 // 首屏先取 MAP_BATCH_DAYS 天，之后 LOAD MORE 再往后追加。
 function mapEventDays(index) {
-  const ids = (index?.kinds?.events || []).map((x) => x.id).filter(Boolean);
-  if (!ids.length || !rows.value.length) return [];
+  const ids = new Set((index?.kinds?.events || []).map((x) => x.id).filter(Boolean));
+  // 手表路线（服务器每 15 分钟发布的那份）不进归档索引，日期单独放在 watchDays。
+  // 笔记本整天关机时，那天的原始数据**只有** watch 一份 —— 不并进来，地图会
+  // 根本不请求这一天，刚部署的服务端链路就等于白做。
+  for (const id of index?.watchDays || []) if (id) ids.add(id);
+  if (!ids.size || !rows.value.length) return [];
   const from = rows.value[0].day;
-  const to = rows.value[rows.value.length - 1].day;
-  return ids
+  // 右端按「今天」封顶：笔记本关机后 /api/life 的最后一篇会停在关机那天，
+  // 手表路线却还在服务器上更新，不能因为聚合落后就把它挡在窗口外。
+  const last = rows.value[rows.value.length - 1].day;
+  const to = todayRef.value && todayRef.value > last ? todayRef.value : last;
+  return [...ids]
     .filter((id) => id >= from && id <= to)
     .sort()
     .reverse();
