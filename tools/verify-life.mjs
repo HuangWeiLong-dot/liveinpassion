@@ -553,6 +553,9 @@ const LIFE_STATE = `(function () {
     todayDesktopRows: q('.life-today .is-desktop .life-row').length,
     todayPhoneRows: q('.life-today .life-today-card:nth-child(2) .life-row').length,
     todayAiRows: q('.life-today .life-today-card:nth-child(3) .life-row').length,
+    todayTiles: q('.life-today .life-today-tile').length,
+    todayTileText: (document.querySelector('.life-today-strip') || {}).textContent?.replace(/\\s+/g, ' ').trim() || '',
+    todayDesktopBig: (document.querySelector('.life-today .is-desktop .life-today-big') || {}).textContent?.trim() || '',
     radarControls: q('.life-radar-range').length,
     radarAxes: q('.life-radar-axis').length,
     radarRows: q('.life-radar-row').length,
@@ -744,6 +747,16 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
     throw new Error(`today desktop should list 2 apps + 2 sites, got ${state.todayDesktopRows}`);
   }
   if (state.todayPhoneRows !== 2) throw new Error(`today phone rows: ${state.todayPhoneRows}`);
+  if (!/^\d+h/.test(state.todayDesktopBig)) {
+    throw new Error(`today desktop card missing total time: "${state.todayDesktopBig}"`);
+  }
+  if (state.todayTiles < 5) throw new Error(`today stat strip too short: ${state.todayTiles}`);
+  // UNIQUE / WORKOUTS 只在有 collapsedHours / 当天锻炼时才出现，桩数据里没有
+  for (const label of ['DESKTOP', 'PHONE', 'READINGS', 'STEPS', 'TRANSIT']) {
+    if (!state.todayTileText.includes(label)) {
+      throw new Error(`today stat strip missing ${label}: ${state.todayTileText}`);
+    }
+  }
   if (state.todayAiRows !== 2) throw new Error(`today AI project rows: ${state.todayAiRows}`);
   if (state.legendZero.slice(0, 7).some(Boolean)) {
     throw new Error(`legend dimmed a dimension that has data: ${JSON.stringify(state.legendZero)}`);

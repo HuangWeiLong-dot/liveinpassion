@@ -82,6 +82,122 @@ const phoneTotal = computed(() => total(props.payload?.phone?.topApps));
 const aiTotal = computed(() => total(props.payload?.ai?.projects));
 const phone = computed(() => props.payload?.phone || null);
 const ai = computed(() => props.payload?.ai || null);
+const health = computed(() => props.payload?.health || null);
+const location = computed(() => props.payload?.location || null);
+const workouts = computed(() => (Array.isArray(props.payload?.workouts) ? props.payload.workouts : []));
+
+function sumOf(list) {
+  const values = list.map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  return values.length ? values.reduce((a, b) => a + b, 0) : null;
+}
+
+// null 和 0 要分开：没有数据时显示 "—"，不能靠 minutesLabel 把 null 变成 "0m"。
+function durOrNull(minutes) {
+  return minutes == null ? null : minutesLabel(minutes);
+}
+
+// 桌面窗口活跃时长（trackedHours 是小时）
+const desktopMinutes = computed(() => {
+  const h = Number(props.payload?.trackedHours);
+  return Number.isFinite(h) ? h * 60 : null;
+});
+
+// 手机屏幕亮起：screen_on → screen_off 的实测区间
+const phoneMinutes = computed(() => {
+  const m = Number(phone.value?.screenMinutes);
+  return Number.isFinite(m) ? m : null;
+});
+
+// 两台设备的**读数相加**。电脑前刷手机的那一分钟会被算两次，所以它不是实际时长，
+// 不能拿去和 UNIQUE 对账 —— 那个差值正是雷达底部的 OVERLAP。
+const readingMinutes = computed(() => sumOf([desktopMinutes.value, phoneMinutes.value]));
+
+// 所有来源区间去重后的真实时长（服务端 collapsedHours，小时）
+const uniqueMinutes = computed(() => {
+  const h = Number(props.payload?.collapsedHours);
+  return Number.isFinite(h) ? h * 60 : null;
+});
+
+const stepCount = computed(() => {
+  const v = Number(health.value?.steps);
+  return Number.isFinite(v) ? Math.round(v) : null;
+});
+
+const transitMinutes = computed(() => {
+  const v = Number(location.value?.transitMinutes ?? location.value?.movingMinutes);
+  return Number.isFinite(v) ? v : null;
+});
+
+const spanKm = computed(() => {
+  const v = Number(location.value?.spanKm);
+  return Number.isFinite(v) ? v : null;
+});
+
+const workoutStats = computed(() => {
+  const list = workouts.value;
+  if (!list.length) return null;
+  return {
+    count: list.length,
+    km: sumOf(list.map((w) => w.km)),
+    minutes: sumOf(list.map((w) => w.minutes)),
+  };
+});
+
+// 「今天」横向读数条：把应用榜单之外的所有当日数字摆在一起。
+// READINGS 是两台设备的读数之和，UNIQUE 才是去重时长，两者本来就不该相等。
+const tiles = computed(() => {
+  if (!props.payload) return [];
+  const list = [
+    {
+      key: 'desktop',
+      label: 'DESKTOP',
+      value: durOrNull(desktopMinutes.value),
+      note: 'WINDOW-ACTIVE',
+    },
+    {
+      key: 'phone',
+      label: 'PHONE',
+      value: durOrNull(phoneMinutes.value),
+      note: 'SCREEN-ON',
+    },
+    {
+      key: 'readings',
+      label: 'READINGS',
+      value: durOrNull(readingMinutes.value),
+      note: 'NOT A UNION',
+      hint: 'Desktop + phone added up. A minute on the phone while sitting at the computer is counted twice, so READINGS ≥ UNIQUE.',
+    },
+    {
+      key: 'unique',
+      label: 'UNIQUE',
+      value: durOrNull(uniqueMinutes.value),
+      note: 'DE-DUPLICATED',
+      hint: 'Union of desktop blocks, transport, workouts and every phone app — no minute counted twice. Same figure as UNIQUE TIME under the radar.',
+    },
+    {
+      key: 'steps',
+      label: 'STEPS',
+      value: stepCount.value == null ? null : num(stepCount.value),
+      note: 'WATCH',
+    },
+    {
+      key: 'transit',
+      label: 'TRANSIT',
+      value: durOrNull(transitMinutes.value),
+      note: spanKm.value == null ? 'GPS' : `${num(spanKm.value, 1)} KM SPAN`,
+      hint: 'Measured moving time plus the gaps between distant stays (subway / underground GPS losses).',
+    },
+    {
+      key: 'workouts',
+      label: 'WORKOUTS',
+      value: workoutStats.value ? `${workoutStats.value.count}×` : null,
+      note: workoutStats.value?.km != null
+        ? `${num(workoutStats.value.km, 1)} KM`
+        : durOrNull(workoutStats.value?.minutes) || 'WATCH',
+    },
+  ];
+  return list.filter((t) => t.value != null);
+});
 
 const AI_SOURCES = {
   platform: 'PLATFORM BILL',
@@ -101,14 +217,27 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
         <em class="life-today-date">{{ dayLabel(day) }}</em>
       </span>
       <span class="life-today-updated">
-        <template v-if="payload">
-          TRACKED {{ hoursToDuration(payload.trackedHours) }} · UPDATED {{ updated }}
-        </template>
+        <template v-if="payload">SO FAR · UPDATED {{ updated }}</template>
         <template v-else>WAITING FOR TODAY'S FIRST SNAPSHOT</template>
       </span>
     </div>
 
-    <div v-if="payload" class="life-today-grid">
+    <template v-if="payload">
+      <!-- 当日读数条：桌面 / 手机分开，READINGS 是相加、UNIQUE 是去重，别当同一个数 -->
+      <div v-if="tiles.length" class="life-today-strip">
+        <span
+          v-for="t in tiles"
+          :key="t.key"
+          class="life-today-tile"
+          :title="t.hint"
+        >
+          <em>{{ t.label }}</em>
+          <b>{{ t.value }}</b>
+          <small>{{ t.note }}</small>
+        </span>
+      </div>
+
+      <div class="life-today-grid">
       <article
         class="life-today-card is-desktop is-openable"
         role="button"
@@ -121,6 +250,13 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
         <div class="life-today-label">
           <span>01</span> DESKTOP
           <span class="life-today-open">VIEW ALL <i aria-hidden="true">→</i></span>
+        </div>
+
+        <!-- 和 PHONE 卡片对齐：先给总时长，再给应用 / 站点榜单 -->
+        <strong class="life-today-big">{{ hoursToDuration(payload.trackedHours) }}</strong>
+        <div class="life-today-meta">
+          <span>WINDOW-ACTIVE</span>
+          <span>LOCK SCREEN EXCLUDED</span>
         </div>
 
         <h5 class="life-today-sub">
@@ -181,6 +317,7 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
           </strong>
           <div class="life-today-meta">
             <span>SCREEN TIME</span>
+            <span>{{ num(phone.screenOn) }} SCREEN-ON</span>
             <span>{{ num(phone.unlocks) }} UNLOCKS</span>
             <span>{{ num(phone.appSwitches) }} SWITCHES</span>
           </div>
@@ -245,7 +382,8 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
         </template>
         <p v-else class="life-today-empty">NO AI SPEND TODAY.</p>
       </article>
-    </div>
+      </div>
+    </template>
 
     <p v-else class="life-today-empty is-block">NO AGGREGATE FOR TODAY YET.</p>
   </section>
@@ -300,6 +438,62 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
 .life-today-grid {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr;
+}
+
+/* 当日读数条：一格里一个小指标。桌面 / 手机 / 相加 / 去重 / 步数 / 交通 / 锻炼 */
+.life-today-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  border-bottom: 1px solid var(--border);
+}
+
+.life-today-tile {
+  display: block;
+  min-width: 0;
+  padding: 12px 16px 13px;
+  border-right: 1px solid var(--border);
+}
+
+.life-today-tile:last-child {
+  border-right: 0;
+}
+
+.life-today-tile em {
+  display: block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.46rem;
+  font-style: normal;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.life-today-tile b {
+  display: block;
+  margin-top: 6px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.02rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.life-today-tile small {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 .life-today-card {
@@ -461,6 +655,18 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
 
   .life-today-grid {
     grid-template-columns: 1fr;
+  }
+
+  .life-today-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .life-today-tile {
+    padding: 11px 14px 12px;
+  }
+
+  .life-today-tile:nth-child(2n) {
+    border-right: 0;
   }
 
   .life-today-card {
