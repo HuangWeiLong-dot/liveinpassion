@@ -25,15 +25,17 @@ function open(kind) {
   emit('open', kind);
 }
 
-function hoursLabel(h) {
-  const v = Number(h);
-  return Number.isFinite(v) ? `${v.toFixed(1)}h` : '—';
-}
-
 function minutesLabel(m) {
   const v = Math.round(Number(m) || 0);
   if (v < 60) return `${v}m`;
   return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, '0')}m`;
+}
+
+// 桌面应用时长在聚合里是**小时**（站点、手机是分钟）。以前只显示一位小数的
+// "3.4h"，分钟被抹掉了；换算成分钟再走 minutesLabel，显示成 "3h 24m"。
+function hoursToDuration(h) {
+  const v = Number(h);
+  return Number.isFinite(v) ? minutesLabel(v * 60) : '—';
 }
 
 function money(v) {
@@ -100,7 +102,7 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
       </span>
       <span class="life-today-updated">
         <template v-if="payload">
-          TRACKED {{ hoursLabel(payload.trackedHours) }} · UPDATED {{ updated }}
+          TRACKED {{ hoursToDuration(payload.trackedHours) }} · UPDATED {{ updated }}
         </template>
         <template v-else>WAITING FOR TODAY'S FIRST SNAPSHOT</template>
       </span>
@@ -128,7 +130,7 @@ const aiSource = computed(() => AI_SOURCES[ai.value?.costSource] || '');
         <div v-for="a in apps" :key="a.name" class="life-row">
           <span class="life-rank">{{ a.rank }}</span>
           <span class="life-name">{{ a.name }}</span>
-          <span class="life-num">{{ hoursLabel(a.value) }}</span>
+          <span class="life-num">{{ hoursToDuration(a.value) }}</span>
           <span class="life-track">
             <span
               class="life-fill"

@@ -40,6 +40,12 @@ function minutesLabel(m) {
   return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, '0')}m`;
 }
 
+// 桌面应用时长是小时（站点、手机是分钟）；换算成分钟，保留到分钟。
+function hoursToDuration(h) {
+  const v = Number(h);
+  return Number.isFinite(v) ? minutesLabel(v * 60) : '—';
+}
+
 function money(v) {
   const n = Number(v);
   return Number.isFinite(n) ? `¥${n.toFixed(2)}` : '—';
@@ -159,7 +165,7 @@ watch(
                 <div v-for="a in apps" :key="a.name" class="life-day-row">
                   <span class="life-rank">{{ a.rank }}</span>
                   <span class="life-name">{{ a.name }}</span>
-                  <span class="life-num">{{ hoursLabel(a.value) }}</span>
+                  <span class="life-num">{{ hoursToDuration(a.value) }}</span>
                   <span class="life-track">
                     <span
                       class="life-fill"

@@ -11,6 +11,15 @@
 
 ---
 
+## fix: 45.3 — 2026-10-25
+
+### 今日统计的桌面应用时长显示到分钟
+`topApps` 的时长单位是**小时**，`LifeToday` 用 `hoursLabel` 只显示一位小数（`3.4h`），
+分钟被抹掉了；站点、手机用的是 `minutesLabel`，同一张卡里两种写法。
+现在桌面应用换算成分钟再走 `minutesLabel`，显示 `3h 24m`，不足 1 小时显示 `40m`。
+`LifeDetailModal` 的 DESKTOP 分类详情同样处理；卡片头部的 `TRACKED` 也统一成
+`12h 42m` 的写法（原先 `12.7h`）。
+
 ## fix: 45.2 — 2026-10-24
 
 ### 雷达维度名不再被截断
@@ -47,8 +56,11 @@
 - KPI 改为 4 × 2 bento 共 6 张，`SCREEN-ON HOURS` 可点开逐日桌面 / 手机表。
 - 跑步弹窗补分段配速、爬升 / 坡度、心率区间（`data/runStats.js`，纯函数）；
   路线缩略图改用独立包围盒，操场小圈不再缩成一个点。
-- NEURAL CORE 改成「规则神经元」：8 条主树突 + 每日节点挂在末梢上，
+- NEURAL CORE 内部改成「规则神经元」：8 条主树突 + 每日节点挂在末梢上，
   可切换 RADIAL / PYRAMID 形态；布局仍是确定性 seed，截图可比对。
+  **显示名不变**，页面上仍然叫 `NEURAL CORE`（副标题 `8 REGIONS · N DAYS · LIVE GRAPH`），
+  「规则神经元」只是代码里对布局形态的叫法。
+- 神经图面板编号从 **00** 挪到 **01**（七维雷达占了 00）；LIFE 页其余面板依次顺延。
 
 ### 分类规则（LifeLogging）
 - 浏览器里没命中强信号 → Study（看资料）；PUBG / TslGame → Leisure；
