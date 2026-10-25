@@ -362,15 +362,67 @@ watch(() => props.focusDay, (day) => {
 // 其余三维直接来自 payload：Transport = location，Health = health/workouts，
 // Social = phone.topApps 里属于社交应用的那部分。
 const DESKTOP_DIMS = new Set(['Work', 'Study', 'Life', 'Leisure']);
-const SOCIAL_APPS = new Set([
-  'WeChat', 'QQ', 'Telegram', 'WhatsApp', 'Signal', 'Line', 'Discord',
-  'Weibo', 'Xiaohongshu', 'Instagram', 'Facebook', 'Threads', 'LinkedIn',
-]);
-// 手机上的对话式 AI 并入 Study（publish_life_site.py 的 PHONE_STUDY_APPS）。
-// Study 的总数 = 桌面分类 + 手机 AI，所以详情里必须把后者单列，否则总数对不上。
-const PHONE_STUDY_APPS = new Set([
-  'DeepSeek', 'ChatGPT', 'Claude', 'Gemini', 'Copilot', 'Perplexity',
-]);
+// 手机应用 → 七维。和 scripts/normalize.py 的 PHONE_APP_CATEGORIES 是**同一张表**
+// （Worker 的字段白名单不接受新字段，所以客户端只能拿 phone.topApps 自己再分一次）。
+// 口径一致：手机没有 Other 这一档 —— 表里没有的按关键词猜，最后兜底 Life。
+// ⚠️ 改其中一边必须同步另一边，否则「总数里有、详情里没有」会静默出现。
+const PHONE_APP_CATEGORIES = new Map(Object.entries({
+  // Work
+  'QQ Mail': 'Work', Outlook: 'Work', Gmail: 'Work', WeCom: 'Work',
+  DingTalk: 'Work', 'Alibaba Cloud': 'Work', GitHub: 'Work',
+  // Study
+  Chrome: 'Study', Edge: 'Study', Firefox: 'Study',
+  'Via Browser': 'Study', 'Quark Browser': 'Study', 'UC Browser': 'Study',
+  'QQ Browser': 'Study', DeepSeek: 'Study', Doubao: 'Study',
+  Chaoxing: 'Study', WeRead: 'Study', Zhihu: 'Study',
+  'Tencent News': 'Study', 'NetEase News': 'Study', Obsidian: 'Study',
+  Google: 'Study',
+  // Leisure
+  Bilibili: 'Leisure', YouTube: 'Leisure', Douyin: 'Leisure',
+  'NetEase Music': 'Leisure', 'Kugou Lite': 'Leisure',
+  'Pocket Casts': 'Leisure', Xiaoheihe: 'Leisure',
+  Sanguosha: 'Leisure', 'Mi Game Center': 'Leisure',
+  'Mi Wallpaper Carousel': 'Leisure',
+  // Social
+  WeChat: 'Social', QQ: 'Social', Telegram: 'Social',
+  WhatsApp: 'Social', Discord: 'Social', Weibo: 'Social',
+  Xiaohongshu: 'Social', Messages: 'Social', Phone: 'Social',
+  // Life
+  Alipay: 'Life', Amap: 'Life', 'Baidu Maps': 'Life',
+  Bluetooth: 'Life', Camera: 'Life', 'China Mobile': 'Life',
+  Clock: 'Life', Dianping: 'Life', 'Ele.me': 'Life',
+  'F-Droid': 'Life', GPSLogger: 'Life', Gadgetbridge: 'Life',
+  Gallery: 'Life', Hiddify: 'Life', JD: 'Life', Meituan: 'Life',
+  'Mi Gallery Editor': 'Life', 'Mi Shop': 'Life', 'Mi Store': 'Life',
+  Pinduoduo: 'Life', 'Play Store': 'Life', Security: 'Life',
+  'Security Core': 'Life', Settings: 'Life', 'Shanghai Metro': 'Life',
+  Tailscale: 'Life', Taobao: 'Life', Tasker: 'Life', Xianyu: 'Life',
+  'Google Play services': 'Life', 'Photo Picker': 'Life',
+  'MT Manager': 'Life', V2VPN: 'Life',
+}));
+const PHONE_CATEGORY_KEYWORDS = [
+  ['browser', 'Study'], ['reader', 'Study'], ['read', 'Study'],
+  ['news', 'Study'], ['learn', 'Study'], ['dict', 'Study'],
+  ['music', 'Leisure'], ['video', 'Leisure'], ['player', 'Leisure'],
+  ['podcast', 'Leisure'], ['game', 'Leisure'], ['bili', 'Leisure'],
+  ['mail', 'Work'], ['office', 'Work'], ['docs', 'Work'], ['git', 'Work'],
+  ['chat', 'Social'], ['message', 'Social'], ['messenger', 'Social'],
+  ['map', 'Life'], ['camera', 'Life'], ['gallery', 'Life'],
+  ['photo', 'Life'], ['store', 'Life'], ['settings', 'Life'],
+];
+const DEFAULT_PHONE_CATEGORY = 'Life';
+
+function phoneCategory(name) {
+  const key = String(name || '').trim();
+  const hit = PHONE_APP_CATEGORIES.get(key);
+  if (hit) return hit;
+  const lowered = key.toLowerCase();
+  for (const [keyword, cat] of PHONE_CATEGORY_KEYWORDS) {
+    if (lowered.includes(keyword)) return cat;
+  }
+  return DEFAULT_PHONE_CATEGORY;
+}
+
 const DETAIL_CAP = 30;
 
 const detail = ref('');
@@ -384,6 +436,12 @@ let blockSeq = 0;
 let dimLocked = false;
 
 const isDesktopDim = computed(() => DESKTOP_DIMS.has(detail.value));
+
+// 桌面四维的总数 = 桌面 blocks + 手机里归到同一维的应用。
+// blocks 只能解释桌面那一半，所以手机这半必须单列，否则总数看着对不上。
+const detailPhone = computed(() => (isDesktopDim.value && detail.value
+  ? phoneDim(detail.value)
+  : { days: 0, hours: 0, apps: [] }));
 
 const detailTotal = computed(() => (detail.value ? totalOf(windowSamples.value, detail.value) : 0));
 
@@ -618,9 +676,50 @@ const healthStats = computed(() => {
   };
 });
 
+// 窗口内每天的手机应用 → 七维汇总。总量以 payload 的 dimensions 为准，
+// 这里只回答「这个维度里手机贡献了哪些应用」，好让详情页的总数能对得上。
+const phoneDimAgg = computed(() => {
+  const byDim = new Map();
+  let days = 0;
+  windowSamples.value.forEach((sample) => {
+    const phone = sample.payload?.phone;
+    if (!phone) return;
+    days += 1;
+    (Array.isArray(phone.topApps) ? phone.topApps : []).forEach((entry) => {
+      if (!Array.isArray(entry)) return;
+      const [name, minutes] = entry;
+      const value = Number(minutes) || 0;
+      if (value <= 0) return;
+      const dim = phoneCategory(name);
+      if (!byDim.has(dim)) byDim.set(dim, new Map());
+      const agg = byDim.get(dim);
+      agg.set(name, (agg.get(name) || 0) + value);
+    });
+  });
+  return { byDim, days };
+});
+
+function phoneDim(dim) {
+  const { byDim, days } = phoneDimAgg.value;
+  const agg = byDim.get(dim) || new Map();
+  const ranked = [...agg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const max = ranked[0]?.[1] || 1;
+  return {
+    days,
+    hours: [...agg.values()].reduce((acc, minutes) => acc + minutes, 0) / 60,
+    apps: ranked.map(([name, minutes], index) => ({
+      name,
+      hours: minutes / 60,
+      pct: Math.max(2, (minutes / max) * 100),
+      rank: String(index + 1).padStart(2, '0'),
+    })),
+  };
+}
+
+const phoneSocial = computed(() => phoneDim('Social'));
+
 const socialStats = computed(() => {
   const payloads = windowSamples.value.map((sample) => sample.payload).filter(Boolean);
-  const agg = new Map();
   let days = 0;
   let screen = 0;
   let unlocks = 0;
@@ -633,55 +732,14 @@ const socialStats = computed(() => {
     screen += Number(phone.screenMinutes) || 0;
     unlocks += Number(phone.unlocks) || 0;
     switches += Number(phone.appSwitches) || 0;
-    (Array.isArray(phone.topApps) ? phone.topApps : []).forEach((entry) => {
-      if (!Array.isArray(entry)) return;
-      const [name, minutes] = entry;
-      if (!SOCIAL_APPS.has(name)) return;
-      agg.set(name, (agg.get(name) || 0) + (Number(minutes) || 0));
-    });
   });
 
-  const ranked = [...agg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const max = ranked[0]?.[1] || 1;
   return {
     days,
     screen,
     unlocks,
     switches,
-    apps: ranked.map(([name, minutes], index) => ({
-      name,
-      hours: minutes / 60,
-      pct: Math.max(2, (minutes / max) * 100),
-      rank: String(index + 1).padStart(2, '0'),
-    })),
-  };
-});
-
-const phoneStudy = computed(() => {
-  const agg = new Map();
-  let days = 0;
-  windowSamples.value.forEach((sample) => {
-    const phone = sample.payload?.phone;
-    if (!phone) return;
-    days += 1;
-    (Array.isArray(phone.topApps) ? phone.topApps : []).forEach((entry) => {
-      if (!Array.isArray(entry)) return;
-      const [name, minutes] = entry;
-      if (!PHONE_STUDY_APPS.has(name)) return;
-      agg.set(name, (agg.get(name) || 0) + (Number(minutes) || 0));
-    });
-  });
-  const ranked = [...agg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const max = ranked[0]?.[1] || 1;
-  return {
-    days,
-    hours: [...agg.values()].reduce((acc, minutes) => acc + minutes, 0) / 60,
-    apps: ranked.map(([name, minutes], index) => ({
-      name,
-      hours: minutes / 60,
-      pct: Math.max(2, (minutes / max) * 100),
-      rank: String(index + 1).padStart(2, '0'),
-    })),
+    apps: phoneSocial.value.apps,
   };
 });
 
@@ -922,7 +980,7 @@ onBeforeUnmount(() => {
       <p
         v-if="collapsedStats.has"
         class="life-radar-unique"
-        title="UNIQUE TIME = union of desktop blocks, transport, workouts and phone apps (no minute counted twice). OVERLAP = the 7-DIM sum minus that union; desktop «Other» sits inside the union but outside the seven dimensions, so this is a lower bound."
+        title="UNIQUE TIME = union of desktop blocks, transport, workouts and every phone app (no minute counted twice). OVERLAP = the 7-DIM sum minus that union — it is the phone-vs-desktop time counted twice, less desktop «Other», which sits inside the union but outside the seven dimensions, so this is a lower bound."
       >
         <span>UNIQUE TIME <b>{{ hourFmt(collapsedStats.unique) }}</b></span>
         <span>OVERLAP <b>{{ hourFmt(collapsedStats.overlap) }}</b></span>
@@ -989,7 +1047,7 @@ onBeforeUnmount(() => {
                   <template v-if="blockStatus === 'loading'">LOADING ACTIVITY BLOCKS…</template>
                   <template v-else-if="blockStatus === 'error'">RAW BLOCKS UNAVAILABLE — SHOWING TOTALS ONLY.</template>
                   <template v-else>
-                    DESKTOP BLOCKS · LAST {{ blockCovered }} DAYS<template v-if="windowHasToday"> · TODAY PENDING</template><template v-if="blockPartial"> · SOME DAYS UNAVAILABLE</template><template v-if="detail === 'Study'"> · STUDY TOTAL ALSO INCLUDES PHONE AI</template>
+                    DESKTOP BLOCKS · LAST {{ blockCovered }} DAYS<template v-if="windowHasToday"> · TODAY PENDING</template><template v-if="blockPartial"> · SOME DAYS UNAVAILABLE</template><template v-if="detailPhone.apps.length"> · TOTAL ALSO INCLUDES PHONE APPS</template>
                   </template>
                 </p>
 
@@ -1064,11 +1122,11 @@ onBeforeUnmount(() => {
                   NO BLOCKS WERE RECORDED FOR THIS DIMENSION IN THE COVERED DAYS.
                 </p>
 
-                <!-- Study = 桌面分类 + 手机对话式 AI；这里把手机那一半单列出来 -->
-                <section v-if="detail === 'Study'" class="life-dim-section">
-                  <h4>PHONE AI · COUNTED IN STUDY</h4>
-                  <ul v-if="phoneStudy.apps.length" class="life-dim-list">
-                    <li v-for="row in phoneStudy.apps" :key="`phone-study-${row.name}`" class="life-dim-list-row">
+                <!-- 桌面四维的总数 = 桌面 blocks + 手机里归到同一维的应用 -->
+                <section v-if="detailPhone.apps.length" class="life-dim-section">
+                  <h4>PHONE APPS · COUNTED IN {{ detail }}</h4>
+                  <ul class="life-dim-list">
+                    <li v-for="row in detailPhone.apps" :key="`phone-${detail}-${row.name}`" class="life-dim-list-row">
                       <span class="life-dim-rank">{{ row.rank }}</span>
                       <span class="life-dim-label" :title="row.name">{{ row.name }}</span>
                       <b class="life-dim-value">{{ hourFmt(row.hours) }}</b>
@@ -1077,11 +1135,8 @@ onBeforeUnmount(() => {
                       </span>
                     </li>
                   </ul>
-                  <p v-if="!phoneStudy.apps.length" class="life-dim-empty">
-                    NO PHONE AI TIME IN THIS WINDOW.
-                  </p>
-                  <p v-else class="life-dim-note">
-                    {{ hourFmt(phoneStudy.hours) }} ACROSS {{ phoneStudy.days }} DAYS. PHONE TIME IS COUNTED INDEPENDENTLY — IT CAN OVERLAP DESKTOP.
+                  <p class="life-dim-note">
+                    {{ hourFmt(detailPhone.hours) }} ACROSS {{ detailPhone.days }} DAYS. PHONE TIME IS COUNTED INDEPENDENTLY — IT CAN OVERLAP DESKTOP.
                   </p>
                 </section>
               </template>
@@ -1179,7 +1234,7 @@ onBeforeUnmount(() => {
                     <div class="life-dim-kv"><span>SCREEN ON</span><b>{{ durationFmt(socialStats.screen) }}</b></div>
                     <div class="life-dim-kv"><span>UNLOCKS</span><b>{{ socialStats.unlocks.toLocaleString('en-US') }}</b></div>
                     <div class="life-dim-kv"><span>APP SWITCHES</span><b>{{ socialStats.switches.toLocaleString('en-US') }}</b></div>
-                    <p class="life-dim-note">ONLY APPS IN THE SOCIAL SET COUNT. PHONE TIME IS COUNTED INDEPENDENTLY — IT CAN OVERLAP DESKTOP AND TRANSIT.</p>
+                    <p class="life-dim-note">SOCIAL = PHONE MESSAGING APPS ONLY (DESKTOP CHAT APPS COUNT AS LEISURE). PHONE TIME IS COUNTED INDEPENDENTLY — IT CAN OVERLAP DESKTOP AND TRANSIT.</p>
                   </section>
                 </div>
               </template>
