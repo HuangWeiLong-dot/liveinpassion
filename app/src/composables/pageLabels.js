@@ -22,6 +22,7 @@ const SECTIONS = {
   stats: 'STATS',
   life: 'LIFE',
   'life-archive': 'ARCHIVE',
+  organization: 'ORGANIZATION',
   'not-found': 'NOT FOUND',
 };
 

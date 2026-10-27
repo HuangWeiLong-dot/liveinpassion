@@ -15,6 +15,7 @@ import GalleryView from '../views/GalleryView.vue';
 import StatsView from '../views/StatsView.vue';
 import LifeView from '../views/LifeView.vue';
 import LifeArchiveView from '../views/LifeArchiveView.vue';
+import OrganizationView from '../views/OrganizationView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 
 const routes = [
@@ -27,6 +28,7 @@ const routes = [
   { path: '/stats', name: 'stats', component: StatsView },
   { path: '/life', name: 'life', component: LifeView },
   { path: '/life/archive/:kind', name: 'life-archive', component: LifeArchiveView },
+  { path: '/organization', name: 'organization', component: OrganizationView },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ];
 

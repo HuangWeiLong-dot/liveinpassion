@@ -11,6 +11,34 @@
 
 ---
 
+## update: 46 — 2026-10-27
+
+### 新页面 `/organization`：这个组织是什么
+实验型的**一屏一页**演示页（不滚动），回答的不是「这个网站是什么」，而是
+「LIVEINPASSION 是什么组织」。八屏：封面（`WHAT IS LIVE IN PASSION?`）→ 名字 →
+三条主张 → 第一个项目 `OPEN SOURCE LIFE` → 从记录到模型 → 想做成的那家公司 →
+路线图 → 结尾。导航加了一项 `ORG`（转场板子上写全称 `ORGANIZATION`）。
+
+- **一屏就是眼前这一屏**：八块 `.org-slide` 全部绝对定位叠在同一块舞台上。
+  翻页时旧的一帧内用 `gsap.set` 收掉、新的才淡入 —— 不做交叉淡入，
+  任何时刻只有一屏可见，不会两页同框。
+- **翻页**：滚轮 / 点击空白 / ↑↓ / PageUp·PageDown / Home·End / 手机上下滑，
+  右边缘的页码可点跳。一次手势只翻一页（触控板一划会连发几十个 wheel 事件，
+  靠 620ms 冷却压住）；点链接、按钮或刚拉过选区都不算翻页。
+- **不滚动**：`.org-page` 是 `100dvh` + `overflow: hidden`；全局页脚这一页不挂
+  （`App.vue` 的 `showGlobalFooter`）—— 页脚那块占位会把文档撑高，让滚轮有东西可滚。
+- 视觉沿用站内那套：Oswald 大写标题 / Poppins 正文 / JetBrains Mono 标签、
+  1px 发丝线、纯 `--bg` 底色，没有点云、渐变和描边字。
+- **一屏装得下**靠三层：字号用 `vh` 参与 clamp；手机上再收一档；`fitSlides()` 兜底
+  （极矮窗口按需整体缩放，永远不压到导航栏、也不被 `overflow: hidden` 裁掉）。
+  上内边距的下限（96px）高过固定头部，底部在手机上让开 MobileDock。
+  另外：章节顶部那行页码 / 章名是 `div` 不是 `<header>` —— main.css 有一条全站的
+  `header { position: fixed }`，用 header 会被钉到视口顶部、正好压在导航栏上。
+- keep-alive：离开拆监听，回来重新从第一屏开始；reduced-motion 下翻页直接落位。
+- 验收：`tools/verify-organization.mjs`（八屏、任何时刻只有一屏、一次手势只翻一页、
+  点击 / 键盘 / 滑动 / 右轨跳转、内容装得下且不压导航栏、六种窗口尺寸、浅色主题、
+  reduced-motion、零控制台报错）。
+
 ## fix: 45.3 — 2026-10-25
 
 ### 今日统计的桌面应用时长显示到分钟
