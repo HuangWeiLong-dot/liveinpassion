@@ -20,6 +20,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
 import LifeBrain from '../components/LifeBrain.vue';
+import LifeDashboard from '../components/LifeDashboard.vue';
 import LifeRadar from '../components/LifeRadar.vue';
 import LifeNow from '../components/LifeNow.vue';
 import LifeToday from '../components/LifeToday.vue';
@@ -100,6 +101,48 @@ const aiTipRef = ref(null);
 const mapEl = ref(null);
 const mapSvgRef = ref(null);
 const dayCloseRef = ref(null);
+
+// ---- 视图模式 ----
+// feed = 原来的长页（逐块往下读）；dashboard = 一屏铺开的 12 列仪表盘。
+// 两者共用同一份数据和同一个 section，切换只是换一种排法。
+// 记住选择：localStorage 存 lifeViewMode；?view=dashboard 可以直接进仪表盘。
+const VIEW_KEY = 'lifeViewMode';
+const viewMode = ref('feed');
+try {
+  const fromUrl = new URLSearchParams(window.location.search).get('view');
+  const stored = localStorage.getItem(VIEW_KEY);
+  if (fromUrl === 'dashboard' || fromUrl === 'feed') viewMode.value = fromUrl;
+  else if (stored === 'dashboard') viewMode.value = 'dashboard';
+} catch {
+  /* 隐私模式下 localStorage 可能不可用 */
+}
+
+function setViewMode(mode) {
+  if (mode !== 'feed' && mode !== 'dashboard') return;
+  if (viewMode.value === mode) return;
+  viewMode.value = mode;
+  try {
+    localStorage.setItem(VIEW_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+  // URL 同步，方便直接分享到某一种视图；replaceState 不触发路由。
+  try {
+    const url = new URL(window.location.href);
+    if (mode === 'dashboard') url.searchParams.set('view', 'dashboard');
+    else url.searchParams.delete('view');
+    window.history.replaceState(window.history.state, '', url);
+  } catch {
+    /* ignore */
+  }
+
+  nextTick(() => {
+    if (!sectionRef.value) return;
+    // 换回长页时 DOM 是新挂的：重新量滚动触发点，并重新观察地图面板。
+    ScrollTrigger.refresh();
+    if (mode === 'feed') observeMap();
+  });
+}
 
 // ---- 彩色模式 / 单日详情 ----
 const colorMode = ref(false);
@@ -2349,7 +2392,7 @@ onBeforeUnmount(() => {
     <section
       ref="sectionRef"
       class="stats-section life-section"
-      :class="{ 'is-color': colorMode }"
+      :class="{ 'is-color': colorMode, 'is-dashboard': viewMode === 'dashboard' }"
     >
       <!-- 用 div 不用 header：全局 header 是 position: fixed -->
       <div class="stats-hero">
@@ -2385,6 +2428,22 @@ onBeforeUnmount(() => {
             </span>
           </template>
           <i aria-hidden="true"></i>
+          <span class="life-view-switch" role="group" aria-label="LIFE layout">
+            <button
+              type="button"
+              class="life-view-option"
+              :class="{ 'is-active': viewMode === 'feed' }"
+              :aria-pressed="viewMode === 'feed'"
+              @click="setViewMode('feed')"
+            >FEED</button>
+            <button
+              type="button"
+              class="life-view-option"
+              :class="{ 'is-active': viewMode === 'dashboard' }"
+              :aria-pressed="viewMode === 'dashboard'"
+              @click="setViewMode('dashboard')"
+            >DASHBOARD</button>
+          </span>
           <button
             class="life-color-toggle"
             :class="{ 'is-on': colorMode }"
@@ -2417,8 +2476,47 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 现在在干嘛（独立轮询 /api/life/now） -->
-        <LifeNow @snapshot="onNowSnapshot" />
+        <!-- NOW 的实时轮询跟着页面走，两种视图共用同一份快照。
+             仪表盘只消费它的数据，不显示这张长卡片，所以用 v-show 保持挂载：
+             卸掉就没人请求 /api/life/now 了。 -->
+        <div v-show="viewMode === 'feed'" class="life-now-slot">
+          <LifeNow @snapshot="onNowSnapshot" />
+        </div>
+
+        <!-- 仪表盘视图：同一份数据的 12 列排法，点图仍然开原来的弹窗 -->
+        <LifeDashboard
+          v-if="viewMode === 'dashboard'"
+          :rows="rows"
+          :kpis="kpis"
+          :now-snap="nowSnap"
+          :live="liveStatus"
+          :today-payload="todayPayload"
+          :today-ref="todayRef"
+          :top-apps="topApps"
+          :rhythm-rows="rhythmRows"
+          :rhythm-legend="rhythmLegend"
+          :motion-rows="motionRows"
+          :phone-rows="phoneRows"
+          :ai-rows="aiRows"
+          :weekday-rows="weekdayRows"
+          :places="places"
+          :latest-run="latestRun"
+          :radar-rows="radarRows"
+          :archive-tabs="archiveTabs"
+          :color-mode="colorMode"
+          :clock="clock"
+          :city="city"
+          :last-updated="lastUpdated"
+          :latest-is-today="latestIsToday"
+          :cms-base="CMS_BASE"
+          :reduced="REDUCED"
+          @open-day="openDay"
+          @open-today="openTodayDetail"
+          @open-runs="openRuns"
+        />
+
+        <!-- 长页视图（原来的 LIFE） -->
+        <template v-else>
 
         <!-- 今日统计：桌面 / 手机 / AI，跟随页面的 /api/life 轮询 -->
         <LifeToday
@@ -3762,6 +3860,7 @@ onBeforeUnmount(() => {
           <span><i aria-hidden="true"></i>{{ data.timezone }}</span>
           <span><i aria-hidden="true"></i>Refreshes every 60 seconds</span>
         </p>
+        </template>
       </template>
     </section>
 

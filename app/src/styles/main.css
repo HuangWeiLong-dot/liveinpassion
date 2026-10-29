@@ -6631,6 +6631,31 @@
             opacity: 0.7;
         }
 
+        /* 仪表盘里的紧凑版：单列、收起右侧七维列表。工具栏保留，
+           这样在卡片里仍然能切 DAY / 7D / 30D / YEAR。 */
+        .life-radar.is-compact {
+            grid-template-columns: 1fr;
+            gap: 12px;
+            padding: 14px 16px 16px;
+        }
+
+        .life-radar.is-compact .life-radar-toolbar {
+            gap: 6px 10px;
+            padding-bottom: 4px;
+        }
+
+        .life-radar.is-compact .life-radar-side {
+            display: none;
+        }
+
+        .life-radar.is-compact .life-radar-svg {
+            max-width: 340px;
+        }
+
+        .life-radar.is-compact .life-radar-key {
+            gap: 6px 12px;
+        }
+
         /* ---- 七维详情弹窗 ---- */
         .life-dim-modal {
             width: min(900px, 100%);
@@ -9385,6 +9410,88 @@
         .life-color-toggle:focus-visible {
             outline: 1px dashed var(--text-secondary);
             outline-offset: 2px;
+        }
+
+        /* 视图切换：FEED（长页）/ DASHBOARD（12 列板子）。
+           和 COLOR 开关同一套尺寸，但不加底色 —— 它是「模式」，不是开关。 */
+        .life-view-switch {
+            display: inline-flex;
+            border: 1px solid var(--border);
+            background: transparent;
+        }
+
+        .life-view-option {
+            appearance: none;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.5rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease;
+        }
+
+        .life-view-option + .life-view-option {
+            border-left: 1px solid var(--border);
+        }
+
+        .life-view-option:hover {
+            color: var(--text-primary);
+        }
+
+        .life-view-option.is-active {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .life-view-option:focus-visible {
+            outline: 1px dashed var(--text-secondary);
+            outline-offset: -3px;
+        }
+
+        /* 仪表盘模式：hero 收成一窄条，把首屏让给板子。
+           标题 / kicker / meta 都保留，只是缩小左对齐。 */
+        .life-section.is-dashboard {
+            padding-top: 108px;
+            max-width: 1560px;
+        }
+
+        .life-section.is-dashboard .stats-hero {
+            text-align: left;
+        }
+
+        .life-section.is-dashboard .stats-hero-kicker,
+        .life-section.is-dashboard .stats-hero-meta {
+            justify-content: flex-start;
+        }
+
+        .life-section.is-dashboard .stats-title {
+            margin-top: 12px;
+            font-size: clamp(1.7rem, 2.6vw, 2.5rem);
+            letter-spacing: 0.24em;
+        }
+
+        .life-section.is-dashboard .stats-hero-rule,
+        .life-section.is-dashboard .stats-subtitle {
+            display: none;
+        }
+
+        .life-section.is-dashboard .stats-hero-meta {
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .life-section.is-dashboard {
+                padding-top: 92px;
+            }
+
+            .life-section.is-dashboard .stats-title {
+                font-size: 1.6rem;
+            }
         }
 
         .life-color-dots {

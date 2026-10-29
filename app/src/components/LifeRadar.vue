@@ -18,6 +18,9 @@ const props = defineProps({
   focusDay: { type: String, default: '' },
   // 七维详情要读原始 blocks（桌面分类活动），和页面共用同一个 CMS 地址
   cmsBase: { type: String, default: '' },
+  // 仪表盘里的一块：收起右侧七维列表，只留工具栏 + 雷达图。
+  // 默认 false —— 长页模式的结构和动画都不受影响。
+  compact: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:focusDay']);
@@ -834,7 +837,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="life-radar">
+  <div class="life-radar" :class="{ 'is-compact': compact }">
     <div class="life-radar-toolbar">
       <div class="life-radar-ranges" role="group" aria-label="Radar statistics range">
         <button

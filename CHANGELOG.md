@@ -11,6 +11,35 @@
 
 ---
 
+## update: 47 — 2026-10-29
+
+### LIFE 仪表盘视图：FEED / DASHBOARD 可切换
+同一个 `/life` 现在有两种看法，切换点在 hero 那行元信息里（`FEED` / `DASHBOARD`
+分段按钮），选择记在 `localStorage.lifeViewMode`，也认 `?view=dashboard` 直达。
+
+- **长页原样保留**：`FEED` 就是原来的 6 张 KPI + 9 个面板 + 全部 GSAP 入场，
+  一行没删。仪表盘是另一套 DOM（`components/LifeDashboard.vue`），
+  不是把长页压扁。
+- **12 列 bento**：01 NOW（位置 + 电脑/手机/手表 + 实时问答）、02 TODAY
+  （今日桌面小时与前三应用）、6 张 KPI、04 七维雷达（`compact` 紧凑版）、
+  05 DAILY RHYTHM、06/07/08 MOTION / PHONE / AI SPEND、09 PLACES、
+  10 LATEST RUN、11 TOP APPLICATIONS、12 WEEKDAY PROFILE、13 THE ARCHIVE。
+  点击行为和长页一致（单日详情 / 今日明细 / RUNNING 弹窗）。
+- **样式不另起一套**：仪表盘复用 `.stats-panel-head` `.stat-card` `.life-row`
+  `.life-bars` `.life-weekday-row` `.life-chip`，`is-color` 下的分类色照常生效。
+- 仪表盘不挂 `data-reveal` / `data-chart`：这两套 GSAP 揭示是给长页滚动用的，
+  板子一屏铺满，全部直接可见，`ScrollTrigger` 也只管长页。
+- `LifeNow` 在两种视图里**都保持挂载**（切到仪表盘时只 `v-show` 收起）——
+  仪表盘的「现在」读的是它 `@snapshot` 抛出来的那份 `/api/life/now` 快照。
+- 切回 FEED 时重新 `ScrollTrigger.refresh()` 并重挂地图的 `IntersectionObserver`
+  （DOM 刚被重新插进来，旧的观察器已经失效）。
+- 验收：`tools/verify-life-dashboard.mjs`（12 块 / 6 个 KPI / 雷达 / 21 列 rhythm /
+  3 个迷你图 / 7 行 weekday / 8 个归档入口、无横向溢出、点柱子开单日详情、
+  切回 FEED 恢复 `.life-now` 与 6+9、URL 参数清掉、刷新记住选择、手机与浅色截图、
+  零控制台报错）。
+
+---
+
 ## update: 46 — 2026-10-27
 
 ### 新页面 `/organization`：这个组织是什么
