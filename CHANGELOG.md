@@ -11,6 +11,32 @@
 
 ---
 
+## update: 49 — 2026-10-29
+
+### GITHUB ACTIVITY 改成年初至今（48 的补充）
+
+- **格子图从 12 周扩到整年**：公开事件接口只能回溯 90 天，画不出「从 1 月 1 日开始」，
+  所以贡献数据改走 `github-contributions-api.jogruber.de/v4`（CORS 放开、一次给满全年、
+  自带 GitHub 的 0–4 级）。窗口从 1 月 1 日所在那一周开始到本周；1 月 1 日之前的半列
+  和本周里今天之后的几天都不画框、不进统计。日历接口拿不到时退回原来的 12 周画法，
+  脚注标 `CALENDAR UNAVAILABLE · LAST 12 WEEKS`，不会变成一整片空白。
+- **蛇**：照 GitHub snake 的走法沿格子蛇形爬，头经过有活动的格子就吃掉（本轮变空），
+  到终点停一下再来；指针停在格子上 / 面板滚出视口 / reduced-motion 时不推进。
+- **格子图下方补齐**：BUSIEST DAY / BUSIEST WEEKDAY / AVG PER ACTIVE DAY / LONGEST RUN
+  四个数字，再下面是 BY MONTH 的月度柱（带 PEAK 月份），把原来蛇图下面那块空洞填满。
+- **右栏保持纯文字**：TOP REPOSITORIES 去掉进度条，只留序号 / 仓库名 / 事件数；
+  最近动态也放回右栏，和仓库榜同一种列表形态 —— 左栏已经有格子图和月度柱，
+  右栏再来一根根条子不协调。
+- **修：LIFE 整页空白**：旧缓存缺少 `avgPerActiveDay` 时 `.toFixed` 抛错，把整个
+  LifeView 的渲染带崩。缓存键升到 `v4` 并校验形状（`cells` / `totals` / `monthly`），
+  组件里也改成 `Number.isFinite` 兜底显示 `—`。
+- 验收：`tools/verify-github-activity.mjs` 换成全年 fixture（308 格 / 3 格 outside /
+  3 格 future / 月份刻度 / 0–4 级分布 / 蛇推进与悬停暂停 / 普通视图不染成分类色 /
+  刷新命中缓存 / 手机横向滚动、格子保底 9px / 日历失败退回 12 周 / 两个源都失败的空态 /
+  reduced-motion 无蛇）。
+
+---
+
 ## update: 48 — 2026-10-29
 
 ### 新板块 GITHUB ACTIVITY（长页 + 仪表盘都有）
