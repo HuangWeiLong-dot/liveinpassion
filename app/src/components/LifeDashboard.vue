@@ -12,6 +12,7 @@
 // 和 KPI 的 bento 是同一套做法。
 import { computed, ref } from 'vue';
 import OdometerNumber from './OdometerNumber.vue';
+import GithubActivity from './GithubActivity.vue';
 import LifeRadar from './LifeRadar.vue';
 
 const props = defineProps({
@@ -725,11 +726,16 @@ function openDay(day) {
       </div>
     </article>
 
-    <!-- 13 归档入口 -->
+    <!-- 13 GitHub 公开事件：数据自己拉（useGithubActivity），不占 LifeView 的 props -->
+    <article class="dash-tile span-12 dash-github">
+      <GithubActivity variant="tile" index="13" />
+    </article>
+
+    <!-- 14 归档入口 -->
     <article class="dash-tile span-12">
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">13</span>
+          <span class="stats-panel-index">14</span>
           <h2>THE ARCHIVE</h2>
         </div>
         <span class="stats-panel-sub">{{ archiveCount }} ENTRIES · UNFILTERED</span>

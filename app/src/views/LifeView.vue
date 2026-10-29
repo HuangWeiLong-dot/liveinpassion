@@ -20,6 +20,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
 import LifeBrain from '../components/LifeBrain.vue';
+import GithubActivity from '../components/GithubActivity.vue';
 import LifeDashboard from '../components/LifeDashboard.vue';
 import LifeRadar from '../components/LifeRadar.vue';
 import LifeNow from '../components/LifeNow.vue';
@@ -3818,11 +3819,16 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 08 归档：全量原始数据 -->
+        <!-- 08 GitHub：公开事件流（和 LIFE 数据同属「公开生命档案」的一部分） -->
+        <div class="stats-panel life-panel" data-reveal>
+          <GithubActivity variant="panel" index="08" />
+        </div>
+
+        <!-- 09 归档：全量原始数据 -->
         <div class="stats-panel life-panel life-archive-panel" data-reveal>
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">08</span>
+              <span class="stats-panel-index">09</span>
               <h2>THE ARCHIVE</h2>
             </div>
             <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>

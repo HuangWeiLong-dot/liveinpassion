@@ -1,6 +1,32 @@
 {
   "posts": [
     {
+      "slug": "pedestrian",
+      "cardTitle": "PEDESTRIAN",
+      "cardDate": "OCTOBER 29, 2026 · 8:51 PM",
+      "title": "Pedestrian",
+      "date": "October 29, 2026 · 8:51 PM",
+      "readTime": "1 min read",
+      "image": {
+        "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/f49ab563.jpg",
+        "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/155fc290.png"
+      },
+      "body": "<p>Pedestrian walking on the street.<br />Alongside the endless road.<br />You walked by them.<br />You saw their faces.<br />You wonder what kind of life they have.<br />You imagine you are with them.</p>\n<p>Will there be any intersections?<br />Or just one lunatic fantasy?<br />Holding on to something that could never let go.</p>\n<p>Holding an umbrella, lowering their heads, holding their phones.<br />Walking towards aimlessly.</p>\n<p>What does that mean?<br />This endless void drawn.<br />Line. Warning.<br />Segregate two worlds.</p>\n<p>Hold on to your boundaries.<br />Get yourself out of the dirt.<br />Foul, filthy dirt.</p>\n"
+    },
+    {
+      "slug": "afk",
+      "cardTitle": "AFK",
+      "cardDate": "OCTOBER 28, 2026 · 8:29 PM",
+      "title": "Afk",
+      "date": "October 28, 2026 · 8:29 PM",
+      "readTime": "1 min read",
+      "image": {
+        "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3c5fd015.jpg",
+        "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/9fe29545.png"
+      },
+      "body": "<p>Status: AFK</p>\n<p>Signal lost in a static haze.<br />The system demands a hollow grace,<br />But raw truth has no empty space.</p>\n<p>Fabricated files and phantom fears,<br />A glitch in the lens, distorting years.<br />I pull the plug on their deceit,<br />And find my silence, my retreat.</p>\n<p>Offline now. The noise is dead.<br />Rebuilding armor in my head.<br />Tomorrow, I will rise and fight.<br />But for tonight, I am offline.</p>\n"
+    },
+    {
       "slug": "digital-apathy",
       "cardTitle": "DIGITAL APATHY",
       "cardDate": "OCTOBER 27, 2026 · 8:51 PM",

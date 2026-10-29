@@ -585,7 +585,7 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   console.log('  live badge:', liveBadge);
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 6) throw new Error(`expected 6 KPI cards, got ${state.cards}`);
-  if (state.panels !== 9) throw new Error(`expected 9 panels (radar + brain + 7 charts), got ${state.panels}`);
+  if (state.panels !== 10) throw new Error(`expected 10 panels (radar + brain + 7 charts + github), got ${state.panels}`);
 
   // 七维雷达：五档统计窗口，默认 7D；单日模式才出现日期步进 / 下拉
   if (state.radarControls !== 5) throw new Error(`expected 5 radar ranges, got ${state.radarControls}`);
@@ -1275,7 +1275,7 @@ await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, asy
   console.log('  state:', { cards: state.cards, numbers: state.numbers.length, panels: state.panels });
   if (state.cards !== 6) throw new Error('empty: KPI cards missing');
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
-  if (state.panels !== 9) throw new Error('empty: panels missing');
+  if (state.panels !== 10) throw new Error('empty: panels missing');
   await shot('top');
 });
 

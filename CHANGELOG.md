@@ -11,6 +11,32 @@
 
 ---
 
+## update: 48 — 2026-10-29
+
+### 新板块 GITHUB ACTIVITY（长页 + 仪表盘都有）
+LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库排行。
+
+- **数据**：GitHub 公开事件接口 `api.github.com/users/HuangWeiLong-dot/events/public`，
+  不需要 token，也不经过 Worker。未鉴权限 60 次/小时/IP，所以结果缓存在
+  `localStorage`（10 分钟），模块级单例让长页 / 仪表盘共用一份；切视图、刷新都不会重复请求。
+  403/429 时退避 15 分钟，有缓存就继续显示并标 `CACHED`，没缓存才显示 `RETRY`。
+- **格子图**：12 列（周）× 7 行（星期）= 84 格，按当天事件量分 0–4 级深浅；
+  未来几天不画框。悬停 / 聚焦任意一格，下面那行读出当天的 commits / PRs / issues。
+  公开事件接口最多覆盖约 90 天，窗口按「本周一往前 11 周」对齐，header 写实际天数。
+- **合计**：COMMITS / PULL REQS / ISSUES / EVENTS / ACTIVE DAYS / STREAK（长页 6 个，
+  仪表盘收成 4 个）。PushEvent 的提交按 sha 去重（翻页会重叠），合并提交没有
+  commits 时按 1 次算；连续天数沿用 GitHub 口径（今天没活动从昨天起算）。
+- **仓库排行**：只列窗口内碰过的仓库，按事件数排序，名字直接链到 GitHub；
+  底部 `OPEN PROFILE` 出去。
+- 位置：长页里排在 WEEKDAY PROFILE 之后、THE ARCHIVE 之前（08 / 09）；
+  仪表盘里是 13 号格子，ARCHIVE 顺延成 14。
+- 验收：`tools/verify-github-activity.mjs`（84 格 / 未来格数 / 今天格 / 7 行星期 /
+  月份刻度 / 0–4 级分布 / 合计数字 / 仓库数 / 悬停读数 / 切换视图不重新请求 /
+  刷新命中缓存 / 手机不横向溢出 / 403 时的 RETRY 与退避、零控制台报错）。
+  `tools/verify-life.mjs` 的面板数从 9 改成 10，其余断言不变。
+
+---
+
 ## update: 47 — 2026-10-29
 
 ### LIFE 仪表盘视图：FEED / DASHBOARD 可切换
