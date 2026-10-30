@@ -15,7 +15,18 @@ const mePhotoMap = new Map(
   (meAlbum && meAlbum.photos ? meAlbum.photos : []).map((p) => [p.filename, p])
 );
 
-export const mePhotos = [...mePhotoMap.keys()];
+// 快照里同一张图会有两条记录：原名（IMG_20260921_202245.jpg）和带 hash 的别名
+// （IMG_20260921_202245-15f39dd91c2f.jpg），src / fullSrc 完全相同。
+// 不按图片地址去重的话，墙面和底部胶卷条里会并排出现同一张照片。
+// 用 src（没有就用 fullSrc、再退文件名）做键，真实身份只有一个。
+const seenSrc = new Set();
+export const mePhotos = [...mePhotoMap.keys()].filter((filename) => {
+  const p = mePhotoMap.get(filename);
+  const key = p?.src || p?.fullSrc || filename;
+  if (seenSrc.has(key)) return false;
+  seenSrc.add(key);
+  return true;
+});
 
 export function mePhotoByName(filename) {
   const p = mePhotoMap.get(filename);

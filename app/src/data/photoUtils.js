@@ -2,6 +2,15 @@
 // 照片文件名里的 YYYYMM_N 是排序与月份分组的唯一依据，别改这两个函数的规则。
 import { CDN_BASE } from './cdn.js';
 
+// 文件名里的日期（202605_17.jpg → 2026.05；20260508_024939 → 2026.05.08）。
+// 只用于灯箱下方那行展示，不参与排序（排序仍走 sortPhotos）。
+export function photoDate(filename) {
+    if (!filename) return '';
+    const match = filename.match(/(\d{4})(\d{2})(\d{2})?/);
+    if (!match) return '';
+    return match[3] ? `${match[1]}.${match[2]}.${match[3]}` : `${match[1]}.${match[2]}`;
+}
+
 // 辅助函数：按年份月份排序
 export function sortPhotos(photos) {
     return photos.sort((a, b) => {

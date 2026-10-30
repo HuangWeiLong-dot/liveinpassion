@@ -27,8 +27,8 @@ export function staggerWallReveal(root, isVisible = () => true) {
     const img = el.querySelector('.win__img');
     if (!img) return;
     const delay = isVisible(el) ? i * REVEAL_STEP : 0;
-    // .win__img 的 transition 是 opacity, filter —— 只给 opacity 加延迟
-    img.style.transitionDelay = `${delay}ms, 0ms`;
+    // .win__img 的 transition 是 opacity, filter, transform —— 只有 opacity 要延迟
+    img.style.transitionDelay = `${delay}ms, 0ms, 0ms`;
   });
 }
 

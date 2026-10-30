@@ -22,24 +22,37 @@ import {
 import { useRoute, useRouter } from 'vue-router';
 import { clearBlockCursorHot, setBlockCursorHot } from '../composables/useBlockCursor.js';
 import { thumbUrl } from '../composables/useThumbnails.js';
+import { scrollHorizontallyOnWheel } from '../composables/useWheelScroll.js';
 import { useLightbox } from '../composables/useLightbox.js';
 import { staggerWallReveal } from '../composables/useWallMotion.js';
 import { createWallEntry } from '../composables/useWallEntry.js';
+import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import { resetWall, shuffleWall } from '../composables/useWallPuzzle.js';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { friends } from '../data/friends.js';
 import { mePhotos, mePhotoByName } from '../data/mePhotos.js';
+import { photoDate } from '../data/photoUtils.js';
 import albumContent from '../data/content/albums.json';
 
 const route = useRoute();
 const router = useRouter();
-const { open: openLightbox } = useLightbox();
+// 灯箱的当前照片也取同一份单例状态：底部胶卷条据此高亮当前那张
+const {
+  open: openLightbox,
+  isOpen: lightboxOpen,
+  items: lightboxItems,
+  index: lightboxIndex,
+  close: closeLightbox,
+  setStripVisible,
+} = useLightbox();
 const { entered: brandEntered } = useBrandOverlay();
 
 let introPlayed = false;
 let introTimer = 0;
 let prefetchTimer = 0;
 let resizeTimer = 0;
+let stripTimer = 0;
+let detachTilt = null;
 
 // 首屏入场（参照 wndws.space）：每次进入这个页面都重播一次
 const wallEntry = createWallEntry();
@@ -93,6 +106,8 @@ const friendPool = (() => {
     friendPhotoIndex: photoIndex,
     src: p.src,
     fullSrc: p.fullSrc,
+    filename: p.filename,
+    date: photoDate(p.filename),
     placeholder: false,
   })));
 
@@ -129,6 +144,8 @@ const groupPool = (groupAlbum?.photos || []).map((p, i) => ({
   title: 'Group moment',
   src: p.src,
   fullSrc: p.fullSrc,
+  filename: p.filename,
+  date: photoDate(p.filename),
   groupIndex: i,
   placeholder: false,
 }));
@@ -137,16 +154,21 @@ const groupPool = (groupAlbum?.photos || []).map((p, i) => ({
 // 真正的完整相册在 /me/gallery。
 const mePool = mePhotos
   .filter((_, i) => i % 11 === 0)
-  .map((name) => mePhotoByName(name))
-  .filter(Boolean)
-  .map((p) => ({
-    kind: 'me',
-    kicker: 'ME',
-    title: 'Personal archive',
-    to: '/me/gallery',
-    src: p.src,
-    placeholder: false,
-  }));
+  .flatMap((name) => {
+    const p = mePhotoByName(name);
+    if (!p) return [];
+    return [{
+      kind: 'me',
+      kicker: 'ME',
+      title: 'Personal archive',
+      to: '/me/gallery',
+      src: p.src,
+      fullSrc: p.fullSrc,
+      filename: name,
+      date: photoDate(name),
+      placeholder: false,
+    }];
+  });
 
 function interleave(...lists) {
   const out = [];
@@ -235,11 +257,73 @@ const statsText = computed(() => {
   return `${n} windows · ${friendIdSet.size} friends · ${moments} moments`;
 });
 
-// 图片真正 load 之后再加 is-loaded，配合 is-on 做淡入淡出
+// 图片真正 load 之后再加 is-loaded，配合 is-on 做淡入淡出；
+// 同时在这扇窗上来一次抖色故障揭示（参考站的加载镜头）。
+// 「已加载」状态用 rAF 合批：首屏几十张缩略图往往在同一帧里陆续 load，
+// 每张都重建一次 Set 会让整面墙（140 个槽位）跟着重渲染几十次。
 const loadedSrcs = ref(new Set());
-function onImgLoad(item) {
+let loadedQueue = new Set();
+let loadedRaf = 0;
+
+function flushLoaded() {
+  loadedRaf = 0;
+  if (!loadedQueue.size) return;
+  const next = new Set(loadedSrcs.value);
+  for (const src of loadedQueue) next.add(src);
+  loadedQueue = new Set();
+  loadedSrcs.value = next;
+}
+
+function onImgLoad(item, event) {
   if (!item?.src) return;
-  loadedSrcs.value = new Set(loadedSrcs.value).add(item.src);
+  loadedQueue.add(item.src);
+  if (!loadedRaf) loadedRaf = requestAnimationFrame(flushLoaded);
+  const img = event?.target;
+  if (img) playGlitchReveal(img, img.closest('.win--filled'));
+}
+
+// ── 底部胶卷条（参照 oumahi.art）────────────────────────────────────────
+// 把当前筛选下墙上的照片再排成一条固定底栏；点缩略图直接进详情。
+// 缩略图复用 thumbUrl 的 200px 缓存，不在墙上重复解码。
+const stripRef = ref(null);
+// 胶卷条只在这个页面驻留：它被 Teleport 到 body，keep-alive 换页后
+// 不能指望节点一定跟着被摘掉，所以用这个开关按页面激活状态收起。
+const stripAlive = ref(false);
+const stripThumbs = ref({});
+let stripThumbQueue = {};
+let stripThumbRaf = 0;
+const stripItems = computed(() => WALL_ITEMS.filter((item) => item.src && isActive(item)));
+// 灯箱里正在看的那张：按 src 匹配，跨不同相册列表也能对上高亮
+const lightboxSrc = computed(
+  () => (lightboxOpen.value ? (lightboxItems.value[lightboxIndex.value]?.src || '') : '')
+);
+
+function loadStripThumb(item) {
+  if (!item?.src || stripThumbs.value[item.src] || stripThumbQueue[item.src]) return;
+  thumbUrl(item.src, 200).then((url) => {
+    if (!url) return;
+    // 缩略图是逐张异步生成的：同一帧里到的几张合并成一次对象替换，
+    // 否则一条 60 格的胶卷条会被逐张重渲染几十次。
+    stripThumbQueue[item.src] = url;
+    if (stripThumbRaf) return;
+    stripThumbRaf = requestAnimationFrame(() => {
+      stripThumbRaf = 0;
+      const pending = stripThumbQueue;
+      stripThumbQueue = {};
+      stripThumbs.value = { ...stripThumbs.value, ...pending };
+    });
+  });
+}
+
+// 首次不要跟墙上的缩略图抢队列：等入场动画开始后再灌胶卷条
+watch(stripItems, (list) => {
+  for (const item of list) loadStripThumb(item);
+});
+
+function scrollStrip(direction) {
+  const row = stripRef.value;
+  if (!row) return;
+  row.scrollBy({ left: direction * Math.min(row.clientWidth * 0.8, 520), behavior: 'smooth' });
 }
 
 // ── 指针旁的提示 ────────────────────────────────────────────────────────
@@ -285,14 +369,23 @@ function observeWallImages() {
 }
 const tip = ref({ visible: false, kicker: '', title: '' });
 const finePointer = ref(false);
+let tipRaf = 0;
+let tipX = 0;
+let tipY = 0;
 
 function moveTip(event) {
-  const el = tipEl.value;
-  if (!el || !tip.value.visible) return;
+  if (!tip.value.visible) return;
   // 别让提示跑出视口右边
-  const x = Math.min(event.clientX + 14, window.innerWidth - 180);
-  const y = Math.min(event.clientY + 16, window.innerHeight - 54);
-  el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  tipX = Math.min(event.clientX + 14, window.innerWidth - 180);
+  tipY = Math.min(event.clientY + 16, window.innerHeight - 54);
+  // pointermove 可能比屏幕刷新还密（高刷鼠标 / 触控笔），写到 rAF 里合并
+  if (tipRaf) return;
+  tipRaf = requestAnimationFrame(() => {
+    tipRaf = 0;
+    const el = tipEl.value;
+    if (!el || !tip.value.visible) return;
+    el.style.transform = `translate3d(${tipX}px, ${tipY}px, 0)`;
+  });
 }
 
 function showTip(item, event) {
@@ -335,9 +428,10 @@ watch(
 );
 
 // 照片详情的飞行起点：当前这扇窗里的照片矩形 + 图片地址/比例
-function originFromEvent(event) {
+// （底部胶卷条传 .win-strip__img，墙上的窗格用默认的 .win__img）
+function originFromEvent(event, selector = '.win__img') {
   const el = event?.currentTarget;
-  const img = el?.querySelector('.win__img');
+  const img = el?.querySelector(selector);
   const r = (img || el)?.getBoundingClientRect();
   if (!r) return null;
   return {
@@ -349,9 +443,9 @@ function originFromEvent(event) {
   };
 }
 
-function openWindow(item, event) {
+function openWindow(item, event, selector) {
   hideTip();
-  const from = originFromEvent(event);
+  const from = originFromEvent(event, selector);
   // 群组 / 个人相册都没有独立页面了：直接在 Gallery 里开灯箱
   if (item.kind === 'friend') {
     const list = friendPhotoLists[item.friendId] || [];
@@ -364,7 +458,13 @@ function openWindow(item, event) {
     openLightbox(groupPool, item.groupIndex, from);
     return;
   }
-  if (item.to) router.push(item.to);
+  if (item.to) {
+    // 去 ME 相册是换页、不是开灯箱：上一张还开着的话必须先关掉 ——
+    // 这盏灯箱是全局单例，isOpen 不会因为换路由自动复位，
+    // 不关的话大图会跟着跳到 ME 页面，一直停在屏幕中间。
+    if (lightboxOpen.value) closeLightbox();
+    router.push(item.to);
+  }
 }
 
 let swapId = 0;
@@ -401,18 +501,27 @@ watch(selectedFilter, async (next) => {
 
 onMounted(() => {
   finePointer.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  stripAlive.value = true;
+  setStripVisible(stripItems.value.length > 0);
   nextTick(observeWallImages);
+  detachTilt = attachCardTilt(wallRef.value);
   window.addEventListener('resize', onWallResize);
   // 开场之后把整面墙的缩略图在后台排进队列，后续切换筛选不再等图片
   prefetchTimer = setTimeout(() => {
     for (const item of WALL_ITEMS) if (item.src) thumbUrl(item.src, 200);
   }, 2600);
+  stripTimer = setTimeout(() => {
+    for (const item of stripItems.value) loadStripThumb(item);
+  }, 1200);
 });
 
 // keep-alive：每次从导航进入这个页面都重播一次入场
 onActivated(() => {
   clearTimeout(introTimer);
   introPlayed = false;
+  // 胶卷条只在 GALLERY 出现：灯箱要据此给这条底栏让位
+  stripAlive.value = true;
+  setStripVisible(stripItems.value.length > 0);
   wallEntry.reset(wallRef.value);
   nextTick(() => {
     // 等路由的 scrollBehavior 把页面滚回顶部后再量；nextTick 里量到的
@@ -430,6 +539,8 @@ onDeactivated(() => {
   // 这时把墙恢复成"完好的整面墙"会在转场边缘闪一下。
   // 重置放到下一次 onActivated、首帧绘制之前做。
   clearTimeout(introTimer);
+  stripAlive.value = false;
+  setStripVisible(false);
 });
 
 watch(brandEntered, (v) => {
@@ -443,13 +554,20 @@ onBeforeUnmount(() => {
   clearTimeout(introTimer);
   clearTimeout(prefetchTimer);
   clearTimeout(resizeTimer);
+  clearTimeout(stripTimer);
+  cancelAnimationFrame(loadedRaf);
+  cancelAnimationFrame(tipRaf);
+  cancelAnimationFrame(stripThumbRaf);
   wallEntry.reset(wallRef.value);
+  detachTilt?.();
+  stripAlive.value = false;
+  setStripVisible(false);
 });
 </script>
 
 <template>
   <main class="page active">
-    <section class="win-page">
+    <section class="win-page win-page--strip">
       <div class="win-inner">
         <!-- 用 div 而不是 <header>：main.css 里有一条全局的 header{position:fixed}，
              是给站点页头写的，套在内页字标上会把它钉到视口顶部。 -->
@@ -493,12 +611,52 @@ onBeforeUnmount(() => {
                 :alt="item.title"
                 decoding="async"
                 draggable="false"
-                @load="onImgLoad(item)"
+                @load="onImgLoad(item, $event)"
               >
             </button>
           </template>
         </div>
       </div>
+
+      <!-- 底部胶卷条：当前筛选下墙上的照片，点缩略图直接进详情。
+           必须 Teleport 到 body：.page 自带 z-index: 1 会把它关进这个层叠上下文，
+           于是灯箱（1002）永远盖住它。挂到 body 直下，它才能在详情页里一直露着。 -->
+      <Teleport to="body">
+        <div v-if="stripAlive && stripItems.length" class="win-strip" aria-label="Photo filmstrip">
+          <button
+            class="win-strip__edge"
+            type="button"
+            aria-label="Scroll left"
+            @click="scrollStrip(-1)"
+          >‹</button>
+          <div ref="stripRef" class="win-strip__row" @wheel="scrollHorizontallyOnWheel">
+            <button
+              v-for="item in stripItems"
+              :key="item.src"
+              class="win-strip__thumb"
+              :class="{ 'is-active': item.src === lightboxSrc }"
+              type="button"
+              :aria-label="`${item.kicker}: ${item.title}${item.date ? ` · ${item.date}` : ''}`"
+              @click="openWindow(item, $event, '.win-strip__img')"
+            >
+              <img
+                class="win-strip__img"
+                :src="stripThumbs[item.src] || null"
+                :alt="item.title"
+                loading="lazy"
+                decoding="async"
+                draggable="false"
+              >
+            </button>
+          </div>
+          <button
+            class="win-strip__edge"
+            type="button"
+            aria-label="Scroll right"
+            @click="scrollStrip(1)"
+          >›</button>
+        </div>
+      </Teleport>
 
       <div class="win-dock">
         <span class="win-stats" aria-live="polite">{{ statsText }}</span>

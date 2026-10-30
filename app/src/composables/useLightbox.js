@@ -16,6 +16,9 @@ const isOpen = ref(false);
 const isLoading = ref(false);
 // 打开它的那个窗口矩形（照片飞行过渡的起点）；外部直接 open 时可以为空
 const origin = ref(null);
+// GALLERY 的底部胶卷条是否在场。灯箱在详情页里仍然露着这条底栏，
+// 所以要按它的高度给舞台让位（见 Lightbox.vue 的 stripReserve）。
+const stripVisible = ref(false);
 
 const currentItem = computed(() => items.value[index.value] || null);
 const currentSrc = computed(() => {
@@ -70,5 +73,10 @@ export function useLightbox() {
     isLoading.value = false;
   }
 
-  return { items, index, isOpen, isLoading, currentSrc, origin, resolve, open, close, prev, next, onImageSettled };
+  // 由 GALLERY 在激活/离开时调用
+  function setStripVisible(value) {
+    stripVisible.value = Boolean(value);
+  }
+
+  return { items, index, isOpen, isLoading, currentItem, currentSrc, origin, stripVisible, setStripVisible, resolve, open, close, prev, next, onImageSettled };
 }

@@ -839,6 +839,19 @@
             visibility: visible;
         }
 
+        /* GALLERY 的底部胶卷条压在整个灯箱之上（z-index 1005），详情页里也一直露着。
+           这里把灯箱的可用区域往上收一条底栏的高度，舞台跟着上移：
+           照片和下面那行日期都在条的上方，不会被缩略图盖住。
+           数值要和 Lightbox.vue 的 STRIP_RESERVE 一致（92 + 24 的缝）。 */
+        .lightbox.has-strip {
+            padding-bottom: 116px;
+        }
+
+        /* 左右翻页按钮按整个视口居中会显得比照片低，跟着舞台一起抬 */
+        .lightbox.has-strip .lightbox-nav {
+            top: calc(50% - 58px);
+        }
+
         .lightbox-bg {
             position: absolute;
             top: 0;
@@ -849,25 +862,157 @@
             backdrop-filter: blur(10px);
         }
 
+        /* 尺寸由 Lightbox.vue 按照片比例写成行内 style，骨架屏和大图都填满它 */
         .lightbox-content {
             position: relative;
-            max-width: 90vw;
-            max-height: 90vh;
             z-index: 1;
+            /* 大图随指针轻微倾斜：角度变量由 composables/useCardFx.js 写入 */
+            transform: perspective(1400px) rotateX(var(--fx-tilt-x, 0deg)) rotateY(var(--fx-tilt-y, 0deg));
+            transition: transform 0.35s ease;
         }
 
-        .lightbox-content img {
-            max-width: 90vw;
-            max-height: 90vh;
+        .lightbox-stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .lightbox-stage img {
+            display: block;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             opacity: 0;
-            transform: scale(0.95);
-            transition: opacity 0.4s ease, transform 0.4s ease;
+            transition: opacity 0.35s ease;
         }
 
-        .lightbox.active .lightbox-content img {
+        .lightbox-stage img.is-loaded {
             opacity: 1;
-            transform: scale(1);
+        }
+
+        /* ── shimmer 骨架屏 ────────────────────────────────────────────
+           切换照片时先把舞台盖住；高光走 ::after 的 transform（GPU 合成），
+           虚线框走 background-position 的行军蚁，跟参考站一致。 */
+        .lightbox-skeleton {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            overflow: hidden;
+            background: #0d0d0d;
+            pointer-events: none;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+        }
+
+        .lightbox-skeleton::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0.35;
+            background-image:
+                linear-gradient(90deg, #000 50%, #fff 50%),
+                linear-gradient(90deg, #000 50%, #fff 50%),
+                linear-gradient(0deg, #000 50%, #fff 50%),
+                linear-gradient(0deg, #000 50%, #fff 50%);
+            background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+            background-size: 8px 1px, 8px 1px, 1px 8px, 1px 8px;
+            background-position: 0 0, 0 100%, 0 0, 100% 0;
+        }
+
+        .lightbox-skeleton::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -60%;
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(255, 255, 255, 0.16) 50%,
+                transparent 100%
+            );
+            will-change: transform;
+        }
+
+        /* 两条动画只在灯箱真的打开、骨架还在的时候跑。
+           .lightbox 关着时只是 visibility: hidden，动画却照常逐帧走，
+           白白占着主线程和合成器。 */
+        .lightbox.active .lightbox-skeleton:not(.hidden)::before {
+            animation: lb-marching-ants 0.5s linear infinite;
+        }
+
+        .lightbox.active .lightbox-skeleton:not(.hidden)::after {
+            animation: lb-skeleton-shimmer 1.5s ease-in-out infinite;
+        }
+
+        .lightbox-skeleton.hidden {
+            opacity: 0;
+        }
+
+        @keyframes lb-skeleton-shimmer {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(280%); }
+        }
+
+        @keyframes lb-marching-ants {
+            to { background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px; }
+        }
+
+        /* ── 照片下方的日期 / 位置 ──────────────────────────────────── */
+        .lightbox-meta {
+            position: absolute;
+            top: calc(100% + 14px);
+            left: 0;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.66);
+            white-space: nowrap;
+        }
+
+        .lightbox-date {
+            position: relative;
+            /* 高度必须盖住行盒：10px 字号的行高是 17px，容器只有 14px 时
+               会把字的底部裁掉一截（日期看起来被切平）。 */
+            height: 17px;
+            min-width: 76px;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .lightbox-date__text {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            will-change: transform, opacity;
+        }
+
+        /* 日期上下滚动交换：旧日期往上走，新日期从下面进来 */
+        .lb-roll-enter-active,
+        .lb-roll-leave-active {
+            transition: transform 0.44s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+        }
+
+        .lb-roll-enter-from {
+            transform: translate(-50%, 110%);
+            opacity: 0;
+        }
+
+        .lb-roll-leave-to {
+            transform: translate(-50%, -110%);
+            opacity: 0;
+        }
+
+        .lightbox-count {
+            color: rgba(255, 255, 255, 0.4);
         }
 
         .lightbox-close-area {
@@ -1724,11 +1869,58 @@
             object-fit: contain;
             cursor: default;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            /* 大图随指针轻微倾斜：角度变量由 composables/useCardFx.js 写入 */
+            transform: perspective(1400px) rotateX(var(--fx-tilt-x, 0deg)) rotateY(var(--fx-tilt-y, 0deg));
+            transition: opacity 0.3s ease, transform 0.35s ease;
         }
 
         .me-photo-lightbox-full.loaded {
             opacity: 1;
+        }
+
+        /* 照片下方那行日期。这张图是按比例撑开的、宽度未知，
+           所以它直接贴在视口底部上方居中，跟主灯箱的日期行对齐。 */
+        .me-photo-lightbox-meta {
+            position: absolute;
+            left: 50%;
+            bottom: 40px;
+            transform: translateX(-50%);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 10px;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.66);
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* MY GALLERY 的底部胶卷条（z-index 10005）也压在这盏单图灯箱之上，
+           详情页里同样要一直露着 —— 可用区域往上收一条底栏的高度，
+           让照片和下面那行日期都落在条的上方。
+           数值与 Lightbox.vue 的 STRIP_RESERVE 一致（92 + 24 的缝），
+           高度上限 0.9 × (100vh - 116px) ≈ 90vh - 104px。 */
+        @media (min-width: 1025px) {
+            body:has(.win-strip) .me-photo-lightbox {
+                padding-bottom: 116px;
+            }
+
+            body:has(.win-strip) .me-photo-lightbox-full,
+            body:has(.win-strip) .me-photo-lightbox-thumb {
+                max-height: calc(90vh - 104px);
+            }
+
+            /* 模糊占位是绝对定位的，跟大图一起上移半个底栏高 */
+            body:has(.win-strip) .me-photo-lightbox-thumb {
+                top: calc(50% - 58px);
+            }
+
+            body:has(.win-strip) .me-photo-lightbox-meta {
+                bottom: 116px;
+            }
         }
 
         .me-photo-lightbox-close {
@@ -3889,6 +4081,15 @@
             pointer-events: none;
         }
 
+        /* GALLERY 有底部胶卷条时，频谱/歌词这块整体抬到条和统计条的上方 ——
+           否则频谱柱会直接画在缩略图上（它 z-index 996，永远盖在条上面）。
+           统计/筛选条被推到 bottom: 110px（window-wall.css），这里再让过它的高度。 */
+        @media (min-width: 1025px) {
+            body:has(.win-strip) .now-playing {
+                bottom: 172px;
+            }
+        }
+
         /* 歌词视口：上下用 mask 淡出，滚出视野的行自然消失 */
         .now-playing__lyrics {
             position: relative;
@@ -4451,6 +4652,28 @@
         footer p {
             font-size: 0.875rem;
             color: var(--text-secondary);
+        }
+
+        /* 页脚抽屉拉开时，底部这批固定条一并让位（类由 AppFooter.vue 挂到 <html>）：
+           手机那条 MobileDock、GALLERY 的统计/筛选条与胶卷条、播放中的歌词行，
+           平时都固定在底部，正好压在页脚最下面那三句 Be 上，把字挡掉一半。
+           这里只淡出、不移走 —— 往上滚一格抽屉合上，它们自己就回来了。
+           visibility 跟着一起藏：光设 opacity: 0 的话，MobileDock 里那些
+           pointer-events: auto 的按钮还是能点到，等于在空中乱点。 */
+        html .dock,
+        html .win-dock,
+        html .win-strip,
+        html .now-playing {
+            transition: opacity 0.35s ease, visibility 0s linear;
+        }
+
+        html.footer-revealed .dock,
+        html.footer-revealed .now-playing,
+        html.footer-revealed .win-dock,
+        html.footer-revealed .win-strip {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.35s ease, visibility 0s linear 0.35s;
         }
 
         @keyframes fadeInUp {

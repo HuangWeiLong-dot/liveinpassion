@@ -121,10 +121,58 @@
   pointer-events: none;
 }
 
+/* 悬停：轻微上浮 + 指针跟随的 3D 倾斜（变量由 composables/useCardFx.js 写入）。
+   不再缩放整张卡，避免边框和行军蚁描边跟着一起抖；放大交给里面的图片。 */
 .win--filled:hover {
   z-index: 3;
-  transform: translateY(-3px) scale(1.06);
+  transform:
+    perspective(900px)
+    rotateX(var(--fx-tilt-x, 0deg))
+    rotateY(var(--fx-tilt-y, 0deg))
+    translateY(-3px);
   border-color: var(--win-ink);
+}
+
+/* 和 BLOG / 胶片条同一条「行军蚁」描边：8px 黑白短划线，只在悬停这张上跑。 */
+.win--filled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, #000 50%, #fff 50%),
+    linear-gradient(90deg, #000 50%, #fff 50%),
+    linear-gradient(0deg, #000 50%, #fff 50%),
+    linear-gradient(0deg, #000 50%, #fff 50%);
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  background-size: 8px 1px, 8px 1px, 1px 8px, 1px 8px;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  /* 动画只在悬停的那一扇上跑（见下面的 :hover 规则）：整面墙几十扇窗
+     都挂着无限动画的话，每帧都要给这些伪元素做一次样式重算。 */
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.win--filled:hover::after {
+  opacity: 1;
+  animation: win-card-ants 0.45s linear infinite;
+}
+
+@keyframes win-card-ants {
+  to {
+    background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .win--filled:hover {
+    transform: translateY(-3px);
+  }
+
+  .win--filled:hover::after {
+    animation: none;
+  }
 }
 
 .win__img {
@@ -137,18 +185,24 @@
   /* 图片挂了也不要把 alt 文本铺在几十像素的小窗格里 */
   color: transparent;
   font-size: 0;
-  /* 整站是黑白语言；hover 时回一点颜色 */
-  filter: grayscale(1) contrast(1.05);
+  /* 参考站：静息略去色、压暗，被指到的那一张才回到彩色 */
+  filter: grayscale(35%) contrast(1.05) brightness(0.9);
   opacity: 0;
-  transition: opacity 0.55s ease, filter 0.3s ease;
+  transform: scale(1);
+  transition:
+    opacity 0.55s ease,
+    filter 0.35s ease,
+    transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
 .win__img.is-on.is-loaded {
   opacity: 1;
 }
 
+/* 放大放在图片上而不是整张卡上：边框 / 描边保持精确的 1px */
 .win--filled:hover .win__img {
-  filter: grayscale(0) contrast(1.03);
+  filter: grayscale(0) contrast(1.05) brightness(1);
+  transform: scale(1.06);
 }
 
 .win__placeholder {
@@ -430,11 +484,167 @@
 }
 
 .win-header,
-.win-dock {
+.win-dock,
+.win-strip {
   transition: opacity 0.4s ease;
 }
 
 .win-page.is-entering .win-header,
 .win-page.is-entering .win-dock {
   opacity: 0;
+}
+
+/* 胶卷条是 Teleport 到 body 的（见 GalleryView.vue），已经不在 .win-page 里了，
+   入场期间要淡出只能从 body 这只祖先上认。 */
+body:has(.win-page.is-entering) .win-strip {
+  opacity: 0;
+}
+
+/* 它压在主灯箱（1002）和 ME 单图灯箱（10000 / 关闭按钮 10001）之上，
+   所以进站之前（品牌遮罩还盖着，9999）必须藏起来，否则会浮在遮罩上面。
+   ui-ready 是 useBrandOverlay 揭开遮罩时给 body 挂的，之后一直留着。 */
+body:not(.ui-ready) .win-strip {
+  visibility: hidden;
+}
+
+/* ── 底部胶卷条（GALLERY / MY GALLERY 专用，参照 oumahi.art）──────────────
+   固定底栏铺满宽度，缩略图横向排开；点一张直接进详情。
+   桌面端出现时，统计/筛选条上移让位；1024 以下跟 MobileDock 抢位置，直接隐藏。
+   注意它是 body 直下的固定件（不是 .win-page 的子节点），所以主题变量要在这里
+   重新声明一份 —— 阈值 10005 是为压过两种灯箱，详情页里也要一直露着。 */
+.win-strip {
+  --win-ink: var(--text-primary);
+  --win-muted: var(--text-secondary);
+  --win-dock: var(--bg);
+  --win-dock-line: var(--border-color);
+  --win-empty: var(--bg);
+
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10005;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 92px;
+  padding: 0 10px;
+  border-top: 1px solid var(--win-dock-line);
+  background: var(--win-dock);
+}
+
+.win-strip__row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 1px;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* 不要在这里写 scroll-behavior: smooth：滚轮是逐格累加的，
+     每次都补一段动画会把输入拖在后面。左右按钮自己传了 smooth。 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.win-strip__row::-webkit-scrollbar {
+  display: none;
+}
+
+.win-strip__thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 66px;
+  height: 66px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.5;
+  transform-origin: bottom center;
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.win-strip__thumb:hover {
+  opacity: 1;
+  transform: scale(1.16);
+  z-index: 2;
+}
+
+.win-strip__thumb.is-active {
+  opacity: 1;
+}
+
+/* 当前照片的「行军蚁」虚线框：和参考站一致，黑白短划线在框上跑 */
+.win-strip__thumb.is-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, #000 50%, #fff 50%),
+    linear-gradient(90deg, #000 50%, #fff 50%),
+    linear-gradient(0deg, #000 50%, #fff 50%),
+    linear-gradient(0deg, #000 50%, #fff 50%);
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  background-size: 8px 1px, 8px 1px, 1px 8px, 1px 8px;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  animation: win-strip-ants 0.45s linear infinite;
+}
+
+@keyframes win-strip-ants {
+  to {
+    background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px;
+  }
+}
+
+.win-strip__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--win-empty);
+  filter: grayscale(1) contrast(1.05);
+  transition: filter 0.25s ease;
+}
+
+.win-strip__thumb:hover .win-strip__img {
+  filter: grayscale(0) contrast(1.03);
+}
+
+.win-strip__edge {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 66px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--win-muted);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.win-strip__edge:hover {
+  color: var(--win-ink);
+}
+
+@media (min-width: 1025px) {
+  /* 桌面端给胶卷条和上移后的筛选条留出底部空间 */
+  .win-page--strip {
+    padding-bottom: 248px;
+  }
+
+  .win-page--strip .win-dock {
+    bottom: 110px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .win-strip {
+    display: none;
+  }
 }

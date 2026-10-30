@@ -21,6 +21,7 @@ import { gsap } from 'gsap';
 import { CustomEase } from 'gsap/CustomEase';
 import { blogPosts, blogBySlug } from '../data/blogPosts.js';
 import { loadImage } from '../composables/useImageLoader.js';
+import { playGlitchReveal } from '../composables/useCardFx.js';
 import { useLightbox } from '../composables/useLightbox.js';
 import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
@@ -75,6 +76,13 @@ const coverWrapRef = ref(null);
 // 现查而不是 ref：封面元素在换篇时会被 :key 重建（见 loadFeatured 的注释）
 const coverMediaEl = () => coverWrapRef.value?.querySelector('.bd-media') || null;
 const coverInnerEl = () => coverWrapRef.value?.querySelector('.bd-media__inner') || null;
+
+// 封面落定后的一次抖色故障揭示：把"列表小图长成大图"的最后一下接上
+function revealCoverGlitch() {
+  const inner = coverInnerEl();
+  const img = inner?.querySelector('img');
+  if (img) playGlitchReveal(img, inner);
+}
 
 // 封面盒子的比例 = 图自身的比例（盒子的高度是 aspect-ratio 撑的）。
 // 解码前先给个 4/5 兜底，免得盒子塌成 0。
@@ -565,6 +573,7 @@ function playEnter() {
     gsap.set(panel, { opacity: 1 });
     setCoverCurtain(false);
     document.querySelector('.jb-card.is-flying')?.classList.remove('is-flying');
+    requestAnimationFrame(revealCoverGlitch);
     startTyping();
     return;
   }
@@ -625,6 +634,7 @@ function playEnter() {
       if (img) gsap.set(img, { clearProps: 'width,height,maxWidth,maxHeight' });
       inner.dataset.settled = '1'; // 自动化断言用：封面已就位
       enableTilt(); // 落定之后才允许跟着鼠标倾斜
+      revealCoverGlitch(); // 同时来一次故障揭示，接上小图长大的那一下
     },
   }, 0);
   if (img) {
@@ -925,6 +935,13 @@ function solidifyHeader(on) {
   document.documentElement.classList.toggle('blog-detail-open', on);
 }
 
+// 覆盖层是 fixed 的：底下的列表页不该跟着滚。⚠ 这一页是 keep-alive 缓存的，
+// 离开时 onBeforeUnmount 不会跑 —— 锁必须在 onDeactivated 里放掉，
+// 否则切到任何别的页面后整站都滚不动（html 上的行内 overflow 会一直在）。
+function lockPageScroll(on) {
+  document.documentElement.style.overflow = on ? 'hidden' : '';
+}
+
 // ⚠ 原来这里有一条"抽屉拉开时收起底部 Dock"的 watch（往 <html> 挂 bd-cover-open）。
 //   封面改成整屏背景之后**没有这一条了**：背景什么时候都在，底部那条 Dock 也就不该
 //   跟着谁隐身 —— 那只会变成"菜单莫名消失"。那个类全文只有这一页用过，
@@ -932,7 +949,7 @@ function solidifyHeader(on) {
 
 onMounted(() => {
   document.addEventListener('keydown', onKeydown);
-  document.documentElement.style.overflow = 'hidden'; // 覆盖层是 fixed 的：底下的列表页不该跟着滚
+  lockPageScroll(true);
   narrowMql?.addEventListener('change', syncNarrow);
   syncNarrow(narrowMql || { matches: false });
   solidifyHeader(true);
@@ -943,6 +960,7 @@ onMounted(() => {
 // keep-alive 复用时 onMounted 不会重跑，但每次进来都要重播一遍进入动画
 onActivated(() => {
   leaving = false;
+  lockPageScroll(true);
   solidifyHeader(true);
   bgOn.value = true;  // 每次进来都是"看到照片"那一档；要安静读书自己点那颗键
   gsap.set(panelRef.value, { clearProps: 'opacity' });
@@ -950,6 +968,7 @@ onActivated(() => {
 });
 
 onDeactivated(() => {
+  lockPageScroll(false);
   solidifyHeader(false);
   bgOn.value = true;  // 同上：留给下一次进来的是默认那一档，不是上次点过的状态
   disableTilt();
@@ -979,7 +998,7 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
   narrowMql?.removeEventListener('change', syncNarrow);
-  document.documentElement.style.overflow = '';
+  lockPageScroll(false);
   solidifyHeader(false);
   timeline?.kill();
   stageBgTween?.kill();
@@ -1218,6 +1237,7 @@ if (typeof window !== 'undefined') {
                 :data-src="post.image.src"
                 :data-full-src="post.image.fullSrc"
                 :alt="post.title"
+                crossorigin="anonymous"
                 draggable="false"
                 decoding="async"
               >

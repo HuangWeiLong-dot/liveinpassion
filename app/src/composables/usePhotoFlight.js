@@ -11,11 +11,13 @@ export function rectOf(el) {
   return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
-/** 灯箱大图的落点：在 90vw × 90vh 里按照片比例居中。 */
-export function photoTargetRect(aspect, maxW = 0.9, maxH = 0.9) {
+/** 灯箱大图的落点：在 90vw × 90vh 里按照片比例居中。
+    bottomReserve：底部要给固定底栏（GALLERY 的胶卷条）让出的像素，
+    落点和灯箱舞台（靠 padding-bottom 上移）必须用同一个值，否则飞行会落偏。 */
+export function photoTargetRect(aspect, maxW = 0.9, maxH = 0.9, bottomReserve = 0) {
   const a = aspect > 0 ? aspect : 1;
   const W = window.innerWidth * maxW;
-  const H = window.innerHeight * maxH;
+  const H = (window.innerHeight - bottomReserve) * maxH;
   let w = W;
   let h = w / a;
   if (h > H) {
@@ -24,7 +26,7 @@ export function photoTargetRect(aspect, maxW = 0.9, maxH = 0.9) {
   }
   return {
     left: (window.innerWidth - w) / 2,
-    top: (window.innerHeight - h) / 2,
+    top: (window.innerHeight - bottomReserve - h) / 2,
     width: w,
     height: h,
   };
@@ -60,6 +62,9 @@ export function flyPhoto({
     width: `${from.width}px`,
     height: `${from.height}px`,
     overflow: 'hidden',
+    // 飞行期间每帧都在改 left/top/width/height：把布局与绘制收在这个盒子里，
+    // 别让每次尺寸变化都去牵动整页的布局/重绘
+    contain: 'layout paint',
     // 灯箱 1002 / ME 灯箱 10000；光标 100000、转场板 90000
     zIndex: '20000',
     pointerEvents: 'none',

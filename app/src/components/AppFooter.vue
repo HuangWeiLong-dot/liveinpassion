@@ -75,6 +75,9 @@ onMounted(() => {
 
 watch(revealed, (visible) => {
   if (props.compact) return;
+  // 抽屉拉开期间，底部那批固定件（手机汉堡条 / GALLERY 的筛选条与胶卷条 /
+  // 播放中的歌词）正好压在页脚那三句 Be 上，让它们先淡出（规则在 main.css）。
+  document.documentElement.classList.toggle('footer-revealed', visible);
   if (!visible) {
     distortion?.stop();
     return;
@@ -89,6 +92,7 @@ watch(isDark, () => {
 
 onBeforeUnmount(() => {
   disposed = true;
+  document.documentElement.classList.remove('footer-revealed');
   observer?.disconnect();
   window.removeEventListener('resize', onResize);
   clearTimeout(resizeTimer);

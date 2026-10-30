@@ -25,6 +25,9 @@ import { rememberCoverHandoff, consumeReturningFromDetail, setCoverCurtain } fro
 import {
   FILM, focalOf, poseAt, cssMatrix, ringRadius,
 } from '../composables/useFilmPose.js';
+// 第二种呈现：参考 oumahi.art 的"作品环"（CSS 3D，见组件头注释）。
+// 原版横向轨道保持不动，两者由右上角那枚 VIEW 按钮切换。
+import BlogWorld from '../components/BlogWorld.vue';
 // 扭曲层：把封面画在能弯的细分平面上（唯一必须 WebGL 的部分）。
 // 它**不带姿态数学** —— 姿态只有 useFilmPose 那一份，两边共用，避免劈叉。
 
@@ -37,6 +40,59 @@ const activeIndex = ref(0);
 const progress = ref(0);
 const dragging = ref(false);
 const opening = ref(false);
+// 页面是否处于激活态（keep-alive 离开时不跑世界视图的逐帧循环）
+const pageActive = ref(false);
+
+// ── 视图切换：LOOKBACK（原来的横向轨道）/ WORLD（参考站的作品环）────────
+// 两种呈现都常驻同一个页面：切到世界时原轨道只是被盖住、没有卸载，
+// 滚动位置与图片缓存都还在，切回来原地继续。
+const VIEW_KEY = 'blogs-view';
+const viewMode = ref('lookback');
+try {
+  const fromUrl = new URLSearchParams(window.location.search).get('view');
+  const stored = localStorage.getItem(VIEW_KEY);
+  if (fromUrl === 'world' || fromUrl === 'lookback') viewMode.value = fromUrl;
+  else if (stored === 'world') viewMode.value = 'world';
+} catch {
+  /* 隐私模式下 localStorage 可能不可用 */
+}
+
+function setViewMode(mode) {
+  if (mode !== 'world' && mode !== 'lookback') return;
+  if (viewMode.value === mode) return;
+  viewMode.value = mode;
+  try {
+    localStorage.setItem(VIEW_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+  // URL 同步（replaceState 不触发路由），方便直接分享到某一种视图
+  try {
+    const url = new URL(window.location.href);
+    if (mode === 'world') url.searchParams.set('view', 'world');
+    else url.searchParams.delete('view');
+    window.history.replaceState(window.history.state, '', url);
+  } catch {
+    /* ignore */
+  }
+  // 切回轨道时补量一次：世界视图期间轨道一直被盖着，窗口可能已经变过尺寸
+  if (mode === 'lookback') {
+    nextTick(() => {
+      measure();
+      readCards();
+      syncTarget();
+    });
+  }
+}
+
+function toggleView() {
+  setViewMode(viewMode.value === 'lookback' ? 'world' : 'lookback');
+}
+
+// 世界视图里点"READ ENTRY"：把展开层那张大图当作交接起点，封面照常飞进详情页
+function onWorldOpen(post, el) {
+  openPost(post, el);
+}
 
 const total = computed(() => blogPosts.length);
 
@@ -1319,6 +1375,7 @@ watch(
 );
 
 onMounted(async () => {
+  pageActive.value = true;
   activate();
   window.addEventListener('resize', onResize);
   // 切到别的标签页时停掉主循环：留着只是白烧 CPU/电，
@@ -1342,6 +1399,7 @@ onMounted(async () => {
 
 // keep-alive 复用时 onMounted 不会重跑：轨道重新挂进文档、宽度变了都得重来一遍
 onActivated(async () => {
+  pageActive.value = true;
   activate();
   await nextTick();
   measure();
@@ -1353,6 +1411,7 @@ onActivated(async () => {
 });
 
 onDeactivated(() => {
+  pageActive.value = false;
   deactivate();
   unbindClickCapture();
   lazyObserver?.disconnect();
@@ -1368,6 +1427,7 @@ onDeactivated(() => {
 
 onUnmounted(() => {
 
+  pageActive.value = false;
   deactivate();
   unbindClickCapture();
   window.removeEventListener('resize', onResize);
@@ -1415,7 +1475,16 @@ function onVisibility() {
 </script>
 
 <template>
-  <main class="page active blogs-lookback-page">
+  <main class="page active blogs-lookback-page" :class="{ 'is-world': viewMode === 'world' }">
+    <!-- 世界视图：参考 oumahi.art 的作品环。盖在原轨道上而不是把轨道卸掉 ——
+         原版的滚动位置、图片缓存、交接数据都还在，切回去原地继续。 -->
+    <BlogWorld
+      v-if="viewMode === 'world'"
+      :posts="blogPosts"
+      :active="pageActive"
+      @open="onWorldOpen"
+    />
+
     <!-- 这一块是整页的固定版心：字标、横向轨道、页脚条三段。 -->
     <section class="jb-stage">
       <!-- 胶片层：封面由这一张 canvas 画（能弯、能随滚动扭，CSS 做不到）。
@@ -1582,6 +1651,30 @@ function onVisibility() {
         </div>
       </div>
     </section>
+
+    <!-- 视图切换：两种呈现都常驻同一个 URL，选择记在 localStorage -->
+    <button
+      class="jb-viewtoggle"
+      type="button"
+      :aria-pressed="viewMode === 'world'"
+      :aria-label="viewMode === 'world' ? '切换回轨道视图' : '切换到世界视图'"
+      @click="toggleView"
+    >
+      <span class="jb-viewtoggle__k">VIEW</span>
+      <span class="jb-viewtoggle__v">{{ viewMode === 'lookback' ? 'LOOKBACK' : 'WORLD' }}</span>
+      <svg
+        class="jb-viewtoggle__icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 8h13l-3-3M20 16H7l3 3" />
+      </svg>
+    </button>
   </main>
 </template>
 
@@ -1602,6 +1695,9 @@ function onVisibility() {
   --jb-dim: #6b7280;
   --jb-line: #e5e7eb;
   --jb-faint: #b4b4ba;
+  /* World 视图环心那层 LIVEINPASSION 的浓度：字带里的封面留了 58% 不透明，
+     字只有 42% 能透出来，所以这里要比 Hero 那档更重才读得清 */
+  --jb-wordmark: 0.34;
   background: var(--jb-bg);
 }
 :global(html.dark.blogs-lookback) {
@@ -1610,6 +1706,8 @@ function onVisibility() {
   --jb-dim: #8a8a8f;
   --jb-line: #26262a;
   --jb-faint: #4a4a4f;
+  /* 暗色下字是白的，同样要让字带里的半透封面压不住它 */
+  --jb-wordmark: 0.22;
 }
 :global(html.blogs-lookback body) {
   background: var(--jb-bg);
@@ -2331,6 +2429,60 @@ function onVisibility() {
 @media (max-width: 1024px) {
   .jb-corner,
   .jb-coverbtn {
+    display: none;
+  }
+}
+
+/* ── 视图切换按钮 ────────────────────────────────────────────────────────
+   两种呈现都盖在同一页上，这枚按钮要始终在同一条位置：右上角、header 下方。
+   颜色跟随本页独立的 --jb-* 调色板（html.blogs-lookback 上定义的那套），
+   所以亮/暗主题切换时它和轨道、世界视图一起变。 */
+.jb-viewtoggle {
+  position: fixed;
+  top: 92px;
+  right: 64px;
+  z-index: 41;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--jb-line);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--jb-bg) 82%, transparent);
+  backdrop-filter: blur(8px);
+  color: var(--jb-fg);
+  cursor: pointer;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+.jb-viewtoggle:hover {
+  border-color: var(--jb-fg);
+}
+.jb-viewtoggle__k {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--jb-faint);
+}
+.jb-viewtoggle__v {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.jb-viewtoggle__icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+@media (max-width: 1024px) {
+  .jb-viewtoggle {
+    top: 78px;
+    right: 20px;
+    padding: 7px 12px;
+  }
+  /* 小屏时世界视图右上角让不开，标签只留当前视图名 */
+  .jb-viewtoggle__k {
     display: none;
   }
 }
