@@ -38,7 +38,6 @@ function detectImageType(uint8) {
 }
 
 const EXT_MAP = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
 /**
  * 上传图片到 R2
@@ -52,7 +51,6 @@ export async function uploadImage(bucket, data, type, variant = 'original') {
   const uint8 = new Uint8Array(data);
   const mimeType = detectImageType(uint8);
   if (!mimeType) throw new Error('Unsupported image type (only jpg/png/webp)');
-  if (data.byteLength > MAX_SIZE) throw new Error(`Image too large (max ${MAX_SIZE / 1024 / 1024}MB)`);
 
   const hash = await contentHash(data);
   const ext = EXT_MAP[mimeType];
@@ -94,4 +92,4 @@ export async function listAll(bucket, prefix) {
   return results;
 }
 
-export { CDN_BASE, detectImageType, MAX_SIZE };
+export { CDN_BASE, detectImageType };

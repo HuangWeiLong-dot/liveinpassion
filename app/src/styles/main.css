@@ -234,6 +234,15 @@
             height: 64px;
         }
 
+        /* GALLERY / MY GALLERY 底部有一条 92px 高的胶卷条（Teleport 到 body，
+           10005），默认的 32px 底距会让头像整块被它盖住。有胶卷条时把整座塔
+           抬到条的上方，留 16px 的缝；桌面端两条底栏也只在桌面端存在。 */
+        @media (min-width: 1025px) {
+            body:has(.win-strip) .author-tower {
+                bottom: calc(92px + 16px);
+            }
+        }
+
         .author-tower__avatar {
             position: relative;
             z-index: 2;
@@ -4608,16 +4617,18 @@
             color: var(--text-secondary);
         }
 
-        /* 页脚抽屉拉开时，底部这批固定条一并让位（类由 AppFooter.vue 挂到 <html>）：
-           GALLERY 的统计/筛选条与胶卷条、播放中的歌词行，平时都固定在底部，
-           正好压在页脚最下面那三句 Be 上，把字挡掉一半。
+        /* 页脚抽屉拉开时，底部这批固定件一并让位（类由 AppFooter.vue 挂到 <html>）：
+           GALLERY 的统计/筛选条与胶卷条、播放中的歌词行、左下角的 Ava 塔，平时都
+           固定在底部，正好压在页脚最下面那三句 Be 上，把字挡掉一半。
            这里只淡出、不移走 —— 往上滚一格抽屉合上，它们自己就回来了。 */
+        html .author-tower,
         html .win-dock,
         html .win-strip,
         html .now-playing {
             transition: opacity 0.35s ease, visibility 0s linear;
         }
 
+        html.footer-revealed .author-tower,
         html.footer-revealed .now-playing,
         html.footer-revealed .win-dock,
         html.footer-revealed .win-strip {
