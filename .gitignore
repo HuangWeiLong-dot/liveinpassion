@@ -14,6 +14,8 @@ worker/admin-dist/
 worker/dev.vars
 worker/.dev.vars
 admin/node_modules/
+# admin 的 vite.config.js 把 Miniflare 临时目录收在项目内（见那里的注释）
+admin/.tmp-miniflare/
 
 .DS_Store
 Thumbs.db

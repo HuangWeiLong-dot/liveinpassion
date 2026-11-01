@@ -11,6 +11,66 @@
 
 ---
 
+## update: 53 — 2026-11-01
+
+### CMS 换皮：深色优先，一套和前台同源的设计系统
+
+- 默认深色（`#1A1A1A` 底、`#FAFAFA` 字、1px `#333` 线），浅色保留原来那套；
+  `cms-theme` 存 localStorage，`index.html` 在首帧前把 `dark` 类写到 `<html>`，
+  白屏兜底块也跟着主题，深色下不再先闪一块白。顶栏右侧新增日 / 月按钮切换。
+- Oswald 大写宽字距 + Poppins 300 正文，新增 JetBrains Mono 承担元信息；零圆角、
+  1px 发丝线、悬停反色。整套样式抽到 `admin/src/styles/admin.css`，`App.vue` 只剩壳层。
+- md-editor 的样式与 js-xss 配置从 `main.js` 挪进编辑器路由：列表页与相册页不再
+  加载编辑器（构建里 BlogEdit 单独 388KB，列表 3.4KB）。
+
+### 页脚：前台同款抽屉 + 原生 WebGL 字标
+
+- 巨型 LIVEINPASSION 固定在视口底部、被内容盖住，滚到文档末尾占位让开才露出来，
+  下面仍是三句 Be。扭曲用原生 WebGL 等价重写（15×15 位移贴图、指针按速度注入、
+  每帧 ×0.88 衰减），不再为页脚引入 three（约 600KB）。
+- 只在页脚进入视口时跑 RAF，离开即停；WebGL 不可用回退 HTML 字标；主题切换后
+  重画字标贴图，Oswald 字体就绪后再画一次。
+
+### 三个页面
+
+- **顶栏**：固定 80px，滚动超过 4px 才落一条发丝线（rAF 节流）。
+- **Posts**：表格换成编号行 —— 序号、封面、标题 / 摘要 / 日期 / 阅读时间；封面只取
+  `coverKey`（压缩版），没有就显示 NO COVER，不把原图封面拉进列表；顶部统计
+  Posts 与 Published；日期按 D1 的 UTC 字符串换算成北京时间显示。
+- **Albums**：左边是相册索引（编号、名称、`r2Prefix · kind`），右边是选中相册的
+  照片墙。
+- **编辑页**：字段编号 01–04（Card Title / Title / Slug / Cover），封面有空态与
+  换 / 删操作；正文编辑器独立成面板，底部动作条带 Ctrl+S 提示。预览增强的监听
+  改挂在稳定的 `.md-editor` 根上，手机切到预览或预览被重建时都不会丢。
+
+### 登录页与开发环境
+
+- Worker 的自建登录页改成跟随 `cms-theme` 的深浅配色，`color-scheme` 一并声明；
+  仍然零外部依赖、纯表单提交。字标、编号与页脚标注重排。
+- `admin/vite.config.js` 把 Miniflare 的临时目录收进项目内（`admin/.tmp-miniflare`，
+  已加进 `.gitignore`）：本机工作区带低完整性标签时，workerd 写系统临时目录会
+  `CreateDirectory: access denied`，收进项目内即可正常起 dev。
+
+## update: 52 — 2026-11-01
+
+### 上传：去掉 20MB 上限
+
+- Worker 的 `uploadImage` 删掉 `MAX_SIZE = 20 * 1024 * 1024` 的体积校验，并一并
+  去掉它的导出；类型判断不变（只收 jpg / png / webp，按文件头嗅探）。大图不再被
+  「Image too large」挡掉，实际上限回到 Cloudflare Worker 的请求体大小限制。
+- admin 端不变：相册、博客封面与正文图仍先经 `compressImage` 压一版再传，只是
+  原图超过 20MB 时不会再在服务端失败。
+
+### 左下角 Ava 塔：让开胶卷条与页脚
+
+- GALLERY / MY GALLERY 的 92px 胶卷条由 Teleport 挂在 body 上，Ava 塔原本 32px 的
+  底距会让 64px 的头像整块压在条里。`body:has(.win-strip)` 时把整座塔抬到
+  `calc(92px + 16px)`，与条留 16px 的缝；规则放在 `@media (min-width: 1025px)` 里，
+  窄屏本来就没有胶卷条这条底栏。
+- 页脚抽屉拉开（`html.footer-revealed`）时，淡出名单补上 `.author-tower`：塔和
+  GALLERY 的统计 / 筛选条、胶卷条、播放中的歌词行一起让位，不再挡住页脚最下面
+  那三句 Be；往上滚一格抽屉合上，它们自己就回来。
+
 ## update: 51 — 2026-11-01
 
 ### ME：照片变成被风吹着的纸片，整页落在一台复古 CRT 电视

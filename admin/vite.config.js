@@ -1,7 +1,20 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 import { cloudflare } from "@cloudflare/vite-plugin";
+
+// Miniflare 把 email-store 建在系统临时目录（os.tmpdir()）。本机工作区目录带 Low
+// 完整性标签，node_modules 里的 workerd.exe 起的 Workers 运行时只能写工作区内，
+// 于是启动即 `CreateDirectory: #5 Access is denied.; path = miniflare-email-store`。
+// 把临时目录收进项目内（workerd 子进程会继承 TEMP/TMP）即可。
+const localTmp = path.join(path.dirname(fileURLToPath(import.meta.url)), '.tmp-miniflare');
+fs.mkdirSync(localTmp, { recursive: true });
+process.env.TEMP = localTmp;
+process.env.TMP = localTmp;
 
 export default defineConfig({
   plugins: [vue(), cloudflare()],

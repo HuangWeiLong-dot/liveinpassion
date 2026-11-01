@@ -1,10 +1,52 @@
 <script setup>
 import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MdEditor } from 'md-editor-v3';
+import { MdEditor, config } from 'md-editor-v3';
+import 'md-editor-v3/lib/style.css';
 import { blogApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
+import { isDark } from '../theme.js';
+
+// 编辑器预览内置 js-xss 过滤，默认会：
+//   1) 剥离非白名单协议（blob: 不在其列）→ 编辑期暂存图片无法显示
+//   2) 剥离 figure/figcaption/div/section/span 的 class → 排版样式失效
+// 这里扩展白名单并放行 blob: 图片地址（保存时它们会被替换成 https CDN 地址）。
+// 配置放在编辑器路由内，列表 / 相册页不会加载 md-editor。
+config({
+  markdownItPlugins(plugins) {
+    const xssPlugin = plugins.find((p) => p.type === 'xss');
+    if (xssPlugin) {
+      xssPlugin.options = {
+        // 函数式配置：接收 xss 库，返回 FilterXSS 选项
+        xss: (xssLib) => {
+          const whiteList = xssLib.getDefaultWhiteList();
+          // 编辑器内置扩展（MdWhiteList）：图片 class、任务列表、嵌入视频
+          whiteList.img = [...new Set([...(whiteList.img || []), 'class'])];
+          whiteList.input = ['class', 'disabled', 'type', 'checked'];
+          whiteList.iframe = [
+            'class', 'width', 'height', 'src', 'title',
+            'border', 'frameborder', 'framespacing', 'allow', 'allowfullscreen',
+          ];
+          // 照片排版容器允许 class，data-gid 用于拖拽回写时定位块
+          whiteList.figure = ['class', 'data-gid'];
+          whiteList.figcaption = ['class'];
+          whiteList.div = ['class', 'data-gid'];
+          whiteList.section = ['class'];
+          whiteList.span = ['class'];
+          return {
+            whiteList,
+            safeAttrValue(tag, name, value, cssFilter) {
+              if (name === 'src' && /^\s*blob:/i.test(value)) return value.trim();
+              return xssLib.safeAttrValue(tag, name, value, cssFilter);
+            },
+          };
+        },
+      };
+    }
+    return plugins;
+  },
+});
 
 const route = useRoute();
 const router = useRouter();
@@ -30,6 +72,12 @@ const saving = ref(false);
 const uploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
+
+// 编辑器扩展按内容按需加载：照片博客里通常没有代码/公式/流程图，
+// 不写这些内容时就不要从 unpkg 拉 highlight.js / katex / mermaid
+const hasCodeBlock = computed(() => /```/.test(form.value.contentMd));
+const hasMath = computed(() => /\$\$|\\\(|\\\[|\$[^$\n]+\$/.test(form.value.contentMd));
+const hasMermaid = computed(() => /```mermaid/.test(form.value.contentMd));
 
 // Title / Slug 是否已被手动编辑过；手动改过的不再自动填充
 const titleDirty = ref(false);
@@ -89,8 +137,9 @@ onMounted(async () => {
       // 已有内容不参与自动填充
       if (data.title) titleDirty.value = true;
       if (data.slug) slugDirty.value = true;
-      if (data.coverFullKey) {
-        coverPreview.value = `https://img.liveinpassion.me/${data.coverFullKey}`;
+      if (data.coverFullKey || data.coverKey) {
+        // 优先用压缩版做预览；旧文章只有原图时才退回原图（只此一处）
+        coverPreview.value = `https://img.liveinpassion.me/${data.coverKey || data.coverFullKey}`;
       }
     } catch (e) {
       error.value = e.message;
@@ -108,7 +157,7 @@ async function onCoverUpload(e) {
     const result = await uploadApi.upload(file, compressed, 'blog');
     form.value.coverKey = result.compressed ? result.compressed.key : result.original.key;
     form.value.coverFullKey = result.original.key;
-    coverPreview.value = result.original.url;
+    coverPreview.value = result.compressed ? result.compressed.url : result.original.url;
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -430,12 +479,20 @@ function onThumbPointerDown(idx, e) {
 }
 
 // ===== 预览区直接拖拽编辑（仅 admin；前台无此逻辑）=====
+let editorRoot = null;
 let previewEl = null;
 let previewObs = null;
 let removeFly = null;
 const blockNodes = new Map(); // gid -> 预览中的 figure/div
 const ordinalFallback = new Map(); // gid -> { re, index }，兼容老块
 let dragState = null;
+
+// 预览是 md-editor 按需挂载的（手机默认收起），监听挂在稳定的 .md-editor 根上，
+// 预览出现/换新时只刷新引用，不再靠 200ms 轮询。
+function refreshPreviewEl() {
+  previewEl = editorRoot?.querySelector('.md-editor-preview') || null;
+  return previewEl;
+}
 
 const EDITBAR_BUTTONS = [
   { cmd: 'masonry', label: 'M', title: 'Switch to Masonry' },
@@ -474,14 +531,10 @@ function ensureGid(node, kind) {
   return gid;
 }
 
-let enhanceQueued = false;
+// 预览整块 innerHTML 会在每次排版刷新时重建。观察器只在预览区真的变化时触发，
+// 这里同步把工具条补回去：不经过下一帧，避免重建瞬间出现"工具条短暂消失"的窗口。
 function scheduleEnhance() {
-  if (enhanceQueued) return;
-  enhanceQueued = true;
-  requestAnimationFrame(() => {
-    enhanceQueued = false;
-    enhanceBlocks();
-  });
+  enhanceBlocks();
 }
 
 function enhanceBlocks() {
@@ -510,6 +563,7 @@ function enhanceBlocks() {
 // 走 pointer 事件：HTML5 拖放（draggable + dragstart/dragover/drop）在触屏上根本不触发，
 // 手机上拖不动任何一张图。鼠标按下即拖、触摸长按起拖的差异封在 pressDrag 里。
 function onPreviewPointerDown(e) {
+  if (!refreshPreviewEl()) return;
   const img = e.target;
   if (!(img instanceof HTMLImageElement)) return;
   const fig = img.closest('figure.gallery');
@@ -530,11 +584,11 @@ function onPreviewPointerDown(e) {
 }
 
 function clearHint() {
-  previewEl?.querySelectorAll('.drop-hint').forEach((n) => n.classList.remove('drop-hint'));
+  refreshPreviewEl()?.querySelectorAll('.drop-hint').forEach((n) => n.classList.remove('drop-hint'));
 }
 
 function updateDropTarget(x, y) {
-  if (!dragState) return;
+  if (!dragState || !refreshPreviewEl()) return;
   const el = document.elementFromPoint(x, y);
   const fig = el?.closest?.('figure.gallery');
   if (!fig || !previewEl.contains(fig)) return;
@@ -553,7 +607,7 @@ function updateDropTarget(x, y) {
 
 function endDrag() {
   clearHint();
-  previewEl?.querySelectorAll('.is-dragging').forEach((n) => n.classList.remove('is-dragging'));
+  refreshPreviewEl()?.querySelectorAll('.is-dragging').forEach((n) => n.classList.remove('is-dragging'));
   dragState = null;
 }
 
@@ -587,6 +641,7 @@ function commitMove(toNode) {
 
 // ---- 悬浮工具条：切换布局 / 追加 / 删除 ----
 function onBarClick(e) {
+  if (!refreshPreviewEl()) return;
   const btn = e.target.closest?.('.gallery-editbtn');
   if (!btn) return;
   const node = btn.closest('figure.gallery, .media-text');
@@ -646,6 +701,7 @@ function positionFly(img) {
 }
 
 function onPreviewMouseOver(e) {
+  if (!refreshPreviewEl()) return;
   const img = e.target;
   if (!(img instanceof HTMLImageElement)) return;
   const fig = img.closest('figure.gallery');
@@ -666,6 +722,7 @@ function onPreviewMouseOver(e) {
 // 桌面端不受影响（hover 出删除钮，点击仍然放大）。
 function onPreviewClickCapture(e) {
   if (!coarsePointer.matches) return;
+  if (!refreshPreviewEl()) return;
   const img = e.target;
   if (!(img instanceof HTMLImageElement)) return;
   const fig = img.closest('figure.gallery');
@@ -681,7 +738,7 @@ function onPreviewClick(e) {
   if (!coarsePointer.matches) return;
   const img = e.target;
   const fig = img instanceof HTMLImageElement ? img.closest('figure.gallery') : null;
-  if (!fig || !previewEl.contains(fig)) hideFly();
+  if (!fig || !previewEl?.contains(fig)) hideFly();
 }
 
 function scheduleHideFly() {
@@ -712,11 +769,13 @@ function hideFly() {
 }
 
 function initPreviewEditing() {
-  previewEl = document.querySelector('.md-editor-preview');
-  if (!previewEl) {
+  editorRoot = document.querySelector('.md-editor');
+  if (!editorRoot) {
+    // 编辑器组件还没挂载完，再等一小拍
     setTimeout(initPreviewEditing, 200);
     return;
   }
+
   removeFly = document.createElement('button');
   removeFly.type = 'button';
   removeFly.className = 'gallery-img-remove';
@@ -727,17 +786,28 @@ function initPreviewEditing() {
   removeFly.addEventListener('mouseleave', scheduleHideFly);
   document.body.appendChild(removeFly);
 
-  previewEl.addEventListener('pointerdown', onPreviewPointerDown);
-  previewEl.addEventListener('click', onPreviewClickCapture, true);
-  previewEl.addEventListener('click', onBarClick);
-  previewEl.addEventListener('click', onPreviewClick);
-  previewEl.addEventListener('mouseover', onPreviewMouseOver);
-  previewEl.addEventListener('mouseout', onPreviewMouseOut);
+  // 监听挂在稳定的 .md-editor 根上：手机切出预览、或预览被库重建时都不会丢
+  editorRoot.addEventListener('pointerdown', onPreviewPointerDown);
+  editorRoot.addEventListener('click', onPreviewClickCapture, true);
+  editorRoot.addEventListener('click', onBarClick);
+  editorRoot.addEventListener('click', onPreviewClick);
+  editorRoot.addEventListener('mouseover', onPreviewMouseOver);
+  editorRoot.addEventListener('mouseout', onPreviewMouseOut);
   window.addEventListener('scroll', hideFly, true);
   window.addEventListener('resize', hideFly);
 
-  previewObs = new MutationObserver(scheduleEnhance);
-  previewObs.observe(previewEl, { childList: true, subtree: true });
+  previewObs = new MutationObserver((mutations) => {
+    const prev = previewEl;
+    refreshPreviewEl();
+    if (!previewEl) return;
+    // 输入框打字会改 CodeMirror 的 DOM，那些 mutation 与预览无关，直接忽略
+    const previewTouched = previewEl !== prev
+      || mutations.some((m) => m.target === previewEl || previewEl.contains(m.target));
+    if (previewTouched) scheduleEnhance();
+  });
+  previewObs.observe(editorRoot, { childList: true, subtree: true });
+
+  refreshPreviewEl();
   enhanceBlocks();
 }
 
@@ -745,13 +815,15 @@ onMounted(initPreviewEditing);
 
 onUnmounted(() => {
   previewObs?.disconnect();
-  if (previewEl) {
-    previewEl.removeEventListener('pointerdown', onPreviewPointerDown);
-    previewEl.removeEventListener('click', onPreviewClickCapture, true);
-    previewEl.removeEventListener('click', onBarClick);
-    previewEl.removeEventListener('click', onPreviewClick);
-    previewEl.removeEventListener('mouseover', onPreviewMouseOver);
-    previewEl.removeEventListener('mouseout', onPreviewMouseOut);
+  previewObs = null;
+  if (flyHideTimer) clearTimeout(flyHideTimer);
+  if (editorRoot) {
+    editorRoot.removeEventListener('pointerdown', onPreviewPointerDown);
+    editorRoot.removeEventListener('click', onPreviewClickCapture, true);
+    editorRoot.removeEventListener('click', onBarClick);
+    editorRoot.removeEventListener('click', onPreviewClick);
+    editorRoot.removeEventListener('mouseover', onPreviewMouseOver);
+    editorRoot.removeEventListener('mouseout', onPreviewMouseOut);
   }
   window.removeEventListener('scroll', hideFly, true);
   window.removeEventListener('resize', hideFly);
@@ -763,50 +835,56 @@ onUnmounted(() => {
   <div>
     <div class="page-head">
       <div>
-        <div class="eyebrow">{{ isNew ? 'Content Management — Writing' : 'Content Management — Editing' }}</div>
+        <div class="eyebrow">{{ isNew ? 'Content Desk — 03 / Writing' : 'Content Desk — 03 / Editing' }}</div>
         <h1>{{ isNew ? 'New Post' : 'Edit Post' }}</h1>
       </div>
-      <button class="btn btn-secondary" @click="router.push('/')">← Back</button>
+      <div class="page-head__side">
+        <div class="meta-line">{{ isNew ? 'Unsaved Draft' : `Post #${route.params.id}` }}</div>
+        <button class="btn btn-secondary" @click="router.push('/')">← Back to Posts</button>
+      </div>
     </div>
 
     <div v-if="error" class="error-box">{{ error }}</div>
 
-    <div class="panel" style="margin-bottom:20px;">
+    <div class="panel meta-panel">
       <div class="form-grid">
-        <div>
-          <label class="field-label">Card Title</label>
+        <div class="field field--wide">
+          <label class="field-label">01 / Card Title</label>
           <input v-model="form.cardTitle" placeholder="IN THE MIDDLE OF THE WORLD" @input="onCardTitleInput" />
           <div class="field-hint">Shown on the blog list card, usually uppercase · auto-fills Title & Slug</div>
         </div>
-        <div>
-          <label class="field-label">Title</label>
+        <div class="field">
+          <label class="field-label">02 / Title</label>
           <input v-model="form.title" placeholder="In the Middle of the World" @input="titleDirty = true" />
           <div class="field-hint">Full title shown on the post page</div>
         </div>
-        <div>
-          <label class="field-label">Slug</label>
+        <div class="field">
+          <label class="field-label">03 / Slug</label>
           <input v-model="form.slug" placeholder="in-the-middle-of-the-world" @input="slugDirty = true" />
           <div class="field-hint">URL path, lowercase letters, numbers and hyphens only</div>
         </div>
-        <div>
-          <label class="field-label">Cover</label>
+        <div class="field field--wide">
+          <label class="field-label">04 / Cover</label>
           <div class="cover-row">
-            <label class="btn btn-secondary cover-btn" :class="{ 'is-uploading': uploading }">
-              {{ uploading ? 'Uploading ———' : 'Select Image' }}
-              <input type="file" accept="image/*" hidden @change="onCoverUpload" :disabled="uploading" />
-            </label>
-            <div v-if="coverPreview" class="cover-preview">
-              <img :src="coverPreview" alt="cover preview" />
+            <div class="cover-preview" :class="{ 'is-empty': !coverPreview }">
+              <img v-if="coverPreview" :src="coverPreview" alt="cover preview" />
+              <span v-else class="cover-empty">No cover selected</span>
             </div>
-            <span v-if="!coverPreview && !uploading" class="field-hint">Not set, a default cover will be shown</span>
+            <div class="cover-actions">
+              <label class="btn btn-secondary cover-btn" :class="{ 'is-uploading': uploading }">
+                {{ uploading ? 'Uploading ———' : 'Select Image' }}
+                <input type="file" accept="image/*" hidden @change="onCoverUpload" :disabled="uploading" />
+              </label>
+              <p class="field-hint">Without a cover, the default site image is used.</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="panel" style="padding:0; margin-bottom:20px; overflow:hidden;">
+    <div class="editor-panel">
       <div class="editor-head">
-        <span>Markdown Editor</span>
+        <span>Markdown — Editor</span>
         <span class="editor-tip">
           <template v-if="imgProgress">{{ imgProgress }}</template>
           <template v-else-if="pendingImages.size">{{ pendingImages.size }} image(s) pending · upload on save</template>
@@ -822,7 +900,11 @@ onUnmounted(() => {
         :on-save="onEditorSave"
         :def-toolbars="[photoLayoutToolbar]"
         language="en-US"
+        :theme="isDark ? 'dark' : 'light'"
         :preview="!isNarrow"
+        :no-highlight="!hasCodeBlock"
+        :no-katex="!hasMath"
+        :no-mermaid="!hasMermaid"
         :show-code-row-number="true"
         :auto-detect-code="true"
         :table-shape="[6, 4]"
@@ -835,13 +917,16 @@ onUnmounted(() => {
           'save', 'prettier', '=',
           'preview', 'previewOnly', 'htmlPreview', 'catalog', 'pageFullscreen', 'fullscreen',
         ]"
-        style="height:60vh;"
+        style="height:62vh;min-height:420px;"
       />
     </div>
 
     <div class="action-bar">
-      <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
-      <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
+      <span class="action-bar__hint">Ctrl+S saves a draft</span>
+      <div class="action-bar__btns">
+        <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
+        <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
+      </div>
     </div>
 
     <!-- 照片排版弹窗 -->
@@ -853,7 +938,7 @@ onUnmounted(() => {
         </div>
 
         <div class="layout-section">
-          <div class="field-label">1 · Choose photos</div>
+          <div class="field-label">01 / Choose photos</div>
           <label class="btn btn-secondary layout-pick-btn">
             Select Photos
             <input type="file" accept="image/*" multiple hidden @change="onLayoutFiles" />
@@ -875,7 +960,7 @@ onUnmounted(() => {
         </div>
 
         <div class="layout-section">
-          <div class="field-label">2 · Pick a layout</div>
+          <div class="field-label">02 / Pick a layout</div>
           <div class="layout-types">
             <button
               v-for="opt in layoutOptions"
@@ -891,7 +976,7 @@ onUnmounted(() => {
         </div>
 
         <div v-if="layoutType === 'media'" class="layout-section">
-          <div class="field-label">3 · Photo side</div>
+          <div class="field-label">03 / Photo side</div>
           <div class="seg">
             <button :class="{ active: layoutSide === 'left' }" @click="layoutSide = 'left'">Photo left</button>
             <button :class="{ active: layoutSide === 'right' }" @click="layoutSide = 'right'">Photo right</button>
@@ -906,7 +991,7 @@ onUnmounted(() => {
         </div>
 
         <div v-else class="layout-section">
-          <div class="field-label">3 · Caption <span class="field-hint">(optional)</span></div>
+          <div class="field-label">03 / Caption <span class="field-hint">(optional)</span></div>
           <input v-model="layoutCaption" placeholder="A quiet afternoon…" />
         </div>
 
@@ -922,22 +1007,88 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.form-grid { display: grid; gap: 20px; }
-.cover-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.meta-panel { margin-bottom: 24px; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 26px;
+}
+.field--wide { grid-column: 1 / -1; }
+
+.cover-row { display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap; }
+.cover-preview {
+  width: 180px;
+  aspect-ratio: 4 / 3;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.cover-preview img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cover-empty {
+  font-family: var(--font-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 0 12px;
+}
+.cover-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .cover-btn { position: relative; overflow: hidden; }
 .cover-btn input { display: none; }
-.cover-preview {
-  width: 128px; height: 80px; border: 1px solid var(--border); overflow: hidden;
+.is-uploading { opacity: 0.6; cursor: wait; }
+
+.editor-panel {
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow: hidden;
 }
-.cover-preview img { width: 100%; height: 100%; object-fit: cover; display: block; filter: invert(var(--invert, 0)); }
 .editor-head {
-  padding: 10px 16px; border-bottom: 1px solid var(--border);
-  font-family: var(--font-display); font-weight: 500; font-size: 0.6rem;
-  letter-spacing: 0.25em; text-transform: uppercase; color: var(--text-secondary);
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
-.editor-tip { text-transform: none; letter-spacing: 0.05em; font-size: 0.7rem; }
-.action-bar { display: flex; gap: 12px; justify-content: flex-end; }
+.editor-tip {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.55rem;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.action-bar__hint {
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+.action-bar__btns { display: flex; gap: 12px; }
 
 /* 触屏上没有 Ctrl+S，"paste / drop" 也不成立，换成触摸版的提示 */
 .tip-coarse { display: none; }
@@ -946,10 +1097,19 @@ onUnmounted(() => {
   .tip-coarse { display: inline; }
 }
 
+@media (max-width: 700px) {
+  .form-grid { grid-template-columns: 1fr; gap: 20px; }
+  .field--wide { grid-column: auto; }
+  .action-bar__hint { display: none; }
+  .action-bar__btns { width: 100%; }
+  .action-bar__btns .btn { flex: 1; }
+  .cover-preview { width: 100%; max-width: 260px; }
+}
+
 /* 排版弹窗 */
 .layout-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.6);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .layout-dialog {
@@ -961,19 +1121,22 @@ onUnmounted(() => {
   position: sticky; top: 0; z-index: 1;
   display: flex; justify-content: space-between; align-items: center;
   padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg);
-  font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.25em; text-transform: uppercase;
+  font-family: var(--font-mono); font-weight: 500; font-size: 0.6rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
 }
 .layout-x, .layout-thumb-x {
   border: none; background: transparent; cursor: pointer; line-height: 1; color: var(--text-secondary);
 }
 .layout-x { font-size: 1.4rem; }
 .layout-section { padding: 18px 20px; border-bottom: 1px solid var(--border); }
-.layout-pick-btn { display: inline-block; margin: 8px 0 12px; }
+.layout-pick-btn { display: inline-flex; margin: 8px 0 12px; }
 .layout-thumbs {
   display: grid; grid-template-columns: repeat(auto-fill, 84px); gap: 8px; margin-bottom: 10px;
 }
 .layout-thumb {
   position: relative; width: 84px; height: 84px; cursor: grab;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .layout-thumb:active { cursor: grabbing; }
@@ -981,7 +1144,7 @@ onUnmounted(() => {
 .layout-thumb.is-dragging { opacity: 0.5; }
 .layout-thumb.is-drop-target { outline: 2px solid var(--text-primary); outline-offset: -2px; }
 .layout-thumb-x {
-  position: absolute; top: 2px; right: 2px; width: 20px; height: 20px;
+  position: absolute; top: 0; right: 0; width: 20px; height: 20px;
   background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.9rem;
 }
 @media (hover: none) {
@@ -997,12 +1160,24 @@ onUnmounted(() => {
 .layout-type {
   text-align: left; padding: 10px 12px; border: 1px solid var(--border); background: transparent; cursor: pointer;
   display: flex; flex-direction: column; gap: 4px;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
 }
+.layout-type:hover { border-color: var(--text-primary); }
 .layout-type.active { border-color: var(--text-primary); background: var(--text-primary); color: var(--bg); }
-.layout-type-label { font-size: 0.85rem; font-weight: 600; }
-.layout-type-hint { font-size: 0.7rem; opacity: 0.7; }
+.layout-type-label {
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.layout-type-hint { font-family: var(--font-mono); font-size: 0.52rem; opacity: 0.7; }
 .seg { display: inline-flex; border: 1px solid var(--border); margin-top: 8px; }
-.seg button { border: none; background: transparent; padding: 7px 14px; cursor: pointer; font-size: 0.8rem; color: var(--text-secondary); }
+.seg button {
+  border: none; background: transparent; padding: 7px 14px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-secondary);
+}
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button.active { background: var(--text-primary); color: var(--bg); }
 .layout-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; }
@@ -1036,21 +1211,22 @@ onUnmounted(() => {
 .gallery-editbar {
   position: absolute; top: 6px; right: 6px; z-index: 6;
   display: flex; gap: 2px; padding: 2px;
-  background: rgba(0, 0, 0, 0.6); border-radius: 6px;
+  background: rgba(0, 0, 0, 0.68); border-radius: 0;
   opacity: 0; transition: opacity 0.15s ease;
 }
 .block-editable:hover > .gallery-editbar { opacity: 1; }
 .gallery-editbtn {
-  width: 22px; height: 22px; padding: 0; border: none; border-radius: 4px;
+  width: 22px; height: 22px; padding: 0; border: none; border-radius: 0;
   background: transparent; color: #fff; cursor: pointer;
-  font-size: 0.7rem; line-height: 22px; text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.66rem; line-height: 22px; text-align: center;
 }
 .gallery-editbtn:hover { background: rgba(255, 255, 255, 0.25); }
 .gallery-editbtn[data-cmd='delete']:hover { background: #c0392b; }
 .gallery-img-remove {
   position: fixed; z-index: 1500; width: 22px; height: 22px; padding: 0;
-  border: none; border-radius: 50%; background: rgba(0, 0, 0, 0.7); color: #fff;
-  font-size: 0.9rem; line-height: 1; cursor: pointer;
+  border: none; border-radius: 0; background: rgba(0, 0, 0, 0.72); color: #fff;
+  font-family: var(--font-mono); font-size: 0.9rem; line-height: 1; cursor: pointer;
 }
 
 /* ============ 触屏（hover: none） ============
