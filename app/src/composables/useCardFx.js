@@ -206,6 +206,50 @@ export function playGlitchReveal(img, host, { duration = 1000, dot = 3 } = {}) {
     return;
   }
 
+  playGlitchBitmap(host, data, dw, dh, {
+    left: img.offsetLeft,
+    top: img.offsetTop,
+    width: w,
+    height: h,
+    duration,
+  });
+}
+
+/**
+ * 与 playGlitchReveal 同一套「Bayer 抖色 + 逐行揭示」，但底图由调用方提供
+ * （已经是一张低分辨率位图，例如按钮 / 图标拼出来的快照）。
+ * 用来让非图片控件也有和照片一样的那一下加载故障。
+ * @param {HTMLElement} host 承载控件的容器（position: relative）
+ * @param {HTMLCanvasElement} source 低分辨率底图（宽高就是抖色的采样数）
+ */
+export function playGlitchRevealCanvas(host, source, { left = 0, top = 0, width, height, duration = 720 } = {}) {
+  if (!host || !source || reduceMotion() || document.hidden) return;
+  const w = width || host.clientWidth;
+  const h = height || host.clientHeight;
+  if (w < 12 || h < 12) return;
+  if (source.width < 3 || source.height < 3) return;
+
+  host.querySelectorAll('.fx-glitch').forEach((node) => node.remove());
+
+  let data;
+  try {
+    const sctx = source.getContext('2d', { willReadFrequently: true });
+    data = sctx?.getImageData(0, 0, source.width, source.height).data;
+  } catch {
+    return;
+  }
+  if (!data) return;
+
+  playGlitchBitmap(host, data, source.width, source.height, {
+    left,
+    top,
+    width: w,
+    height: h,
+    duration,
+  });
+}
+
+function playGlitchBitmap(host, data, dw, dh, { left, top, width, height, duration }) {
   // 两张预计算表：
   //   color  已揭示区的真实颜色
   //   dither 未揭示区的 Bayer-1bit 黑白
@@ -233,10 +277,10 @@ export function playGlitchReveal(img, host, { duration = 1000, dot = 3 } = {}) {
   cv.height = dh;
   Object.assign(cv.style, {
     position: 'absolute',
-    left: `${img.offsetLeft}px`,
-    top: `${img.offsetTop}px`,
-    width: `${w}px`,
-    height: `${h}px`,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
     pointerEvents: 'none',
     zIndex: '4',
     opacity: '1',
@@ -249,12 +293,18 @@ export function playGlitchReveal(img, host, { duration = 1000, dot = 3 } = {}) {
   const out = ctx.createImageData(dw, dh);
   const out32 = new Uint32Array(out.data.buffer);
 
-  const start = performance.now();
+  // 起点取「第一帧自己的时间戳」，而不是调度时的 performance.now()：
+  // rAF 回调拿到的是这一帧开始的时间，可能比 performance.now() 还早几毫秒 ——
+  // 那样 t 会是负数，front 跟着为负，抖色那段从负行号开始算，
+  // Uint32Array.set 会抛 RangeError（offset is out of bounds），绘制循环当场断掉：
+  // 故障层既画不出来，也永远不会走到"淡出 + 移除"，就一直挂在卡片上。
+  let start = 0;
 
   const paint = (now) => {
     // 页面切走 / 卡片被摘出文档：直接收工
     if (!cv.isConnected) return;
-    const t = Math.min(1, (now - start) / duration);
+    if (!start) start = now;
+    const t = Math.min(1, Math.max(0, (now - start) / duration));
     if (t >= 1) {
       // 画布上已经是干净的整张图了，淡出交还给真实 <img>
       cv.style.opacity = '0';

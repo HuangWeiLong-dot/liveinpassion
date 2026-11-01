@@ -320,8 +320,7 @@
 }
 
 @media (max-width: 1024px) {
-  /* MobileDock 在 1024 以下都会出现（固定底部）。统计/筛选条固定到它上方，
-     再给页面留出足够的底部余量，让最后一行窗户能滚到条的上方。 */
+  /* 底部那条汉堡已经收进右上角（AppHeader），统计/筛选条不再给它让位。 */
   .win-page {
     padding-bottom: 190px;
   }
@@ -329,7 +328,7 @@
   .win-dock {
     position: fixed;
     left: 50%;
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     width: min(calc(100vw - 28px), 560px);
     margin: 0;
     flex-wrap: wrap;
@@ -509,7 +508,7 @@ body:not(.ui-ready) .win-strip {
 
 /* ── 底部胶卷条（GALLERY / MY GALLERY 专用，参照 oumahi.art）──────────────
    固定底栏铺满宽度，缩略图横向排开；点一张直接进详情。
-   桌面端出现时，统计/筛选条上移让位；1024 以下跟 MobileDock 抢位置，直接隐藏。
+   桌面端出现时，统计/筛选条上移让位；1024 以下直接隐藏。
    注意它是 body 直下的固定件（不是 .win-page 的子节点），所以主题变量要在这里
    重新声明一份 —— 阈值 10005 是为压过两种灯箱，详情页里也要一直露着。 */
 .win-strip {

@@ -285,10 +285,7 @@ function onScrubEnd(e) {
 </script>
 
 <template>
-  <button class="music-toggle-btn" id="musicToggleBtn" :class="{ active: playerVisible }" aria-label="Toggle music player" tabindex="-1" @click="togglePlayer">
-    <img :src="ICONS.notes" alt="Music">
-  </button>
-
+  <!-- 悬浮开关已挪进头部（AppHeader 的 LOGO 工具条 / 汉堡），这里只留遮罩和播放器本体。 -->
   <div class="player-overlay" id="playerOverlay" :class="{ visible: playerVisible }" @click="togglePlayer"></div>
 
   <div class="music-player" id="musicPlayer" :class="{ visible: playerVisible }">

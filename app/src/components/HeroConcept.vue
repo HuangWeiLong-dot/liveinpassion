@@ -4,10 +4,15 @@
 // 画面：Individuation 作为主体居中；四个人格化作粒子流，从主体身上散发出去、
 // 在三维空间里环绕它。悬停某一条 → 粒子收拢、聚成那张照片；点击 → 共享元素过渡进博客。
 //
-// 最新 8 篇其他博客则完全不进这套粒子系统 —— 它们是 Hero **背后的一层拼贴底纹**：
-// 去色、模糊、极淡，散在背景上，开场走完之后由 GSAP 一张一张淡进来
-//（见 revealBlogWall）。不承载悬停、不承载点击，但会跟着指针透镜一起弯
-//（见 updateWallLens）。
+// 其他博客的封面完全不进这套粒子系统 —— 它们是 Hero **背后的一层 3D 球体底纹**
+//（参照 oumahi.art 首页）：封面像一张张相片切在球面上、朝外，球外套一层经纬线框；
+// 整颗球缓慢自转，空白处可以按住拖动并带惯性。它只是底纹：去色、压暗、
+// 不承载点击，开场走完之后才一张张淡进来（见 revealCoverSphere）。
+// 拖拽松手 / 滚轮停下后，整颗球会在「球体」和「十二面体」之间换形一次 ——
+// 每张卡飞到十二面体的顶点上，线框交叉淡换成 30 条棱（见 morphSphereShape）。
+//
+// 指针划过页面时还会拖一条单色、朝尾部渐隐的折线（参照同一站的鼠标拖迹，
+// 见 composables/useCursorTrail.js）。它和方块光标共用墨色，只在首页存在。
 //
 // 三维是怎么落的：
 //   - 人格的粒子场整个交给 Three.js（composables/usePersonaScene.js）。
@@ -25,6 +30,7 @@ import { blogBySlug, blogPosts } from '../data/blogPosts.js';
 import { navigateWithViewTransition } from '../composables/useViewTransition.js';
 import { rememberCoverHandoff } from '../composables/useCoverHandoff.js';
 import { createRippleEffect } from '../composables/useRippleEffect.js';
+import { createCursorTrail } from '../composables/useCursorTrail.js';
 import { useTheme } from '../composables/useTheme.js';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { useWallPref } from '../composables/useWallPref.js';
@@ -42,9 +48,15 @@ import {
 
 const { isDark } = useTheme();
 
-// 背景拼贴开不开：状态提到 composables/useWallPref.js 里了。
-// 手机上这个开关也收进了汉堡菜单（MobileDock），那边要读同一个 ref。
+// 背景球开不开：状态提到 composables/useWallPref.js 里了。
+// 手机上这个开关收进了汉堡菜单（AppHeader），那边要读同一个 ref。
 const { wallHidden } = useWallPref();
+
+// 关掉再打开时要把球的自转循环重新点起来（没 WebGL 时循环会停在隐藏那一刻）。
+watch(wallHidden, (hidden) => {
+  if (hidden) endSphereDrag();
+  else ensureTicking(true);
+});
 // 品牌遮罩揭开之后，那个 LIVEINPASSION 由这里接着显示成 Hero 的一层背景字
 const { entered: brandEntered, wordmarkOn } = useBrandOverlay();
 
@@ -118,15 +130,16 @@ const PERSONAS = [
   },
 ];
 
-// ── 背景拼贴：博客封面墙 ────────────────────────────────────────────────
-// 参照 sashamartynchuk.com 首页的 dome grid：
-//   · 等宽等高的海报排成**规则网格**（不是散点，也不带随机旋转）；
-//   · 整面墙贴在一个大球面上，边缘略微后退；
-//   · 指针经过时，附近 1.5 个格子内的海报被往镜头方向顶起并放大。
+// ── 背景：封面 3D 球 ─────────────────────────────────────────────────────
+// 参照 oumahi.art 首页：
+//   · 每张封面是一个小长方体卡片，按 lat/lon 切在球面上、正面朝外；
+//   · 卡片的数量/尺寸/深度有一点点确定性的随机，球看起来才不是"点阵"；
+//   · 球外面套一层经纬线框（lat 圈 + lon 子午线，每段用一根 1px 的 div 表示）；
+//   · 整颗球缓慢自转；指针在空白处按住拖动会改角度，松手后带惯性。
 //
-// 网格由 CSS grid 自动铺满，这里只准备足够多的瓦片；封面循环使用，
-// 避免相邻两格总是同一张。src 用 CMS 的压缩封面（这层本来就压得很淡）。
-const WALL_COVERS = (() => {
+// 28 张封面循环铺满 56 个节点：同图会在球上出现两次，但 fibonacci 分布
+// 会把它们放到球的两侧，不会挨在一起。src 用 CMS 的压缩封面（这层压得很淡）。
+const SPHERE_COVERS = (() => {
   const personaSlugs = new Set(PERSONAS.map((p) => p.slug));
   return blogPosts
     .filter((p) => !personaSlugs.has(p.slug) && p.image?.src)
@@ -134,10 +147,19 @@ const WALL_COVERS = (() => {
     .slice(0, 28);
 })();
 
-// 64 块足够铺到 2560 宽的屏幕；多出来的会被 .hero-wall 的 overflow 裁掉。
-const WALL_TILES = WALL_COVERS.length
-  ? Array.from({ length: 64 }, (_, i) => WALL_COVERS[i % WALL_COVERS.length])
+const SPHERE_NODE_COUNT = 56; // 56 个节点 + 210 根线，铺满一屏
+const SPHERE_TILES = SPHERE_COVERS.length
+  ? Array.from({ length: SPHERE_NODE_COUNT }, (_, i) => SPHERE_COVERS[i % SPHERE_COVERS.length])
   : [];
+
+const SPHERE_RADIUS_RATIO = 0.34; // 球半径 = hero 短边 × 该比例
+const SPHERE_DRAG_DEG = 0.22;    // 拖拽 1px 转多少度
+const SPHERE_WHEEL_DEG = 0.18;   // 滚轮 1px 转多少度
+const SPHERE_AUTO_Y = 1.6;       // 自转：度 / 秒
+const SPHERE_AUTO_Z = 0.45;
+const SPHERE_FRICTION = 0.945;   // 松手后的惯性衰减（按 60fps 归一）
+const SPHERE_MAX_TILT = 70;      // 上下最多转多少度
+const SHAPE_MORPH_MS = 900;      // 拖拽松手后 球体 ↔ 十二面体 的变形时长
 
 const ORBIT_PERIOD = 60; // 公转一圈多少秒
 
@@ -194,13 +216,27 @@ const INTRO_SPIN_AT = 0.55; // 展开到多少就放开公转（太晚会有一�
 
 const router = useRouter();
 const heroEl = ref(null);
-const wallEl = ref(null);
+const sphereEl = ref(null);
+const sphereWorldEl = ref(null);
+const sphereWireGroup = ref(null);
+const dodecaWireGroup = ref(null);
+const sphereOn = ref(false);
+const sphereGrabbing = ref(false);
+const sphereNodes = ref([]);
+const sphereWires = ref([]);
+const dodecaWires = ref([]);
+const sphereState = { radius: 0, rotX: -10, rotY: 0, rotZ: 0, velX: 0, velY: 0 };
+let sphereShape = 'sphere'; // 当前排布：'sphere' | 'dodeca'
+let sphereMorphing = false;
+let sphereNodeEls = [];
 const stageEl = ref(null);
 const orbitEl = ref(null);
 const sceneCanvas = ref(null);
 const subjectEl = ref(null);
 const rippleCanvas = ref(null);
 const grainCanvas = ref(null);
+const trailCanvas = ref(null);
+let cursorTrail = null;
 
 const groups = ref([]);
 const assembledSet = ref({});
@@ -385,10 +421,6 @@ function updateScene(now) {
 
   if (spinOn) rings.persona.angle += (dt / 1000) * rings.persona.speed;
 
-  // 指针透镜先推进（位置/强度缓动）。现在只有背景拼贴吃这套透镜；
-  // 主体和四个人格保持原样，不参与形变。
-  updateLens(dt);
-
   // 主体在场景里的中心与半尺寸（世界单位）。主体是 DOM，位置现读。
   const su = readSubject();
   if (su) {
@@ -417,30 +449,483 @@ function updateScene(now) {
     g.el.style.transform =
       `translate(-50%, -50%) translate(${pr.x}px, ${pr.y}px) scale(${pr.scale.toFixed(4)})`;
   }
-
-  updateWallLens();
 }
 
-// 背景海报墙：原来的指针透镜（全局扭曲态，参照 sashamartynchuk.com）。
-// 局部雅可比近似成一张斜切/缩放的四边形；网格是平的，扭曲只发生在指针附近。
-function updateWallLens() {
-  const active = lensVisible();
-  // 网格现在铺到 hero 之外很远；透镜的径向放大是距离平方，远处格子会被
-  // 放大到几倍、位移几千像素。只弯视口附近的格子，屏外的清掉变换。
-  const limitX = heroBox.w * 0.72;
-  const limitY = heroBox.h * 0.72;
-  for (const it of wallItems) {
-    if (!active || Math.abs(it.cx) > limitX || Math.abs(it.cy) > limitY) {
-      if (it.el.style.transform) it.el.style.transform = '';
-      continue;
+// ── 背景球：几何 ─────────────────────────────────────────────────────────
+// 坐标约定和参考站一致：
+//   节点 transform = rotateY(lon) rotateX(-lat) translateZ(radius)
+//   —— 卡片切在球面上、法线朝外，整颗球由父级的 rotateX/Y/Z 一起带着转。
+//   线框端点用 latLonToXYZ()（y 取负），和节点的朝向对齐。
+function sphereSeeded(i, k) {
+  const s = Math.sin(i * k) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** 均匀铺在球面上的第 i 个点（fibonacci sphere 的 lat/lon）。 */
+function fibonacciLatLon(i, n) {
+  if (n <= 1) return { lat: 0, lon: 0 };
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const y = 1 - (i / (n - 1)) * 2;
+  const ring = Math.sqrt(Math.max(0, 1 - y * y));
+  const theta = golden * i;
+  return {
+    lat: Math.asin(Math.max(-1, Math.min(1, y))),
+    lon: Math.atan2(Math.cos(theta) * ring, Math.sin(theta) * ring),
+  };
+}
+
+function latLonToXYZ(lat, lon, r) {
+  return [
+    Math.cos(lat) * Math.sin(lon) * r,
+    -Math.sin(lat) * r,
+    Math.cos(lat) * Math.cos(lon) * r,
+  ];
+}
+
+// ── 第二种排布：十二面体 ────────────────────────────────────────────────
+// 参考站拖拽松手后会让整颗球在「球体」和「十二面体」之间变形：
+// 每个节点从球面上的位置飞到一个十二面体顶点，20 个顶点循环坐 56 张卡，
+// 所以会看到卡片成簇地聚到 20 个角上。顶点/棱只算一次。
+const DODECA_PHI = (1 + Math.sqrt(5)) / 2;
+const DODECA_IPHI = 1 / DODECA_PHI;
+let dodecaGeo = null;
+
+function dodecaGeometry() {
+  if (dodecaGeo) return dodecaGeo;
+
+  // 标准正十二面体顶点：8 个立方体角 + 3 组各 4 个黄金比例点
+  const verts = [];
+  for (const a of [-1, 1]) {
+    for (const b of [-1, 1]) {
+      for (const c of [-1, 1]) verts.push([a, b, c]);
     }
-    const m = warpLensMatrix(it.cx, it.cy, it.hw, it.hh);
-    it.el.style.transform =
-      `translate(${(m.x - it.cx).toFixed(2)}px, ${(m.y - it.cy).toFixed(2)}px) ` +
-      `matrix(${m.a.toFixed(4)}, ${m.b.toFixed(4)}, ${m.c.toFixed(4)}, ${m.d.toFixed(4)}, 0, 0) ` +
-      `rotate(${it.r})`;
+  }
+  for (const a of [-1, 1]) {
+    for (const b of [-1, 1]) {
+      verts.push([0, a * DODECA_IPHI, b * DODECA_PHI]);
+      verts.push([a * DODECA_IPHI, b * DODECA_PHI, 0]);
+      verts.push([b * DODECA_PHI, 0, a * DODECA_IPHI]);
+    }
+  }
+
+  const dirs = verts.map(([x, y, z]) => {
+    const len = Math.hypot(x, y, z) || 1;
+    return [x / len, y / len, z / len];
+  });
+  const latlon = dirs.map(([x, y, z]) => ({ lat: Math.asin(y), lon: Math.atan2(x, z) }));
+
+  // 顶点间最短距离的就是棱；正十二面体正好 30 条
+  let minD = Infinity;
+  for (let i = 0; i < dirs.length; i++) {
+    for (let j = i + 1; j < dirs.length; j++) {
+      const d = Math.hypot(
+        dirs[i][0] - dirs[j][0],
+        dirs[i][1] - dirs[j][1],
+        dirs[i][2] - dirs[j][2]
+      );
+      if (d < minD) minD = d;
+    }
+  }
+  const tol = minD * 1.01;
+  const edges = [];
+  for (let i = 0; i < dirs.length; i++) {
+    for (let j = i + 1; j < dirs.length; j++) {
+      const d = Math.hypot(
+        dirs[i][0] - dirs[j][0],
+        dirs[i][1] - dirs[j][1],
+        dirs[i][2] - dirs[j][2]
+      );
+      if (d <= tol) edges.push([i, j]);
+    }
+  }
+
+  dodecaGeo = { latlon, edges };
+  return dodecaGeo;
+}
+
+/** 一段线的 width + transform（从 a 拉到 b，世界坐标）。 */
+function wireAt(a, b) {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 0.001) return { len: 0, tf: '' };
+  const yaw = Math.atan2(dx, dz);
+  const pitch = Math.atan2(-dy, Math.hypot(dx, dz));
+  return {
+    len,
+    tf: `translate3d(${a[0]}px, ${a[1]}px, ${a[2]}px) rotateY(${yaw}rad) rotateX(${pitch}rad)`,
+  };
+}
+
+/** 经纬线框：lat 圈按 ARC_STEPS 段折线，lon 子午线从一极到另一极。 */
+function buildSphereWires(radius) {
+  const n = SPHERE_TILES.length || SPHERE_NODE_COUNT;
+  const latRings = Math.max(4, Math.round(Math.sqrt(n * 0.55)));
+  const lonMeridians = Math.max(6, Math.round(Math.sqrt(n * 1.8)));
+  const ARC_STEPS = 3;
+  const wires = [];
+
+  for (let r = 1; r < latRings; r++) {
+    const lat = Math.PI / 2 - (r / latRings) * Math.PI;
+    for (let c = 0; c < lonMeridians; c++) {
+      const lon0 = (c / lonMeridians) * Math.PI * 2 - Math.PI;
+      for (let s = 0; s < ARC_STEPS; s++) {
+        const lonA = lon0 + (s / ARC_STEPS) * ((Math.PI * 2) / lonMeridians);
+        const lonB = lon0 + ((s + 1) / ARC_STEPS) * ((Math.PI * 2) / lonMeridians);
+        wires.push(wireAt(latLonToXYZ(lat, lonA, radius), latLonToXYZ(lat, lonB, radius)));
+      }
+    }
+  }
+
+  for (let c = 0; c < lonMeridians; c++) {
+    const lon = (c / lonMeridians) * Math.PI * 2 - Math.PI;
+    for (let r = 0; r < latRings; r++) {
+      const latA = Math.PI / 2 - (r / latRings) * Math.PI;
+      const latB = Math.PI / 2 - ((r + 1) / latRings) * Math.PI;
+      wires.push(wireAt(latLonToXYZ(latA, lon, radius), latLonToXYZ(latB, lon, radius)));
+    }
+  }
+  return wires;
+}
+
+/** 十二面体的 30 条棱（和球体线框同一套 wireAt 坐标）。 */
+function buildDodecaWires(radius) {
+  const geo = dodecaGeometry();
+  return geo.edges.map(([i, j]) =>
+    wireAt(
+      latLonToXYZ(geo.latlon[i].lat, geo.latlon[i].lon, radius),
+      latLonToXYZ(geo.latlon[j].lat, geo.latlon[j].lon, radius)
+    )
+  );
+}
+
+/** 按当前半径给一个节点算宽高（面积不变地适配图片比例）和 3D 位置。 */
+function sizeSphereNode(node) {
+  const size = sphereState.radius * node.sr;
+  const aspect = node.aspect || 1;
+  const w = Math.max(24, Math.round(Math.sqrt(size * size * aspect)));
+  const h = Math.max(24, Math.round(Math.sqrt((size * size) / aspect)));
+  node.w = w;
+  node.h = h;
+  node.ml = -w / 2;
+  node.mt = -h / 2;
+  node.tf =
+    `rotateY(${node.lon}rad) rotateX(${-node.lat}rad) ` +
+    `translateZ(${sphereState.radius * node.depth}px)`;
+}
+
+function buildSphereModel() {
+  if (sphereNodes.value.length || !SPHERE_TILES.length) return;
+  const geo = dodecaGeometry();
+  sphereNodes.value = SPHERE_TILES.map((_, i) => {
+    const { lat, lon } = fibonacciLatLon(i, SPHERE_TILES.length);
+    // 同一张卡在两种排布里的目标位置；变形时在 sLat/sLon ↔ dLat/dLon 间插值
+    const d = geo.latlon[i % geo.latlon.length];
+    return {
+      sLat: lat,
+      sLon: lon,
+      dLat: d.lat,
+      dLon: d.lon,
+      lat,
+      lon,
+      // 大小/远近各一点点确定性随机：纯等大的球会像点阵，不像相片簇
+      sr: 0.31 + sphereSeeded(i, 12.9898) * 0.1,
+      depth: 0.88 + sphereSeeded(i, 78.233) * 0.22,
+      aspect: 1,
+      w: 0,
+      h: 0,
+      ml: 0,
+      mt: 0,
+      tf: '',
+    };
+  });
+}
+
+/** 按 hero 尺寸重算球半径、每个节点的位置和整张经纬网。 */
+function layoutSphere() {
+  const hero = heroEl.value;
+  if (!hero || !SPHERE_TILES.length) return;
+  const w = hero.clientWidth;
+  const h = hero.clientHeight;
+  if (!w || !h) return;
+  sphereState.radius = Math.min(520, Math.max(150, Math.min(w, h) * SPHERE_RADIUS_RATIO));
+  buildSphereModel();
+  for (const node of sphereNodes.value) sizeSphereNode(node);
+  sphereWires.value = buildSphereWires(sphereState.radius);
+  dodecaWires.value = buildDodecaWires(sphereState.radius);
+  applySphereSpin();
+  applyWireShape();
+}
+
+/** 两种线框只显示当前排布的那一组（变形中由 morph 逐帧改写透明度）。 */
+function applyWireShape() {
+  if (sphereWireGroup.value) {
+    sphereWireGroup.value.style.opacity = sphereShape === 'sphere' ? '1' : '0';
+  }
+  if (dodecaWireGroup.value) {
+    dodecaWireGroup.value.style.opacity = sphereShape === 'dodeca' ? '1' : '0';
   }
 }
+
+function applySphereSpin() {
+  const el = sphereWorldEl.value;
+  if (!el) return;
+  el.style.transform =
+    `rotateX(${sphereState.rotX.toFixed(2)}deg) ` +
+    `rotateY(${sphereState.rotY.toFixed(2)}deg) ` +
+    `rotateZ(${sphereState.rotZ.toFixed(2)}deg)`;
+}
+
+/** 每帧推进自转与惯性；返回是否还需要继续跑。 */
+function tickSphere(now) {
+  if (!sphereOn.value || !sphereWorldEl.value) return false;
+  const dt = Math.min(64, now - (sphereLastT || now));
+  sphereLastT = now;
+
+  if (sphereDrag.active) {
+    // 拖动时角度由 pointermove 直接写，这里只保持画面同步
+    applySphereSpin();
+    return true;
+  }
+
+  if (reducedMotion.value || wallHidden.value) {
+    applySphereSpin();
+    return false;
+  }
+
+  const f = dt / 16.667;
+  sphereState.rotY += SPHERE_AUTO_Y * (dt / 1000) + sphereState.velY * f;
+  sphereState.rotZ += SPHERE_AUTO_Z * (dt / 1000);
+  sphereState.rotX = Math.max(
+    -SPHERE_MAX_TILT,
+    Math.min(SPHERE_MAX_TILT, sphereState.rotX + sphereState.velX * f)
+  );
+  const decay = Math.pow(SPHERE_FRICTION, f);
+  sphereState.velX *= decay;
+  sphereState.velY *= decay;
+  if (Math.abs(sphereState.velX) < 0.002) sphereState.velX = 0;
+  if (Math.abs(sphereState.velY) < 0.002) sphereState.velY = 0;
+  applySphereSpin();
+  return true;
+}
+
+// ── 背景球：球体 ↔ 十二面体 变形 ──────────────────────────────────────
+// 参考站最抓眼的那一下：拖拽松手后整颗球换形，每张卡都飞到新位置。
+// 56 个节点每帧直接写 style.transform，**不走 Vue 的响应式重渲染** ——
+// 60fps × 56 个节点的补间要是每次都触发 patch，主线程会明显掉帧。
+// 只在补间结束时把终值写回响应式数据，下一次 resize/重渲染才不会弹回旧位置。
+let wheelMorphTimer = 0;
+let sphereWheelTravel = 0;
+
+function cacheSphereNodeEls() {
+  if (sphereNodeEls.length) return sphereNodeEls;
+  sphereNodeEls = [...(sphereEl.value?.querySelectorAll('.hero-sphere__node') || [])];
+  return sphereNodeEls;
+}
+
+function cancelWheelMorph() {
+  if (wheelMorphTimer) clearTimeout(wheelMorphTimer);
+  wheelMorphTimer = 0;
+  sphereWheelTravel = 0;
+}
+
+function toggleSphereShape() {
+  if (sphereMorphing || reducedMotion.value) return;
+  morphSphereShape(sphereShape === 'sphere' ? 'dodeca' : 'sphere');
+}
+
+function morphSphereShape(target) {
+  if (sphereMorphing || target === sphereShape) return;
+  const nodes = sphereNodes.value;
+  const els = cacheSphereNodeEls();
+  if (!nodes.length || els.length !== nodes.length) return;
+
+  cancelWheelMorph();
+  sphereMorphing = true;
+  const radius = sphereState.radius;
+  const starts = nodes.map((n) => ({ lat: n.lat, lon: n.lon }));
+  const ends = nodes.map((n) => (
+    target === 'dodeca'
+      ? { lat: n.dLat, lon: n.dLon }
+      : { lat: n.sLat, lon: n.sLon }
+  ));
+  // 经度取较短的那条弧，不然有些卡会绕大半圈才到新位置
+  const deltas = ends.map((end, i) => {
+    let d = end.lon - starts[i].lon;
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  });
+
+  const state = { t: 0 };
+  gsap.to(state, {
+    t: 1,
+    duration: SHAPE_MORPH_MS / 1000,
+    ease: 'power2.inOut',
+    onUpdate: () => {
+      const e = state.t;
+      for (let i = 0; i < nodes.length; i++) {
+        const a = starts[i];
+        const b = ends[i];
+        const lat = a.lat + (b.lat - a.lat) * e;
+        const lon = a.lon + deltas[i] * e;
+        const n = nodes[i];
+        els[i].style.transform =
+          `rotateY(${lon.toFixed(4)}rad) rotateX(${(-lat).toFixed(4)}rad) ` +
+          `translateZ(${(radius * n.depth).toFixed(2)}px)`;
+      }
+      if (sphereWireGroup.value) {
+        sphereWireGroup.value.style.opacity = (1 - e).toFixed(3);
+      }
+      if (dodecaWireGroup.value) {
+        dodecaWireGroup.value.style.opacity = e.toFixed(3);
+      }
+    },
+    onComplete: () => {
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].lat = ends[i].lat;
+        nodes[i].lon = ends[i].lon;
+        sizeSphereNode(nodes[i]);
+      }
+      sphereShape = target;
+      sphereMorphing = false;
+      applyWireShape();
+    },
+  });
+}
+
+
+// ── 背景球：拖拽 ────────────────────────────────────────────────────────
+// 球是底纹，只有**空白处**能起手：卡片自己 pointer-events:none，主体和人格
+// 在更高的层，所以 pointerdown 只会在没有别的东西接的时候落到球上。
+// 触屏不接拖拽（那是纵向滚动手势的地盘），只保留自转。
+const sphereDrag = { active: false, lastX: 0, lastY: 0, stepY: 0, stepX: 0, startX: 0, startY: 0, moved: false };
+
+function onSphereDown(event) {
+  if (!finePointer.value || reducedMotion.value || wallHidden.value) return;
+  if (event.button !== 0) return;
+  // 拖背景时不要顺带把字选中 / 触发原生拖拽
+  event.preventDefault();
+  // 手一按下去就把还没落地的滚轮换形取消，免得拖到一半整颗球自己变一次
+  cancelWheelMorph();
+  sphereDrag.active = true;
+  sphereDrag.lastX = event.clientX;
+  sphereDrag.lastY = event.clientY;
+  sphereDrag.startX = event.clientX;
+  sphereDrag.startY = event.clientY;
+  sphereDrag.stepX = 0;
+  sphereDrag.stepY = 0;
+  sphereDrag.moved = false;
+  // 抓住球就把残余惯性清掉，和参考站一样
+  sphereState.velX = 0;
+  sphereState.velY = 0;
+  sphereGrabbing.value = true;
+  window.addEventListener('pointermove', onSphereMove, { passive: true });
+  window.addEventListener('pointerup', onSphereUp);
+  window.addEventListener('pointercancel', onSphereCancel);
+  ensureTicking(true);
+}
+
+function onSphereMove(event) {
+  if (!sphereDrag.active) return;
+  const dx = event.clientX - sphereDrag.lastX;
+  const dy = event.clientY - sphereDrag.lastY;
+  sphereDrag.lastX = event.clientX;
+  sphereDrag.lastY = event.clientY;
+  if (!sphereDrag.moved &&
+      Math.hypot(event.clientX - sphereDrag.startX, event.clientY - sphereDrag.startY) > 6) {
+    sphereDrag.moved = true;
+  }
+  const stepY = dx * SPHERE_DRAG_DEG;
+  const stepX = -dy * SPHERE_DRAG_DEG;
+  sphereState.rotY += stepY;
+  sphereState.rotX = Math.max(
+    -SPHERE_MAX_TILT,
+    Math.min(SPHERE_MAX_TILT, sphereState.rotX + stepX)
+  );
+  // 滑动速度的平滑估计，松手时接成惯性
+  sphereDrag.stepY = sphereDrag.stepY * 0.7 + stepY * 0.3;
+  sphereDrag.stepX = sphereDrag.stepX * 0.7 + stepX * 0.3;
+  applySphereSpin();
+}
+
+function onSphereUp() {
+  finishSphereDrag(true);
+}
+
+/** pointercancel 只收尾，不换形 —— 手势被系统打断时不该触发一次变形。 */
+function onSphereCancel() {
+  finishSphereDrag(false);
+}
+
+function finishSphereDrag(allowMorph) {
+  window.removeEventListener('pointermove', onSphereMove);
+  window.removeEventListener('pointerup', onSphereUp);
+  window.removeEventListener('pointercancel', onSphereCancel);
+  if (!sphereDrag.active) return;
+  const moved = sphereDrag.moved;
+  sphereDrag.active = false;
+  sphereDrag.moved = false;
+  sphereState.velY = Math.max(-5, Math.min(5, sphereDrag.stepY));
+  sphereState.velX = Math.max(-5, Math.min(5, sphereDrag.stepX));
+  sphereGrabbing.value = false;
+  ensureTicking(true);
+  // 拖拽松手 → 换形（点一下不换，不然误触也会整颗球变）
+  if (allowMorph && moved) toggleSphereShape();
+}
+
+function endSphereDrag() {
+  cancelWheelMorph();
+  finishSphereDrag(false);
+}
+
+// ── 背景球：滚轮 ────────────────────────────────────────────────────────
+// 指针落在**球体范围内**时，滚轮只转球、不滚页面 —— 这样卡片位移是看得见的，
+// 不会和页脚抽屉一起被滚上去。指针移到球外的空白处，滚轮照常滚页面。
+// 每格滚轮先归一到像素（有的浏览器报"行"而不是像素），再限幅，
+// 免得触控板一划就把球甩出半圈；Ctrl + 滚轮留给浏览器缩放，不抢。
+function onSphereWheel(event) {
+  if (!finePointer.value || reducedMotion.value || wallHidden.value || !sphereOn.value) return;
+  if (event.ctrlKey) return;
+  const raw = event.deltaY;
+  if (!raw) return;
+
+  const hero = heroEl.value;
+  if (!hero) return;
+  const r = hero.getBoundingClientRect();
+  const dx = event.clientX - (r.left + r.width / 2);
+  const dy = event.clientY - (r.top + r.height / 2);
+  // 只接球体本体的半径：透视放大的外圈（还有两侧的空白）留给页面滚动，
+  // 想去看页脚时把指针挪出球就能正常滚。
+  if (Math.hypot(dx, dy) > sphereState.radius * 1.05) return;
+
+  if (event.cancelable) event.preventDefault();
+
+  const px = raw * (event.deltaMode === 1 ? 30 : event.deltaMode === 2 ? 300 : 1);
+  const deg = Math.max(-40, Math.min(40, px * SPHERE_WHEEL_DEG));
+  sphereState.rotY += deg;
+  // 给一点尾部惯性：滚轮停下后球还会自己再滑一小段，和拖拽松手一个手感
+  sphereState.velY = Math.max(-5, Math.min(5, sphereState.velY + deg * 0.03));
+  applySphereSpin();
+  ensureTicking(true);
+
+  // 滚轮停在球上之后换一次形：这就是"滚动一下，卡片位置明显切换"的那一下。
+  // 650ms 没有新的滚轮事件才算一段；一小格触控板抖动（<12°）不换。
+  sphereWheelTravel += Math.abs(deg);
+  if (wheelMorphTimer) clearTimeout(wheelMorphTimer);
+  wheelMorphTimer = window.setTimeout(() => {
+    wheelMorphTimer = 0;
+    const travel = sphereWheelTravel;
+    sphereWheelTravel = 0;
+    if (travel >= 12 && !sphereMorphing && !wallHidden.value && !reducedMotion.value) {
+      toggleSphereShape();
+    }
+  }, 650);
+}
+
+let sphereLastT = 0;
+
 
 // ── 主体：位置（画布坐标 + 舞台坐标）、水波纹、粒子层 ────────────────────
 const subjectBox = { cx: 0, cy: 0, hw: 0, hh: 0, sx: 0, sy: 0 };
@@ -589,6 +1074,7 @@ function drawGrain(now, packed) {
 const intro = ref(-1);
 let introEased = 1;
 let introT0 = 0;
+let introFallbackTimer = 0;
 
 function startIntro() {
   if (intro.value >= 0) return;
@@ -603,7 +1089,24 @@ function startIntro() {
   introEased = 0;
   introT0 = 0;
   applyIntro();
-  ensureTicking();
+  // force：不在开场期间被 IO 的旧判断挡住（否则 intro 会永远停在 0）
+  ensureTicking(true);
+}
+
+// 开场循环万一没跑起来（极慢的机器 / IO 还认为 Hero 在视口外），
+// 这个兜底在 INTRO_MS 之后再检查一次：直接把开场落到终态，
+// 后面 caption / 球体 / 主体化开都跟着 intro=1 走。不能因为一次循环没起来
+// 就让整颗球永远停在透明态。
+function armIntroFallback() {
+  clearTimeout(introFallbackTimer);
+  introFallbackTimer = window.setTimeout(() => {
+    if (intro.value < 0 || intro.value >= 1) return;
+    intro.value = 1;
+    introEased = 1;
+    spinOn = true;
+    applyIntro();
+    ensureTicking(true);
+  }, INTRO_MS + 600);
 }
 
 function applyIntro() {
@@ -621,9 +1124,11 @@ const captionOn = ref(false);
 watch(intro, (v) => {
   // 关了动效时开场是瞬时到位的（startIntro 里直接把 intro 置 1），这里同样接得住
   if (v < 1) return;
+  clearTimeout(introFallbackTimer);
+  introFallbackTimer = 0;
   captionOn.value = true;
-  // 开场走完才去取背景那 8 张封面（首屏请求要紧，见 revealBlogWall）
-  revealBlogWall();
+  // 开场落定，背景球才露面；封面从点 ENTER 那一刻就在取了（见 loadCoverSphere）。
+  revealCoverSphere();
   // 开场落定 → 停一拍就把主体的人像化开成粒子
   scheduleSubjectDissolve();
 });
@@ -631,161 +1136,23 @@ watch(intro, (v) => {
 // ── 动画驱动 ────────────────────────────────────────────────────────────
 let masterRaf = 0;
 const heroVisible = ref(true);
-// hero 的尺寸。透镜的坐标以 hero 中心为原点（背景拼贴铺满 hero）。
-const heroBox = { left: 0, top: 0, w: 0, h: 0 };
 const groupEls = [];
-// 背景拼贴的 8 张封面也要跟着透镜弯（用户要求"包括背景"）。
-// 它们的位置是 left/top/width 百分比写死的，量一次就行；尺寸/位置只在 relayout 变。
-// 注意不能每次用 getBoundingClientRect 量：那里面已经含上一帧我们自己写的
-// transform，会越量越偏 —— 这里用 offset*（不受 transform 影响）。
-const wallItems = [];
-
-function measureWall() {
-  wallItems.length = 0;
-  const wall = wallEl.value;
-  if (!wall) return;
-  const wr = wall.getBoundingClientRect();
-  const hcx = heroBox.left + heroBox.w / 2;
-  const hcy = heroBox.top + heroBox.h / 2;
-  // offsetLeft/Top 不受 transform 影响，量到的是格子的**基准**位置。
-  for (const el of wall.querySelectorAll('.hero-wall__img')) {
-    wallItems.push({
-      el,
-      cx: wr.left + el.offsetLeft + el.offsetWidth / 2 - hcx,
-      cy: wr.top + el.offsetTop + el.offsetHeight / 2 - hcy,
-      hw: el.offsetWidth / 2,
-      hh: el.offsetHeight / 2,
-      // 网格已经对齐，不再有逐张的旋转；保留这个字段给透镜写 inline 用
-      r: '0deg',
-    });
-  }
-}
-
-// ── 指针透镜（参考 sashamartynchuk.com 首页的 dome grid）──────────────────
-// 指针在 Hero 里移动时，以它为中心形成一个圆顶状的凸起：基础径向放大 + 一个
-// 高斯气泡。**只作用在背景海报墙上** —— 主体和四个人格不参与形变，
-// 人脸和标签保持原样。
-const LENS = {
-  // 不再做全局径向放大：只让指针周围那一块起泡，远处的格子保持原样。
-  k: 0,
-  bulge: 0.1,      // 指针气泡的强度（原来 0.24，收小一半以上）
-  sigma: 0.5,      // 气泡半径（单位：半个屏幕高）——约一个格子多一点
-  follow: 0.12,    // 指针位置缓动（每 60fps 帧的追近比例）
-  build: 0.08,     // 气泡强度的缓动
-};
-const lens = {
-  x: 0, y: 0,       // 当前气泡中心（相对 hero 中心，CSS 像素，y 向下）
-  tx: 0, ty: 0,     // 目标
-  s: 0, ts: 0,      // 当前 / 目标强度
-};
-
-function lensActive() {
-  return finePointer.value && !reducedMotion.value;
-}
-
-// 真正要不要顶起。强度低于门槛时墙面只剩静态球面。
-function lensVisible() {
-  return lensActive() && lens.s > 0.0005;
-}
-
-/** 缓动：把参考站的 U(cur, target, ease, dt) 原样搬过来（按 60fps 归一）。 */
-function easeTo(cur, target, ease, dtMs) {
-  return cur + (target - cur) * (1 - Math.pow(1 - ease, (dtMs / 1000) * 60));
-}
-
-function updateLens(dt) {
-  if (!lensActive()) {
-    lens.x = 0;
-    lens.y = 0;
-    lens.s = 0;
-    return;
-  }
-  lens.x = easeTo(lens.x, lens.tx, LENS.follow, dt);
-  lens.y = easeTo(lens.y, lens.ty, LENS.follow, dt);
-  lens.s = easeTo(lens.s, lens.ts, LENS.build, dt);
-  if (lens.ts === 0 && lens.s < 0.001) lens.s = 0;
-}
-
-/**
- * 把 hero 坐标（相对中心，CSS 像素，y 向下）弯到透镜后的位置。
- * q 以「半个屏幕高」为单位，和参考站的公式同式。
- */
-function warpLens(px, py) {
-  const halfH = heroBox.h / 2 || 1;
-  let qx = px / halfH;
-  let qy = -py / halfH;
-  // 基础放大也乘强度：指针第一次进入时不会"啪"地鼓起来，离开时一起收回。
-  const mag = 1 + LENS.k * (qx * qx + qy * qy) * lens.s;
-  qx *= mag;
-  qy *= mag;
-  if (lens.s > 0.0005) {
-    const dx = qx - lens.x / halfH;
-    const dy = qy + lens.y / halfH;
-    const sig2 = LENS.sigma * LENS.sigma;
-    const g = LENS.bulge * lens.s * Math.exp(-(dx * dx + dy * dy) / sig2);
-    qx += dx * g;
-    qy += dy * g;
-  }
-  return { x: qx * halfH, y: -qy * halfH };
-}
-
-/**
- * 背景封面的局部形变：在图片中心取一个十字，用数值差分得到 2×2 雅可比。
- * 只做 translate+scale 的话，圆顶边缘的「剪切」就没了 —— 参考站之所以像
- * 一块被顶起来的布，靠的正是相邻格子的四边形各自变形。
- */
-function warpLensMatrix(px, py, halfW, halfH) {
-  if (!lensVisible()) {
-    return { x: px, y: py, a: 1, b: 0, c: 0, d: 1 };
-  }
-  const w = warpLens(px, py);
-  const ex = Math.max(1, halfW);
-  const ey = Math.max(1, halfH);
-  const x1 = warpLens(px + ex, py);
-  const x0 = warpLens(px - ex, py);
-  const y1 = warpLens(px, py + ey);
-  const y0 = warpLens(px, py - ey);
-  return {
-    x: w.x,
-    y: w.y,
-    // CSS matrix(a,b,c,d,e,f)：x' = a·x + c·y + e，y' = b·x + d·y + f
-    a: (x1.x - x0.x) / (2 * ex),
-    b: (x1.y - x0.y) / (2 * ex),
-    c: (y1.x - y0.x) / (2 * ey),
-    d: (y1.y - y0.y) / (2 * ey),
-  };
-}
-
-function resetLens() {
-  lens.tx = 0;
-  lens.ty = 0;
-  lens.ts = 0;
-  lens.x = 0;
-  lens.y = 0;
-  lens.s = 0;
-}
-
-function onHeroPointerMove(event) {
-  if (!lensActive() || !heroEl.value) return;
-  const r = heroEl.value.getBoundingClientRect();
-  if (!r.width || !r.height) return;
-  lens.tx = event.clientX - (r.left + r.width / 2);
-  lens.ty = event.clientY - (r.top + r.height / 2);
-  lens.ts = 1;
-  ensureTicking();
-}
-
-function onHeroPointerLeave() {
-  lens.ts = 0;
-  ensureTicking();
-}
 
 function paused() {
   return document.hidden || !heroVisible.value;
 }
 
-function ensureTicking() {
-  if (!masterRaf && !paused()) masterRaf = requestAnimationFrame(tick);
+/**
+ * 点起主循环。
+ * force = true 时顺便把 heroVisible 置真：开场/指针交互这些时刻，页面一定是可见的，
+ * 但 IntersectionObserver 可能还停在"Hero 在视口下方"的旧判断上（实测会让开场
+ * 卡在 intro<1、整颗球永远停在透明态）。置真之后 IO 会在真正滚出视口时再改回来。
+ */
+function ensureTicking(force = false) {
+  if (force) heroVisible.value = true;
+  if (!masterRaf && !document.hidden && (force || heroVisible.value)) {
+    masterRaf = requestAnimationFrame(tick);
+  }
 }
 
 function tick(now) {
@@ -824,6 +1191,10 @@ function tick(now) {
       scene3d.uniforms.uProgress.value[i] = groups.value[i].progress;
     }
   }
+
+  // 背景球：自转和拖拽惯性。它不依赖 WebGL 场景，所以单独判一次 ——
+  // 拿不到 WebGL 时首页也要有这颗球。
+  if (tickSphere(now)) again = true;
 
   // 场景每帧都要更新：公转一直在走，DOM 的位置也就一直在动
   if (scene3d) {
@@ -895,48 +1266,98 @@ function loadImage(src) {
   });
 }
 
-// ── 背景拼贴的揭示 ──────────────────────────────────────────────────────
-// 那 8 张封面**不进首屏请求**：首屏已经有 5 张图（4 个人格 + 主体），再叠 8 张
-// CDN 封面会把首屏请求数翻一倍多，而它们只是背景底纹，晚几秒完全不影响观看。
-// 等开场动画走完（intro 到 1）再去取，取到一张就用 GSAP 淡进来一张。
+// ── 背景球的取图与揭示 ──────────────────────────────────────────────────
+// 那 28 张封面**不进首屏请求**：首屏已经有 5 张图（4 个人格 + 主体），再叠 28 张
+// CDN 封面会把首屏请求数翻几倍，而它们只是背景底纹，晚几秒完全不影响观看。
 //
-// 为什么一张一张而不是一起显：一次全出来的话，整块背景"啪"地闪一下，
-// 会和开场那一下抢注意力。错开之后它是一层慢慢长出来的底纹。
-// 错开量写成"序号 × 固定步长"而不是"谁先加载完谁先亮"—— 后者在快网络下
-// 会挤成一团、在慢网络下又会变成乱序。
-let wallRevealed = false;
+// 取图挂在"遮罩揭开"（点 ENTER）这一刻，但**显示**要等开场动画走完 ——
+// 中间这 2.4 秒正好给 28 张封面预热，开场落定时球多半已经是满的，
+// 而不是先亮出一颗空线框球再慢慢长照片。
+// 取到一张就用 GSAP 淡进来一张（容器这时还是透明的，看不到这个淡入）。
+//
+// 为什么一张一张而不是一起显：一次全出来的话，整颗球"啪"地闪一下，
+// 会和开场那一下抢注意力。错开量写成"序号 × 固定步长"而不是"谁先加载完谁先亮"
+// —— 后者在快网络下会挤成一团、在慢网络下又会变成乱序。
+let sphereLoaded = false;
 
-function revealBlogWall() {
-  if (wallRevealed) return;
-  wallRevealed = true;
-  const els = [...(wallEl.value?.querySelectorAll('.hero-wall__img') || [])];
-  if (!els.length) return;
+/** 图片自己的比例到了之后，把这张卡片按原比例重排（面积不变）。 */
+function fitSphereNode(index, img) {
+  const node = sphereNodes.value[index];
+  if (!node || !img.naturalWidth || !img.naturalHeight) return;
+  const aspect = img.naturalWidth / img.naturalHeight;
+  if (Math.abs(aspect - node.aspect) < 0.005) return;
+  node.aspect = aspect;
+  sizeSphereNode(node);
+}
 
-  els.forEach((el, i) => {
-    const entry = WALL_TILES[i];
-    if (!entry) return;
-    // 直接挂到真元素上、听它自己的 load：省掉"先用 Image 预热再赋值"的第二次请求
-    el.addEventListener('load', () => {
-      if (reducedMotion.value) {
-        gsap.set(el, { autoAlpha: 1 });
-        return;
-      }
-      // ⚠ 只动 autoAlpha（opacity + visibility），**不碰 transform**。
-      // 这一格的位置/尺寸/角度全是 Vue 的 :style 绑定写的（left/top/width/--r），
-      // 而 GSAP 的 clearProps: 'all' 会把行内样式**整条**抹掉 —— 包括那几个绑定，
-      // 于是图失去宽度和定位，退回原始尺寸铺在静态位置上：就是"闪烁 + 放大"。
-      // 只写 opacity/visibility 的话两边互不干涉，也不需要 clearProps。
-      // 浓度（--wall-opacity）挂在容器上，所以这里淡到 1 就对了，收尾没有跳变。
-      // 墙面现在是 64 块：按行/列铺开一个短波浪，而不是每块都等 0.22s
-      const delay = Math.min(1.2, (i % 8) * 0.035 + Math.floor(i / 8) * 0.045);
-      gsap.fromTo(
-        el,
-        { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 0.9, delay, ease: 'power2.out' }
-      );
-    }, { once: true });
+/** 一张封面到了可见态：先按原图比例重排卡片，再淡入（或直接点亮）。 */
+function showCoverImage(index, el, animate) {
+  fitSphereNode(index, el);
+  if (!animate || reducedMotion.value) {
+    // 回到首页时直接用这个分支：图早就在缓存里，不必再演一遍慢淡入
+    gsap.set(el, { autoAlpha: 1 });
+    return;
+  }
+  // ⚠ 只动 autoAlpha（opacity + visibility），**不碰 transform**。
+  // 这张图的尺寸/位置全是 Vue 的 :style 绑定和父级的 3D transform 写的，
+  // 而 GSAP 的 clearProps: 'all' 会把行内样式**整条**抹掉。
+  // 只写 opacity/visibility 的话两边互不干涉，也不需要 clearProps。
+  const delay = Math.min(1.1, (index % 10) * 0.025 + Math.floor(index / 10) * 0.05);
+  gsap.fromTo(
+    el,
+    { autoAlpha: 0 },
+    { autoAlpha: 1, duration: 0.9, delay, ease: 'power2.out' }
+  );
+}
+
+/** 把第 i 张封面接到节点上；重复调用是安全的。 */
+function bindCoverImage(nodeEl, i, animate) {
+  const entry = SPHERE_TILES[i];
+  const el = nodeEl?.querySelector('.hero-sphere__img');
+  if (!entry || !el) return;
+
+  // 直接挂到真元素上、听它自己的 load：省掉"先用 Image 预热再赋值"的第二次请求
+  if (!el.dataset.coverBound) {
+    el.dataset.coverBound = '1';
+    el.addEventListener('load', () => showCoverImage(i, el, animate), { once: true });
+  }
+  if (!el.getAttribute('src')) {
     el.src = entry.src;
-  });
+  } else if (el.complete && el.naturalWidth) {
+    // 组件回到前台时最常见：src 还在、图也解完了，但可见性可能被保留成隐藏 / 节点被重渲过
+    showCoverImage(i, el, false);
+  }
+}
+
+async function loadCoverSphere() {
+  if (sphereLoaded) return;
+  sphereLoaded = true;
+  if (!SPHERE_TILES.length) return;
+  // 等 Vue 把 56 个节点挂进 DOM 再取元素 —— 关掉动效时 intro 是同步置 1 的，
+  // 对应的 watcher 可能跑在渲染之前，直接 querySelectorAll 会拿到空数组。
+  await nextTick();
+  const nodeEls = cacheSphereNodeEls();
+  nodeEls.forEach((nodeEl, i) => bindCoverImage(nodeEl, i, true));
+}
+
+/**
+ * 从别的页面回到首页时重新校验一遍：
+ *   · 节点元素可能被 keep-alive 重插时重渲过 → 缓存清空重取；
+ *   · 每张封面如果丢了 src / 被设成 hidden → 补 src、直接点亮。
+ * 这一步和开场/循环无关，是"回来就能看到照片"的最后一道保险。
+ */
+function restoreCoverSphere() {
+  if (!sphereLoaded || !SPHERE_TILES.length) return;
+  sphereNodeEls = [];
+  const nodeEls = cacheSphereNodeEls();
+  nodeEls.forEach((nodeEl, i) => bindCoverImage(nodeEl, i, false));
+}
+
+/** 开场落定，球体这一层才淡进来（图已经预热过了）。 */
+function revealCoverSphere() {
+  if (!SPHERE_TILES.length) return;
+  sphereOn.value = true;
+  ensureTicking(true);
 }
 
 async function onTileClick(event, config) {
@@ -1224,11 +1645,13 @@ function onVisibility() {
 
 function syncPointerMode(event) {
   finePointer.value = event.matches;
-  // 换成触屏了：把握着的那杆旗放下（全局方块光标自己也有一份判定，
-  // 但这条旗是我们举的，得我们来放），透镜也一起归位。
-  if (!event.matches) {
+  // 换成精确指针就开拖迹；换成触屏就收干净，别在手机上压一层 canvas。
+  if (event.matches) {
+    if (!reducedMotion.value) cursorTrail?.start();
+  } else {
+    cursorTrail?.stop();
     clearBlockCursorHot();
-    resetLens();
+    endSphereDrag();
   }
 }
 
@@ -1245,25 +1668,10 @@ function relayout() {
   const w = stage.clientWidth;
   const h = stage.clientHeight;
   if (!w || !h) return;
-  // 透镜的坐标系：hero 的尺寸。布局没变时也重算一遍 ——
-  // 滚动、地址栏收起都会改变 rect。
-  const hr = heroEl.value.getBoundingClientRect();
-  heroBox.left = hr.left;
-  heroBox.top = hr.top;
-  heroBox.w = hr.width;
-  heroBox.h = hr.height;
-  // 海报墙的格子尺寸照参考站来：0.25 * sqrt(宽*高)，夹到 140~360；
-  // 间距是格子的 12%，透视按球面半径给（0.62 倍）。
-  const wallCell = Math.round(
-    Math.min(460, Math.max(140, 0.25 * Math.sqrt(hr.width * hr.height)))
-  );
-  if (wallEl.value) {
-    wallEl.value.style.setProperty('--wall-cell', `${wallCell}px`);
-    wallEl.value.style.setProperty('--wall-gap', `${Math.round(wallCell * 0.12)}px`);
-  }
-  measureWall();
+  // 背景球的半径和所有卡片/线框都按 hero 的当前尺寸重算。
+  layoutSphere();
   const dpr = Math.min(window.devicePixelRatio || 1, 1.75);
-  // 画布盖住整个 hero，粒子和被拖走的格子才不会在舞台外被裁掉
+  // 画布盖住整个 hero，粒子和被拖走的人格才不会在舞台外被裁掉
   canvas.style.width = `${heroEl.value.clientWidth}px`;
   canvas.style.height = `${heroEl.value.clientHeight}px`;
   scene3d?.resize(heroEl.value.clientWidth, heroEl.value.clientHeight, dpr);
@@ -1301,7 +1709,13 @@ onMounted(async () => {
   isCompact.value = compactMql.matches;
   compactMql.addEventListener('change', syncCompact);
 
-  // 首屏只等这 5 张（4 个人格 + 主体）。背景那 8 张封面走 revealBlogWall，
+  // 鼠标拖迹：和方块光标同一套墨色（亮色黑、暗色白），只在这一页、精确指针下开。
+  cursorTrail = createCursorTrail(trailCanvas.value, {
+    getInk: () => (isDark.value ? '255, 255, 255' : '0, 0, 0'),
+  });
+  if (finePointer.value && !reducedMotion.value) cursorTrail.start();
+
+  // 首屏只等这 5 张（4 个人格 + 主体）。背景球那 28 张封面走 revealCoverSphere，
   // 开场动画之后才去取。
   const [personaImgs, subjectImg] = await Promise.all([
     Promise.all(PERSONAS.map((p) => loadImage(p.src))),
@@ -1347,6 +1761,8 @@ onMounted(async () => {
     applyIntro();
   } else {
     heroEl.value?.classList.add('no-scene');
+    // 没有 WebGL 也要摆背景球（它完全不依赖场景）
+    layoutSphere();
   }
 
   layoutGrain();
@@ -1392,7 +1808,11 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('resize', onResize);
 
-  if (brandEntered.value) startIntro();
+  if (brandEntered.value) {
+    startIntro();
+    loadCoverSphere();
+    armIntroFallback();
+  }
 });
 
 // 品牌遮罩揭开之后才开始展开（遮罩盖着的时候放动画等于白放）。
@@ -1400,6 +1820,9 @@ onMounted(async () => {
 watch(brandEntered, (v) => {
   if (!v) return;
   startIntro();
+  // 点 ENTER 的这一刻就开始取背景球的封面：接下来 2.4 秒的开场正好给它们预热。
+  loadCoverSphere();
+  armIntroFallback();
   // 人像跟着 Hero 一起从下方浮上来，而且**上来的时候就已经是模糊的** ——
   // 所以亮人像挂在"遮罩揭开"这一刻，不是挂在"开场走完"。
   showSubjectSolid();
@@ -1416,12 +1839,26 @@ watch(isDark, async (dark) => {
   layoutGrain();
   if (grainCanvas.value) drawGrain(performance.now(), grainMouse);
   if (scene3d) updateScene(performance.now());
+  // 拖迹已经画在 canvas 上了，换主题要把这笔墨色重刷一遍
+  cursorTrail?.redraw();
   // 下一帧再淡回来，保证换完色的那一帧已经画出来了
   requestAnimationFrame(() => { themeShifting.value = false; });
 });
 
 onActivated(() => {
   forcedAssembled.value = null;
+  // 从别的页面回到首页：拖迹的 canvas 是挂在 body 上的，离开时已经 stop 了，
+  // 这里按当前指针模式重新接上。
+  if (finePointer.value && !reducedMotion.value) cursorTrail?.start();
+
+  // 回首页统一从顶部看：别的页面可能把 window 滚到很深的位置，
+  // 回家时球体就落在视口外了。
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
+  // 极端状态下补开场 / 补揭示：开场没开始（intro<0）或已经完成但球层没亮。
+  if (brandEntered.value && intro.value < 0) startIntro();
+  if (intro.value >= 1 && !sphereOn.value) revealCoverSphere();
+
   // 从别的页面回到首页：这一页是 keep-alive 的，离开时节点被摘出文档 ——
   // 那期间 IntersectionObserver 会把 heroVisible 置成 false、渲染循环停掉，
   // 回来时也不能假定它一定又收到了 isIntersecting=true（实测过不动的情况），
@@ -1432,7 +1869,10 @@ onActivated(() => {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     relayout();
     heroVisible.value = true;
-    ensureTicking();
+    // 每张封面重新校验 src / 可见性（防 keep-alive 重插时节点被重渲）
+    if (sphereLoaded) restoreCoverSphere();
+    else if (brandEntered.value) loadCoverSphere();
+    ensureTicking(true);
   }));
   // 顺带兜住另一种"回来看见椭圆"的情况：人像还没化开就离开首页的话，
   // 化开那一步从没排上（它挂在"开场走完"上），v 会一直停在 1 ——
@@ -1446,9 +1886,11 @@ onActivated(() => {
 // （全局组件每帧也会自检一遍兜底，见 composables/useBlockCursor.js。）
 onDeactivated(() => {
   clearBlockCursorHot();
-  // 离开首页时把透镜收回 0：keep-alive 回来时指针多半在别处，
-  // 留着旧气泡会在回到页面的第一帧闪一下。
-  resetLens();
+  // 拖迹只在首页画：离开时把 canvas 清空、监听摘掉，别在别的页面留一条线。
+  cursorTrail?.stop();
+  // 离开首页时把还没松手的球体拖拽收掉：keep-alive 摘走元素时不会补
+  // pointerup，window 上的监听会一直挂着、把回页后的第一次滑动当成拖拽。
+  endSphereDrag();
 });
 
 onBeforeUnmount(() => {
@@ -1456,6 +1898,7 @@ onBeforeUnmount(() => {
   masterRaf = 0;
   clearTimeout(resizeTimer);
   clearTimeout(riseClipTimer);
+  clearTimeout(introFallbackTimer);
   toggleRiseClip(false); // 别把 clip 留在这一页上（keep-alive 复用时它还在）
   rippleGone = true;
   ripple?.dispose();
@@ -1468,6 +1911,9 @@ onBeforeUnmount(() => {
   mql?.removeEventListener('change', syncPointerMode);
   compactMql?.removeEventListener('change', syncCompact);
   window.removeEventListener('resize', onResize);
+  cursorTrail?.stop();
+  cursorTrail = null;
+  endSphereDrag();
 });
 </script>
 
@@ -1480,44 +1926,68 @@ onBeforeUnmount(() => {
       'is-theme-shift': themeShifting,
       'is-risen': brandEntered,
     }"
-    @pointermove.passive="onHeroPointerMove"
-    @pointerleave="onHeroPointerLeave"
+    @wheel="onSphereWheel"
   >
-    <!-- 背景拼贴的开关。和主题按钮、播放器同一条竖列（fixed 右下角往上数第三格），
-         所以它跟着别的悬浮控件一起被 X 键收起来（见 styles/main.css 的名单）。 -->
+  <!-- 鼠标拖迹：一条跟着指针、朝尾部渐隐的折线（参照 oumahi.art 首页）。
+         和方块光标一样 Teleport 到 body —— 留在 Hero 里的话，Hero 的 transform
+         会把 fixed 的包含块换成它自己，canvas 就不会稳稳盖住视口。
+         画由 composables/useCursorTrail.js 负责；这一页离开时会 stop 并清空。 -->
     <Teleport to="body">
-    <button
-      class="wall-toggle"
-      :class="{ 'is-off': wallHidden, 'is-on': brandEntered }"
-      :aria-pressed="String(!wallHidden)"
-      aria-label="切换背景封面"
-      tabindex="-1"
-      @click="wallHidden = !wallHidden"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7.5" height="7.5" rx="1" />
-        <rect x="13.5" y="3" width="7.5" height="7.5" rx="1" />
-        <rect x="3" y="13.5" width="7.5" height="7.5" rx="1" />
-        <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1" />
-      </svg>
-    </button>
+      <canvas ref="trailCanvas" class="hero-cursor-trail" aria-hidden="true" />
     </Teleport>
 
-    <!-- 背景海报墙：规则网格铺满 hero，封面上限 28 张循环使用。
-         去色、极淡，只是底纹 —— 不承载悬停也不承载点击；
-         指针靠近时附近格子会被顶起（updateWallLens）。
-         这里**不写 src**：首屏一个请求都不该为它花，等开场走完由 revealBlogWall
+    <!-- 背景：封面 3D 球（参照 oumahi.art 首页）。
+         28 张博客封面循环铺到 56 个节点上，每张卡片切在球面上、正面朝外；
+         球外套一层经纬线框。整颗球缓慢自转，空白处按住拖拽可转、松手带惯性。
+         它只是底纹 —— 不承载点击、不承载悬停，所以卡片 pointer-events:none。
+         这里**不写 src**：首屏一个请求都不该为它花，等开场走完由 revealCoverSphere
          一批挂上并淡进来。 -->
-    <div ref="wallEl" class="hero-wall" :class="{ 'is-off': wallHidden }" aria-hidden="true">
-      <img
-        v-for="(_, i) in WALL_TILES"
-        :key="i"
-        class="hero-wall__img"
-        alt=""
-        decoding="async"
-        draggable="false"
-      >
+    <div
+      ref="sphereEl"
+      class="hero-sphere"
+      :class="{ 'is-on': sphereOn, 'is-off': wallHidden, 'is-grabbing': sphereGrabbing }"
+      aria-hidden="true"
+      @pointerdown="onSphereDown"
+    >
+      <div class="hero-sphere__viewport">
+        <div ref="sphereWorldEl" class="hero-sphere__world">
+          <div ref="sphereWireGroup" class="hero-sphere__wiregroup">
+            <div
+              v-for="(wire, i) in sphereWires"
+              :key="`sw${i}`"
+              class="hero-sphere__wire"
+              :style="{ width: wire.len + 'px', transform: wire.tf }"
+            />
+          </div>
+          <div ref="dodecaWireGroup" class="hero-sphere__wiregroup hero-sphere__wiregroup--dodeca">
+            <div
+              v-for="(wire, i) in dodecaWires"
+              :key="`dw${i}`"
+              class="hero-sphere__wire"
+              :style="{ width: wire.len + 'px', transform: wire.tf }"
+            />
+          </div>
+          <div
+            v-for="(node, i) in sphereNodes"
+            :key="`n${i}`"
+            class="hero-sphere__node"
+            :style="{
+              width: node.w + 'px',
+              height: node.h + 'px',
+              marginLeft: node.ml + 'px',
+              marginTop: node.mt + 'px',
+              transform: node.tf,
+            }"
+          >
+            <img class="hero-sphere__img" alt="" decoding="async" draggable="false">
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- 背景氛围层：暗角 + 极淡的水平扫描线（参照 oumahi.art 的 .atmosphere）。
+         只压球体，不压主体和人格 —— 主体在 z5、人格在 z1，这一层在 z0。 -->
+    <div class="hero-atmosphere" aria-hidden="true" />
 
     <!-- Hero 的背景字：品牌遮罩揭开之后淡入，接住那一个 LIVEINPASSION。
          下面那行 INDIVIDUATION 等首屏动画走完再逐字打出来。 -->
@@ -1608,16 +2078,26 @@ onBeforeUnmount(() => {
 .hero-concept {
   --hero-bg: #fafafa;
   /* 次级字（人格标签、正下方那行小字）在亮色下要更实一点：
-     50% 的黑压在浅底 + 照片拼贴上，10–11px 的小字几乎读不出来 */
+     50% 的黑压在浅底 + 封面球上，10–11px 的小字几乎读不出来 */
   --hero-fg: rgba(0, 0, 0, 0.68);
   --hero-fg-strong: rgba(0, 0, 0, 0.95);
   /* 背景主字（LIVEINPASSION）的浓度：它是底纹，但 7.5% 的黑在 #fafafa 上
      只剩 #ececec，等于没有。亮色给到 0.16 才立得住，暗色保持原来的 7.5%。 */
   --wordmark-opacity: 0.16;
   --hero-noise-opacity: 0.05;
-  /* 背景拼贴的浓度。照片是去色的，压在白底上比压在黑底上更容易"化掉"，
-     所以亮色这一档从 0.17 提到 0.22（暗色仍是 0.26）。 */
-  --wall-opacity: 0.22;
+  /* 背景球的浓度。整颗球先合成、再整体乘这个不透明度 —— 卡片相互重叠时
+     不会越叠越亮（参考站那种实体球才压得住主体，也不会变成一团糊影）。
+     照片是去色的，压在白底上比压在黑底上更容易"化掉"，所以亮色给到 0.38
+     （暗色 0.42，球在近黑底上要更实一点才看得出来）。 */
+  --sphere-card-opacity: 0.38;
+  --sphere-wire: rgba(0, 0, 0, 0.2);
+  --sphere-frame: rgba(0, 0, 0, 0.16);
+  --sphere-card-bg: rgba(255, 255, 255, 0.28);
+  /* 亮色底上的封面要再压暗一点才立得住（白底 + 低不透明度很容易化掉） */
+  --sphere-img-filter: grayscale(1) contrast(1.05) brightness(0.82);
+  /* 球外的氛围：亮色是"纸边发白"的暗角，暗色是参考站那种黑场暗角 */
+  --hero-vignette: rgba(250, 250, 250, 0.72);
+  --hero-scanline: rgba(0, 0, 0, 0.01);
   /* 羽化遮罩：只把四条边揉软，不留一圈矩形硬边。
      用两个线性渐变取交集，而不是径向渐变 —— 径向从 62% 就开始衰减，
      整张照片会被削成一大团椭圆（浅色底上尤其像一坨黑斑），
@@ -1657,7 +2137,13 @@ onBeforeUnmount(() => {
   --hero-fg-strong: rgba(255, 255, 255, 0.95);
   --wordmark-opacity: 0.075;
   --hero-noise-opacity: 0.042;
-  --wall-opacity: 0.26;
+  --sphere-card-opacity: 0.42;
+  --sphere-wire: rgba(255, 255, 255, 0.32);
+  --sphere-frame: rgba(255, 255, 255, 0.2);
+  --sphere-card-bg: rgba(0, 0, 0, 0.42);
+  --sphere-img-filter: grayscale(1) contrast(1.05);
+  --hero-vignette: rgba(0, 0, 0, 0.62);
+  --hero-scanline: rgba(255, 255, 255, 0.022);
 }
 
 /* ⚠ 这里原来有一条"系统光标压掉"的规则（.hero-concept.is-fine ... cursor:none），
@@ -1675,98 +2161,15 @@ onBeforeUnmount(() => {
   background-size: 160px 160px;
 }
 
-/* 舞台锁 16:10，宽度由可用高度反推 —— 百分比坐标才会等比缩放 */
+/* 舞台锁 16:10，宽度由可用高度反推 —— 百分比坐标才会等比缩放。
+   ⚠ 舞台本身 pointer-events:none：它是一整块透明的定位盒子，默认会把
+   球体那层挡住，于是"空白处拖球"只有舞台外的边条能用。
+   主体和人格各自把指针事件重新打开（见下面的 .hero-subject / .persona）。 */
 .hero-concept__stage {
   position: relative;
   width: min(100%, calc((100vh - 260px) * 1.6));
   aspect-ratio: 16 / 10;
-}
-
-/* ── 背景拼贴的开关 ────────────────────────────────────────────────────── */
-/* 和 .theme-toggle / .music-toggle-btn 同一条竖列：主题在 bottom 32、播放器在
-   104，这个排第三格（176）。是 fixed 的，所以只在 Hero 挂着的时候存在 ——
-   离开首页它跟着组件一起消失，不用另外判断路由。 */
-.wall-toggle {
-  /* 悬浮在网页上，和主题按钮 / 播放器同一条竖列的第三格（右 32 / 下 168）。
-     ⚠ 它必须**挂在 body 上**（模板里 Teleport 出去了），不能留在 Hero 里：
-     .hero-concept 上有 transform（哪怕值是 translateY(0)），而被 transform 的
-     祖先会把内部 position:fixed 的包含块改成它自己 —— 那样这个按钮就变成
-     "跟着 Hero 定位"，永远浮不到网页上，滚起来也跟着 Hero 走。 */
-  position: fixed;
-  bottom: 168px;
-  right: 32px;
-  /* 和头部那批一起出来：它在 body 上，不在 .shell 的错峰名单里，所以自己排时间。
-     不排的话首屏遮罩一揭开它就杵在那儿了 —— 那会儿 Hero 还在往上浮。 */
-  opacity: 0;
-  /* translate 那一条是"边缘滑出"用的（见 styles/main.css 的 .is-edge-hover）：
-     它被 Teleport 到 body 上，不在 .shell 的错峰名单里，过渡只能自己写。
-     默认 0s 延迟 —— 蹭到屏幕右边要立刻出来，不能跟着淡入一起等。 */
-  transition: opacity 0.6s ease 0.35s, translate 0.42s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
-  width: 56px;
-  height: 56px;
-  border-radius: 0; /* 直角：站内按钮统一去圆角 */
-  border: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 999;
-  background: var(--text-primary);
-  color: var(--bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  outline: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.wall-toggle.is-on {
-  opacity: 1;
-}
-
-.wall-toggle:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-}
-
-.wall-toggle svg {
-  width: 22px;
-  height: 22px;
-}
-
-/* 关掉的时候按钮自己变"空心"一点，一眼能看出现在的状态。
-   !important 是为了压过上面 .is-on 的 1（两个类同时存在） */
-.wall-toggle.is-off {
-  opacity: 0.45 !important;
-}
-
-/* 断点跟着 main.css 里那两个（800 / 480）：悬浮按钮在窄屏上会缩到 48 / 44 并往下挪，
-   这一格不跟着走的话会飘到别的按钮身上。 */
-@media (max-width: 800px) {
-  .wall-toggle {
-    bottom: 140px;
-    right: 16px;
-    width: 48px;
-    height: 48px;
-  }
-
-  .wall-toggle svg {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-@media (max-width: 480px) {
-  .wall-toggle {
-    bottom: 128px;
-    right: 12px;
-    width: 44px;
-    height: 44px;
-  }
-
-  .wall-toggle svg {
-    width: 18px;
-    height: 18px;
-  }
+  pointer-events: none;
 }
 
 /* ── 背景字 ────────────────────────────────────────────────────────────── */
@@ -1829,6 +2232,8 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--hero-fg);
+  /* 同 .persona__label：那行小字也会压在球上 */
+  text-shadow: 0 0 4px var(--hero-bg), 0 0 10px var(--hero-bg);
 }
 
 /* 单个字：先摆在下方、透明，进到位才实。最后一个字后面那段字距不算进宽度，
@@ -1899,6 +2304,8 @@ onBeforeUnmount(() => {
   aspect-ratio: 3 / 4;
   display: block;
   z-index: 5;
+  /* 舞台是 pointer-events:none，这一层要自己打开（球体拖拽从别处穿透） */
+  pointer-events: auto;
   /* 原来这里是 <a href>，指针样式由链接给。现在只保留点击收拢的手感，不跳转。 */
   cursor: pointer;
   /* 椭圆取景：这张是照片，矩形边和背景接不上，显得生硬。
@@ -2047,6 +2454,8 @@ onBeforeUnmount(() => {
   width: var(--card-w, 160px);
   aspect-ratio: 3 / 4;
   display: block;
+  /* 舞台是 pointer-events:none，卡片要自己打开（否则点不到、也拖不动） */
+  pointer-events: auto;
   text-decoration: none;
   color: inherit;
   /* 每帧由 JS 重写（含公转和远近缩放）；给个初值免得首帧闪在原点 */
@@ -2082,6 +2491,8 @@ onBeforeUnmount(() => {
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--hero-fg);
+  /* 人格标签压在封面球上：给一圈背景色阴影，明暗两种主题下都还读得出来 */
+  text-shadow: 0 0 4px var(--hero-bg), 0 0 10px var(--hero-bg);
   transition: color 0.35s ease;
 }
 
@@ -2089,58 +2500,149 @@ onBeforeUnmount(() => {
   color: var(--hero-fg-strong);
 }
 
-/* ── 背景拼贴（其他博客的封面）─────────────────────────────────────────
-   一层散在背景上的封面墙：清晰、去色、压到两三成。它压在星尘画布下面
-   （z-index 同为 0，靠 DOM 顺序 —— 这一块排在 canvas 前面）。
-   四边的渐隐遮罩是必须的：8 张图铺到边上的话，hero 四条边会露出硬边。
-   这是一层纯底纹：不吃鼠标事件（主体和人格都在它上面，但它自己不该拦任何东西）。
+/* ── 背景：封面球（其他博客的封面，参照 oumahi.art 首页）─────────────────
+   球体是一层纯底纹：z0，排在星尘画布前面（画布同为 z0，DOM 在后所以盖住它）。
+   卡片本身 pointer-events:none，只有最外层容器收 pointerdown —— 也就是只有
+   "空白处"才能起手拖球（主体/人格在更高的层，轮不到球）。
+   关了之后整层淡出并让开事件；不做 display:none —— 那会把图片重新变成
+   "没加载过"的状态，再打开时又要重来一遍。 */
+.hero-sphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: auto;
+  /* 触屏上纵向手势留给页面滚动，横向拖动也不接（onSphereDown 只认精确指针） */
+  touch-action: pan-y;
+  cursor: grab;
+  transition: opacity 0.9s ease;
+  /* 球边缘揉软。mask 挂在最外层，不碰里面那层 perspective ——
+     mask/opacity 这类分组属性挂在 perspective 上会把 3D 压平。 */
+  mask-image: radial-gradient(circle closest-side at 50% 50%, #000 60%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%, #000 60%, transparent 100%);
+}
 
-   浓度挂在这一层：每一张淡到 1 就行，8 张一起乘上这个数才是一眼看到的浓度，
-   主题切换时也只改这一个变量、8 张一起过渡。 */
-/* 关掉之后整层淡出并让开事件。不做 display:none —— 那会把 8 张图重新变成
-   "没加载过"的状态，再打开时又要重来一遍；这里只是看不见。 */
-.hero-wall.is-off {
+.hero-sphere.is-on {
+  opacity: var(--sphere-card-opacity);
+}
+
+.hero-sphere.is-off {
   opacity: 0 !important;
   pointer-events: none;
 }
 
-.hero-wall {
-  position: absolute;
-  /* 往外多铺一格：球面把边缘的格子往后/往外推，不留出硬边 */
-  inset: calc(-1 * var(--wall-cell, 240px));
-  z-index: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, var(--wall-cell, 240px));
-  grid-auto-rows: var(--wall-cell, 240px);
-  gap: var(--wall-gap, 29px);
-  /* 横向居中（左右各留一格 overscan）；纵向从顶部铺起 —— 64 块会比墙面多，
-     居中会把前几行推到视口上方，最先加载的封面就全看不见了。 */
-  place-content: start center;
-  pointer-events: none;
-  overflow: hidden;
-  opacity: var(--wall-opacity);
-  transition: opacity 0.4s ease;
-  mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 42%, transparent 100%);
-  -webkit-mask-image: radial-gradient(ellipse 74% 74% at 50% 50%, #000 42%, transparent 100%);
+.hero-sphere.is-grabbing {
+  cursor: grabbing;
 }
 
-.hero-wall__img {
+.hero-sphere__viewport {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+}
+
+/* 世界的原点在 hero 中心；每条线的坐标、每张卡片的位置都以这里为准。 */
+.hero-sphere__world {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* 两种线框各装一组：球体（经纬网）和十二面体（30 条棱）。
+   形变时只交叉淡入淡出两组，不逐帧重建 200 多根线。 */
+.hero-sphere__wiregroup {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.hero-sphere__wiregroup--dodeca {
+  opacity: 0;
+}
+
+/* 经纬线：一根 1px 的 div 从 a 拉到 b。变换是静态的，整颗球转的时候
+   由父级 world 一起带着走，所以每帧只有一次 transform 写入。 */
+.hero-sphere__wire {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 1px;
+  transform-origin: 0 50%;
+  background: var(--sphere-wire);
+  pointer-events: none;
+}
+
+/* 每张封面是切在球面上的一个平面，正面朝外。 */
+.hero-sphere__node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  background: var(--sphere-card-bg);
+  box-shadow: inset 0 0 0 1px var(--sphere-frame);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hero-sphere__img {
   width: 100%;
   height: 100%;
-  aspect-ratio: 1;
   object-fit: cover;
   display: block;
-  /* GSAP 从 0 淡到 1（见 revealBlogWall）；浓度由 .hero-wall 那一层压 */
+  /* GSAP 从 0 淡到 1（见 revealCoverSphere）；浓度由 .hero-sphere__node 压 */
   opacity: 0;
   visibility: hidden;
-  transform-origin: 50% 50%;
-  will-change: transform;
-  backface-visibility: hidden;
   /* 清晰，但去色 —— 整站是黑白语言，底纹带上颜色就会跳出来 */
-  filter: grayscale(1);
+  filter: var(--sphere-img-filter);
+  backface-visibility: visible;
+}
+
+/* ── 背景氛围：暗角 + 极淡的水平扫描线（参照 oumahi.art 的 .atmosphere）──
+   z0 且排在球后面，所以只压球体这一层：主体（z5）和人格（z1）都在它上面。
+   两个渐变合成一层，扫描线是 1px 亮/2px 暗的重复渐变，不是 300 个 div。 */
+.hero-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 38%, var(--hero-vignette) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      var(--hero-scanline) 0,
+      var(--hero-scanline) 1px,
+      transparent 1px,
+      transparent 3px
+    );
 }
 
 
+/* ── 鼠标拖迹 ────────────────────────────────────────────────────────── */
+/* 挂在 body 上（Teleport）。z-index 900：压在页面内容之上，但在方块光标
+   （100000）、品牌遮罩（9999）和转场层（90000）之下 —— 入场/换页时不会
+   有一条线浮在最上面。 */
+.hero-cursor-trail {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 900;
+  pointer-events: none;
+}
+
+@media (hover: none) {
+  .hero-cursor-trail {
+    display: none;
+  }
+}
 
 /* ── 方块光标 ──────────────────────────────────────────────────────────── */
 /* 已经整体搬到 components/BlockCursor.vue（含样式）。这里不再留一份 ——

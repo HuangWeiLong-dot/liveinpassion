@@ -33,6 +33,22 @@ const DAY_KEYS = new Set([
   'health', 'location', 'phone', 'ai', 'workouts', 'allTime', 'dimensions',
   // 七维之和会重复计时；collapsedHours 是同一天各来源区间的并集
   'collapsedHours',
+  // 睡眠窗口是**推断**的（手机/电脑静默），随行带 basis/confidence。
+  // 前端要把它画得和步数不一样，否则读者会以为是测出来的。
+  'sleep',
+  // 天气：城市级的当日汇总，不含坐标。
+  'weather',
+  // 饮食：只有合计和顿数。每顿的原文是用户自己写的话，不进聚合。
+  'nutrition',
+]);
+// 睡眠窗口的钟点：`23:40` 这种形状，不接受日期或时区后缀。
+const HHMM_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+const SLEEP_KEYS = new Set(['onset', 'wake', 'hours', 'basis', 'confidence']);
+const WEATHER_KEYS = new Set([
+  'tempMax', 'tempMin', 'precipMm', 'sunshineMin', 'windMax', 'condition',
+]);
+const NUTRITION_KEYS = new Set([
+  'calories', 'proteinG', 'carbsG', 'fatG', 'meals', 'confidence',
 ]);
 const ALL_TIME_KEYS = new Set([
   'runs', 'km', 'bestPaceS', 'bestPaceKm', 'bestPaceName', 'bestPaceDay',
@@ -185,6 +201,39 @@ function validateDay(d) {
     for (const key of DIMENSION_KEYS) {
       if (!isNum(dim[key], 0, 24)) return `dimensions.${key}`;
     }
+  }
+
+  // 睡眠：钟点 + 时长 + 来源。没有数据的日子是 null，不是 00:00。
+  if (d.sleep !== undefined && d.sleep !== null) {
+    const s = d.sleep;
+    if (!isObj(s) || !onlyKeys(s, SLEEP_KEYS)) return 'sleep';
+    if (typeof s.onset !== 'string' || !HHMM_RE.test(s.onset)) return 'sleep.onset';
+    if (typeof s.wake !== 'string' || !HHMM_RE.test(s.wake)) return 'sleep.wake';
+    if (!isNum(s.hours, 0, 24)) return 'sleep.hours';
+    if (s.basis !== null && !isName(s.basis, 20)) return 'sleep.basis';
+    if (s.confidence !== null && !isName(s.confidence, 10)) return 'sleep.confidence';
+  }
+
+  if (d.weather !== undefined && d.weather !== null) {
+    const w = d.weather;
+    if (!isObj(w) || !onlyKeys(w, WEATHER_KEYS)) return 'weather';
+    if (!isOptNum(w.tempMax, -60, 60)) return 'weather.tempMax';
+    if (!isOptNum(w.tempMin, -60, 60)) return 'weather.tempMin';
+    if (!isOptNum(w.precipMm, 0, 1000)) return 'weather.precipMm';
+    if (!isOptNum(w.sunshineMin, 0, 1440)) return 'weather.sunshineMin';
+    if (!isOptNum(w.windMax, 0, 500)) return 'weather.windMax';
+    if (w.condition !== null && !isName(w.condition, 30)) return 'weather.condition';
+  }
+
+  if (d.nutrition !== undefined && d.nutrition !== null) {
+    const n = d.nutrition;
+    if (!isObj(n) || !onlyKeys(n, NUTRITION_KEYS)) return 'nutrition';
+    if (!isOptNum(n.calories, 0, 20000)) return 'nutrition.calories';
+    if (!isOptNum(n.proteinG, 0, 2000)) return 'nutrition.proteinG';
+    if (!isOptNum(n.carbsG, 0, 3000)) return 'nutrition.carbsG';
+    if (!isOptNum(n.fatG, 0, 2000)) return 'nutrition.fatG';
+    if (!isOptNum(n.meals, 0, 20)) return 'nutrition.meals';
+    if (n.confidence !== null && !isName(n.confidence, 10)) return 'nutrition.confidence';
   }
 
   if (d.health !== null) {

@@ -1172,14 +1172,7 @@ watch(brandVisible, (v) => {
   }
 }
 
-/* 手机上底部有一条固定的 MobileDock（距底 16px + 52px 高），
-   正文必须停在它上面，不能钻到那条汉堡底下。 */
-@media (max-width: 1024px) {
-  .org-page {
-    --org-pad-b: clamp(84px, 11vh, 104px);
-  }
-}
-
+/* 手机上不再有底部 MobileDock：底部只留页面自己的收边。 */
 @media (max-width: 640px) {
   .org-page {
     --org-pad-y: clamp(96px, 11vh, 104px);
@@ -1275,9 +1268,8 @@ watch(brandVisible, (v) => {
   }
 }
 
-/* 短屏（笔记本 13寸 / iPhone SE 横竖）：一屏装不下时再收一档，
+/* 矮屏（笔记本 13寸 / iPhone SE 横竖）：一屏装不下时再收一档，
    并把第 03 章的采集清单让位给正文 —— 这一页不能靠滚动补救。 */
-/* 矮屏：网底那条 MobileDock 让位不下 24px 的收边，只有宽屏（没有 dock）才收到底 */
 @media (max-height: 700px) and (min-width: 1025px) {
   .org-page {
     --org-pad-b: 24px;

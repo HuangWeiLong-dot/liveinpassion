@@ -16,6 +16,7 @@
 //  3. 真实数据可能只有几天：窗口按“已存最新日往前、但不早于第一条”裁，
 //     中间缺日保留成虚线基线，不补 30 个空白。
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import OdometerNumber from '../components/OdometerNumber.vue';
@@ -23,9 +24,15 @@ import LifeBrain from '../components/LifeBrain.vue';
 import GithubActivity from '../components/GithubActivity.vue';
 import LifeDashboard from '../components/LifeDashboard.vue';
 import LifeRadar from '../components/LifeRadar.vue';
+import LifeSleep from '../components/LifeSleep.vue';
+import LifeWeather from '../components/LifeWeather.vue';
+import LifeNutrition from '../components/LifeNutrition.vue';
+import LifeCoverage from '../components/LifeCoverage.vue';
+import LifeHeart from '../components/LifeHeart.vue';
 import LifeNow from '../components/LifeNow.vue';
 import LifeToday from '../components/LifeToday.vue';
 import LifeDetailModal from '../components/LifeDetailModal.vue';
+import SiteStats from '../components/SiteStats.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import {
   latestIdFor,
@@ -104,22 +111,24 @@ const mapSvgRef = ref(null);
 const dayCloseRef = ref(null);
 
 // ---- 视图模式 ----
-// feed = 原来的长页（逐块往下读）；dashboard = 一屏铺开的 12 列仪表盘。
-// 两者共用同一份数据和同一个 section，切换只是换一种排法。
-// 记住选择：localStorage 存 lifeViewMode；?view=dashboard 可以直接进仪表盘。
+// feed = 原来的长页（逐块往下读）；dashboard = 一屏铺开的 12 列仪表盘；
+// stats = 站点访问统计（原 /stats 页）。三者共用同一个 section 外壳，
+// 切换只是换一种排法 / 换一份数据。
+// 记住选择：localStorage 存 lifeViewMode；?view=dashboard|stats 可以直接进对应视图。
 const VIEW_KEY = 'lifeViewMode';
+const route = useRoute();
 const viewMode = ref('feed');
 try {
   const fromUrl = new URLSearchParams(window.location.search).get('view');
   const stored = localStorage.getItem(VIEW_KEY);
-  if (fromUrl === 'dashboard' || fromUrl === 'feed') viewMode.value = fromUrl;
-  else if (stored === 'dashboard') viewMode.value = 'dashboard';
+  if (fromUrl === 'dashboard' || fromUrl === 'feed' || fromUrl === 'stats') viewMode.value = fromUrl;
+  else if (stored === 'dashboard' || stored === 'stats') viewMode.value = stored;
 } catch {
   /* 隐私模式下 localStorage 可能不可用 */
 }
 
 function setViewMode(mode) {
-  if (mode !== 'feed' && mode !== 'dashboard') return;
+  if (mode !== 'feed' && mode !== 'dashboard' && mode !== 'stats') return;
   if (viewMode.value === mode) return;
   viewMode.value = mode;
   try {
@@ -130,12 +139,15 @@ function setViewMode(mode) {
   // URL 同步，方便直接分享到某一种视图；replaceState 不触发路由。
   try {
     const url = new URL(window.location.href);
-    if (mode === 'dashboard') url.searchParams.set('view', 'dashboard');
+    if (mode === 'dashboard' || mode === 'stats') url.searchParams.set('view', mode);
     else url.searchParams.delete('view');
     window.history.replaceState(window.history.state, '', url);
   } catch {
     /* ignore */
   }
+
+  // 换视图 = 换一套内容，停在页面中段会看到摸不着头脑的半截；统一回顶部
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 
   nextTick(() => {
     if (!sectionRef.value) return;
@@ -144,6 +156,25 @@ function setViewMode(mode) {
     if (mode === 'feed') observeMap();
   });
 }
+
+// 旧地址 /stats 会重定向到 /life?view=stats；站点是 keep-alive 缓存的，
+// 已经挂载过的 LIFE 不会再跑 setup，所以这里跟着路由查询参数走一遍。
+watch(
+  () => route.query.view,
+  (v) => {
+    if (v === 'feed' || v === 'dashboard' || v === 'stats') setViewMode(v);
+  }
+);
+
+// 页面激活态（给 SiteStats 用：keep-alive 切走时停掉它的轮询）
+const pageActive = ref(true);
+
+// hero 那句副标题跟着视图走：stats 是站点访客，不是生活记录
+const heroSubtitle = computed(() => (
+  viewMode.value === 'stats'
+    ? 'Who passes through Live in Passion'
+    : 'A quiet record of time, motion, places and attention'
+));
 
 // ---- 彩色模式 / 单日详情 ----
 const colorMode = ref(false);
@@ -2306,6 +2337,7 @@ let firstActivation = true;
 
 onMounted(() => {
   activeNow = true;
+  pageActive.value = true;
   mountedAt = performance.now();
   startClock();
   startPolling();
@@ -2329,6 +2361,7 @@ onActivated(() => {
     return;
   }
   activeNow = true;
+  pageActive.value = true;
   mountedAt = performance.now();
   startClock();
   startPolling();
@@ -2360,6 +2393,7 @@ function teardownMap() {
 
 onDeactivated(() => {
   activeNow = false;
+  pageActive.value = false;
   closeDay();
   stopPolling();
   stopClock();
@@ -2372,6 +2406,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   activeNow = false;
+  pageActive.value = false;
   window.removeEventListener('keydown', onDayKey);
   closeDay();
   closeDetail();
@@ -2414,21 +2449,23 @@ onBeforeUnmount(() => {
 
         <div class="stats-hero-rule" aria-hidden="true"><span></span></div>
 
-        <p class="stats-subtitle">A quiet record of time, motion, places and attention</p>
+        <p class="stats-subtitle">{{ heroSubtitle }}</p>
 
         <div class="stats-hero-meta">
-          <span>Last {{ rows.length || '—' }} {{ rows.length === 1 ? 'day' : 'days' }}</span>
-          <i aria-hidden="true"></i>
-          <span>{{ city }}</span>
-          <i aria-hidden="true"></i>
-          <span>Updated {{ lastUpdated }}</span>
-          <template v-if="latestIsToday">
+          <template v-if="viewMode !== 'stats'">
+            <span>Last {{ rows.length || '—' }} {{ rows.length === 1 ? 'day' : 'days' }}</span>
             <i aria-hidden="true"></i>
-            <span class="life-live-badge" title="Today's figures are partial until the 23:00 close">
-              <i aria-hidden="true"></i>TODAY · LIVE
-            </span>
+            <span>{{ city }}</span>
+            <i aria-hidden="true"></i>
+            <span>Updated {{ lastUpdated }}</span>
+            <template v-if="latestIsToday">
+              <i aria-hidden="true"></i>
+              <span class="life-live-badge" title="Today's figures are partial until the 23:00 close">
+                <i aria-hidden="true"></i>TODAY · LIVE
+              </span>
+            </template>
+            <i aria-hidden="true"></i>
           </template>
-          <i aria-hidden="true"></i>
           <span class="life-view-switch" role="group" aria-label="LIFE layout">
             <button
               type="button"
@@ -2444,6 +2481,13 @@ onBeforeUnmount(() => {
               :aria-pressed="viewMode === 'dashboard'"
               @click="setViewMode('dashboard')"
             >DASHBOARD</button>
+            <button
+              type="button"
+              class="life-view-option"
+              :class="{ 'is-active': viewMode === 'stats' }"
+              :aria-pressed="viewMode === 'stats'"
+              @click="setViewMode('stats')"
+            >STATS</button>
           </span>
           <button
             class="life-color-toggle"
@@ -2457,7 +2501,12 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="loading" class="stats-loading life-loading" aria-label="Loading life data">
+      <!-- 站点访问统计（原 /stats 页）：独立取数，不依赖 /api/life 是否成功 -->
+      <template v-if="viewMode === 'stats'">
+        <SiteStats :active="pageActive" />
+      </template>
+
+      <div v-else-if="loading" class="stats-loading life-loading" aria-label="Loading life data">
         <span v-for="n in 6" :key="n"></span>
       </div>
 
@@ -2585,11 +2634,23 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <!-- 01 神经网络（交互 3D） -->
-        <div class="stats-panel life-panel life-brain-panel" data-reveal>
+        <!-- 01 睡眠窗口：几点睡、几点起。数据是推断的，手表没有睡眠功能。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="sleep">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
               <span class="stats-panel-index">01</span>
+              <h2>SLEEP WINDOW</h2>
+            </div>
+            <span class="stats-panel-sub">ONSET → WAKE · INFERRED, NOT MEASURED</span>
+          </div>
+          <LifeSleep :rows="rows" />
+        </div>
+
+        <!-- 02 神经网络（交互 3D） -->
+        <div class="stats-panel life-panel life-brain-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">02</span>
               <h2>NEURAL CORE</h2>
             </div>
             <div class="stats-panel-head-right">
@@ -2606,11 +2667,11 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <!-- 02 每日节奏 -->
+        <!-- 03 每日节奏 -->
         <div class="stats-panel life-panel" data-reveal data-chart="rhythm">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">02</span>
+              <span class="stats-panel-index">03</span>
               <h2>DAILY RHYTHM</h2>
             </div>
             <span class="stats-panel-sub">{{ rhythmRows.length }}D · DESKTOP + GPS + WATCH + PHONE</span>
@@ -2718,11 +2779,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No desktop activity recorded yet.</p>
         </div>
 
-        <!-- 03 运动 -->
+        <!-- 04 运动 -->
         <div class="stats-panel life-panel" data-reveal data-chart="motion">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">03</span>
+              <span class="stats-panel-index">04</span>
               <h2>MOTION</h2>
             </div>
             <div class="stats-legend">
@@ -3245,11 +3306,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No health data recorded yet.</p>
         </div>
 
-        <!-- 04 地点：区级时长 + 轨迹地图 -->
+        <!-- 05 地点：区级时长 + 轨迹地图 -->
         <div class="stats-panel life-panel" data-reveal data-chart="places">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">04</span>
+              <span class="stats-panel-index">05</span>
               <h2>PLACES</h2>
             </div>
             <span class="stats-panel-sub">
@@ -3534,11 +3595,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No location data recorded yet.</p>
         </div>
 
-        <!-- 05 手机 -->
+        <!-- 06 手机 -->
         <div class="stats-panel life-panel" data-reveal data-chart="phone">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">05</span>
+              <span class="stats-panel-index">06</span>
               <h2>PHONE</h2>
             </div>
             <div class="stats-legend">
@@ -3643,11 +3704,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No phone data recorded yet.</p>
         </div>
 
-        <!-- 06 AI 花费 -->
+        <!-- 07 AI 花费 -->
         <div class="stats-panel life-panel" data-reveal data-chart="ai">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">06</span>
+              <span class="stats-panel-index">07</span>
               <h2>AI SPEND</h2>
             </div>
             <div class="stats-panel-head-right">
@@ -3757,11 +3818,11 @@ onBeforeUnmount(() => {
           <p v-else class="stats-panel-empty">No AI spend recorded in this window.</p>
         </div>
 
-        <!-- 07 星期轮廓 -->
+        <!-- 08 星期轮廓 -->
         <div class="stats-panel life-panel" data-reveal data-chart="weekday">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">07</span>
+              <span class="stats-panel-index">08</span>
               <h2>WEEKDAY PROFILE</h2>
             </div>
             <span class="stats-panel-sub">{{ weekdayDays }}D · AVERAGE PER WEEKDAY · DESKTOP + GPS + WATCH + PHONE</span>
@@ -3819,16 +3880,64 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 08 GitHub：公开事件流（和 LIFE 数据同属「公开生命档案」的一部分） -->
-        <div class="stats-panel life-panel" data-reveal>
-          <GithubActivity variant="panel" index="08" />
-        </div>
-
-        <!-- 09 归档：全量原始数据 -->
-        <div class="stats-panel life-panel life-archive-panel" data-reveal>
+        <!-- 09 天气：温度区间 + 降水。外发粗化坐标才拿得到，默认关闭。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="weather">
           <div class="stats-panel-head">
             <div class="stats-panel-title">
               <span class="stats-panel-index">09</span>
+              <h2>WEATHER</h2>
+            </div>
+            <span class="stats-panel-sub">DAILY LOW → HIGH · RAINFALL · OPEN-METEO</span>
+          </div>
+          <LifeWeather :rows="rows" />
+        </div>
+
+        <!-- 10 饮食：热量柱 + 蛋白折线。数据是估算，覆盖率低于 60% 时会明说。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="nutrition">
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">10</span>
+              <h2>NUTRITION</h2>
+            </div>
+            <span class="stats-panel-sub">KCAL + PROTEIN · ESTIMATED FROM A ONE-LINE LOG</span>
+          </div>
+          <LifeNutrition :rows="rows" />
+        </div>
+
+        <!-- 11 数据覆盖：每个源在窗口里哪几天有数据。没有就留空格，不画成 0。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="coverage">
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">11</span>
+              <h2>DATA COVERAGE</h2>
+            </div>
+            <span class="stats-panel-sub">WHICH SOURCES LANDED ON WHICH DAYS</span>
+          </div>
+          <LifeCoverage :rows="rows" />
+        </div>
+
+        <!-- 12 心率区间：当天最低 → 最高，中间压一条均值。右侧按星期几摊开。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="heart">
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">12</span>
+              <h2>HEART RATE</h2>
+            </div>
+            <span class="stats-panel-sub">DAILY MIN → MAX · AVERAGE LINE</span>
+          </div>
+          <LifeHeart :rows="rows" />
+        </div>
+
+        <!-- 13 GitHub：公开事件流（和 LIFE 数据同属「公开生命档案」的一部分） -->
+        <div class="stats-panel life-panel" data-reveal>
+          <GithubActivity variant="panel" index="13" />
+        </div>
+
+        <!-- 14 归档：全量原始数据 -->
+        <div class="stats-panel life-panel life-archive-panel" data-reveal>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">14</span>
               <h2>THE ARCHIVE</h2>
             </div>
             <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>

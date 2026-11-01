@@ -19,10 +19,9 @@ const SECTIONS = {
   me: 'ME',
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
-  stats: 'STATS',
   life: 'LIFE',
   'life-archive': 'ARCHIVE',
-  organization: 'ORGANIZATION',
+  'me-organization': 'ORGANIZATION',
   'not-found': 'NOT FOUND',
 };
 

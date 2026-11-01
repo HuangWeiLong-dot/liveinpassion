@@ -50,8 +50,7 @@ const HOT = [
   '.steam-profile-btn',
   '.lightbox-nav', '.lightbox-close-area', '.me-photo-lightbox-close',
   '.bd-closezone', '.modal-close', '.jb-card', '.playlist-item',
-  '.dock-btn', '.dock-item', '.brand__enter', '.wall-toggle', '.menu-toggle',
-  '.theme-toggle', '.music-toggle-btn', '.author-avatar',
+  '.brand__enter', '.menu-toggle', '.nav-tool', '.author-tower__avatar',
   '.player-btn', '.player-play-btn', '.stats-retry',
 ].join(',');
 

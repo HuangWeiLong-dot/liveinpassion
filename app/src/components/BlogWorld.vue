@@ -35,6 +35,12 @@ const SNAP = 0.12;     // 目标角度的逼近系数（60Hz 基准）
 const VEL_DECAY = 0.94; // 松手惯性的衰减系数（60Hz 基准）
 const IDLE_STEP = 32;   // 空闲自转的更新间隔（ms）：约 30fps，省一半合成开销
 
+// ── 操作灵敏度 ──────────────────────────────────────────────────────────
+// 数值越小越"沉"：同一个手势/同一格滚轮，环转过的角度更小。
+const DRAG_GAIN = 0.1;   // 拖拽：每像素对应的角度（原 0.28）
+const DRAG_VELOCITY = 0.035; // 松手惯性：每像素对应的角速度（原 0.1，与 DRAG_GAIN 同比例）
+const WHEEL_GAIN = 0.04;   // 滚轮：每单位 delta 对应的角度（原 0.12）
+
 const sceneRef = ref(null);
 const worldRef = ref(null);
 const stripRef = ref(null);
@@ -243,8 +249,8 @@ function onPointerMove(e) {
   if (!dragging) return;
   const dx = e.clientX - dragX;
   moved = Math.max(moved, Math.abs(dx));
-  rot = dragRot - dx * 0.28;
-  vel = -dx * 0.1; // 松手那一刻的速度，帧循环里按时间衰减
+  rot = dragRot - dx * DRAG_GAIN;
+  vel = -dx * DRAG_VELOCITY; // 松手那一刻的速度，帧循环里按时间衰减
 }
 
 function onPointerUp() {
@@ -262,7 +268,7 @@ function onWheel(e) {
   // 竖滚也当作转动世界：这页没有纵向滚动，滚轮不该是空操作
   const raw = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
   const unit = e.deltaMode === 1 ? 18 : e.deltaMode === 2 ? 300 : 1;
-  rot += raw * unit * 0.12;
+  rot += raw * unit * WHEEL_GAIN;
   vel = 0;
   desired = null;
   e.preventDefault();

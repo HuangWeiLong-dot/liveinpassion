@@ -222,12 +222,142 @@
             text-decoration: none;
         }
 
+        /* ── 左下角的「Ava 塔」 ──────────────────────────────────────────
+           头像常驻，指针停在头像上之后，那批控件从它后面往上滑出来。
+           整个塔只在宽屏出现；≤1024px 让位给右上角的汉堡。 */
+        .author-tower {
+            position: fixed;
+            left: 32px;
+            bottom: 32px;
+            z-index: 999;
+            width: 64px;
+            height: 64px;
+        }
+
+        .author-tower__avatar {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.22s ease;
+        }
+
+        .author-tower__avatar:hover {
+            border-color: var(--text-primary);
+        }
+
+        .author-tower__avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* 塔身：绝对定位在头像上方，底部多留 14px 并和头像叠 8px ——
+           中间没有缝，指针从头像往上走时不会误触发 mouseleave；
+           视觉上仍留 6px 间距。 */
+        .author-tower__stack {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% - 8px);
+            z-index: 1;
+            translate: -50% 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 14px;
+            pointer-events: none;
+        }
+
+        .author-tower.is-open .author-tower__stack {
+            pointer-events: auto;
+        }
+
+        /* 每个按钮从头像后面往上滑；离头像越近的越早出来（--i 在模板里写） */
+        .author-tower__stack .brand-tool {
+            opacity: 0;
+            translate: 0 22px;
+            transition: background-color 0.22s ease, color 0.22s ease,
+                opacity 0.22s ease, translate 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .author-tower.is-open .author-tower__stack .brand-tool {
+            opacity: 1;
+            translate: 0 0;
+            transition-delay: calc(var(--i, 0) * 40ms);
+        }
+
+        /* 和站内其他悬浮按钮同一套语言：直角、实心/空心反转。
+           这里用空心，避免一整列实心黑块压得太重。 */
+        .brand-tool,
+        .nav-tool {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border: 1px solid var(--text-primary);
+            border-radius: 0;
+            background: transparent;
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.22s ease, color 0.22s ease, opacity 0.22s ease;
+        }
+
+        .brand-tool:hover,
+        .nav-tool:hover,
+        .brand-tool.is-active,
+        .nav-tool.is-active {
+            background: var(--text-primary);
+            color: var(--bg);
+        }
+
+        .brand-tool svg,
+        .nav-tool svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        .brand-tool img,
+        .nav-tool img {
+            width: 18px;
+            height: 18px;
+            filter: invert(var(--invert));
+            transition: filter 0.22s ease;
+        }
+
+        .brand-tool:hover img,
+        .nav-tool:hover img,
+        .brand-tool.is-active img,
+        .nav-tool.is-active img {
+            filter: invert(calc(1 - var(--invert)));
+        }
+
+        /* 背景开关关掉时自己淡一点，状态一眼可辨 */
+        .brand-tool.is-off,
+        .nav-tool.is-off {
+            opacity: 0.42;
+        }
+
+        /* 汉堡里的控件行：宽屏不显示，≤1024px 才跟着导航一起出来 */
+        .nav-tools {
+            display: none;
+        }
+
         nav {
             display: flex;
             gap: 32px;
         }
 
-        nav a {
+        nav > a {
             font-size: 0.875rem;
             color: var(--text-secondary);
             text-decoration: none;
@@ -235,7 +365,7 @@
             letter-spacing: 0.02em;
         }
 
-        nav a:hover {
+        nav > a:hover {
             color: var(--text-primary);
         }
 
@@ -821,9 +951,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            /* ⚠ 必须高过移动端那条 .dock（z-index 1001，MobileDock.vue）：
-               1000 的话，手机上看灯箱时那条全宽的白色"空格键"会浮在照片下面一截，
-               而且它还吃点击。其余各层都在这之上（品牌遮罩 9999 / 转场板 90000 /
+            /* 1002：压在播放器 / 统计条这批 99x 的悬浮件之上。
+               其余各层都在这之上（品牌遮罩 9999 / 转场板 90000 /
                方块光标 100000），所以只抬到 1002 —— 别一路加上去。 */
             z-index: 1002;
             display: flex;
@@ -3853,47 +3982,6 @@
             transform: rotate(45deg);
         }
 
-        .music-toggle-btn {
-            position: fixed;
-            bottom: 100px;
-            right: 32px;
-            width: 56px;
-            height: 56px;
-            border-radius: 0; /* 直角（需求） */
-            background: var(--text-primary);
-            color: var(--bg);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 999;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
-            border: 0;
-        }
-
-        .music-toggle-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-        }
-
-        .music-toggle-btn svg,
-        .music-toggle-btn img {
-            width: 24px;
-            height: 24px;
-            filter: invert(calc(1 - var(--invert)));
-        }
-
-        .music-toggle-btn.active {
-            background: var(--text-secondary);
-        }
-
         .player-overlay {
             position: fixed;
             top: 0;
@@ -3910,130 +3998,6 @@
         .player-overlay.visible {
             opacity: 1;
             pointer-events: auto;
-        }
-
-        .theme-toggle {
-            position: fixed;
-            bottom: 32px;
-            right: 32px;
-            width: 56px;
-            height: 56px;
-            border-radius: 0; /* 直角（需求：按钮统一去圆角） */
-            background: var(--text-primary);
-            background-image: linear-gradient(to right, var(--text-primary) 0%, var(--text-primary) 100%);
-            color: var(--bg);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            z-index: 999;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
-            border: 0;
-            background-clip: padding-box;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        .theme-toggle:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-        }
-
-        .theme-toggle svg {
-            width: 24px;
-            height: 24px;
-            transition: transform 0.3s ease;
-            backface-visibility: hidden;
-        }
-
-        .theme-toggle.dark svg {
-            transform: rotate(180deg);
-        }
-
-        .author-section {
-            position: fixed;
-            bottom: 32px;
-            left: 32px;
-            z-index: 999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .social-links {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: opacity 0.3s ease, transform 0.3s ease;
-            pointer-events: none;
-        }
-
-        .author-section:hover .social-links {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
-        }
-
-        .social-link {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--text-primary);
-            color: var(--bg);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
-        }
-
-        .social-link:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-        }
-
-        .social-link svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .author-avatar {
-            width: 64px;
-            height: 64px;
-            overflow: hidden;
-            border: 2px solid var(--border);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            -webkit-tap-highlight-color: transparent;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-            outline: none;
-            touch-action: manipulation;
-        }
-
-        .author-avatar:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.2);
-            border-color: var(--text-primary);
         }
 
         /* 音乐播放器样式 */
@@ -4173,10 +4137,9 @@
             }
         }
 
-        /* 手机上底部有 dock（MobileDock），整块抬到它上方 */
+        /* 手机上「正在播放」舞台铺满两侧，只把高度收一点 */
         @media (max-width: 1024px) {
             .now-playing {
-                bottom: 84px;
                 width: min(480px, calc(100vw - 32px));
             }
 
@@ -4197,7 +4160,6 @@
 
         @media (max-width: 480px) {
             .now-playing {
-                bottom: 80px;
                 width: calc(100vw - 24px);
             }
 
@@ -4545,14 +4507,6 @@
             50% { height: 12px; }
         }
 
-        .author-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        
-
         .blog-section {
             padding: 120px 64px 80px;
         }
@@ -4655,19 +4609,15 @@
         }
 
         /* 页脚抽屉拉开时，底部这批固定条一并让位（类由 AppFooter.vue 挂到 <html>）：
-           手机那条 MobileDock、GALLERY 的统计/筛选条与胶卷条、播放中的歌词行，
-           平时都固定在底部，正好压在页脚最下面那三句 Be 上，把字挡掉一半。
-           这里只淡出、不移走 —— 往上滚一格抽屉合上，它们自己就回来了。
-           visibility 跟着一起藏：光设 opacity: 0 的话，MobileDock 里那些
-           pointer-events: auto 的按钮还是能点到，等于在空中乱点。 */
-        html .dock,
+           GALLERY 的统计/筛选条与胶卷条、播放中的歌词行，平时都固定在底部，
+           正好压在页脚最下面那三句 Be 上，把字挡掉一半。
+           这里只淡出、不移走 —— 往上滚一格抽屉合上，它们自己就回来了。 */
         html .win-dock,
         html .win-strip,
         html .now-playing {
             transition: opacity 0.35s ease, visibility 0s linear;
         }
 
-        html.footer-revealed .dock,
         html.footer-revealed .now-playing,
         html.footer-revealed .win-dock,
         html.footer-revealed .win-strip {
@@ -4818,6 +4768,67 @@
             }
         }
 
+        /* ≤1024px：左下角那座 Ava 塔让位；原来底部"空格键"里的全部控件
+           统一收进右上角的汉堡。 */
+        @media (max-width: 1024px) {
+            .author-tower {
+                display: none;
+            }
+
+            nav {
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 100%;
+                height: 100vh;
+                padding: 88px 24px 40px;
+                background-color: var(--bg);
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 26px;
+                overflow-y: auto;
+                transition: right 0.3s ease;
+            }
+
+            nav.active {
+                right: 0;
+            }
+
+            nav > a {
+                font-size: 1.5rem;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .nav-tools {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 8px;
+                max-width: 340px;
+                margin-top: 6px;
+                padding-top: 24px;
+                border-top: 1px solid var(--border);
+            }
+
+            .nav-tools__avatar {
+                width: 44px;
+                height: 44px;
+                border: 1px solid var(--border);
+                object-fit: cover;
+                display: block;
+            }
+
+            .nav-tool {
+                width: 44px;
+                height: 44px;
+            }
+        }
+
         @media (max-width: 800px) {
             header {
                 padding: 20px 24px;
@@ -4827,32 +4838,6 @@
                 position: absolute;
                 left: 50%;
                 transform: translateX(-50%);
-            }
-
-            nav {
-                position: fixed;
-                top: 0;
-                right: -100%;
-                width: 100%;
-                height: 100vh;
-                background-color: var(--bg);
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                gap: 32px;
-                transition: right 0.3s ease;
-            }
-
-            nav.active {
-                right: 0;
-            }
-
-            nav a {
-                font-size: 1.5rem;
-            }
-
-            .menu-toggle {
-                display: block;
             }
 
             .hero {
@@ -5003,50 +4988,6 @@
                 text-overflow: ellipsis;
             }
 
-            .author-section {
-                bottom: 20px;
-                left: 16px;
-            }
-
-            .author-avatar {
-                width: 48px;
-                height: 48px;
-            }
-
-            .social-link {
-                width: 32px;
-                height: 32px;
-            }
-
-            .social-link svg {
-                width: 14px;
-                height: 14px;
-            }
-
-            .theme-toggle {
-                bottom: 20px;
-                right: 16px;
-                width: 48px;
-                height: 48px;
-            }
-
-            .theme-toggle svg {
-                width: 20px;
-                height: 20px;
-            }
-
-            .music-toggle-btn {
-                bottom: 80px;
-                right: 16px;
-                width: 48px;
-                height: 48px;
-            }
-
-            .music-toggle-btn svg {
-                width: 20px;
-                height: 20px;
-            }
-
             .music-player {
                 width: calc(100% - 32px);
                 max-width: 380px;
@@ -5173,50 +5114,6 @@
 
             .hero h1 {
                 font-size: 2rem;
-            }
-
-            .author-section {
-                bottom: 16px;
-                left: 12px;
-            }
-
-            .author-avatar {
-                width: 44px;
-                height: 44px;
-            }
-
-            .social-link {
-                width: 28px;
-                height: 28px;
-            }
-
-            .social-link svg {
-                width: 12px;
-                height: 12px;
-            }
-
-            .theme-toggle {
-                bottom: 16px;
-                right: 12px;
-                width: 44px;
-                height: 44px;
-            }
-
-            .theme-toggle svg {
-                width: 18px;
-                height: 18px;
-            }
-
-            .music-toggle-btn {
-                bottom: 72px;
-                right: 12px;
-                width: 44px;
-                height: 44px;
-            }
-
-            .music-toggle-btn svg {
-                width: 18px;
-                height: 18px;
             }
 
             footer {
@@ -8109,6 +8006,44 @@
             outline-offset: 2px;
         }
 
+        /* dash-mini：dashboard 的小卡形态。放在全局而不是 LifeDashboard 的
+           scoped 里 —— LifeSleep / LifeWeather / LifeNutrition 三个子组件
+           也用它，而 scoped 样式只作用到子组件的根节点，内层元素套不上。 */
+        .dash-mini {
+          padding: 14px 18px 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          flex: 1;
+        }
+
+        .dash-mini-main strong {
+          display: block;
+          font-family: 'Oswald', sans-serif;
+          font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+          font-weight: 600;
+          line-height: 1;
+          color: var(--text-primary);
+        }
+
+        .dash-mini-main span {
+          display: block;
+          margin-top: 5px;
+          font-family: 'JetBrains Mono', ui-monospace, monospace;
+          font-size: 0.46rem;
+          letter-spacing: 0.08em;
+          color: var(--text-secondary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .dash-mini-chart {
+          position: relative;
+          height: 82px;
+          margin-top: auto;
+        }
+
         .life-svg {
             color: var(--text-primary);
         }
@@ -9602,6 +9537,30 @@
         .is-color [data-chart="motion"] .life-bar { background: var(--cat-5); }
         .is-color [data-chart="phone"] .life-bar { background: var(--cat-1); }
         .is-color [data-chart="ai"] .life-bar { background: var(--cat-3); }
+
+        /* 2026-11-01 新增的五张图也要跟着颜色开关走。
+           每个面板的柱子有两种形态：长页里是 .life-bar，dashboard 小卡里是
+           .mbar（后者不吃入场动画）。细分小图的柱子是 .lc-sub-bar。 */
+        .is-color [data-chart="sleep"] .life-bar,
+        .is-color [data-chart="sleep"] .mbar,
+        .is-color [data-chart="sleep"] .lc-sub-bar { background: var(--cat-1); }
+
+        /* 天气只给温度带上色，降水条保留斜纹 —— 两者量纲不同，
+           共用一种纯色会把「下了多少雨」和「多少度」糊成一样。 */
+        .is-color [data-chart="weather"] .lw-band,
+        .is-color [data-chart="weather"] .mbar,
+        .is-color [data-chart="weather"] .lc-sub-bar { background: var(--cat-0); }
+
+        .is-color [data-chart="nutrition"] .life-bar,
+        .is-color [data-chart="nutrition"] .mbar { background: var(--cat-2); }
+
+        .is-color [data-chart="heart"] .life-bar,
+        .is-color [data-chart="heart"] .mbar { background: var(--cat-4); }
+
+        .is-color [data-chart="coverage"] .lc-cells i.is-on {
+            background: var(--cat-7);
+            border-color: var(--cat-7);
+        }
 
         .life-color-toggle {
             display: inline-flex;
@@ -11660,58 +11619,17 @@
 
 /*
  * X 键：把页面上所有的图标 / 按钮收起来（见 App.vue 的 onKeydown）。
- * 用 html 上的类 + 全局选择器，是因为这些控件分散在 shell 和各个页面里
- * （头部、主题按钮、播放器、作者区、首页那个"背景开关"）——
- * 逐组件透传一个 prop 不如一条规则省事。
- * 加这个新控件时记得把它也写进这张名单（以及下面 `.is-edge-hover` 那两张）。
+ * 用 html 上的类 + 全局选择器，是因为这些控件分散在 shell 和各个页面里。
+ * 头部（连同右上角的汉堡）和左下角那座 Ava 塔都在这张名单里。
  */
 html.is-chrome-hidden #header,
-html.is-chrome-hidden .theme-toggle,
-html.is-chrome-hidden .author-section,
-html.is-chrome-hidden .music-toggle-btn,
-html.is-chrome-hidden .wall-toggle {
-    /* ⚠ 必须 !important：App.vue 里"逐个浮出来"那套是
-       `.shell.is-ready > #header` 这种带 id 的选择器、还带着 scoped 的属性选择器，
-       权重比这里高得多（实测头部和主题按钮压不下去，就是被它顶掉的）。
+html.is-chrome-hidden .author-tower {
+    /* ⚠ 必须 !important：App.vue 里"浮出来"那套是 `.shell.is-ready > #header`
+       这种带 id 的选择器、还带着 scoped 的属性选择器，权重比这里高得多。
        这里要的就是"不管前面怎么写的，都先收起来"。 */
     opacity: 0 !important;
     pointer-events: none;
     transition: opacity 0.35s ease;
-}
-
-/*
- * 边缘滑出：左下角的作者区、右下那一竖列悬浮按钮，平时推到屏幕外，
- * 指针靠到那个角上才滑进来。
- *
- * 为什么用独立的 translate 属性，而不是 transform：主题按钮和背景开关的 hover 是
- * `transform: scale(1.1)`，两者挤进同一个 transform 就会互相覆盖 —— 一 hover
- * 元素就跳回原位。translate / rotate / scale 三个独立属性是三条互不干扰的通道。
- *
- * 怎么判定在 composables/useEdgeReveal.js：
- *   is-edge-hover —— 这台设备有真指针、能 hover，才把控件收起来。
- *                    触屏上没有 hover，收了就再也叫不出来，所以不加这个类、保持常显。
- *   is-edge-left / is-edge-right —— 指针这会儿就在那一边。
- *
- * 位移量取得比"刚好藏起来"更宽（桌面要 88px，这里给 112px）：好处是
- * 800 / 480 两个断点下控件变小、边距变窄，一个值照样盖得住，不必跟着写三份。
- * 过渡写在 App.vue 的 `.shell > .theme-toggle` 那几条（跟淡入同一处，
- * scoped 权重更高，写在别处会被它顶掉）；背景开关在自己的 scoped 样式里。
- */
-html.is-edge-hover .author-section {
-    translate: -112px 0;
-}
-
-html.is-edge-hover .theme-toggle,
-html.is-edge-hover .music-toggle-btn,
-html.is-edge-hover .wall-toggle {
-    translate: 112px 0;
-}
-
-html.is-edge-hover.is-edge-left .author-section,
-html.is-edge-hover.is-edge-right .theme-toggle,
-html.is-edge-hover.is-edge-right .music-toggle-btn,
-html.is-edge-hover.is-edge-right .wall-toggle {
-    translate: 0 0;
 }
 
 /*

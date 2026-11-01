@@ -12,18 +12,18 @@ export function renderLoginPage({ error = '', next = '/admin/' } = {}) {
   const safeNext = /^\/[a-zA-Z0-9\-_./?=&%]*$/.test(next) && !next.startsWith('//') ? next : '/admin/';
   const msg =
     error === 'locked'
-      ? '失败次数太多，请 10 分钟后再试。'
+      ? 'Too many failed attempts. Try again in 10 minutes.'
       : error === '1'
-        ? '密码错误，请重试。'
+        ? 'Incorrect password. Please try again.'
         : '';
 
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>登录 · LIVE IN PASSION CMS</title>
+<title>Log In · LIVE IN PASSION CMS</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -76,9 +76,9 @@ export function renderLoginPage({ error = '', next = '/admin/' } = {}) {
     <div class="rule"></div>
     <label class="field-label" for="pw">Password</label>
     <input id="pw" type="password" name="password" autocomplete="current-password"
-           required autofocus aria-label="密码">
+           required autofocus aria-label="Password">
     <input type="hidden" name="next" value="${esc(safeNext)}">
-    <button class="btn" type="submit">登 录</button>
+    <button class="btn" type="submit">Log In</button>
     ${msg ? `<div class="msg">${esc(msg)}</div>` : ''}
     <div class="foot">© ${new Date().getFullYear()} LIVE IN PASSION</div>
   </form>

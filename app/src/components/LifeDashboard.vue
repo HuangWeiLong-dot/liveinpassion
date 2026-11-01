@@ -14,6 +14,11 @@ import { computed, ref } from 'vue';
 import OdometerNumber from './OdometerNumber.vue';
 import GithubActivity from './GithubActivity.vue';
 import LifeRadar from './LifeRadar.vue';
+import LifeSleep from './LifeSleep.vue';
+import LifeWeather from './LifeWeather.vue';
+import LifeNutrition from './LifeNutrition.vue';
+import LifeCoverage from './LifeCoverage.vue';
+import LifeHeart from './LifeHeart.vue';
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -568,11 +573,59 @@ function openDay(day) {
       </div>
     </article>
 
+    <!-- 09 SLEEP -->
+    <article class="dash-tile span-4" data-chart="sleep">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">09</span>
+          <h2>SLEEP</h2>
+        </div>
+        <span class="stats-panel-sub">ASLEEP → WAKE</span>
+      </div>
+      <LifeSleep :rows="rows" compact />
+    </article>
+
+    <!-- 10 WEATHER -->
+    <article class="dash-tile span-4" data-chart="weather">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">10</span>
+          <h2>WEATHER</h2>
+        </div>
+        <span class="stats-panel-sub">LOW → HIGH</span>
+      </div>
+      <LifeWeather :rows="rows" compact />
+    </article>
+
+    <!-- 11 NUTRITION -->
+    <article class="dash-tile span-4" data-chart="nutrition">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">11</span>
+          <h2>NUTRITION</h2>
+        </div>
+        <span class="stats-panel-sub">KCAL</span>
+      </div>
+      <LifeNutrition :rows="rows" compact />
+    </article>
+
+    <!-- 12 HEART RATE -->
+    <article class="dash-tile span-12" data-chart="heart">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">12</span>
+          <h2>HEART RATE</h2>
+        </div>
+        <span class="stats-panel-sub">MIN → MAX</span>
+      </div>
+      <LifeHeart :rows="rows" />
+    </article>
+
     <!-- 09 PLACES -->
     <article class="dash-tile span-5">
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">09</span>
+          <span class="stats-panel-index">13</span>
           <h2>PLACES</h2>
         </div>
         <span class="stats-panel-sub">{{ places?.city || city }} · {{ places?.cityCount || 0 }} CITIES</span>
@@ -611,7 +664,7 @@ function openDay(day) {
     >
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">10</span>
+          <span class="stats-panel-index">14</span>
           <h2>LATEST RUN</h2>
         </div>
         <span class="stats-panel-sub">
@@ -663,7 +716,7 @@ function openDay(day) {
     <article class="dash-tile span-6">
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">11</span>
+          <span class="stats-panel-index">15</span>
           <h2>TOP APPLICATIONS</h2>
         </div>
         <span class="stats-panel-sub">{{ topApps.length }} APPS · WINDOW TOTAL</span>
@@ -683,7 +736,7 @@ function openDay(day) {
     <article class="dash-tile span-6">
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">12</span>
+          <span class="stats-panel-index">16</span>
           <h2>WEEKDAY PROFILE</h2>
         </div>
         <span class="stats-panel-sub">AVERAGE PER WEEKDAY</span>
@@ -735,7 +788,7 @@ function openDay(day) {
     <article class="dash-tile span-12">
       <div class="stats-panel-head">
         <div class="stats-panel-title">
-          <span class="stats-panel-index">14</span>
+          <span class="stats-panel-index">17</span>
           <h2>THE ARCHIVE</h2>
         </div>
         <span class="stats-panel-sub">{{ archiveCount }} ENTRIES · UNFILTERED</span>
@@ -751,6 +804,18 @@ function openDay(day) {
           <b>{{ t.count }}</b>
         </router-link>
       </div>
+    </article>
+
+    <!-- 17 数据覆盖：每个源哪几天有数据 -->
+    <article class="dash-tile span-12" data-chart="coverage">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">18</span>
+          <h2>DATA COVERAGE</h2>
+        </div>
+        <span class="stats-panel-sub">SOURCES × DAYS</span>
+      </div>
+      <LifeCoverage :rows="rows" compact />
     </article>
   </div>
 </template>
@@ -1154,40 +1219,6 @@ function openDay(day) {
 
 /* ---------- 迷你柱线 ---------- */
 
-.dash-mini {
-  padding: 14px 18px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-}
-
-.dash-mini-main strong {
-  display: block;
-  font-family: 'Oswald', sans-serif;
-  font-size: clamp(1.6rem, 2.4vw, 2.2rem);
-  font-weight: 600;
-  line-height: 1;
-  color: var(--text-primary);
-}
-
-.dash-mini-main span {
-  display: block;
-  margin-top: 5px;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.46rem;
-  letter-spacing: 0.08em;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dash-mini-chart {
-  position: relative;
-  height: 82px;
-  margin-top: auto;
-}
 
 /* ---------- PLACES / TOP APPS ---------- */
 

@@ -12,7 +12,6 @@ import BlogDetailView from '../views/BlogDetailView.vue';
 import MeView from '../views/MeView.vue';
 import MeGalleryView from '../views/MeGalleryView.vue';
 import GalleryView from '../views/GalleryView.vue';
-import StatsView from '../views/StatsView.vue';
 import LifeView from '../views/LifeView.vue';
 import LifeArchiveView from '../views/LifeArchiveView.vue';
 import OrganizationView from '../views/OrganizationView.vue';
@@ -25,10 +24,12 @@ const routes = [
   { path: '/me', name: 'me', component: MeView },
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },
-  { path: '/stats', name: 'stats', component: StatsView },
   { path: '/life', name: 'life', component: LifeView },
   { path: '/life/archive/:kind', name: 'life-archive', component: LifeArchiveView },
-  { path: '/organization', name: 'organization', component: OrganizationView },
+  { path: '/me/organization', name: 'me-organization', component: OrganizationView },
+  // 旧地址保留：statistics 现在是 LIFE 的第三个视图，organization 现在挂在 ME 下
+  { path: '/stats', redirect: { name: 'life', query: { view: 'stats' } } },
+  { path: '/organization', redirect: { name: 'me-organization' } },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
 ];
 

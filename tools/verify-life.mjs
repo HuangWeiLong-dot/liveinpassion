@@ -111,6 +111,27 @@ function buildFull() {
         trainingEffect: 3.2,
         recoveryHours: 24,
       }] : null,
+      // 天气 / 饮食：同样每隔几天缺一次，覆盖率不足时组件要自己说出来
+      weather: idx % 4 === 0 ? null : {
+        tempMax: 18 + (idx % 8),
+        tempMin: 7 + (idx % 6),
+        precipMm: idx % 5 === 0 ? 3.2 : 0,
+        sunshineMin: 280 + (idx % 7) * 40,
+        windMax: 12 + (idx % 5) * 2.4,
+        condition: ['clear', 'partly cloudy', 'overcast', 'slight rain'][idx % 4],
+      },
+      nutrition: idx % 3 === 0 ? null : {
+        calories: 1750 + (idx % 9) * 55,
+        proteinG: 95 + (idx % 7) * 6,
+        carbsG: 180 + (idx % 5) * 12,
+        fatG: 52 + (idx % 6) * 4,
+        meals: 2 + (idx % 3),
+        confidence: idx % 4 === 0 ? 'low' : 'medium',
+      },
+      // 睡眠窗口：每 5 天缺一次，用来验证「没数据就是缺，不是 0 小时」
+      sleep: idx % 5 === 0 ? null : (idx % 2
+        ? { onset: '23:40', wake: '08:10', hours: 8.5, basis: 'phone_silence', confidence: 'high' }
+        : { onset: '00:35', wake: '06:55', hours: 6.33, basis: idx % 6 === 0 ? 'manual' : 'phone_silence', confidence: 'medium' }),
       allTime: {
         runs: 87,
         km: 312.5,
@@ -499,6 +520,23 @@ const LIFE_STATE = `(function () {
     fetches: window.__lifeFetches,
     cards: q('.stat-card').length,
     panels: q('.life-panel').length,
+    // 睡眠 / 天气 / 饮食三张图：缺的那几天不能画成 0
+    sleepBars: q('[data-chart="sleep"] .life-col:not(.is-missing)').length,
+    sleepGaps: q('[data-chart="sleep"] .life-col.is-missing').length,
+    sleepChips: Array.prototype.map.call(
+      q('[data-chart="sleep"] .life-chip b'),
+      function (e) { return e.textContent.trim(); },
+    ).join(' | '),
+    weatherBands: q('[data-chart="weather"] .lw-band').length,
+    weatherRain: q('[data-chart="weather"] .lw-rain').length,
+    weatherMean: !!document.querySelector('[data-chart="weather"] .life-mean'),
+    nutritionBars: q('[data-chart="nutrition"] .life-col:not(.is-missing)').length,
+    nutritionRail: q('[data-chart="nutrition"] .life-rail .life-row').length,
+    heartBands: q('[data-chart="heart"] .lh-band').length,
+    heartAvg: q('[data-chart="heart"] .lh-avg').length,
+    heartWeekday: q('[data-chart="heart"] .life-rail .life-row').length,
+    coverageRows: q('[data-chart="coverage"] .lc-row').length,
+    coverageCells: q('[data-chart="coverage"] .lc-cells i.is-on').length,
     means: q('.life-mean').length,
     weekdayRows: q('.life-weekday-row').length,
     weekdaySegs: q('.life-weekday-bar .life-seg').length,
@@ -585,7 +623,30 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   console.log('  live badge:', liveBadge);
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 6) throw new Error(`expected 6 KPI cards, got ${state.cards}`);
-  if (state.panels !== 10) throw new Error(`expected 10 panels (radar + brain + 7 charts + github), got ${state.panels}`);
+  if (state.panels !== 15) {
+    throw new Error(`expected 15 panels (radar + sleep + brain + 5 charts + weather + nutrition + coverage + heart + weekday + github + archive), got ${state.panels}`);
+  }
+
+  // 三张新图。断言的重点不是「画了多少根」，而是「缺的那几天没有被画成 0」——
+  // 桩数据里每隔几天就缺一次，条带数必须少于窗口天数，且缺口要有独立标记。
+  if (state.sleepBars <= 0) throw new Error('sleep panel drew no bars');
+  if (state.sleepGaps <= 0) throw new Error('sleep panel should mark missing nights');
+  if (!/h/.test(state.sleepChips)) throw new Error(`sleep chips missing duration: ${state.sleepChips}`);
+  if (state.weatherBands <= 0) throw new Error('weather panel drew no temperature bands');
+  if (!state.weatherMean) throw new Error('weather panel is missing the mean line');
+  if (state.nutritionBars <= 0) throw new Error('nutrition panel drew no bars');
+  // 心率：每天一条区间带 + 一条均值线，右侧按星期几摊开七行
+  if (state.heartBands <= 0) throw new Error('heart panel drew no min-max bands');
+  if (state.heartAvg < state.heartBands) throw new Error('every heart band should carry an average marker');
+  if (state.heartWeekday !== 7) throw new Error(`heart rail should list 7 weekdays, got ${state.heartWeekday}`);
+
+  // 覆盖率面板：9 个源各一行；有数据的格子数必须少于 源数×天数（桩数据里有缺口）
+  if (state.coverageRows !== 9) throw new Error(`coverage should list 9 sources, got ${state.coverageRows}`);
+  if (state.coverageCells <= 0) throw new Error('coverage grid has no filled cells');
+
+  if (state.nutritionRail !== 3) {
+    throw new Error(`nutrition rail should list protein/carbs/fat, got ${state.nutritionRail}`);
+  }
 
   // 七维雷达：五档统计窗口，默认 7D；单日模式才出现日期步进 / 下拉
   if (state.radarControls !== 5) throw new Error(`expected 5 radar ranges, got ${state.radarControls}`);
@@ -803,7 +864,8 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (runsClosed.locked) throw new Error('runs modal left body locked');
   if (state.titleChars !== 4) throw new Error('expected per-letter LIFE title');
   if (state.numbers.length !== 6) throw new Error(`expected 6 odometers, got ${state.numbers.length}`);
-  if (state.means !== 3) throw new Error(`expected 3 mean lines, got ${state.means}`);
+  // 3 条原有（节奏 / 运动 / AI）+ 睡眠 + 天气 + 饮食 + 心率
+  if (state.means !== 7) throw new Error(`expected 6 mean lines, got ${state.means}`);
   if (state.weekdayRows !== 7) throw new Error(`expected 7 weekday rows, got ${state.weekdayRows}`);
   if (state.weekdaySegs < 7) throw new Error('weekday stacks not rendered');
   if (state.rhythmCols !== 30) throw new Error(`expected 30 rhythm columns, got ${state.rhythmCols}`);
@@ -1211,7 +1273,7 @@ await withPage({ width: 1440, height: 1000, label: 'reduced', reduced: true }, a
   if (!/matrix\(1, 0, 0, 1,/.test(state.stackTransform)) throw new Error('reduced: stacks hidden');
   if (state.lineDash && state.lineDash !== 'none') throw new Error('reduced: line still dashed');
   if (state.panelOpacity.some((o) => Number(o) < 0.99)) throw new Error('reduced: panels hidden');
-  if (state.means !== 3) throw new Error('reduced: mean lines missing');
+  if (state.means !== 7) throw new Error(`reduced: expected 6 mean lines, got ${state.means}`);
   if (state.weekdayRows !== 7) throw new Error('reduced: weekday rows missing');
   await shot('top');
 });
@@ -1275,7 +1337,9 @@ await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, asy
   console.log('  state:', { cards: state.cards, numbers: state.numbers.length, panels: state.panels });
   if (state.cards !== 6) throw new Error('empty: KPI cards missing');
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
-  if (state.panels !== 10) throw new Error('empty: panels missing');
+  // 没数据时三张新图各自显示空态文案，但**面板本身还在** ——
+  // 少一块会让整页的编号错位，也看不出是「这个源没开」还是「页面坏了」。
+  if (state.panels !== 15) throw new Error(`empty: expected 15 panels, got ${state.panels}`);
   await shot('top');
 });
 

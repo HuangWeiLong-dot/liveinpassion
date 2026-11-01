@@ -1,24 +1,25 @@
 <script setup>
-// STATS 页（公开）。数据来自 Worker 的 /api/stats，60 秒轮询一次。
+// SITE STATS —— LIFE 页的第三个视图（FEED / DASHBOARD / STATS）。
 //
-// 视觉基调跟全站一致：黑白、Oswald 大标题、JetBrains Mono 小标签、
-// 1px 发丝线、方块。动效全部交给 GSAP —— 逐字标题、KPI 数字滚轮、
-// 30 天柱+线绘制、面板滚动揭示、实时脉冲、跑马灯。
+// 内容搬自原来的 /stats 独立页：站点访问统计，数据来自 Worker 的 /api/stats，
+// 60 秒轮询一次。页面外壳（大标题 / 视图切换 / 彩色开关）由 LifeView 提供，
+// 这里只负责统计面板本身，所以没有自己的 hero 标题。
 //
-// 两个时序上的坑：
-//  1. keep-alive：首次挂载后再次进入不会重跑 onMounted，所以重播走 onActivated。
-//     数据与 DOM 都还在，只把动画复位再演一遍；已经揭示过的面板不再藏起来，
-//     否则每次回来页面都先闪一下空白。
-//  2. 首屏品牌遮罩 / 通用转场板子：直接打开 /stats 时页面在遮罩底下，站内点
-//     STATS 进来时页面前 ~380ms 在转场板子底下。早演等于白演，所以入场排在
-//     "遮罩撤掉"或"板子滑走"之后（见 scheduleIntro）。
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
+// 两条时序约束沿用原页：
+//   · LIFE 被 keep-alive 缓存，父页切走时靠 props.active 停掉轮询；
+//   · 切到本视图才挂载，每次进入都是新实例，入场直接演一遍即可。
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import OdometerNumber from '../components/OdometerNumber.vue';
+import OdometerNumber from './OdometerNumber.vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 
 gsap.registerPlugin(ScrollTrigger);
+
+const props = defineProps({
+  // 父页（LIFE）当前是否处于激活态：切走时暂停轮询，回来再续上
+  active: { type: Boolean, default: true },
+});
 
 const CMS_BASE =
   import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
@@ -37,12 +38,10 @@ const MONTHS = [
 const data = ref(null);
 const error = ref(false);
 const loading = ref(true);
-const clock = ref('--:--:--');
 const lastUpdated = ref('—');
 const hoverIndex = ref(-1);
 // 每次 +1 让 KPI 数字重新滚一遍（0 = 还没开始）
 const numbersRun = ref(0);
-const titleChars = [...'STATISTICS'];
 
 const sectionRef = ref(null);
 const tickerTrackRef = ref(null);
@@ -91,20 +90,6 @@ function formatTime(iso) {
     }).format(new Date(iso));
   } catch {
     return '—';
-  }
-}
-
-function tickClock() {
-  try {
-    clock.value = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'Asia/Shanghai',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(new Date());
-  } catch {
-    clock.value = new Date().toTimeString().slice(0, 8);
   }
 }
 
@@ -239,7 +224,7 @@ function pathName(p) {
     '/me': 'ME',
     '/me/gallery': 'ME — GALLERY',
     '/gallery': 'GALLERY',
-    '/stats': 'STATS',
+    '/life': 'LIFE',
   };
   return names[p] || String(p).replace(/^\//, '').toUpperCase();
 }
@@ -250,16 +235,16 @@ const tickerItems = computed(() => [
   'Anonymous random ID',
   data.value?.timezone || 'Asia/Shanghai (UTC+8)',
   'Refreshes every 60 seconds',
+  `Updated ${lastUpdated.value}`,
   `Tracking since ${data.value?.since || '—'}`,
 ]);
 
 // ── 拉数据 ──────────────────────────────────────────────────────────────
 
 let pollTimer = null;
-let clockTimer = null;
 let activeNow = false;
 let introStarted = false;
-let mountedAt = performance.now();
+let mountedAt = 0;
 let introTimer = null;
 let introTl = null;
 let tickerTween = null;
@@ -301,34 +286,21 @@ function stopPolling() {
   pollTimer = null;
 }
 
-function startClock() {
-  stopClock();
-  tickClock();
-  clockTimer = setInterval(tickClock, 1000);
-}
-
-function stopClock() {
-  clearInterval(clockTimer);
-  clockTimer = null;
-}
-
 // ── 入场编排 ────────────────────────────────────────────────────────────
 
 function scheduleIntro() {
   if (!activeNow || !data.value || introStarted) return;
-  // 首屏品牌遮罩还盖着：等它撤（下面的 watch 会再来一次）
   if (brandVisible.value) return;
   clearTimeout(introTimer);
-  // 站内导航进来：转场板子在新页挂载后还要 ~380ms 才滑走
-  const wait = Math.max(0, 420 - (performance.now() - mountedAt));
+  // 触发点就在父页里，没有整屏转场要等，稍微让一帧即可
+  const wait = Math.max(0, 120 - (performance.now() - mountedAt));
   introTimer = setTimeout(() => {
     introTimer = null;
-    // 数据加载与遮罩撤掉可能各排一次；播放本身再挡一道
-    if (activeNow && !brandVisible.value && !introStarted) playIntro(false);
+    if (activeNow && !brandVisible.value && !introStarted) playIntro();
   }, wait);
 }
 
-async function playIntro(replay) {
+async function playIntro() {
   if (!activeNow || !data.value) return;
   clearTimeout(introTimer);
   introTimer = null;
@@ -339,51 +311,31 @@ async function playIntro(replay) {
 
   killIntro();
 
-  // 数字滚轮：首次从 0 滚到目标；重进页面也重滚一遍
+  // 数字滚轮：从 0 滚到目标
   numbersRun.value += 1;
 
   const q = (sel) => (sectionRef.value ? sectionRef.value.querySelectorAll(sel) : []);
-  const kickers = q('.stats-kicker');
-  const chars = q('.stats-char');
-  const ruleFill = q('.stats-hero-rule span');
-  const subtitle = q('.stats-subtitle');
-  const meta = q('.stats-hero-meta');
   const ticker = q('.stats-ticker');
   const cardsEls = q('.stat-card');
 
-  // 上一次可能演到一半就离开了：先把内联状态清掉再重排
-  gsap.set([...kickers, ...subtitle, ...meta, ...ticker, ...cardsEls], { clearProps: 'opacity,visibility,transform' });
+  // 上一次可能演到一半就切走了：先把内联状态清掉再重排
+  gsap.set([...ticker, ...cardsEls], { clearProps: 'opacity,visibility,transform' });
   // 数字卡片不做整块隐藏：卡片保持可见，入场交给 OdometerNumber 从 0 滚上来。
   gsap.set(cardsEls, { autoAlpha: 1, y: 0 });
-  gsap.set([...chars, ...ruleFill], { clearProps: 'opacity,visibility,transform' });
 
   startTicker();
   startLive();
 
   if (REDUCED) {
-    if (!replay) buildScrollReveals(true);
+    buildScrollReveals(true);
     return;
   }
 
   introTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-  introTl
-    .fromTo(kickers, { autoAlpha: 0, y: 14 }, { autoAlpha: 1, y: 0, duration: 0.6 }, 0)
-    // 逐字从线下升起来。父级 overflow: hidden 就是遮罩。
-    .fromTo(chars, { yPercent: 118 }, {
-      yPercent: 0, duration: 1.15, stagger: 0.05, ease: 'power4.out',
-    }, 0.08)
-    .fromTo(ruleFill, { scaleX: 0 }, { scaleX: 1, duration: 1.1, ease: 'power3.inOut' }, 0.36)
-    .fromTo(subtitle, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.8 }, 0.5)
-    .fromTo(meta, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.75 }, 0.62)
-    .fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0.7);
+  introTl.fromTo(ticker, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.7 }, 0);
 
-  // 第一次进来才铺滚动揭示；重进时已经看过的面板保持原样，只补没揭示过的
-  if (!replay) {
-    prepareChart();
-    buildScrollReveals(true);
-  } else {
-    buildScrollReveals(false);
-  }
+  prepareChart();
+  buildScrollReveals(true);
 }
 
 function killIntro() {
@@ -394,9 +346,7 @@ function killIntro() {
     introTl = null;
   }
   if (!sectionRef.value) return;
-  gsap.killTweensOf(sectionRef.value.querySelectorAll(
-    '.stats-kicker, .stats-char, .stats-hero-rule span, .stats-subtitle, .stats-hero-meta, .stats-ticker, .stat-card'
-  ));
+  gsap.killTweensOf(sectionRef.value.querySelectorAll('.stats-ticker, .stat-card'));
 }
 
 // ── 滚动揭示 ────────────────────────────────────────────────────────────
@@ -428,10 +378,6 @@ function revealChildren(panel) {
   }
 }
 
-/**
- * @param {boolean} reset true = 第一次进入，全部重新藏起来再揭示；
- *                        false = 重进页面，只处理还没揭示过的
- */
 function buildScrollReveals(reset) {
   killReveals();
   if (!sectionRef.value) return;
@@ -582,24 +528,12 @@ function killLive() {
   if (liveRef.value) {
     gsap.set(liveRef.value.querySelectorAll('i'), { clearProps: 'transform,opacity' });
   }
-  const dot = sectionRef.value?.querySelector('.stats-live-dot');
-  if (dot) gsap.set(dot, { clearProps: 'opacity' });
 }
 
 function startLive() {
   killLive();
-  const dot = sectionRef.value?.querySelector('.stats-live-dot');
-  if (REDUCED) {
-    if (dot) gsap.set(dot, { opacity: 1 });
-    return;
-  }
-  if (dot) {
-    dotTween = gsap.to(dot, {
-      opacity: 0.2, duration: 0.85, ease: 'sine.inOut', yoyo: true, repeat: -1,
-    });
-  }
   const rings = liveRef.value?.querySelectorAll('i');
-  if (!rings?.length) return;
+  if (!rings?.length || REDUCED) return;
   liveTween = gsap.fromTo(
     rings,
     { scale: 1, opacity: 0.85 },
@@ -634,16 +568,13 @@ watch(hoverData, async (v) => {
 
 // ── 生命周期 ────────────────────────────────────────────────────────────
 
-let firstActivation = true;
-
 onMounted(() => {
   activeNow = true;
   mountedAt = performance.now();
-  startClock();
   startPolling();
   load();
 
-  // 首屏遮罩撤掉的那一刻再排入场（直接打开 /stats 时的路径）
+  // 首屏遮罩还盖着时先别演（直接打开 /life?view=stats 的路径）
   stopBrandWatch = watch(brandVisible, (v) => {
     if (!v && activeNow && !introStarted) scheduleIntro();
   });
@@ -656,42 +587,24 @@ onMounted(() => {
   }
 });
 
-onActivated(() => {
-  // 首挂载时 onMounted 与 onActivated 会各来一次，第一次交给 onMounted
-  if (firstActivation) {
-    firstActivation = false;
-    return;
+// 父页被 keep-alive 切走 / 切回：暂停 / 恢复轮询，入场也一并停
+watch(
+  () => props.active,
+  (on) => {
+    activeNow = on;
+    if (on) {
+      startPolling();
+      load();
+      scheduleIntro();
+    } else {
+      stopPolling();
+    }
   }
-  activeNow = true;
-  mountedAt = performance.now();
-  startClock();
-  startPolling();
-  load();
-  // 和站内首次进入一样，等转场板子滑走再演；introStarted 还是 false 说明上次
-  // 在入场排期之前就离开了 —— 按"第一次"处理，不能走 replay 的捷径
-  if (data.value) {
-    clearTimeout(introTimer);
-    introTimer = setTimeout(() => {
-      introTimer = null;
-      if (activeNow) playIntro(introStarted);
-    }, 420);
-  }
-});
-
-onDeactivated(() => {
-  activeNow = false;
-  stopPolling();
-  stopClock();
-  killIntro();
-  killTicker();
-  killLive();
-  killReveals();
-});
+);
 
 onBeforeUnmount(() => {
   activeNow = false;
   stopPolling();
-  stopClock();
   killIntro();
   killTicker();
   killLive();
@@ -706,257 +619,240 @@ function setLiveEl(el) {
 </script>
 
 <template>
-  <main class="page active">
-    <section ref="sectionRef" class="stats-section">
-      <!-- 注意用 div 不用 header：站点顶栏的全局 `header { position: fixed; display: flex }`
-           会连这个页内头部一起吃掉，整块 hero 会飞到屏幕顶上变成一排 -->
-      <div class="stats-hero">
-        <div class="stats-hero-kicker">
-          <span class="stats-kicker stats-live">
-            <i class="stats-live-dot" aria-hidden="true"></i>
-            Live data feed
-          </span>
-          <span class="stats-kicker stats-kicker-rule" aria-hidden="true"></span>
-          <span class="stats-kicker stats-clock">UTC+8 <b>{{ clock }}</b></span>
-        </div>
+  <section ref="sectionRef" class="site-stats" aria-label="Site statistics">
+    <div v-if="loading" class="stats-loading" aria-label="Loading statistics">
+      <span v-for="n in 4" :key="n"></span>
+    </div>
 
-        <h1 class="stats-title" aria-label="STATISTICS">
-          <span class="stats-title-line" aria-hidden="true">
-            <span v-for="(ch, i) in titleChars" :key="i" class="stats-char">{{ ch }}</span>
-          </span>
-        </h1>
+    <div v-else-if="error" class="stats-empty">
+      <p>Statistics are temporarily unavailable.</p>
+      <button class="stats-retry" @click="load">RETRY</button>
+    </div>
 
-        <div class="stats-hero-rule" aria-hidden="true"><span></span></div>
-
-        <p class="stats-subtitle">Who passes through Live in Passion</p>
-
-        <div class="stats-hero-meta">
-          <template v-if="data?.since">
-            <span>Tracking since {{ data.since }}</span>
-            <i aria-hidden="true"></i>
-          </template>
-          <span>{{ data?.timezone || 'Asia/Shanghai (UTC+8)' }}</span>
-          <i aria-hidden="true"></i>
-          <span>Updated {{ lastUpdated }}</span>
+    <template v-else>
+      <!-- 系统信息跑马灯 -->
+      <div class="stats-ticker" aria-hidden="true">
+        <div ref="tickerTrackRef" class="stats-ticker-track">
+          <div v-for="g in 2" :key="g" class="stats-ticker-group">
+            <span v-for="(item, i) in tickerItems" :key="i" class="stats-ticker-item">
+              {{ item }}<i class="stats-ticker-sep"></i>
+            </span>
+          </div>
         </div>
       </div>
 
-      <div v-if="loading" class="stats-loading" aria-label="Loading statistics">
-        <span v-for="n in 4" :key="n"></span>
-      </div>
+      <!-- KPI -->
+      <div class="stats-cards">
+        <article
+          v-for="(card, i) in cards"
+          :key="card.key"
+          class="stat-card"
+          :class="{ 'stat-card-live': card.live }"
+        >
+          <div class="stat-card-head">
+            <span class="stat-index">{{ String(i + 1).padStart(2, '0') }}</span>
+            <span class="stat-eyebrow">{{ card.label }}</span>
+          </div>
 
-      <div v-else-if="error" class="stats-empty">
-        <p>Statistics are temporarily unavailable.</p>
-        <button class="stats-retry" @click="load">RETRY</button>
-      </div>
+          <div class="stat-number-wrap">
+            <OdometerNumber
+              class="stat-number"
+              :value="card.value"
+              :run="numbersRun"
+              :delay="card.delay"
+              :reduced="REDUCED"
+            />
+          </div>
 
-      <template v-else>
-        <!-- 系统信息跑马灯 -->
-        <div class="stats-ticker" aria-hidden="true">
-          <div ref="tickerTrackRef" class="stats-ticker-track">
-            <div v-for="g in 2" :key="g" class="stats-ticker-group">
-              <span v-for="(item, i) in tickerItems" :key="i" class="stats-ticker-item">
-                {{ item }}<i class="stats-ticker-sep"></i>
+          <div class="stat-card-foot">
+            <template v-if="card.trend">
+              <span class="stat-trend" :class="`is-${card.trend.dir}`">
+                <span class="stat-trend-arrow" aria-hidden="true">{{ card.trend.arrow }}</span>{{ card.trend.text }}
               </span>
-            </div>
+              <span class="stat-note">vs. yesterday · {{ fmt(data.today.visitors) }} visitors</span>
+            </template>
+            <span v-else class="stat-note">{{ card.note }}</span>
+          </div>
+
+          <span
+            v-if="card.live"
+            :ref="setLiveEl"
+            class="stat-live-rings"
+            aria-hidden="true"
+          >
+            <b></b><i></i><i></i><i></i>
+          </span>
+        </article>
+      </div>
+
+      <!-- 近 30 天：柱 = PV，线 = UV -->
+      <div ref="chartRef" class="stats-panel stats-chart-panel" data-reveal data-chart>
+        <div class="stats-panel-head">
+          <div class="stats-panel-title">
+            <span class="stats-panel-index">01</span>
+            <h2>LAST 30 DAYS</h2>
+          </div>
+          <div class="stats-legend">
+            <span><i class="lg-swatch"></i>Page views</span>
+            <span><i class="lg-line"></i>Visitors</span>
           </div>
         </div>
 
-        <!-- KPI -->
-        <div class="stats-cards">
-          <article
-            v-for="(card, i) in cards"
-            :key="card.key"
-            class="stat-card"
-            :class="{ 'stat-card-live': card.live }"
-          >
-            <div class="stat-card-head">
-              <span class="stat-index">{{ String(i + 1).padStart(2, '0') }}</span>
-              <span class="stat-eyebrow">{{ card.label }}</span>
-            </div>
+        <div v-if="dailyBars.length" class="stats-chart">
+          <div class="stats-chart-main">
+            <div ref="plotRef" class="stats-chart-plot">
+              <div class="stats-chart-grid" aria-hidden="true">
+                <i></i><i></i><i></i>
+              </div>
 
-            <div class="stat-number-wrap">
-              <OdometerNumber
-                class="stat-number"
-                :value="card.value"
-                :run="numbersRun"
-                :delay="card.delay"
-                :reduced="REDUCED"
-              />
-            </div>
+              <svg
+                class="stats-chart-svg"
+                viewBox="0 0 1000 100"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="statsAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.16" />
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <path ref="areaRef" :d="areaPath" class="stats-chart-area" />
+                <path ref="lineRef" :d="linePath" class="stats-chart-line" />
+              </svg>
 
-            <div class="stat-card-foot">
-              <template v-if="card.trend">
-                <span class="stat-trend" :class="`is-${card.trend.dir}`">
-                  <span class="stat-trend-arrow" aria-hidden="true">{{ card.trend.arrow }}</span>{{ card.trend.text }}
+              <div class="stats-bars" :class="{ 'is-hovering': hoverIndex >= 0 }">
+                <div
+                  v-for="(b, i) in dailyBars"
+                  :key="b.day"
+                  class="stats-bar-col"
+                  :class="{ 'is-today': b.isToday }"
+                  tabindex="0"
+                  role="img"
+                  :aria-label="`${b.fullLabel}: ${fmt(b.pv)} page views, ${fmt(b.uv)} visitors`"
+                  @pointerenter="hoverIndex = i"
+                  @pointerleave="hoverIndex = -1"
+                  @focus="hoverIndex = i"
+                  @blur="hoverIndex = -1"
+                >
+                  <div class="stats-bar" :style="{ height: b.pvPct + '%' }"></div>
+                </div>
+              </div>
+
+              <div ref="scanRef" class="stats-chart-scan" aria-hidden="true"></div>
+
+              <div
+                class="stats-chart-cursor"
+                aria-hidden="true"
+                :style="{ left: hoverData ? hoverData.leftPct + '%' : '0%', opacity: hoverData ? 1 : 0 }"
+              ></div>
+
+              <div
+                ref="tipRef"
+                class="stats-chart-tooltip"
+                aria-hidden="true"
+                :style="{ left: hoverData ? hoverData.tipPct + '%' : '0%' }"
+              >
+                <span class="stats-tip-date">{{ hoverData?.fullLabel || '' }}</span>
+                <span class="stats-tip-row">
+                  <b>{{ fmt(hoverData?.pv || 0) }}</b><em>PAGE VIEWS</em>
                 </span>
-                <span class="stat-note">vs. yesterday · {{ fmt(data.today.visitors) }} visitors</span>
-              </template>
-              <span v-else class="stat-note">{{ card.note }}</span>
+                <span class="stats-tip-row">
+                  <b>{{ fmt(hoverData?.uv || 0) }}</b><em>VISITORS</em>
+                </span>
+              </div>
             </div>
 
-            <span
-              v-if="card.live"
-              :ref="setLiveEl"
-              class="stat-live-rings"
-              aria-hidden="true"
-            >
-              <b></b><i></i><i></i><i></i>
-            </span>
-          </article>
+            <div class="stats-chart-yaxis" aria-hidden="true">
+              <span>{{ compact(chartMax) }}</span>
+              <span>{{ compact(Math.round(chartMax / 2)) }}</span>
+              <span>0</span>
+            </div>
+          </div>
+
+          <div class="stats-chart-xaxis" aria-hidden="true">
+            <span v-for="b in dailyBars" :key="b.day">{{ b.showLabel ? b.label : '' }}</span>
+          </div>
         </div>
 
-        <!-- 近 30 天：柱 = PV，线 = UV -->
-        <div ref="chartRef" class="stats-panel stats-chart-panel" data-reveal data-chart>
+        <p v-else class="stats-panel-empty">No visits recorded yet.</p>
+      </div>
+
+      <div class="stats-two-col">
+        <!-- 按月 -->
+        <div class="stats-panel" data-reveal data-stagger>
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">01</span>
-              <h2>LAST 30 DAYS</h2>
+              <span class="stats-panel-index">02</span>
+              <h2>MONTHLY</h2>
             </div>
-            <div class="stats-legend">
-              <span><i class="lg-swatch"></i>Page views</span>
-              <span><i class="lg-line"></i>Visitors</span>
-            </div>
+            <span class="stats-panel-sub">Page views / visitors</span>
           </div>
 
-          <div v-if="dailyBars.length" class="stats-chart">
-            <div class="stats-chart-main">
-              <div ref="plotRef" class="stats-chart-plot">
-                <div class="stats-chart-grid" aria-hidden="true">
-                  <i></i><i></i><i></i>
-                </div>
-
-                <svg
-                  class="stats-chart-svg"
-                  viewBox="0 0 1000 100"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  <defs>
-                    <linearGradient id="statsAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="currentColor" stop-opacity="0.16" />
-                      <stop offset="100%" stop-color="currentColor" stop-opacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path ref="areaRef" :d="areaPath" class="stats-chart-area" />
-                  <path ref="lineRef" :d="linePath" class="stats-chart-line" />
-                </svg>
-
-                <div class="stats-bars" :class="{ 'is-hovering': hoverIndex >= 0 }">
-                  <div
-                    v-for="(b, i) in dailyBars"
-                    :key="b.day"
-                    class="stats-bar-col"
-                    :class="{ 'is-today': b.isToday }"
-                    tabindex="0"
-                    role="img"
-                    :aria-label="`${b.fullLabel}: ${fmt(b.pv)} page views, ${fmt(b.uv)} visitors`"
-                    @pointerenter="hoverIndex = i"
-                    @pointerleave="hoverIndex = -1"
-                    @focus="hoverIndex = i"
-                    @blur="hoverIndex = -1"
-                  >
-                    <div class="stats-bar" :style="{ height: b.pvPct + '%' }"></div>
-                  </div>
-                </div>
-
-                <div ref="scanRef" class="stats-chart-scan" aria-hidden="true"></div>
-
-                <div
-                  class="stats-chart-cursor"
-                  aria-hidden="true"
-                  :style="{ left: hoverData ? hoverData.leftPct + '%' : '0%', opacity: hoverData ? 1 : 0 }"
-                ></div>
-
-                <div
-                  ref="tipRef"
-                  class="stats-chart-tooltip"
-                  aria-hidden="true"
-                  :style="{ left: hoverData ? hoverData.tipPct + '%' : '0%' }"
-                >
-                  <span class="stats-tip-date">{{ hoverData?.fullLabel || '' }}</span>
-                  <span class="stats-tip-row">
-                    <b>{{ fmt(hoverData?.pv || 0) }}</b><em>PAGE VIEWS</em>
-                  </span>
-                  <span class="stats-tip-row">
-                    <b>{{ fmt(hoverData?.uv || 0) }}</b><em>VISITORS</em>
-                  </span>
-                </div>
-              </div>
-
-              <div class="stats-chart-yaxis" aria-hidden="true">
-                <span>{{ compact(chartMax) }}</span>
-                <span>{{ compact(Math.round(chartMax / 2)) }}</span>
-                <span>0</span>
-              </div>
+          <div v-if="monthlyRows.length" class="stats-month-list">
+            <div class="stats-month-head" aria-hidden="true">
+              <span>Month</span><span></span><span>PV</span><span>UV</span>
             </div>
-
-            <div class="stats-chart-xaxis" aria-hidden="true">
-              <span v-for="b in dailyBars" :key="b.day">{{ b.showLabel ? b.label : '' }}</span>
+            <div v-for="m in monthlyRows" :key="m.month" class="stats-month-row">
+              <span class="stats-month-label">{{ m.name }}</span>
+              <span class="stats-month-track">
+                <span class="stats-month-fill" :style="{ width: m.pct + '%' }"></span>
+              </span>
+              <span class="stats-month-pv">{{ fmt(m.pv) }}</span>
+              <span class="stats-month-uv">{{ fmt(m.uv) }}</span>
             </div>
           </div>
-
-          <p v-else class="stats-panel-empty">No visits recorded yet.</p>
+          <p v-else class="stats-panel-empty">No monthly data yet.</p>
         </div>
 
-        <div class="stats-two-col">
-          <!-- 按月 -->
-          <div class="stats-panel" data-reveal data-stagger>
-            <div class="stats-panel-head">
-              <div class="stats-panel-title">
-                <span class="stats-panel-index">02</span>
-                <h2>MONTHLY</h2>
-              </div>
-              <span class="stats-panel-sub">Page views / visitors</span>
+        <!-- 热门页面 -->
+        <div class="stats-panel" data-reveal data-stagger>
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">03</span>
+              <h2>TOP PAGES</h2>
             </div>
-
-            <div v-if="monthlyRows.length" class="stats-month-list">
-              <div class="stats-month-head" aria-hidden="true">
-                <span>Month</span><span></span><span>PV</span><span>UV</span>
-              </div>
-              <div v-for="m in monthlyRows" :key="m.month" class="stats-month-row">
-                <span class="stats-month-label">{{ m.name }}</span>
-                <span class="stats-month-track">
-                  <span class="stats-month-fill" :style="{ width: m.pct + '%' }"></span>
-                </span>
-                <span class="stats-month-pv">{{ fmt(m.pv) }}</span>
-                <span class="stats-month-uv">{{ fmt(m.uv) }}</span>
-              </div>
-            </div>
-            <p v-else class="stats-panel-empty">No monthly data yet.</p>
+            <span class="stats-panel-sub">All time views</span>
           </div>
 
-          <!-- 热门页面 -->
-          <div class="stats-panel" data-reveal data-stagger>
-            <div class="stats-panel-head">
-              <div class="stats-panel-title">
-                <span class="stats-panel-index">03</span>
-                <h2>TOP PAGES</h2>
-              </div>
-              <span class="stats-panel-sub">All time views</span>
-            </div>
-
-            <ol v-if="pathRows.length" class="stats-paths">
-              <li v-for="(p, i) in pathRows" :key="p.path" class="stats-path-item">
-                <span class="stats-rank">{{ String(i + 1).padStart(2, '0') }}</span>
-                <span class="stats-path-name">{{ p.name }}</span>
-                <span class="stats-path-num">{{ fmt(p.views) }}</span>
-                <span class="stats-path-track">
-                  <span class="stats-path-fill" :style="{ width: p.pct + '%' }"></span>
-                </span>
-              </li>
-            </ol>
-            <p v-else class="stats-panel-empty">No data yet.</p>
-          </div>
+          <ol v-if="pathRows.length" class="stats-paths">
+            <li v-for="(p, i) in pathRows" :key="p.path" class="stats-path-item">
+              <span class="stats-rank">{{ String(i + 1).padStart(2, '0') }}</span>
+              <span class="stats-path-name">{{ p.name }}</span>
+              <span class="stats-path-num">{{ fmt(p.views) }}</span>
+              <span class="stats-path-track">
+                <span class="stats-path-fill" :style="{ width: p.pct + '%' }"></span>
+              </span>
+            </li>
+          </ol>
+          <p v-else class="stats-panel-empty">No data yet.</p>
         </div>
+      </div>
 
-        <p class="stats-foot" data-reveal>
-          <span><i aria-hidden="true"></i>Tracking since {{ data.since || '—' }}</span>
-          <span><i aria-hidden="true"></i>{{ data.timezone }}</span>
-          <span><i aria-hidden="true"></i>No cookies, no IPs — an anonymous random ID only</span>
-          <span><i aria-hidden="true"></i>Refreshes every 60 seconds</span>
-        </p>
-      </template>
-    </section>
-  </main>
+      <p class="stats-foot" data-reveal>
+        <span><i aria-hidden="true"></i>Tracking since {{ data.since || '—' }}</span>
+        <span><i aria-hidden="true"></i>{{ data.timezone }}</span>
+        <span><i aria-hidden="true"></i>Updated {{ lastUpdated }}</span>
+        <span><i aria-hidden="true"></i>No cookies, no IPs — an anonymous random ID only</span>
+        <span><i aria-hidden="true"></i>Refreshes every 60 seconds</span>
+      </p>
+    </template>
+  </section>
 </template>
+
+<style scoped>
+/* 页面外壳已经由 LIFE 提供，这里只补一点内容起始间距 */
+.site-stats {
+  padding-top: clamp(24px, 4vh, 48px);
+  /* ⚠ 必须显式放开：main.css 有一条全局 `section { overflow-x: hidden }`，
+     按 CSS 规则另一轴 visible 会被算成 auto —— 这一块就变成了纵向滚动容器，
+     面板入场那 44px 的位移立刻让它长出右侧的默认滚动条。
+     取消这一轴的隐藏，滚动交回给整页（整页那条已经藏掉了）。 */
+  overflow: visible;
+}
+
+/* 跑马灯原本是 hero 之后的第一件东西，这里紧接视图切换，收一点上边距 */
+.stats-ticker {
+  margin-top: 0;
+}
+</style>

@@ -1338,8 +1338,7 @@ function deactivate() {
 // 被点的那张卡排除在外：封面正从它那一格飞回来，它得先亮着接手，否则是个洞。
 const RETURN_FADE_SELECTOR = [
   '.jb-wordmark', '.jb-rail', '.jb-end', 'header',
-  '.jb-card:not(.is-flying)', '.music-toggle-btn', '.theme-toggle',
-  '.author-section', '.wall-toggle',
+  '.jb-card:not(.is-flying)',
 ].join(', ');
 
 // 退场那一趟的渐入时长（秒）。用户要"渐隐渐入看得见"：0.34 太像硬切 → 0.6 → 1.0。
