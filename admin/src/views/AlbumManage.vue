@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { albumApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
@@ -12,7 +12,34 @@ const error = ref('');
 
 // 新建相册
 const showNewAlbum = ref(false);
-const newAlbum = ref({ r2Prefix: '', name: '', kind: 'friend' });
+const newAlbum = ref({ r2Prefix: '', name: '', kind: 'friend', person: '' });
+
+// photography 相册：人名既是 /photography/:person 的路由段，也是 R2 子目录。
+// 填人名时自动把 R2 Prefix 拼成 photography/<人名>，用户仍可手动改。
+function personSlug(value) {
+  return String(value || '').trim().replace(/\s+/g, '');
+}
+
+watch(
+  () => [newAlbum.value.kind, newAlbum.value.person],
+  ([kind, person]) => {
+    if (kind !== 'photography') return;
+    const slug = personSlug(person);
+    if (slug) newAlbum.value.r2Prefix = `photography/${slug}`;
+  }
+);
+
+// 上传前缀：photography 相册把照片写进 photography/<人名>/<yyyyMM>/，
+// 和相册的 r2Prefix 对齐；其它相册沿用原来的 album / me。
+function uploadType(album) {
+  if (!album) return 'album';
+  if (album.kind === 'me') return 'me';
+  if (album.kind === 'photography') {
+    const person = album.person || String(album.r2Prefix || '').replace(/^photography\//, '');
+    return person ? `photography/${person}` : 'album';
+  }
+  return 'album';
+}
 
 // 批量上传
 const uploading = ref(false);
@@ -61,8 +88,14 @@ function selectAlbum(album) {
 
 async function createAlbum() {
   try {
-    const res = await albumApi.create(newAlbum.value);
-    newAlbum.value = { r2Prefix: '', name: '', kind: 'friend' };
+    const payload = { ...newAlbum.value };
+    if (payload.kind === 'photography') {
+      if (!payload.person.trim()) { alert('Person is required for photography albums'); return; }
+      if (!payload.r2Prefix.trim()) payload.r2Prefix = `photography/${personSlug(payload.person)}`;
+      if (!payload.name.trim()) payload.name = payload.person.trim();
+    }
+    const res = await albumApi.create(payload);
+    newAlbum.value = { r2Prefix: '', name: '', kind: 'friend', person: '' };
     showNewAlbum.value = false;
     await loadAlbums();
     activeAlbumId.value = res.id;
@@ -101,7 +134,7 @@ async function onFileSelect(e) {
     const file = files[i];
     try {
       const compressed = await compressImage(file);
-      const result = await uploadApi.upload(file, compressed, album.kind === 'me' ? 'me' : 'album');
+      const result = await uploadApi.upload(file, compressed, uploadType(album));
       photoRecords.push({
         fileName: file.name,
         originalKey: result.original.key,
@@ -218,7 +251,12 @@ onMounted(loadAlbums);
             <option value="friend">Friend</option>
             <option value="group">Group</option>
             <option value="me">Me</option>
+            <option value="photography">Photography</option>
           </select>
+        </div>
+        <div v-if="newAlbum.kind === 'photography'">
+          <label class="field-label">04 / Person</label>
+          <input v-model="newAlbum.person" placeholder="Han Yong" />
         </div>
         <div class="new-album-actions">
           <button class="btn btn-primary" @click="createAlbum">Create</button>
@@ -309,7 +347,7 @@ onMounted(loadAlbums);
 .new-album-panel { margin-bottom: 24px; }
 .new-album-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
   gap: 18px;
   align-items: end;
 }

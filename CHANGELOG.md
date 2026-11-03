@@ -11,6 +11,34 @@
 
 ---
 
+## update: 54 — 2026-11-03
+
+### 新板块 PHOTOGRAPHY：按人名分组的摄影作品
+
+- 新增 `/photography` 与 `/photography/:person`，沿用 GALLERY 的窗户墙：入场
+  （`useWallEntry`）、悬停倾斜与故障揭示（`useCardFx`）、空窗格 / 洞、方块光标热区、
+  灯箱都直接复用。索引页一扇窗一个人名（封面 + 名字 + 张数），详情页一扇窗一张
+  照片；窗格改成 4:3 横窗、8 列，缩略图走 `useThumbnails`（索引 800px、详情 360px），
+  触屏没有 hover 时名字常显。
+- 索引与详情是同一个组件实例（keep-alive 不按 fullPath 重建），所以 watch
+  `isDetail / activePerson` 重新准备缩略图并重播入场；品牌遮罩落定后 1.4 秒才入场。
+- 顶部导航在 BLOGS 与 LIFE 之间加 PHOTO；屏幕中央的板块名走 `pageLabels`：索引
+  PHOTOGRAPHY，详情用人名大写，查不到就退回路由段。
+
+### CMS 与数据：photography 相册
+
+- `0004_photography_albums.sql`：`albums.kind` 增加 `photography`，新增 `person` 列。
+  SQLite 改不了 CHECK 约束，迁移里先把照片备份到无外键的 `photos_backup`，再依次删
+  child / parent，最后按新结构恢复 —— 不能直接 DROP albums，`foreign_keys` 开启时
+  会顺着 ON DELETE CASCADE 把照片记录一起删掉。
+- Worker：创建 / 更新相册接受 `person`（photography 必填，且 `r2Prefix` 必须以
+  `photography/` 开头）；`person` 存去掉空格的路由段，展示名仍走 `name`；公开
+  `/albums` 返回 `person`，老相册为 null。
+- 后台新建相册多一个 Photography 类型与 Person 字段：填人名自动把 R2 Prefix 拼成
+  `photography/<人名>`，上传写进 `photography/<人名>/<yyyyMM>/`；人名留空会被拦下。
+- 构建快照同步：新增 Han Yong 的摄影相册；博客快照补上三篇新文（Next to Me / Rain? /
+  Upward）。
+
 ## update: 53 — 2026-11-01
 
 ### CMS 换皮：深色优先，一套和前台同源的设计系统

@@ -20,17 +20,24 @@ app.get('/', requireAccessAuth, async (c) => {
 // 创建相册
 app.post('/', requireAccessAuth, async (c) => {
   const db = c.env.DB;
-  const { r2Prefix, name, kind, sortOrder } = await c.req.json();
+  const { r2Prefix, name, kind, person, sortOrder } = await c.req.json();
   if (!r2Prefix || !name || !kind) {
     return c.json({ error: 'r2Prefix, name, kind are required' }, 400);
   }
-  if (!['friend', 'group', 'me'].includes(kind)) {
-    return c.json({ error: 'kind must be friend, group, or me' }, 400);
+  if (!['friend', 'group', 'me', 'photography'].includes(kind)) {
+    return c.json({ error: 'kind must be friend, group, me, or photography' }, 400);
+  }
+  const resolvedPerson = resolvePerson(kind, person, r2Prefix);
+  if (kind === 'photography' && !resolvedPerson) {
+    return c.json({ error: 'person is required for photography albums' }, 400);
+  }
+  if (kind === 'photography' && !r2Prefix.startsWith('photography/')) {
+    return c.json({ error: 'photography r2Prefix must start with photography/' }, 400);
   }
   try {
     const result = await db.prepare(
-      `INSERT INTO albums (r2_prefix, name, kind, sort_order) VALUES (?, ?, ?, ?)`
-    ).bind(r2Prefix, name, kind, sortOrder || 0).run();
+      `INSERT INTO albums (r2_prefix, name, kind, person, sort_order) VALUES (?, ?, ?, ?, ?)`
+    ).bind(r2Prefix, name, kind, resolvedPerson, sortOrder || 0).run();
     c.executionCtx.waitUntil(triggerRebuild(c.env, `album ${r2Prefix} created`).catch(() => {}));
     return c.json({ id: result.meta.last_row_id }, 201);
   } catch (err) {
@@ -49,12 +56,17 @@ app.put('/:id', requireAccessAuth, async (c) => {
   const existing = await db.prepare('SELECT * FROM albums WHERE id=?').bind(id).first();
   if (!existing) return c.json({ error: 'Album not found' }, 404);
 
+  const kind = body.kind || existing.kind;
+  const r2Prefix = body.r2Prefix || existing.r2_prefix;
+  const resolvedPerson = resolvePerson(kind, body.person ?? existing.person, r2Prefix);
+
   await db.prepare(
-    `UPDATE albums SET r2_prefix=?, name=?, kind=?, cover_photo_id=?, sort_order=? WHERE id=?`
+    `UPDATE albums SET r2_prefix=?, name=?, kind=?, person=?, cover_photo_id=?, sort_order=? WHERE id=?`
   ).bind(
-    body.r2Prefix || existing.r2_prefix,
+    r2Prefix,
     body.name || existing.name,
-    body.kind || existing.kind,
+    kind,
+    resolvedPerson,
     body.coverPhotoId !== undefined ? body.coverPhotoId : existing.cover_photo_id,
     body.sortOrder !== undefined ? body.sortOrder : existing.sort_order,
     id
@@ -158,6 +170,17 @@ app.delete('/photos/:photoId', requireAccessAuth, async (c) => {
 });
 
 // ---------- 辅助 ----------
+
+// photography 的人名同时是 /photography/:person 的路由段与 R2 子目录：
+// 优先用显式传入的 person，其次从 r2Prefix（photography/xxx）里取。
+function resolvePerson(kind, person, r2Prefix) {
+  if (kind !== 'photography') return null;
+  // 存进 D1 的是路由段（去掉空格），展示名走 albums.name
+  const explicit = String(person || '').trim().replace(/\s+/g, '');
+  if (explicit) return explicit;
+  const prefix = String(r2Prefix || '');
+  return prefix.startsWith('photography/') ? prefix.slice('photography/'.length) : null;
+}
 
 function rowToPhoto(row) {
   return {

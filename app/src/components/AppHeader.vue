@@ -80,6 +80,7 @@ watch(() => route.fullPath, () => {
     <nav :class="{ active: navOpen }">
       <router-link to="/">HOME</router-link>
       <router-link to="/blogs">BLOGS</router-link>
+      <router-link to="/photography">PHOTO</router-link>
       <router-link to="/life">LIFE</router-link>
       <router-link to="/me" id="meNavLink">{{ virtue }}</router-link>
 

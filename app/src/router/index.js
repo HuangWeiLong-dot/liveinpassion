@@ -12,6 +12,7 @@ import BlogDetailView from '../views/BlogDetailView.vue';
 import MeView from '../views/MeView.vue';
 import MeGalleryView from '../views/MeGalleryView.vue';
 import GalleryView from '../views/GalleryView.vue';
+import PhotographyView from '../views/PhotographyView.vue';
 import LifeView from '../views/LifeView.vue';
 import LifeArchiveView from '../views/LifeArchiveView.vue';
 import OrganizationView from '../views/OrganizationView.vue';
@@ -24,6 +25,9 @@ const routes = [
   { path: '/me', name: 'me', component: MeView },
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },
+  // 摄影作品：索引 + 按人名分组（person 同时是 CMS 里 photography 相册的人名）
+  { path: '/photography', name: 'photography', component: PhotographyView },
+  { path: '/photography/:person', name: 'photography-person', component: PhotographyView },
   { path: '/life', name: 'life', component: LifeView },
   { path: '/life/archive/:kind', name: 'life-archive', component: LifeArchiveView },
   { path: '/me/organization', name: 'me-organization', component: OrganizationView },

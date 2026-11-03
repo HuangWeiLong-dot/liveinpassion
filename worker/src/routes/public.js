@@ -83,6 +83,8 @@ app.get('/albums', async (c) => {
     r2Prefix: a.r2_prefix,
     name: a.name,
     kind: a.kind,
+    // photography 的人名（= /photography/:person 路由段）。老相册没有这个列值，返回 null。
+    person: a.person || null,
     coverPhotoId: a.cover_photo_id,
     sortOrder: a.sort_order,
     photos: photosByAlbum[a.id] || [],

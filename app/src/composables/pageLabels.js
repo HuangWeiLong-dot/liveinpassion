@@ -9,6 +9,7 @@
 // 所以这里只允许同步查表，不许出现 await / fetch。
 import { blogBySlug } from '../data/blogPosts.js';
 import { friendById } from '../data/friends.js';
+import albumContent from '../data/content/albums.json';
 
 // 固定板块直接用路由名查表 —— 和 router/index.js 的 name 一一对应。
 // 值是**大写**：屏幕正中那行字沿用的是站内导航的字形（BLOGS / STATS 那个调子），
@@ -19,6 +20,7 @@ const SECTIONS = {
   me: 'ME',
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
+  photography: 'PHOTOGRAPHY',
   life: 'LIFE',
   'life-archive': 'ARCHIVE',
   'me-organization': 'ORGANIZATION',
@@ -46,6 +48,17 @@ export function sectionLabelFor(to) {
   if (name === 'friend-detail') {
     const friend = friendById[to.params?.id];
     if (friend) return friend.titleName || friend.name;
+  }
+
+  // 摄影子页：用人名（photography 相册的 name），查不到就退回路由段。
+  if (name === 'photography-person') {
+    const person = String(to.params?.person || '');
+    const album = (albumContent.albums || []).find(
+      (a) => a.kind === 'photography' && (a.person || String(a.r2Prefix || '').replace(/^photography\//, '')) === person
+    );
+    if (album?.name) return album.name.toUpperCase();
+    if (person) return person.toUpperCase();
+    return 'PHOTOGRAPHY';
   }
 
   return SECTIONS[name] || 'NOT FOUND';
