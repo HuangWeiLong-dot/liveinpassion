@@ -166,7 +166,7 @@ const ORBIT_PERIOD = 60; // 公转一圈多少秒
 // 主体：个体化。悬停时水波纹 + 鼠标处粒子重组；点它把散出去的四条收回来（不跳转）。
 const SUBJECT = {
   src: '/me/individuation.jpg',
-  alt: 'Individuation',
+  alt: 'Portrait of Huang Wei Long — the individuation series',
 };
 
 // 四个人格绕主体公转的那条环。
@@ -2022,8 +2022,19 @@ onBeforeUnmount(() => {
         @pointerleave="onSubjectLeave"
         @pointermove="onSubjectMove"
       >
-        <!-- img 是底图，也是 WebGL 不可用时的全部内容 -->
-        <img class="hero-subject__photo" :src="SUBJECT.src" :alt="SUBJECT.alt" decoding="async" draggable="false">
+        <!-- img 是底图，也是 WebGL 不可用时的全部内容。
+             首屏 LCP 图：eager + high，并给出 intrinsic 尺寸避免解码后回流。 -->
+        <img
+          class="hero-subject__photo"
+          :src="SUBJECT.src"
+          :alt="SUBJECT.alt"
+          width="960"
+          height="1280"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
+          draggable="false"
+        >
         <canvas ref="rippleCanvas" class="hero-subject__ripple" aria-hidden="true" />
         <canvas ref="grainCanvas" class="hero-subject__grain" aria-hidden="true" />
       </div>

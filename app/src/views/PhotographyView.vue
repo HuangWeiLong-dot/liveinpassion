@@ -367,7 +367,9 @@ onBeforeUnmount(() => {
                 class="win__img"
                 :class="{ 'is-on': true, 'is-loaded': loadedSrcs.has(item.src) }"
                 :src="thumbFor(item)"
-                :alt="item.title"
+                :alt="item.kind === 'album'
+                  ? `${item.title} — photography album, ${item.count} photos`
+                  : `${activePerson} — photograph ${item.title}`"
                 decoding="async"
                 draggable="false"
                 @load="onImgLoad(item, $event)"

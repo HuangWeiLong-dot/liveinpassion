@@ -28,7 +28,7 @@ function openPost() {
       <div class="skeleton-loader"></div>
       <!-- 列表卡片只加载压缩图（loadImage 的取值顺序 data-src → data-full-src）：
            原图只在详情页那张大图上请求。 -->
-      <img ref="imgRef" :data-src="post.image.src" alt="Blog Featured Image" class="blur-placeholder">
+      <img ref="imgRef" :data-src="post.image.src" :alt="post.title" class="blur-placeholder">
     </div>
     <div class="blog-card-overlay">
       <span class="blog-card-date">{{ post.cardDate }}</span>

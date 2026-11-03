@@ -8,6 +8,23 @@ import HeroConcept from '../components/HeroConcept.vue';
 
 <template>
   <main class="page active">
+    <!-- 页面标题：可见字标是逐字动画的装饰元素（aria-hidden），这里给搜索与读屏一份真实 H1 -->
+    <h1 class="sr-only">LIVEINPASSION — Huang Wei Long · Photography, Stories &amp; Friends</h1>
     <HeroConcept />
   </main>
 </template>
+
+<style scoped>
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+</style>

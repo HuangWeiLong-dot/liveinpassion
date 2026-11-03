@@ -4,7 +4,6 @@
 // 传列表与起始索引（useLightbox.open(list, index)），不再有隐式全局状态。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useLightbox } from '../composables/useLightbox.js';
-import { flyPhoto, photoTargetRect, rectOf } from '../composables/usePhotoFlight.js';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import { photoDate } from '../data/photoUtils.js';
 
@@ -25,14 +24,14 @@ const {
 const imgEl = ref(null);
 const rootEl = ref(null);
 const stageEl = ref(null);
-// 正在播"窗口 → 大图"的飞行动画：这期间的 load 不触发抖色揭示，
-// 等飞完落定再来一次，才看得见（否则会被飞行的克隆盖住）。
-let opening = false;
+// 这张图是否已经播过故障揭示：缓存命中时 settleIfCached() 先收尾，
+// 紧接着 load 事件仍可能再来一次，不挡住就会把画布重建、揭示重播一遍。
+let revealedFor = '';
 let detachTilt = null;
 
 // ── 详情舞台 ────────────────────────────────────────────────────────────
 // 舞台的宽高由照片比例算出来（而不是让 <img> 自己撑开）：
-// 打开时的飞行落点、骨架屏、大图全都用同一个矩形，切换照片时不会跳版。
+// 骨架屏、大图、故障揭示画布全都用同一个矩形，切换照片时不会跳版。
 const loaded = ref(false);
 const failed = ref(false);
 const aspect = ref(1);
@@ -96,6 +95,18 @@ function settleIfCached() {
   loaded.value = true;
   failed.value = false;
   onImageSettled();
+  revealIfNeeded();
+}
+
+// 图就绪后立刻在舞台上播一次「抖色 + 逐行揭示」：
+// 开图不做窗口飞行动画，点击后看到的第一帧就该是这张图自己在故障里长出来。
+function revealIfNeeded() {
+  const img = imgEl.value;
+  if (!img || !img.complete || !img.naturalWidth) return;
+  const key = img.getAttribute('src') || '';
+  if (!key || key === revealedFor) return;
+  revealedFor = key;
+  playGlitchReveal(img, stageEl.value);
 }
 
 function handleLoad(event) {
@@ -107,13 +118,11 @@ function handleLoad(event) {
     if (img.naturalWidth && img.naturalHeight) {
       aspect.value = img.naturalWidth / img.naturalHeight;
     }
-    // 关闭时留下的行内 opacity:0 要清掉，否则 .is-loaded 也压不过它
-    img.style.opacity = '';
     loaded.value = true;
     failed.value = false;
     onImageSettled();
-    // 切换照片（← →）没有飞行，解码完成立刻来一次抖色揭示
-    if (!opening) playGlitchReveal(img, stageEl.value);
+    // 解码完成立刻来一次抖色揭示（开图和 ← → 切图都是这条路径）
+    revealIfNeeded();
   };
   // decode() 把解码移出主线程，避免切换照片时主线程被大图解码卡住
   if (typeof img.decode === 'function') img.decode().then(apply).catch(apply);
@@ -123,53 +132,35 @@ function handleLoad(event) {
 function handleError() {
   loaded.value = false;
   failed.value = true;
-  opening = false;
   onImageSettled();
 }
 
-// 打开：照片从点击的窗口飞到大图位置（参照 wndws.space）
+// 打开：直接让大图在灯箱舞台上做一次故障揭示。
+// 不再做"窗口克隆飞到大图位置"的过渡 —— 那个克隆只是点击图的一张替代品，
+// 点击之后应该看到的就是这张图本身逐渐加载出来。
 watch(isOpen, async (open) => {
-  if (!open) { opening = false; return; }
-  opening = true;
+  if (!open) return;
+  revealedFor = '';
   loaded.value = false;
   failed.value = false;
   await nextTick();
   settleIfCached();
   probeAspect(currentSrc.value);
   const img = imgEl.value;
-  if (img) img.style.opacity = '';
+  if (!img) return;
+  // 先按来源窗口里那张图的比例把舞台撑好，故障揭示才有正确的尺寸；
+  // 大图解码完成后再由 handleLoad 用真实比例校正
   const from = origin.value;
-  if (!img || !from?.rect) { opening = false; return; }
-  const a = from.aspect
+  const a = from?.aspect
     || (img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0)
-    || from.rect.width / from.rect.height;
+    || (from?.rect ? from.rect.width / from.rect.height : 0);
   if (a > 0) aspect.value = a;
-  // 落点必须和舞台尺寸一致（0.9 / 0.86 / 底部让位）
-  const to = photoTargetRect(a, 0.9, 0.86, reserve.value);
-  img.style.opacity = '0';
-  flyPhoto({
-    from: from.rect,
-    to,
-    // 优先用来源窗口里**已经加载好**的缩略图：灯箱大图可能还在解码，
-    // 用它会先出现一帧黑底
-    src: from.src || img.getAttribute('src'),
-    duration: 0.68,
-    fromGray: true,
-    toGray: false,
-    onDone: () => {
-      // 克隆还在时就把大图交还给 CSS（已加载则由 .is-loaded 淡入，
-      // 没加载则由下面的骨架屏继续撑着，不会闪黑）
-      img.style.opacity = '';
-      // 落定之后再来一次抖色故障揭示：小窗长大图的那一下就是从这里接上的
-      opening = false;
-      playGlitchReveal(img, stageEl.value);
-    },
-  });
 });
 
-// 切换照片：骨架屏重新盖住舞台，新图解码完成后再淡入
+// 切换照片：骨架屏重新盖住舞台，新图解码完成后再淡入并重新揭示
 watch(currentSrc, async () => {
   if (!isOpen.value) return;
+  revealedFor = '';
   loaded.value = false;
   failed.value = false;
   await nextTick();
@@ -182,29 +173,17 @@ function onResize() {
   vh.value = window.innerHeight;
 }
 
-// 关闭：大图飞回原来的窗口；背景同时开始淡出
-function closeWithFlight() {
+// 关闭：整块灯箱（遮罩 + 大图）一起淡出。
+// 不再生成"飞回原来那扇窗"的克隆：大图先被瞬间藏掉、再让一个带描边的
+// 替代品飞回去，看起来就是闪一下；和开图那边一致地只做淡出才顺。
+function requestClose() {
   if (!isOpen.value) return;
-  const img = imgEl.value;
-  const from = origin.value;
-  if (!img || !from?.rect) { close(); return; }
-  const start = rectOf(img);
-  const src = img.currentSrc || from.src || img.getAttribute('src');
-  img.style.opacity = '0';
   close();
-  flyPhoto({
-    from: start,
-    to: from.rect,
-    src,
-    duration: 0.55,
-    fromGray: false,
-    toGray: true,
-  });
 }
 
 function onKeydown(e) {
   if (!isOpen.value) return;
-  if (e.key === 'Escape') closeWithFlight();
+  if (e.key === 'Escape') requestClose();
   if (e.key === 'ArrowLeft') prev();
   if (e.key === 'ArrowRight') next();
 }
@@ -224,7 +203,7 @@ onUnmounted(() => {
 
 <template>
   <div class="lightbox" id="lightbox" ref="rootEl" :class="{ active: isOpen, 'has-strip': stripOn }">
-    <div class="lightbox-bg" id="lightboxBg" @click="closeWithFlight"></div>
+    <div class="lightbox-bg" id="lightboxBg" @click="requestClose"></div>
     <div class="lightbox-nav lightbox-prev" id="lightboxPrev" @click="prev"></div>
     <div class="lightbox-nav lightbox-next" id="lightboxNext" @click="next"></div>
     <div class="lightbox-content" :style="stageStyle">
@@ -243,7 +222,7 @@ onUnmounted(() => {
         >
         <!-- 大图解码完成前先盖一块 shimmer 骨架，避免切换时闪黑 -->
         <div class="lightbox-skeleton" :class="{ hidden: !showSkeleton }" aria-hidden="true"></div>
-        <div class="lightbox-close-area" id="lightboxCloseArea" @click="closeWithFlight"></div>
+        <div class="lightbox-close-area" id="lightboxCloseArea" @click="requestClose"></div>
       </div>
 
       <!-- 照片下方：日期 + 位置。日期切换时上下滚动交换（参照 oumahi.art） -->

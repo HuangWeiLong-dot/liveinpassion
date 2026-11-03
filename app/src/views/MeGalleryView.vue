@@ -314,38 +314,13 @@ onBeforeUnmount(() => {
 // ── 单图灯箱 ────────────────────────────────────────────────────────────
 const lightboxOpen = ref(false);
 const lightboxSrc = ref('');
-const lightboxThumb = ref('');
 const lightboxDate = ref('');
-const lightboxOrigin = ref(null);
-// 底部胶卷条要让出的高度（桌面端 92px 条 + 24px 缝，和 window-wall.css 一致）
-const photoReserve = ref(0);
-// 从哪张图打开：(event, selector) 里的图矩形就是飞行起点。
-// 胶卷条传 .win-strip__img，墙上的窗格用默认的 .win__img。
-function openPhoto(item, event, selector = '.win__img') {
+// 灯箱主图用压缩图（原图太大，切换时容易停在上一张）
+function openPhoto(item) {
   hideTip();
-  // 打开详情时记下这扇窗的矩形：照片从它飞到大图位置
-  const el = event?.currentTarget;
-  const img = el?.querySelector(selector);
-  const r = (img || el)?.getBoundingClientRect();
-  lightboxOrigin.value = r ? {
-    rect: { left: r.left, top: r.top, width: r.width, height: r.height },
-    src: img?.currentSrc || item.thumb,
-    aspect: img?.naturalWidth && img?.naturalHeight
-      ? img.naturalWidth / img.naturalHeight
-      : r.width / r.height,
-  } : null;
-  photoReserve.value = window.innerWidth > 1024 ? 116 : 0;
-  // 灯箱主图用压缩图（原图太大，切换时容易停在上一张）；
-  // 先挂 200px 缩略图做模糊占位，主图载入后由组件无缝替换。
   lightboxSrc.value = item.thumb;
   lightboxDate.value = item.date || '';
-  lightboxThumb.value = '';
   lightboxOpen.value = true;
-  thumbUrl(item.thumb, 200).then((url) => {
-    if (lightboxOpen.value && lightboxSrc.value === item.thumb) {
-      lightboxThumb.value = url;
-    }
-  });
 }
 
 // ── 底部胶卷条（和 /gallery 一致，参照 oumahi.art）─────────────────────
@@ -363,10 +338,16 @@ const stripItems = computed(() => items.value.filter((it) => it.thumb));
 const stripActive = computed(() => (lightboxOpen.value ? lightboxSrc.value : ''));
 let stripTimer = 0;
 
-function loadStripThumb(item) {
+function loadStripThumb(item, attempt = 0) {
   if (!item?.thumb || stripThumbs.value[item.thumb] || stripThumbQueue[item.thumb]) return;
   thumbUrl(item.thumb, 200).then((url) => {
-    if (!url) return;
+    if (!url) {
+      // 生成失败：隔一会儿再试（最多两次），否则这个格子会一直停在占位块上
+      if (attempt < 2) {
+        setTimeout(() => { if (stripAlive.value) loadStripThumb(item, attempt + 1); }, 2000 + attempt * 2000);
+      }
+      return;
+    }
     // 逐张异步到达的缩略图合并成一次对象替换，避免整条胶卷条反复重渲染
     stripThumbQueue[item.thumb] = url;
     if (stripThumbRaf) return;
@@ -383,6 +364,14 @@ function loadStripThumb(item) {
 watch(stripItems, (list) => {
   for (const item of list) loadStripThumb(item);
 });
+
+// 某个缩略图已经拿到 URL 却解码失败：丢掉它，退回占位块，别留一个破图图标
+function dropStripThumb(item) {
+  if (!item?.thumb || !stripThumbs.value[item.thumb]) return;
+  const next = { ...stripThumbs.value };
+  delete next[item.thumb];
+  stripThumbs.value = next;
+}
 
 function scrollStrip(direction) {
   const row = stripRef.value;
@@ -420,7 +409,7 @@ function scrollStrip(direction) {
               :style="{ '--win-i': index }"
               type="button"
               :aria-label="`ME: ${item.date || item.filename}`"
-              @click="openPhoto(item, $event)"
+              @click="openPhoto(item)"
               @pointerenter="enterWindow(item, $event)"
               @pointerleave="leaveWindow()"
             >
@@ -429,7 +418,7 @@ function scrollStrip(direction) {
                 :class="{ 'is-on': true, 'is-loaded': loadedSrcs.has(item.thumb) }"
                 :data-src="item.thumb"
                 :data-photo="item.thumb"
-                :alt="item.filename"
+                :alt="`Me — ${item.filename}`"
                 decoding="async"
                 draggable="false"
                 @load="onImgLoad(item, $event)"
@@ -457,16 +446,20 @@ function scrollStrip(direction) {
               :class="{ 'is-active': item.thumb === stripActive }"
               type="button"
               :aria-label="`ME: ${item.date || item.filename}`"
-              @click="openPhoto(item, $event, '.win-strip__img')"
+              @click="openPhoto(item)"
             >
+              <!-- 缩略图是异步生成的：没拿到之前先铺一块中性占位，绝不挂空 src ——
+                   空 src 的 <img> 会把 alt（文件名）和破图图标画在 66px 的格子里。 -->
               <img
+                v-if="stripThumbs[item.thumb]"
                 class="win-strip__img"
-                :src="stripThumbs[item.thumb] || null"
-                :alt="item.filename"
-                loading="lazy"
+                :src="stripThumbs[item.thumb]"
+                alt=""
                 decoding="async"
                 draggable="false"
+                @error="dropStripThumb(item)"
               >
+              <span v-else class="win-strip__ph" aria-hidden="true"></span>
             </button>
           </div>
           <button
@@ -504,10 +497,7 @@ function scrollStrip(direction) {
     <MePhotoLightbox
       :visible="lightboxOpen"
       :src="lightboxSrc"
-      :thumb="lightboxThumb"
       :date="lightboxDate"
-      :reserve="photoReserve"
-      :origin="lightboxOrigin"
       @close="lightboxOpen = false"
     />
   </main>

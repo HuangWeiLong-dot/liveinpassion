@@ -3,20 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIVEINPASSION</title>
+    <title>LIVEINPASSION — Huang Wei Long · Photography, Stories &amp; Friends</title>
 
     <meta name="description" content="Personal site of Huang Wei Long — photos, stories and friends. When that moment comes, I'll let it rest, breathe it in, and know it as a memory born.">
+    <meta name="author" content="Huang Wei Long">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#050505">
     <link rel="canonical" href="https://liveinpassion.me/">
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+    <link rel="alternate" type="application/rss+xml" title="LIVEINPASSION Blog" href="https://liveinpassion.me/feed.xml">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="LIVEINPASSION">
-    <meta property="og:title" content="LIVEINPASSION">
-    <meta property="og:description" content="Personal site of Huang Wei Long — photos, stories and friends.">
+    <meta property="og:title" content="LIVEINPASSION — Huang Wei Long · Photography, Stories &amp; Friends">
+    <meta property="og:description" content="Personal site of Huang Wei Long — photos, stories and friends. When that moment comes, I'll let it rest, breathe it in, and know it as a memory born.">
     <meta property="og:url" content="https://liveinpassion.me/">
-    <meta property="og:image" content="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:image" content="https://cms.liveinpassion.me/img/blog/202611/_compressed/35e48c7b.jpg">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:site" content="@HuangWeiLong525">
-    <meta name="twitter:image" content="https://img.liveinpassion.me/blog_photos/blog_photos_compressed/5.jpg">
+    <meta name="twitter:title" content="LIVEINPASSION — Huang Wei Long">
+    <meta name="twitter:description" content="Personal site of Huang Wei Long — photos, stories and friends.">
+    <meta name="twitter:image" content="https://cms.liveinpassion.me/img/blog/202611/_compressed/35e48c7b.jpg">
+
+    <!-- 首页结构化数据兜底；运行时由 composables/useSeo.js 按路由改写同一个 script -->
+    <script id="seo-jsonld" type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@graph": [
+                {
+                    "@type": "WebSite",
+                    "@id": "https://liveinpassion.me/#website",
+                    "url": "https://liveinpassion.me/",
+                    "name": "LIVEINPASSION",
+                    "description": "Personal site of Huang Wei Long — photos, stories and friends.",
+                    "inLanguage": "en",
+                    "author": { "@id": "https://liveinpassion.me/#person" }
+                },
+                {
+                    "@type": "Person",
+                    "@id": "https://liveinpassion.me/#person",
+                    "name": "Huang Wei Long",
+                    "url": "https://liveinpassion.me/me",
+                    "image": "https://liveinpassion.me/avatar/1.jpg",
+                    "sameAs": ["https://x.com/HuangWeiLong525", "https://github.com/HuangWeiLong-dot"]
+                },
+                {
+                    "@type": "WebPage",
+                    "@id": "https://liveinpassion.me/#webpage",
+                    "url": "https://liveinpassion.me/",
+                    "name": "LIVEINPASSION — Huang Wei Long · Photography, Stories & Friends",
+                    "description": "Personal site of Huang Wei Long — photos, stories and friends.",
+                    "isPartOf": { "@id": "https://liveinpassion.me/#website" },
+                    "inLanguage": "en"
+                }
+            ]
+        }
+    </script>
 
     <link rel="icon" type="image/png" href="/favicon.png" sizes="192x192">
     <link rel="apple-touch-icon" href="/favicon.png">
@@ -25,11 +68,14 @@
     <link rel="dns-prefetch" href="https://fonts.googleapis.com">
     <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="dns-prefetch" href="https://img.liveinpassion.me">
+    <link rel="dns-prefetch" href="https://cms.liveinpassion.me">
 
-    <!-- 预连接：提前完成 DNS + TCP + TLS 握手，使后续请求立即发起 -->
+    <!-- 预连接：提前完成 DNS + TCP + TLS 握手，使后续请求立即发起。
+         照片与 API 现在都在 cms.liveinpassion.me，img 只服务音乐。 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://img.liveinpassion.me">
+    <link rel="preconnect" href="https://cms.liveinpassion.me" crossorigin>
 
     <!-- 字体 CSS 非阻塞加载：preload 高优先级拉取，加载完成后转为 stylesheet 应用 -->
     <link id="fontCSS" rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" onload="this.rel='stylesheet'">

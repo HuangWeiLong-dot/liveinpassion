@@ -1956,9 +1956,10 @@
             }
         }
 
-        /* 照片灯箱 */
+        /* 照片灯箱。遮罩本身淡入（和主灯箱一致），不要 display 一刀切 ——
+           点击之后整屏突然变黑，看起来就像闪了一下。 */
         .me-photo-lightbox {
-            display: none;
+            display: flex;
             position: fixed;
             top: 0;
             left: 0;
@@ -1969,34 +1970,14 @@
             justify-content: center;
             align-items: center;
             cursor: zoom-out;
-            transition: opacity 0.4s ease;
-        }
-
-        /* 照片飞回窗口期间，遮罩跟着淡出 */
-        .me-photo-lightbox.leaving {
             opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
         }
 
         .me-photo-lightbox.active {
-            display: flex;
-        }
-
-        .me-photo-lightbox-thumb {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) scale(1.04);
-            max-width: 90vw;
-            max-height: 90vh;
-            object-fit: contain;
-            filter: blur(20px);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            z-index: 0;
-        }
-
-        .me-photo-lightbox-thumb.active {
             opacity: 1;
+            visibility: visible;
         }
 
         .me-photo-lightbox-full {
@@ -2046,14 +2027,8 @@
                 padding-bottom: 116px;
             }
 
-            body:has(.win-strip) .me-photo-lightbox-full,
-            body:has(.win-strip) .me-photo-lightbox-thumb {
+            body:has(.win-strip) .me-photo-lightbox-full {
                 max-height: calc(90vh - 104px);
-            }
-
-            /* 模糊占位是绝对定位的，跟大图一起上移半个底栏高 */
-            body:has(.win-strip) .me-photo-lightbox-thumb {
-                top: calc(50% - 58px);
             }
 
             body:has(.win-strip) .me-photo-lightbox-meta {

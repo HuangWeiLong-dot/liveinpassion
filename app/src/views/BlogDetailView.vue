@@ -1238,6 +1238,7 @@ if (typeof window !== 'undefined') {
                 :data-full-src="post.image.fullSrc"
                 :alt="post.title"
                 crossorigin="anonymous"
+                fetchpriority="high"
                 draggable="false"
                 decoding="async"
               >

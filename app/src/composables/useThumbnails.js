@@ -116,7 +116,9 @@ export function thumbUrl(src, width = 200) {
     return url;
   })()
     .catch(() => {
-      cache.set(key, '');
+      // 失败不要写进缓存：一次网络抖动 / 偶发解码失败不该让这张图
+      // 整个会话都"加载不出来"，下次调用还能重试
+      cache.delete(key);
       return '';
     })
     .finally(() => {

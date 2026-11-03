@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router/index.js';
 import { installTracker } from './composables/useTracker.js';
+import { installSeo } from './composables/useSeo.js';
 import { installPageTransition } from './composables/usePageTransition.js';
 import './styles/main.css';
 import './styles/view-transition.css';
@@ -10,6 +11,8 @@ import './styles/window-wall.css';
 const app = createApp(App);
 app.use(router);
 installTracker(router);
+// SEO：路由切换时写入 title / description / canonical / OG / JSON-LD
+installSeo(router);
 // 通用转场：每次路由切换都"画面放大冲过去 → 再从放大态缩回"
 installPageTransition(router);
 

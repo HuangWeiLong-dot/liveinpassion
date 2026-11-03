@@ -298,10 +298,16 @@ const lightboxSrc = computed(
   () => (lightboxOpen.value ? (lightboxItems.value[lightboxIndex.value]?.src || '') : '')
 );
 
-function loadStripThumb(item) {
+function loadStripThumb(item, attempt = 0) {
   if (!item?.src || stripThumbs.value[item.src] || stripThumbQueue[item.src]) return;
   thumbUrl(item.src, 200).then((url) => {
-    if (!url) return;
+    if (!url) {
+      // 生成失败：隔一会儿再试（最多两次），否则这个格子会一直停在占位块上
+      if (attempt < 2) {
+        setTimeout(() => { if (stripAlive.value) loadStripThumb(item, attempt + 1); }, 2000 + attempt * 2000);
+      }
+      return;
+    }
     // 缩略图是逐张异步生成的：同一帧里到的几张合并成一次对象替换，
     // 否则一条 60 格的胶卷条会被逐张重渲染几十次。
     stripThumbQueue[item.src] = url;
@@ -319,6 +325,14 @@ function loadStripThumb(item) {
 watch(stripItems, (list) => {
   for (const item of list) loadStripThumb(item);
 });
+
+// 某个缩略图已经拿到 URL 却解码失败：丢掉它，退回占位块，别留一个破图图标
+function dropStripThumb(item) {
+  if (!item?.src || !stripThumbs.value[item.src]) return;
+  const next = { ...stripThumbs.value };
+  delete next[item.src];
+  stripThumbs.value = next;
+}
 
 function scrollStrip(direction) {
   const row = stripRef.value;
@@ -427,7 +441,8 @@ watch(
   }
 );
 
-// 照片详情的飞行起点：当前这扇窗里的照片矩形 + 图片地址/比例
+// 开图前先取这扇窗里那张图的真实比例：灯箱舞台据此撑好尺寸，
+// 故障揭示才不会在一个 1:1 的空台上开演（不再有飞行，矩形本身只作兜底）。
 // （底部胶卷条传 .win-strip__img，墙上的窗格用默认的 .win__img）
 function originFromEvent(event, selector = '.win__img') {
   const el = event?.currentTarget;
@@ -608,7 +623,7 @@ onBeforeUnmount(() => {
                 :class="{ 'is-on': isActive(item), 'is-loaded': loadedSrcs.has(item.src) }"
                 :data-src="isActive(item) ? item.src : null"
                 :data-photo="item.src"
-                :alt="item.title"
+                :alt="`${item.kicker} — ${item.title}`"
                 decoding="async"
                 draggable="false"
                 @load="onImgLoad(item, $event)"
@@ -639,14 +654,18 @@ onBeforeUnmount(() => {
               :aria-label="`${item.kicker}: ${item.title}${item.date ? ` · ${item.date}` : ''}`"
               @click="openWindow(item, $event, '.win-strip__img')"
             >
+              <!-- 缩略图是异步生成的：没拿到之前先铺一块中性占位，绝不挂空 src ——
+                   空 src 的 <img> 会把 alt（文件名）和破图图标画在 66px 的格子里。 -->
               <img
+                v-if="stripThumbs[item.src]"
                 class="win-strip__img"
-                :src="stripThumbs[item.src] || null"
-                :alt="item.title"
-                loading="lazy"
+                :src="stripThumbs[item.src]"
+                alt=""
                 decoding="async"
                 draggable="false"
+                @error="dropStripThumb(item)"
               >
+              <span v-else class="win-strip__ph" aria-hidden="true"></span>
             </button>
           </div>
           <button
