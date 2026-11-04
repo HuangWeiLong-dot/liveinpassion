@@ -204,6 +204,14 @@ export function resolveSeo(name, params, posts = [], albums = []) {
     const description = clamp(post.body);
     const image = post.image?.fullSrc || post.image?.src || defaultImage;
     const published = toIso(post.date || post.cardDate);
+    // 词数 / 阅读时长 / 关键词在构建期由 enhancePosts 写进快照；
+    // 老快照没有这些字段时用正文实时兜底。
+    const wordCount = post.wordCount
+      || (stripHtml(post.body).match(/[A-Za-z0-9]+(?:['’\-][A-Za-z0-9]+)*/g) || []).length;
+    const readingMinutes = post.readingMinutes
+      || Number((post.readTime || '').match(/\d+/)?.[0])
+      || 1;
+    const keywords = post.keywords || [];
     return {
       path,
       url,
@@ -225,6 +233,10 @@ export function resolveSeo(name, params, posts = [], albums = []) {
             mainEntityOfPage: { '@type': 'WebPage', '@id': url },
             datePublished: published,
             dateModified: published,
+            wordCount,
+            timeRequired: `PT${readingMinutes}M`,
+            keywords: keywords.length ? keywords : undefined,
+            articleSection: 'Blog',
             author: { '@type': 'Person', name: AUTHOR, url: `${SITE}/me` },
             publisher: {
               '@type': 'Organization',

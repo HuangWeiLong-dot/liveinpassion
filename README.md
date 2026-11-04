@@ -148,6 +148,20 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 56 — 2026-11-04
+
+#### 博客正文在构建期做 SEO 增强
+
+- 新增 `app/src/seo/enhanceBody.js`，在 `fetch-content.mjs` 写入快照前处理每篇文章，
+  四件事都幂等：正文 `<h1>` 降为 `<h2>`（文章标题已经是页面 H1）、给 h2–h6 补稳定
+  anchor id（重名自动加序号）、图片按 figcaption 或「标题 + 序号」补 alt 并补
+  `loading=lazy` / `decoding=async`、统计 `wordCount / readingMinutes / keywords`。
+- 关键词取正文词频前 6 个，跳过停用词、长度不足 3 与缩写；标题里出现的词权重 ×2。
+- 拉取失败时不再只保留旧快照，也会把本地快照就地增强一遍，兜底版本同样带 SEO 字段。
+- `meta.js` 的 BlogPosting 结构化数据补 `wordCount`、`timeRequired`、`keywords` 与
+  `articleSection`；老快照缺字段时按正文实时兜底。`blogPosts.json` 快照同步写入增强
+  后的正文与统计。
+
 ### update: 55 — 2026-11-03
 
 #### SEO：每个真实 URL 都有静态 head，深链接不再靠 404 兜底

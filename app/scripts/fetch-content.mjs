@@ -1,5 +1,6 @@
 // 构建期内容拉取脚本
 // 从 Worker public API 拉取博客与相册数据，写入 app/src/data/content/*.json
+// 博客正文会先经过 src/seo/enhanceBody.js 的 SEO 增强（标题层级/锚点/图片 alt/关键词）
 // 失败时保留仓库内最近一次快照（不覆盖为空），确保不发布空站
 //
 // 用法：node scripts/fetch-content.mjs
@@ -7,9 +8,10 @@
 //   CMS_API_BASE  —— Worker API 地址，默认 https://cms.liveinpassion.me
 //   CMS_TIMEOUT   —— 请求超时毫秒，默认 15000
 
-import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { enhancePosts } from '../src/seo/enhanceBody.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appDir = resolve(__dirname, '..');
@@ -46,11 +48,27 @@ async function main() {
   // 拉取博客
   try {
     const data = await fetchJson('/api/posts');
+    // 正文 SEO 增强：标题层级、标题锚点、图片 alt/lazy、词数与关键词。
+    // 新文章上传后由 CMS 触发重建，下一次构建会自动跑到这里。
+    data.posts = enhancePosts(data.posts || []);
     safeWrite(resolve(contentDir, 'blogPosts.json'), data);
     blogOk = true;
   } catch (err) {
     console.warn(`  ⚠ Blog fetch failed: ${err.message}`);
     console.warn('    Keeping existing blogPosts.json snapshot.');
+    // 网络失败时也把本地快照增强一遍，保证兜底版本同样带 SEO 字段
+    try {
+      const snapshotPath = resolve(contentDir, 'blogPosts.json');
+      if (existsSync(snapshotPath)) {
+        const local = JSON.parse(readFileSync(snapshotPath, 'utf8'));
+        if (Array.isArray(local.posts)) {
+          local.posts = enhancePosts(local.posts);
+          safeWrite(snapshotPath, local);
+        }
+      }
+    } catch (enhanceErr) {
+      console.warn(`    ⚠ Snapshot enhancement skipped: ${enhanceErr.message}`);
+    }
   }
 
   // 拉取相册
