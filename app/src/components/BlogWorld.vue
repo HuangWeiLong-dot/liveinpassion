@@ -21,12 +21,16 @@ const props = defineProps({
 const emit = defineEmits(['open']);
 
 // ── 环的几何 ────────────────────────────────────────────────────────────
-// 每件的角度 = 360 / 件数；半径固定 1500px，配合 13.5vw 的卡片宽度，
-// 相邻两件在弧上的间距刚好是一张卡片的宽度（环上的"缝"靠几何自己合上）。
+// 每件的角度 = 360 / 件数；半径固定 1500px。卡片宽度同时受 13.5vw 和
+// 「相邻两件的弧长 − 12px」两道限制（见 arcWidth / --bw-card-w），
+// 件数变多时只会把卡片收窄一点，不会让相邻两张插在一起。
 const RADIUS = 1500;
 const DRIFT = 0.02; // 空闲时每帧转的角度（约 1.2°/s）：慢到只是"活着"，不抢注意力
 const N = computed(() => props.posts.length);
 const STEP = computed(() => (N.value ? 360 / N.value : 0));
+// 相邻两件在环上的弧长（= 2πR / 件数）。卡片宽度必须收在这个值以内，
+// 否则件数一多（现在 49 篇，43 篇的宽高比就不够了），相邻封面就会插在一起。
+const arcWidth = computed(() => (N.value ? (2 * Math.PI * RADIUS) / N.value : 0));
 
 // 逐帧缓动都按「时间」而不是「帧」算：60Hz 下与原来的逐帧系数等价，
 // 120Hz / 144Hz 上不会跑得比 60Hz 快一倍（原来 rot += Δ * 0.12 正是这个问题）。
@@ -327,7 +331,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="bw-stage" :class="{ 'is-expanded': current }">
+  <div
+    class="bw-stage"
+    :class="{ 'is-expanded': current }"
+    :style="{ '--bw-arc': `${arcWidth}px` }"
+  >
     <!-- 世界：一圈封面 + 中间一枚很淡的记号 -->
     <div
       class="bw-scene"
@@ -478,9 +486,10 @@ onBeforeUnmount(() => {
   /* 顶部让开站点 header，底部留给胶片条 */
   padding: 76px 0 118px;
   box-sizing: border-box;
-  /* 环上单件封面的尺寸：竖直构图（1.34 比例）。半径 1500px 时相邻两件
-     在弧上正好隔开一张卡片的宽度，不会互相插进去。 */
-  --bw-card-w: clamp(140px, 13.5vw, 210px);
+  /* 环上单件封面的尺寸：竖直构图（1.34 比例）。
+     宽度必须小于相邻两件的弧长（--bw-arc，由件数算出来并写在行内 style 上），
+     否则件数一多，宽屏上 210px 的卡片就会插进邻居里 —— 留 12px 的缝。 */
+  --bw-card-w: min(clamp(140px, 13.5vw, 210px), calc(var(--bw-arc, 5000px) - 12px));
   --bw-card-h: calc(var(--bw-card-w) * 1.34);
   /* 环心那条「字带」：所有封面的竖直中线都落在环心高度上，所以用一段
      以卡片中线为准的横向渐变，就能在屏幕上对齐成一条横带 —— 这条带里

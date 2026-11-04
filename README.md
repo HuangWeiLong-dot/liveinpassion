@@ -148,6 +148,19 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 57 — 2026-11-04
+
+#### BLOGS 版面适配：49 篇封面不互插、矮屏还高度给卡片
+
+- `BlogWorld.vue` 的环上卡片宽度除了 `13.5vw`，再加一道「相邻弧长 − 12px」的上限
+  （`arcWidth` 由件数算出，经行内 `--bw-arc` 传给 CSS 的 `min()`）。文章数涨到 49 篇后，
+  宽屏上 210px 的封面会插进邻居；现在件数变多只会把卡片收窄一点，几何自己保持缝隙。
+- `BlogsView.vue` 新增 `max-height: 820px` 断点：字标上边距 122→90、巨号标题 5.2rem、
+  `--jb-rail` 收到 `clamp(48px, 12vh, 132px)`。常见 720/768 高笔记本上，卡片不再被压成
+  97px 的扁带；≤560 高仍交给原有的矮视口规则。
+- `main.css` 在 `html.blogs-lookback` 下隐藏左下角头像塔：LOOKBACK / WORLD 整页铺满卡片，
+  1280×720 实测头像与卡片下缘重叠 41px，也压住底部 rail 的编号；离开本页即恢复。
+
 ### update: 56 — 2026-11-04
 
 #### 博客正文在构建期做 SEO 增强

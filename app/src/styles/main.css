@@ -243,6 +243,14 @@
             }
         }
 
+        /* BLOGS 列表（LOOKBACK / WORLD）整页铺满卡片，左下角没有"安全区"：
+           轨道上任何固定件都会压住卡片下缘和底部 rail 的编号
+           （1280×720 实测头像与卡片重叠 41px）。这一页让它让位 ——
+           类由 BlogsView 的 activate/deactivate 挂在 <html> 上，离开即恢复。 */
+        html.blogs-lookback .author-tower {
+            display: none;
+        }
+
         .author-tower__avatar {
             position: relative;
             z-index: 2;
