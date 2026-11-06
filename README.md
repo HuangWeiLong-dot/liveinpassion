@@ -48,6 +48,35 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 59 — 2026-11-06
+
+#### 封面评分、自由分类、标签胶囊，封面交接补漏
+
+- **封面评分**：`0007_cover_rating.sql` 给 posts 加 `cover_rating_json`，与正文自评完全独立，
+  只存 `score` / `grade` / `verdict`；grade 仍由后端从分数重算（阈值同上）。posts 的
+  新建与局部更新、public 列表与详情都带上 `coverRating`。Admin 新增 `08 / Cover Rating`
+  折叠块（分数 + 一句 verdict）；前台详情页在封面右上角钉一枚鉴定章（等级 / 分数 / verdict），
+  叠在图上、不挡点击。
+- **分类改为自由文本**：`normalizeCategory` 不再走白名单 —— 早期版本会把作者自定义的分类
+  静默改成 UNFILED。现在只做大小写 / 空白归一化与 24 字符截断，空值才落 UNFILED。
+  Admin 把 select 换成输入框（`maxlength=24`），下方列出「文章里已用过的分类」作建议签；
+  ARCHIVE 的分类 tabs 也改为固定常用项 + 实际出现过的自定义分类，`?cat=` 直接接受任意值。
+- **标签改成胶囊输入**：Enter / 逗号成 tag，点击整块移除，退格删最后一个；未按 Enter 的草稿
+  保存时自动收进列表。上限 12 个、单个 24 字符，与后端归一化一致。
+- **Admin 修复与收敛**：新文章 `rating` 初值改为完整对象（`null` 会让 `/blogs/new` 模板里
+  `form.rating.score` 直接白屏）；编辑器里 `note` 字段改为英文多行 textarea；底部提示、
+  登录失效文案、boot 兜底页统一改成英文；评分块样式对齐 CMS 的直角 / 细边框 / mono 风格；
+  列表序号改为按时间顺序（最早 = 01，最新 = 最大号）。补 `900px` 断点。
+- **封面交接补漏**（`useCoverHandoff` / `BlogDetailView`）：图还没解码时 `<img>` 是 0×0，
+  旧逻辑直接 return，导致详情页硬切、按 Esc 也没有落点 —— 现在退回卡片 / 相框那一格量尺寸；
+  同时把 `naturalWidth/naturalHeight` 带过去，详情媒体盒一开始就按真实比例撑开，
+  消除 632px → 379px 的盒子瞬跳。打字机逻辑加「代次」计数，换篇 / 退场时正在分批拆字的
+  循环立即收工，不会把半套 span 继续塞进 DOM。标签行移到正文末尾做成落款，打字期间不显影，
+  并改用站点真实色板（`--border` / `--text-secondary`），修掉 `--fg` 未定义导致的 0px 边框。
+- **视图切换**：右上角改为带真实作品缩略图的抽屉（LOOKBACK / WORLD / ARCHIVE 各一张，
+  随浏览位置变化），点选后强制收回；从 ARCHIVE 切走先播整页退场再换视图。ARCHIVE 里
+  打开一篇不再硬跳，直接复用 LOOKBACK 的封面 FLIP。
+
 ### update: 58 — 2026-11-06
 
 #### ECHOES：博客分类 / 标签 / 作者自评 + ARCHIVE 卷轴，BLOGS 改名

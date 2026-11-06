@@ -44,7 +44,7 @@
   <div id="boot">
     <div style="text-align:center;padding:24px;">
       <div id="boot-text">Loading ———</div>
-      <a id="boot-retry" href="javascript:location.reload()">重新加载</a>
+      <a id="boot-retry" href="javascript:location.reload()">Reload</a>
     </div>
   </div>
   <script>
@@ -58,7 +58,7 @@
     }, 200);
     function fail() {
       clearInterval(timer);
-      document.getElementById('boot-text').innerHTML = '加载失败，请检查网络后重试';
+      document.getElementById('boot-text').innerHTML = 'Load failed — check your network and retry';
       document.getElementById('boot-retry').style.display = 'inline-block';
     }
     window.addEventListener('error', function (e) {

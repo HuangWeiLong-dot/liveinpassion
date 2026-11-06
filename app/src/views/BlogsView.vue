@@ -91,24 +91,55 @@ function setViewMode(mode) {
   }
 }
 
-function toggleView() {
-  // LOOKBACK → WORLD → ARCHIVE → LOOKBACK
-  setViewMode(viewMode.value === 'lookback' ? 'world'
-    : viewMode.value === 'world' ? 'archive'
-    : 'lookback');
+// 右侧抽屉：三种视图各配一张真实作品缩略图。图会跟着当前浏览位置变化，
+// 用压缩图（原图几 MB，用在 100px 缩略图上纯属浪费带宽）。
+const viewThumbs = computed(() => {
+  const n = blogPosts.length;
+  const pick = (p) => p?.image?.src || p?.image?.fullSrc || '';
+  return [
+    { key: 'lookback', label: 'LOOKBACK', image: pick(current.value || blogPosts[0]) },
+    { key: 'world', label: 'WORLD', image: pick(blogPosts[Math.floor(n / 2)] || blogPosts[0]) },
+    { key: 'archive', label: 'ARCHIVE', image: pick(activeWork.value || blogPosts[0]) },
+  ];
+});
+const drawerOpen = ref(false);
+// 点完缩略图后强制收回：hover / focus 都不许把它留在展开态。
+const drawerClosing = ref(false);
+let drawerTimer = 0;
+// ARCHIVE 的两段退场动画：切换到别的视图（整页退场）。
+const archiveExiting = ref(false);
+let archiveExitTimer = 0;
+
+function chooseView(key, e) {
+  // 从 ARCHIVE 切走时，先让整页做一次退场，再真正换视图。
+  if (viewMode.value === 'archive' && key !== 'archive') {
+    if (archiveExiting.value) return;
+    archiveExiting.value = true;
+    clearTimeout(archiveExitTimer);
+    archiveExitTimer = window.setTimeout(() => {
+      archiveExiting.value = false;
+      applyViewChoice(key, e);
+    }, 460);
+    return;
+  }
+  applyViewChoice(key, e);
 }
 
-// ARCHIVE 里从索引行进详情（没有封面交接，不能复用 openPost）
-function onArchiveOpen(post, el) {
-  if (opening.value || !post) return;
-  opening.value = true;
-  setCoverCurtain(true);
-  skipNextPageTransition();
-  // 没有封面 handoff 就按缺省入场，直接 replace
-  router
-    .push({ name: 'echo-detail', params: { slug: post.slug } })
-    .catch(() => {})
-    .finally(() => { opening.value = false; });
+function applyViewChoice(key, e) {
+  setViewMode(key);
+  drawerOpen.value = false;
+  drawerClosing.value = true;
+  try { e?.currentTarget?.blur?.(); } catch { /* ignore */ }
+  clearTimeout(drawerTimer);
+  drawerTimer = window.setTimeout(() => { drawerClosing.value = false; }, 480);
+}
+
+// ARCHIVE 里打开一篇：完全复用 LOOKBACK 的封面 FLIP —— 把被点的那张照片
+// 当作交接起点，详情页的封面从它当前位置飞过去；返回时再飞回同一格。
+function onArchiveOpen(work, el = null) {
+  if (!work) return;
+  const post = blogPosts.find((p) => p.slug === work.slug) || work;
+  openPost(post, el);
 }
 
 // 世界视图里点"READ ENTRY"：把展开层那张大图当作交接起点，封面照常飞进详情页
@@ -163,6 +194,19 @@ const CATEGORY_TABS = [
   { key: 'LETTER',   label: 'LETTER' },
 ];
 
+// 分类是 CMS 里自由填写的：固定的常用项后面，再补上文章里实际出现过的自定义分类
+const categoryTabs = computed(() => {
+  const seen = new Set(CATEGORY_TABS.map((t) => t.key));
+  const extras = [];
+  for (const p of blogPosts) {
+    const c = String(p.category || '').trim().toUpperCase();
+    if (!c || c === 'UNFILED' || seen.has(c)) continue;
+    seen.add(c);
+    extras.push({ key: c, label: c });
+  }
+  return [...CATEGORY_TABS, ...extras.sort((a, b) => a.key.localeCompare(b.key))];
+});
+
 const activeArchiveCat = ref('ALL');
 const activeTag = ref('');
 
@@ -170,8 +214,8 @@ try {
   const params = new URLSearchParams(window.location.search);
   const fromCat = params.get('cat');
   const fromTag = params.get('tag');
-  if (fromCat && CATEGORY_TABS.some((t) => t.key === fromCat.toUpperCase())) {
-    activeArchiveCat.value = fromCat.toUpperCase();
+  if (fromCat) {
+    activeArchiveCat.value = String(fromCat).trim().toUpperCase();
   }
   if (fromTag) activeTag.value = fromTag.trim().toUpperCase();
 } catch { /* ignore */ }
@@ -217,87 +261,157 @@ const archiveWorks = computed(() => {
   });
 });
 
-// 滚动步长：一步 = 视口高度的 62%。51 篇 ≈ 32 屏，比每篇一整屏短得多。
-const ARCHIVE_STEP = 0.62;
-
 const archiveIndex = ref(0);
-const archiveReel = ref(null);
-
-const activeWork = computed(
-  () => archiveWorks.value[Math.min(archiveIndex.value, archiveWorks.value.length - 1)] || null,
-);
-
-// 外层要够长，舞台才能一路 sticky；最后一步还要留满一屏给舞台停住。
-const archiveReelStyle = computed(() => {
-  const n = archiveWorks.value.length;
-  if (!n) return { height: '100vh' };
-  return { height: `calc(${((n - 1) * ARCHIVE_STEP * 100).toFixed(2)}vh + 100vh)` };
+// 当前项上下的邻居：做成竖向预览框（参考站中图上下会露出前后作品）。
+// 只渲染 active 前后各 2 篇，51 篇全渲染会白白拉一堆图。
+const archiveFrames = computed(() => {
+  const list = archiveWorks.value;
+  const n = list.length;
+  if (!n) return [];
+  const from = Math.max(0, archiveIndex.value - 2);
+  const to = Math.min(n, archiveIndex.value + 3);
+  const out = [];
+  for (let i = from; i < to; i += 1) {
+    out.push({ work: list[i], no: i, d: i - archiveIndex.value });
+  }
+  return out;
 });
 
-// 左栏只露当前附近的 7 个序号：51 条全铺会把索引列撑爆。
+const activeWork = computed(() => archiveWorks.value[archiveIndex.value] || null);
+
+// 当前是往上翻还是往下翻：左右两栏的信息跟着这个方向滚，而不是原地换字。
+const archiveDir = ref(1);
+
+// 左栏：以当前篇为中心的序号 + 文章名，整列用 transform 跟着中间的主图一起滚。
+// 只铺前后各 10 行（再多也超出裁切窗口），51 行全渲染没必要。
 const archiveIndexWindow = computed(() => {
   const list = archiveWorks.value;
   const n = list.length;
-  const span = 7;
+  const span = 21;
   if (!n) return [];
-  let start = Math.max(0, archiveIndex.value - Math.floor(span / 2));
+  let start = Math.max(0, archiveIndex.value - 10);
   let end = Math.min(n, start + span);
   if (end - start < span) start = Math.max(0, end - span);
-  return list.slice(start, end).map((w, k) => ({ work: w, no: start + k }));
+  return list.slice(start, end).map((w, k) => ({
+    work: w,
+    no: start + k,
+    d: start + k - archiveIndex.value,
+  }));
 });
 
-function archiveStepPx() {
-  return window.innerHeight * ARCHIVE_STEP;
+// 离中心越远越淡；中心那一行全亮。
+function railOpacity(d) {
+  if (d === 0) return 1;
+  return Math.max(0.1, 0.46 - Math.abs(d) * 0.05);
 }
 
-function syncArchiveIndex() {
-  const reel = archiveReel.value;
+function setArchiveIndex(i) {
   const n = archiveWorks.value.length;
-  if (!reel || !n) return;
-  const offset = Math.max(0, -reel.getBoundingClientRect().top);
-  const idx = Math.max(0, Math.min(n - 1, Math.round(offset / archiveStepPx())));
-  if (idx !== archiveIndex.value) archiveIndex.value = idx;
+  if (!n) return;
+  const next = Math.max(0, Math.min(n - 1, i));
+  if (next === archiveIndex.value) return;
+  archiveDir.value = next > archiveIndex.value ? 1 : -1;
+  archiveIndex.value = next;
 }
 
-// 跳某一步。smooth=false 用于"刚切进 ARCHIVE"的定位，避免页面自己滑一段。
-function jumpToArchive(i, smooth = true) {
-  const reel = archiveReel.value;
-  if (!reel) return;
-  const top = reel.getBoundingClientRect().top + window.scrollY;
-  const target = top + Math.max(0, i) * archiveStepPx();
-  window.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'auto' });
+function stepArchive(dir) {
+  setArchiveIndex(archiveIndex.value + dir);
 }
 
-function onArchiveScroll() {
+// 滚轮翻页。窗口已经锁死不能滚动，滚轮在这里只负责换上一篇/下一篇；
+// 用一道短锁避免一次滚动惯性连翻好几篇。
+let archiveWheelLock = false;
+function onArchiveWheel(e) {
+  const dy = e.deltaY || 0;
+  if (!dy) return;
+  e.preventDefault();
+  if (archiveWheelLock || Math.abs(dy) < 8) return;
+  archiveWheelLock = true;
+  stepArchive(dy > 0 ? 1 : -1);
+  window.setTimeout(() => { archiveWheelLock = false; }, 380);
+}
+
+// 键盘：↑↓ / PageUp PageDown 换篇；Enter 打开当前篇（由封面按钮自己处理）。
+function onArchiveKey(e) {
   if (viewMode.value !== 'archive') return;
-  syncArchiveIndex();
+  if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+    e.preventDefault();
+    stepArchive(1);
+  } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+    e.preventDefault();
+    stepArchive(-1);
+  }
 }
 
-function bindArchiveScroll() {
-  window.removeEventListener('scroll', onArchiveScroll);
-  window.addEventListener('scroll', onArchiveScroll, { passive: true });
+// 触屏竖向滑动换篇（窗口锁死后，滑动不会再滚页面）。
+let archiveTouchY = null;
+function onArchiveTouchStart(e) {
+  archiveTouchY = e.touches?.[0]?.clientY ?? null;
+}
+function onArchiveTouchEnd(e) {
+  if (archiveTouchY == null) return;
+  const endY = e.changedTouches?.[0]?.clientY ?? archiveTouchY;
+  const dy = archiveTouchY - endY;
+  archiveTouchY = null;
+  if (Math.abs(dy) >= 44) stepArchive(dy > 0 ? 1 : -1);
 }
 
-function unbindArchiveScroll() {
-  window.removeEventListener('scroll', onArchiveScroll);
+// 量一下固定导航的实际高度，分类区和抽屉都从这条线往下排，避免和导航重叠。
+// 用 offsetHeight 而不是 rect.bottom：导航在进场动画里可能带 transform，
+// 那一刻量 rect 会拿到被平移过的位置，offsetHeight 永远是它的真实高度。
+function syncHeaderOffset() {
+  const header = document.getElementById('header') || document.querySelector('header');
+  const h = header ? (header.offsetHeight || header.getBoundingClientRect().height) : 84;
+  document.documentElement.style.setProperty('--ba-nav-bottom', `${Math.max(56, Math.round(h))}px`);
 }
 
-// 换分类/清标签后回到第一部，否则 index 会停在超出新列表长度的位置。
-watch([activeArchiveCat, activeTag], async () => {
+function bindArchiveControls() {
+  window.addEventListener('keydown', onArchiveKey);
+  window.addEventListener('resize', syncHeaderOffset);
+  // 首屏进场动画、字体落地都会改变导航高度：多量几次，量不准最多只是间距差一点，
+  // 不会再把分类压到导航上。
+  syncHeaderOffset();
+  window.requestAnimationFrame(syncHeaderOffset);
+  window.setTimeout(syncHeaderOffset, 260);
+  window.setTimeout(syncHeaderOffset, 800);
+  document.fonts?.ready?.then(syncHeaderOffset).catch(() => {});
+}
+function unbindArchiveControls() {
+  window.removeEventListener('keydown', onArchiveKey);
+  window.removeEventListener('resize', syncHeaderOffset);
+}
+
+// 换分类/清标签后回到第一部。
+watch([activeArchiveCat, activeTag], () => {
   archiveIndex.value = 0;
-  await nextTick();
-  jumpToArchive(0, false);
 });
 
-// 进出 ARCHIVE：进时先对齐到当前进度，出时把监听摘掉。
+// 进出 ARCHIVE：进时锁住页面并接管滚轮/键盘，出时把这些控制还回去。
 watch(viewMode, async (mode) => {
-  if (mode === 'archive') {
-    bindArchiveScroll();
-    await nextTick();
-    syncArchiveIndex();
-    jumpToArchive(archiveIndex.value, false);
+  const locked = mode === 'archive';
+  document.documentElement.classList.toggle('echoes-locked', locked);
+  if (locked) {
+    bindArchiveControls();
+    window.scrollTo(0, 0);
   } else {
-    unbindArchiveScroll();
+    unbindArchiveControls();
+    window.scrollTo(0, 0);
+  }
+
+  // 回到 LOOKBACK：舞台刚从 display:none 恢复。藏在别的视图里那段时间，
+  // 释放观察器会把远处（实际上是全部）卡片的 src 摘掉；旧观察器也不会自己
+  // 重新认定交集。这里重建观察器，并把屏幕附近缺图的卡片立刻补上，
+  // 否则切回来只剩 alt 文字。
+  if (mode === 'lookback') {
+    await nextTick();
+    const root = scroller.value;
+    if (!root) return;
+    measure();
+    readCards();
+    observeCovers();
+    const left = root.scrollLeft || 0;
+    const w = root.clientWidth || window.innerWidth;
+    primeCovers(left - w, left + w * 2);
   }
 });
 
@@ -306,14 +420,16 @@ function yearOf(dateStr) {
   return m ? m[1] : '';
 }
 function gradeOf(rating) { return rating?.grade || ''; }
+function verdictOf(rating) { return rating?.verdict || ''; }
+function noteOf(rating) { return rating?.note || ''; }
 function scoreOf(rating) {
   if (!rating?.score) return '';
   return Number(rating.score).toFixed(1);
 }
 
-// 序号补零：卡片上是 01–21，计数器和进度条上也是同一套。
+// 序号补零：列表按最新在上排，但编号是时间顺序 —— 最早发布 = 01，最新 = 最大号。
 function pad(n) {
-  return String(n + 1).padStart(2, '0');
+  return String(blogPosts.length - n).padStart(2, '0');
 }
 
 // "OCTOBER 10, 2026 · 11:55 PM" → "OCT 10, 2026"。取不到就返回空串，模板里 v-if 兜住。
@@ -409,7 +525,7 @@ function openPost(post, el = null, query = null, instant = false) {
     // 这一页的底色也带走一份（详情页在交接这段时间要顶着同一个底色）。
     // ⚠ 现场读 .jb-stage 的计算值，别把 #0b0b0c 抄到 JS 里：那一档颜色归
     //   scoped 样式里的 --jb-bg 管，抄一份出来迟早会和主题/改色对不上。
-    const stage = document.querySelector('.jb-stage');
+    const stage = document.querySelector('.ba-archive') || document.querySelector('.jb-stage');
     rememberCoverHandoff(post.slug, clicked, {
       index: i,
       listLeft: scroller.value?.scrollLeft ?? 0,
@@ -1551,13 +1667,15 @@ watch(
     // 被点那张卡的标记等渐入演完再清（它给封面接手用）：清早了，落点那一格会在
     // 渐入半路被拉回 0（它也在 RETURN_FADE_SELECTOR 之外，靠的就是这个标记）。
     returnFadeTimer = window.setTimeout(() => {
-      document.querySelectorAll('.jb-card.is-flying').forEach((c) => c.classList.remove('is-flying'));
+      document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying')
+        .forEach((c) => c.classList.remove('is-flying'));
     }, RETURN_FADE * 1000 + 150);
   }
 );
 
 onMounted(async () => {
   pageActive.value = true;
+  if (viewMode.value === 'archive') document.documentElement.classList.add('echoes-locked');
   activate();
   window.addEventListener('resize', onResize);
   // 切到别的标签页时停掉主循环：留着只是白烧 CPU/电，
@@ -1577,31 +1695,43 @@ onMounted(async () => {
   observeCovers();
   syncTarget();
   if (scroller.value && scroller.value.scrollLeft === 0) restoreScroll();
-  if (viewMode.value === 'archive') {
-    bindArchiveScroll();
-    await nextTick();
-    syncArchiveIndex();
-  }
+  if (viewMode.value === 'archive') bindArchiveControls();
 });
 
 // keep-alive 复用时 onMounted 不会重跑：轨道重新挂进文档、宽度变了都得重来一遍
 onActivated(async () => {
   pageActive.value = true;
+  if (viewMode.value === 'archive') document.documentElement.classList.add('echoes-locked');
   activate();
   await nextTick();
   measure();
   readCards();
   syncTarget();
+  // 从详情返回时组件被 keep-alive 摘出去过，释放观察器可能已经把 src 撤了：
+  // 重建观察器并把当前屏幕附近的图补齐，避免回到列表只剩 alt。
+  if (viewMode.value === 'lookback') {
+    observeCovers();
+    if (scroller.value) {
+      const left = scroller.value.scrollLeft || 0;
+      const w = scroller.value.clientWidth || window.innerWidth;
+      primeCovers(left - w, left + w * 2);
+    }
+  }
   // 补一次位置：activate() 那次可能因为列表还没插回文档（cycleWidth=0）跳过了。
   // 判据用"还停在 0"——轨道活着的时候永远不会是 0（回卷会把它圈回中间那一份）。
   if (scroller.value && scroller.value.scrollLeft === 0) restoreScroll();
+  if (viewMode.value === 'archive') bindArchiveControls();
 });
 
 onDeactivated(() => {
   pageActive.value = false;
   deactivate();
   unbindClickCapture();
-  unbindArchiveScroll();
+  unbindArchiveControls();
+  document.documentElement.classList.remove('echoes-locked');
+  clearTimeout(drawerTimer);
+  clearTimeout(archiveExitTimer);
+  archiveExiting.value = false;
   lazyObserver?.disconnect();
   releaseObserver?.disconnect();
   loadedSet.clear();
@@ -1620,7 +1750,10 @@ onUnmounted(() => {
   unbindClickCapture();
   window.removeEventListener('resize', onResize);
   document.removeEventListener('visibilitychange', onVisibility);
-  unbindArchiveScroll();
+  unbindArchiveControls();
+  document.documentElement.classList.remove('echoes-locked');
+  clearTimeout(drawerTimer);
+  clearTimeout(archiveExitTimer);
   clearTimeout(resizeTimer);
   stopLoop();
 });
@@ -1841,128 +1974,148 @@ function onVisibility() {
       </div>
     </section>
 
-    <!-- ARCHIVE：east64films 式作品卷轴 —— 中图、左序号、右信息、下方标题动效 -->
+    <!-- ARCHIVE：窗口锁死的作品卷轴 —— 中图、上下预览、左序号、右信息、下方标题动效 -->
     <section
       v-if="viewMode === 'archive'"
-      ref="archiveReel"
       class="ba-archive"
-      :style="archiveReelStyle"
+      :class="{ 'is-exiting': archiveExiting }"
       role="region"
       aria-label="Echo archive"
+      @wheel="onArchiveWheel"
+      @touchstart.passive="onArchiveTouchStart"
+      @touchend.passive="onArchiveTouchEnd"
     >
       <div class="ba-stage">
-        <!-- 顶部：分类细条（保持原有筛选能力，但降到参考站导航的视觉重量） -->
-        <nav class="ba-filters" aria-label="Filter by category">
-          <button
-            v-for="tab in CATEGORY_TABS"
-            :key="tab.key"
-            type="button"
-            class="ba-filter"
-            :class="{ 'is-active': activeArchiveCat === tab.key }"
-            :aria-pressed="activeArchiveCat === tab.key"
-            @click="setArchiveCat(tab.key)"
-          >{{ tab.label }}</button>
-          <span v-if="activeTag" class="ba-filter__tag">
-            {{ activeTag }}
-            <button type="button" class="ba-filter__clear" aria-label="清除标签" @click="setTag('')">×</button>
-          </span>
-          <span class="ba-filters__count">{{ archiveWorks.length }} / {{ total }}</span>
-        </nav>
+        <!-- 左上：分类筛选（label + 条目两行，细字重）。
+             ⚠ 必须用 div，不能用 <header>：main.css 里有一条裸 header 选择器，
+               会把所有 <header> 强制 fixed 到页面顶部，正好压在导航栏上。 -->
+        <div class="ba-filters">
+          <div class="ba-filters__head">
+            <span class="ba-filters__label">CATEGORY</span>
+            <span class="ba-filters__count">{{ archiveWorks.length }} / {{ total }} PIECES</span>
+          </div>
+          <div class="ba-filters__list" role="group" aria-label="Filter by category">
+            <button
+              v-for="tab in categoryTabs"
+              :key="tab.key"
+              type="button"
+              class="ba-filter"
+              :class="{ 'is-active': activeArchiveCat === tab.key }"
+              :aria-pressed="activeArchiveCat === tab.key"
+              @click="setArchiveCat(tab.key)"
+            >{{ tab.label }}</button>
+            <span v-if="activeTag" class="ba-filter__tag">
+              TAG · {{ activeTag }}
+              <button type="button" class="ba-filter__clear" aria-label="清除标签" @click="setTag('')">×</button>
+            </span>
+          </div>
+        </div>
 
         <div v-if="activeWork" class="ba-slug">
-          <!-- 左栏：序号索引；当前这一部才带标题 -->
+          <!-- 左栏：序号 + 文章名，整列跟着中间的卷轴一起上下滚 -->
           <aside class="ba-idx" aria-label="Index">
             <button
               v-for="row in archiveIndexWindow"
               :key="row.work.slug"
               type="button"
               class="ba-idx__row"
-              :class="{ 'is-active': row.no === archiveIndex }"
-              :aria-current="row.no === archiveIndex ? 'true' : undefined"
-              @click="jumpToArchive(row.no)"
+              :class="{ 'is-active': row.d === 0 }"
+              :style="{ '--d': String(row.d), opacity: railOpacity(row.d) }"
+              :aria-current="row.d === 0 ? 'true' : undefined"
+              @click="setArchiveIndex(row.no)"
             >
               <span class="ba-idx__no">{{ String(row.no + 1).padStart(2, '0') }}</span>
-              <span v-if="row.no === archiveIndex" class="ba-idx__label">{{ row.work.category }}</span>
+              <span class="ba-idx__title">{{ row.work.cardTitle }}</span>
+              <span v-if="row.d === 0" class="ba-idx__label">{{ row.work.category }}</span>
             </button>
           </aside>
 
-          <!-- 中间：封面 + 下方标题（切图时两段各自过渡） -->
+          <!-- 中间：上方小字短评（固定槽）+ 主图与上下预览 + 下方大标题（固定槽） -->
           <div class="ba-center">
-            <div
-              class="ba-cover"
-              role="link"
-              tabindex="0"
-              :aria-label="`打开 ${activeWork.cardTitle}`"
-              @click="onArchiveOpen(activeWork)"
-              @keydown.enter.prevent="onArchiveOpen(activeWork)"
-              @keydown.space.prevent="onArchiveOpen(activeWork)"
-            >
-              <Transition name="ba-cover" mode="out-in">
-                <img
-                  v-if="activeWork.image?.fullSrc || activeWork.image?.src"
-                  :key="activeWork.slug"
-                  :src="activeWork.image.fullSrc || activeWork.image.src"
-                  :alt="activeWork.cardTitle"
-                  loading="eager"
-                  decoding="async"
-                />
-                <div v-else :key="activeWork.slug" class="ba-cover__blank">
-                  {{ String(archiveIndex + 1).padStart(2, '0') }}
+            <div class="ba-review">
+              <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
+                <div :key="activeWork.slug" class="ba-review__inner">
+                  <p v-if="verdictOf(activeWork.rating)" class="ba-review__en">
+                    {{ verdictOf(activeWork.rating) }}
+                  </p>
+                  <p v-if="noteOf(activeWork.rating)" class="ba-review__zh">
+                    {{ noteOf(activeWork.rating) }}
+                  </p>
                 </div>
               </Transition>
-              <span class="ba-cover__hint">VIEW ↗</span>
+            </div>
+
+            <div class="ba-reel">
+              <button
+                v-for="f in archiveFrames"
+                :key="f.work.slug"
+                type="button"
+                class="ba-frame"
+                :class="{ 'is-active': f.d === 0 }"
+                :style="{ '--d': String(f.d), '--s': f.d === 0 ? 1 : 0.86, zIndex: 10 - Math.abs(f.d) }"
+                :aria-label="f.d === 0 ? `打开 ${f.work.cardTitle}` : `切换到 ${f.work.cardTitle}`"
+                @click="f.d === 0 ? onArchiveOpen(f.work, $event.currentTarget) : setArchiveIndex(f.no)"
+              >
+                <img
+                  v-if="f.work.image?.src || f.work.image?.fullSrc"
+                  :src="f.work.image.src || f.work.image.fullSrc"
+                  :alt="f.work.cardTitle"
+                  :loading="Math.abs(f.d) <= 1 ? 'eager' : 'lazy'"
+                  decoding="async"
+                />
+                <span v-else class="ba-frame__blank">{{ String(f.no + 1).padStart(2, '0') }}</span>
+                <span v-if="f.d === 0" class="ba-frame__hint">VIEW ↗</span>
+              </button>
             </div>
 
             <div class="ba-caption">
-              <Transition name="ba-swap" mode="out-in">
+              <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
                 <div :key="activeWork.slug" class="ba-caption__inner">
+                  <!-- 图片下方只留大标题：副标题与分类/标签已按需求去掉 -->
                   <h2 class="ba-caption__title">{{ activeWork.cardTitle }}</h2>
-                  <p v-if="activeWork.title && activeWork.title !== activeWork.cardTitle" class="ba-caption__sub">
-                    {{ activeWork.title }}
-                  </p>
-                  <p class="ba-caption__meta">
-                    {{ activeWork.category }}
-                    <template v-if="activeWork.tags.length"> / {{ activeWork.tags.join(' · ') }}</template>
-                  </p>
                 </div>
               </Transition>
             </div>
           </div>
 
-          <!-- 右栏：这一篇的元信息 -->
+          <!-- 右栏：这一篇的元信息；同样按翻页方向滚进滚出 -->
           <aside class="ba-info" aria-label="Entry information">
-            <div class="ba-info__col">
-              <span class="ba-info__k">TYPE</span>
-              <span class="ba-info__v">{{ activeWork.category }}</span>
-            </div>
-            <div class="ba-info__col">
-              <span class="ba-info__k">DATE</span>
-              <span class="ba-info__v">{{ monthOf(activeWork.cardDate) }} {{ activeWork.year }}</span>
-            </div>
-            <div class="ba-info__col">
-              <span class="ba-info__k">SCORE</span>
-              <span class="ba-info__v">
-                <template v-if="gradeOf(activeWork.rating)">
-                  {{ gradeOf(activeWork.rating) }}
-                  <template v-if="scoreOf(activeWork.rating)"> · {{ scoreOf(activeWork.rating) }}</template>
-                </template>
-                <template v-else>—</template>
-              </span>
-            </div>
-            <div class="ba-info__col">
-              <span class="ba-info__k">READ</span>
-              <span class="ba-info__v">{{ activeWork.readTime || '—' }}</span>
-            </div>
-            <div v-if="activeWork.tags.length" class="ba-info__tags">
-              <button
-                v-for="tag in activeWork.tags.slice(0, 8)"
-                :key="tag"
-                type="button"
-                class="ba-chip"
-                :class="{ 'is-active': tag === activeTag }"
-                @click="setTag(tag === activeTag ? '' : tag)"
-              >{{ tag }}</button>
-            </div>
+            <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
+              <div :key="activeWork.slug" class="ba-info__inner">
+                <div class="ba-info__col">
+                  <span class="ba-info__k">TYPE</span>
+                  <span class="ba-info__v">{{ activeWork.category }}</span>
+                </div>
+                <div class="ba-info__col">
+                  <span class="ba-info__k">DATE</span>
+                  <span class="ba-info__v">{{ monthOf(activeWork.cardDate) }}</span>
+                </div>
+                <div class="ba-info__col">
+                  <span class="ba-info__k">SCORE</span>
+                  <span class="ba-info__v">
+                    <template v-if="gradeOf(activeWork.rating)">
+                      {{ gradeOf(activeWork.rating) }}
+                      <template v-if="scoreOf(activeWork.rating)"> · {{ scoreOf(activeWork.rating) }}</template>
+                    </template>
+                    <template v-else>—</template>
+                  </span>
+                </div>
+                <div class="ba-info__col">
+                  <span class="ba-info__k">READ</span>
+                  <span class="ba-info__v">{{ activeWork.readTime || '—' }}</span>
+                </div>
+                <div v-if="activeWork.tags.length" class="ba-info__tags">
+                  <button
+                    v-for="tag in activeWork.tags.slice(0, 8)"
+                    :key="tag"
+                    type="button"
+                    class="ba-chip"
+                    :class="{ 'is-active': tag === activeTag }"
+                    @click="setTag(tag === activeTag ? '' : tag)"
+                  >{{ tag }}</button>
+                </div>
+              </div>
+            </Transition>
           </aside>
         </div>
 
@@ -1970,36 +2123,45 @@ function onVisibility() {
 
         <!-- 右下：进度（参考站那枚 02 / 24） -->
         <div v-if="archiveWorks.length" class="ba-progress">
-          {{ String(archiveIndex + 1).padStart(2, '0') }}
+          {{ String(archiveWorks.length - archiveIndex).padStart(2, '0') }}
           <span>/</span>
           {{ String(archiveWorks.length).padStart(2, '0') }}
         </div>
       </div>
     </section>
 
-    <!-- 视图切换：三种呈现都常驻同一个 URL，选择记在 localStorage -->
-    <button
-      class="jb-viewtoggle"
-      type="button"
-      :aria-pressed="viewMode !== 'lookback'"
-      :aria-label="`当前视图 ${viewMode.toUpperCase()}，点击切换`"
-      @click="toggleView"
+    <!-- 视图切换：右侧抽屉，三张真实作品缩略图（收起时只露一条把手） -->
+    <aside
+      class="jb-viewdrawer"
+      :class="{ 'is-open': drawerOpen, 'is-closing': drawerClosing }"
+      aria-label="Switch view"
     >
-      <span class="jb-viewtoggle__k">VIEW</span>
-      <span class="jb-viewtoggle__v">{{ viewMode === 'lookback' ? 'LOOKBACK' : viewMode === 'world' ? 'WORLD' : 'ARCHIVE' }}</span>
-      <svg
-        class="jb-viewtoggle__icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
+      <div class="jb-viewdrawer__panel">
+        <button
+          v-for="opt in viewThumbs"
+          :key="opt.key"
+          type="button"
+          class="jb-vthumb"
+          :class="{ 'is-active': viewMode === opt.key }"
+          :aria-pressed="viewMode === opt.key"
+          :aria-label="`切换到 ${opt.label} 视图`"
+          @click="chooseView(opt.key, $event)"
+        >
+          <img v-if="opt.image" :src="opt.image" alt="" loading="lazy" decoding="async" />
+          <span v-else class="jb-vthumb__blank" aria-hidden="true"></span>
+          <span class="jb-vthumb__label">{{ opt.label }}</span>
+        </button>
+      </div>
+      <button
+        class="jb-viewdrawer__handle"
+        type="button"
+        :aria-expanded="drawerOpen"
+        aria-label="展开/收起视图切换"
+        @click="drawerOpen = !drawerOpen"
       >
-        <path d="M4 8h13l-3-3M20 16H7l3 3" />
-      </svg>
-    </button>
+        <span class="jb-viewdrawer__handle-text">VIEW</span>
+      </button>
+    </aside>
   </main>
 </template>
 
@@ -2009,15 +2171,17 @@ function onVisibility() {
   overflow: hidden;
 }
 .blogs-lookback-page.is-archive {
-  overflow: visible;
-  min-height: 100vh;
+  overflow: hidden;
+  height: 100vh;
 }
-/* ARCHIVE 是独立的 section，LOOKBACK/WORLD 的舞台元素收掉；但 VIEW 按钮要永远可见 */
+/* ARCHIVE 是独立的 section，LOOKBACK/WORLD 的舞台元素收掉 */
 .blogs-lookback-page.is-archive .jb-stage {
   display: none;
 }
-.blogs-lookback-page.is-archive .jb-viewtoggle {
-  z-index: 10;
+/* 锁住 ARCHIVE 时连浏览器根滚动的默认滚动条一起去掉（页脚占位也不会再撑出滚动条） */
+:global(html.echoes-locked),
+:global(html.echoes-locked body) {
+  overflow: hidden;
 }
 
 /* ── 这一页自己的调色板（亮/暗两套）──────────────────────────────────────
@@ -2792,115 +2956,218 @@ function onVisibility() {
   }
 }
 
-/* ── 视图切换按钮 ────────────────────────────────────────────────────────
-   两种呈现都盖在同一页上，这枚按钮要始终在同一条位置：右上角、header 下方。
-   颜色跟随本页独立的 --jb-* 调色板（html.blogs-lookback 上定义的那套），
-   所以亮/暗主题切换时它和轨道、世界视图一起变。 */
-.jb-viewtoggle {
+/* ── 视图切换：右侧抽屉 ─────────────────────────────────────────────────
+   收起时只露右侧一条把手；悬停/聚焦/点击展开三张真实作品缩略图。
+   颜色跟本页的 --jb-* 调色板走，暗/亮主题都一致。 */
+.jb-viewdrawer {
   position: fixed;
-  top: 92px;
-  right: 64px;
+  top: max(104px, calc(var(--ba-nav-bottom, 84px) + 16px));
+  right: 0;
   z-index: 41;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
+  display: flex;
+  align-items: stretch;
+  transform: translateX(calc(100% - 36px));
+  transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.jb-viewdrawer:hover,
+.jb-viewdrawer:focus-within,
+.jb-viewdrawer.is-open {
+  transform: translateX(0);
+}
+/* 点完缩略图：不管鼠标还在不在上面、焦点还在不在里面，都强制收回去 */
+.jb-viewdrawer.is-closing,
+.jb-viewdrawer.is-closing:hover,
+.jb-viewdrawer.is-closing:focus-within {
+  transform: translateX(calc(100% - 36px));
+}
+.jb-viewdrawer__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--jb-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
   border: 1px solid var(--jb-line);
+  border-right: none;
+}
+.jb-vthumb {
+  position: relative;
+  width: 132px;
+  height: 72px;
+  padding: 0;
+  border: none;
+  background: color-mix(in srgb, var(--jb-fg) 8%, transparent);
+  overflow: hidden;
+  cursor: pointer;
+  display: block;
+}
+.jb-vthumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  opacity: 0.55;
+  transition: opacity 0.22s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.jb-vthumb:hover img,
+.jb-vthumb:focus-visible img {
+  opacity: 0.9;
+  transform: scale(1.04);
+}
+.jb-vthumb.is-active img { opacity: 1; }
+.jb-vthumb.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--jb-fg);
+}
+.jb-vthumb__blank {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--jb-fg) 10%, transparent);
+}
+.jb-vthumb__label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 5px 8px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  color: #f5f5f5;
+  text-align: left;
+  background: linear-gradient(0deg, rgba(11, 11, 12, 0.85) 0%, rgba(11, 11, 12, 0) 100%);
+}
+.jb-viewdrawer__handle {
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--jb-line);
+  border-right: none;
   border-radius: 0;
-  background: color-mix(in srgb, var(--jb-bg) 82%, transparent);
-  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--jb-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
   color: var(--jb-fg);
   cursor: pointer;
-  transition: border-color 0.25s ease, background-color 0.25s ease;
 }
-.jb-viewtoggle:hover {
-  border-color: var(--jb-fg);
-}
-.jb-viewtoggle__k {
+.jb-viewdrawer__handle-text {
+  writing-mode: vertical-rl;
   font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 9px;
-  letter-spacing: 0.14em;
-  color: var(--jb-faint);
-}
-.jb-viewtoggle__v {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-.jb-viewtoggle__icon {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
+  letter-spacing: 0.24em;
 }
 
 @media (max-width: 1024px) {
-  .jb-viewtoggle {
-    top: 78px;
-    right: 20px;
-    padding: 7px 12px;
+  .jb-viewdrawer {
+    top: max(96px, calc(var(--ba-nav-bottom, 84px) + 14px));
+    transform: translateX(calc(100% - 30px));
   }
-  /* 小屏时世界视图右上角让不开，标签只留当前视图名 */
-  .jb-viewtoggle__k {
-    display: none;
+  .jb-vthumb {
+    width: 104px;
+    height: 66px;
   }
+  .jb-viewdrawer__handle { width: 30px; }
 }
 
 /* ── ARCHIVE（east64films 式作品卷轴）──────────────────────────────────────
-   sticky 舞台：中间是封面，左边是序号索引，右边是这一篇的元信息，
-   封面下方的大标题随滚动换篇做文字动效。外层高度由 JS 按条数算，
-   滚动一步 = 换一部作品，图片一直留在 DOM 里，不会重复请求。 */
+   fixed 锁死整个视口：页面不滚动，滚轮/键盘只负责换篇。
+   中间是主图，上下露出前后作品做预览；左边序号，右边元信息，下方标题动效。 */
 .ba-archive {
-  position: relative;
+  position: fixed;
+  inset: 0;
+  z-index: 2;
   background: var(--jb-bg, #0b0b0c);
   color: var(--jb-fg, #f5f5f5);
+  overscroll-behavior: none;
 }
 .ba-stage {
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 88px 56px 40px;
+  /* 从导航实际高度往下排；另设一个下限，测量失败也不会压到导航上 */
+  padding: max(128px, calc(var(--ba-nav-bottom, 84px) + 36px)) 56px 40px;
   box-sizing: border-box;
   overflow: hidden;
 }
 
-/* 顶部筛选：压到参考站导航那种细字重 */
+/* 左上：分类筛选，两行结构（label + 条目） */
 .ba-filters {
   display: flex;
-  align-items: center;
-  gap: 2px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   flex: 0 0 auto;
-  margin-bottom: 8px;
+  margin-bottom: 14px;
+  max-width: 100%;
+}
+.ba-filters__head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+.ba-filters__label {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--jb-fg);
+  border-left: 2px solid var(--jb-fg);
+  padding-left: 8px;
+  line-height: 1;
+}
+.ba-filters__count {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--jb-faint);
+}
+.ba-filters__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 22px;
+  max-width: 100%;
 }
 .ba-filter {
+  position: relative;
   font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 9px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   background: transparent;
   border: none;
-  color: color-mix(in srgb, var(--jb-fg) 42%, transparent);
-  padding: 6px 12px;
+  color: color-mix(in srgb, var(--jb-fg) 38%, transparent);
+  padding: 5px 0 6px;
   cursor: pointer;
   transition: color 0.18s ease;
 }
-.ba-filter:first-child { padding-left: 0; }
 .ba-filter:hover { color: var(--jb-fg); }
 .ba-filter.is-active {
   color: var(--jb-fg);
-  box-shadow: inset 0 -1px 0 var(--jb-fg);
+}
+.ba-filter.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--jb-fg);
 }
 .ba-filter__tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 10px;
-  padding-left: 12px;
+  padding-left: 14px;
   border-left: 1px solid var(--jb-line);
   font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
+  font-size: 8px;
   letter-spacing: 0.18em;
   color: var(--jb-fg);
 }
@@ -2913,14 +3180,6 @@ function onVisibility() {
   line-height: 1;
 }
 .ba-filter__clear:hover { color: var(--jb-fg); }
-.ba-filters__count {
-  margin-left: auto;
-  padding-right: 0;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  color: var(--jb-faint);
-}
 
 /* 三栏：左索引 / 中封面 / 右信息 */
 .ba-slug {
@@ -2930,68 +3189,161 @@ function onVisibility() {
   grid-template-columns: minmax(120px, 1fr) minmax(0, 46vw) minmax(120px, 1fr);
   align-items: center;
   gap: 32px;
+  /* 上短评槽(46+16) / 下标题槽(116+16)：主图中心比整栏中心低 35px */
+  --ba-offset: 35px;
 }
 
-/* 左：只露当前附近的序号 */
+/* 左：跟着卷轴滚动的“序号 + 文章名”列表 */
 .ba-idx {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  align-self: center;
+  position: relative;
+  align-self: stretch;
+  height: 100%;
+  overflow: hidden;
 }
 .ba-idx__row {
-  display: inline-flex;
+  position: absolute;
+  left: 0;
+  top: calc(50% + var(--ba-offset));
+  display: flex;
   align-items: baseline;
   gap: 12px;
-  background: transparent;
+  max-width: 100%;
+  padding: 0;
   border: none;
-  padding: 5px 0;
+  background: transparent;
   cursor: pointer;
-  color: color-mix(in srgb, var(--jb-fg) 26%, transparent);
-  transition: color 0.2s ease;
+  color: color-mix(in srgb, var(--jb-fg) 55%, transparent);
+  transform: translateY(calc(-50% + var(--d) * 32px));
+  transition:
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 0.25s ease,
+    opacity 0.4s ease;
+  white-space: nowrap;
 }
-.ba-idx__row:hover { color: color-mix(in srgb, var(--jb-fg) 70%, transparent); }
-.ba-idx__row.is-active { color: var(--jb-fg); }
+.ba-idx__row.is-active,
+.ba-idx__row:hover { color: var(--jb-fg); }
 .ba-idx__no {
   font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.16em;
   font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
 }
-.ba-idx__label {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
+.ba-idx__title {
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ba-idx__row.is-active .ba-idx__title { font-weight: 500; }
+.ba-idx__label {
+  flex: 0 0 auto;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding-left: 10px;
   border-left: 1px solid var(--jb-line);
+  color: var(--jb-faint);
 }
 
-/* 中：封面 + 标题 */
+/* 中：上方小字短评（固定槽）+ 主图卷轴 + 下方大标题（固定槽）
+   两个槽的高度都是写死的，文字动画只在槽内动，绝不改变中图尺寸 */
 .ba-center {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 26px;
+  gap: 16px;
   min-width: 0;
+  height: 100%;
 }
-.ba-cover {
+/* 上方：作者短评，小字 */
+.ba-review {
+  flex: 0 0 46px;
+  height: 46px;
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.ba-review__inner {
+  width: 100%;
+}
+.ba-review__en {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--jb-fg) 62%, transparent);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ba-review__zh {
+  font-family: var(--font-body, 'Noto Sans SC', sans-serif);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--jb-fg) 46%, transparent);
+  margin: 4px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 卷轴窗口：上下各露出前后作品，超出部分裁掉 */
+.ba-reel {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   max-width: 760px;
-  height: min(52vh, 560px);
+  margin: 0 auto;
   overflow: hidden;
-  background: color-mix(in srgb, var(--jb-fg) 6%, transparent);
-  cursor: pointer;
+  contain: layout paint;
 }
-.ba-cover img {
+.ba-frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
+  height: 82%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate3d(-50%, calc(-50% + var(--d) * 94%), 0) scale(var(--s, 0.86));
+  opacity: 0.38;
+  z-index: 1;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  transition:
+    transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.35s ease;
 }
-.ba-cover__blank {
+/* 图片元素本身就按原始比例撑开（不铺满框、不裁切），
+   这样封面交接量到的矩形正好是照片的真实范围。 */
+.ba-frame img {
+  position: static;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.ba-frame__blank {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -3002,7 +3354,15 @@ function onVisibility() {
   font-size: clamp(48px, 7vw, 96px);
   color: color-mix(in srgb, var(--jb-fg) 22%, transparent);
 }
-.ba-cover__hint {
+.ba-frame.is-active {
+  opacity: 1;
+  cursor: zoom-in;
+}
+.ba-frame.is-active:focus-visible {
+  outline: 1px solid var(--jb-fg);
+  outline-offset: 3px;
+}
+.ba-frame__hint {
   position: absolute;
   right: 14px;
   bottom: 12px;
@@ -3014,50 +3374,81 @@ function onVisibility() {
   opacity: 0;
   transition: opacity 0.25s ease;
 }
-.ba-cover:hover .ba-cover__hint,
-.ba-cover:focus-visible .ba-cover__hint { opacity: 1; }
-.ba-cover:focus-visible { outline: 1px solid var(--jb-fg); outline-offset: 3px; }
+.ba-frame.is-active:hover .ba-frame__hint,
+.ba-frame.is-active:focus-visible .ba-frame__hint { opacity: 1; }
 
-/* 标题块：和中图同宽、居中；切换时整块淡出上移、新块自下而上 */
+/* 点开一篇时沿用 LOOKBACK 的幕布：除被点的那张照片外全部渐隐，
+   照片本身不动，交给详情页的封面 FLIP 从它的真实矩形接手。
+   ⚠ `html` 这一段必须写在 :global() **里面**（和 BlogDetailView 那几条一样）：
+   写成 `:global(html.bd-taking-cover) .ba-filters` 时，Vue 的 scoped 编译器
+   会把 :global() 之后的整串丢掉，只留赤裸的 `html.bd-taking-cover { opacity: 0 }`
+   —— 于是整篇文档（连详情页）都被淡成 0，画布露出默认白色，就是点封面后那一下
+   "白屏"（实测：连续 3–4 帧纯白，返程同样会白）。 */
+:global(html.bd-taking-cover .ba-filters),
+:global(html.bd-taking-cover .ba-review),
+:global(html.bd-taking-cover .ba-caption),
+:global(html.bd-taking-cover .ba-idx),
+:global(html.bd-taking-cover .ba-info),
+:global(html.bd-taking-cover .ba-progress) {
+  opacity: 0;
+  transition: opacity 0.34s ease;
+}
+:global(html.bd-taking-cover .ba-frame:not(.is-flying)) {
+  opacity: 0;
+  transition: opacity 0.34s ease;
+}
+
+/* 切换到别的视图：整页向右退场 */
+.ba-archive.is-exiting .ba-frame {
+  transform: translate3d(calc(-50% + 46vw), -50%, 0) scale(1.08);
+  opacity: 0;
+}
+.ba-archive.is-exiting .ba-filters,
+.ba-archive.is-exiting .ba-review,
+.ba-archive.is-exiting .ba-caption,
+.ba-archive.is-exiting .ba-info,
+.ba-archive.is-exiting .ba-progress {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* 下方大标题：固定高度槽，高度不随文字动画变化 */
 .ba-caption {
+  flex: 0 0 116px;
+  height: 116px;
   width: 100%;
   max-width: 760px;
-  min-height: 118px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  overflow: visible;
+}
+.ba-caption__inner {
+  width: 100%;
 }
 .ba-caption__title {
-  font-family: 'Times New Roman', 'Songti SC', Georgia, serif;
-  font-weight: 400;
-  font-size: clamp(26px, 2.9vw, 46px);
-  line-height: 1.1;
-  letter-spacing: 0.03em;
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: clamp(28px, 3vw, 48px);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   margin: 0;
 }
-.ba-caption__sub {
-  font-family: 'Times New Roman', 'Songti SC', Georgia, serif;
-  font-size: clamp(16px, 1.5vw, 24px);
-  letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--jb-fg) 78%, transparent);
-  margin: 6px 0 0;
-}
-.ba-caption__meta {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--jb-faint);
-  margin: 12px 0 0;
-}
 
-/* 右：元信息（label 在上、值在下） */
+/* 右：元信息（整块按翻页方向滚进滚出） */
 .ba-info {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px 28px;
   justify-self: end;
   align-self: center;
   max-width: 300px;
+  transform: translateY(var(--ba-offset));
+}
+.ba-info__inner {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
 }
 .ba-info__col {
   display: flex;
@@ -3139,33 +3530,33 @@ function onVisibility() {
   color: var(--jb-faint);
 }
 
-/* 切换动效：标题（上出下入）与封面（交叉淡入 + 微缩放） */
-.ba-swap-enter-active,
-.ba-swap-leave-active {
-  transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+/* 切换动效：标题与右栏信息都按翻页方向滚进滚出（向上翻 = 内容向上走） */
+.ba-roll-down-enter-active,
+.ba-roll-down-leave-active,
+.ba-roll-up-enter-active,
+.ba-roll-up-leave-active {
+  transition:
+    opacity 0.26s ease,
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.ba-swap-enter-from { opacity: 0; transform: translateY(16px); }
-.ba-swap-leave-to { opacity: 0; transform: translateY(-16px); }
-
-.ba-cover-enter-active,
-.ba-cover-leave-active {
-  transition: opacity 0.5s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.ba-cover-enter-from { opacity: 0; transform: scale(1.04); }
-.ba-cover-leave-to { opacity: 0; transform: scale(0.985); }
+.ba-roll-down-enter-from { opacity: 0; transform: translateY(22px); }
+.ba-roll-down-leave-to { opacity: 0; transform: translateY(-22px); }
+.ba-roll-up-enter-from { opacity: 0; transform: translateY(-22px); }
+.ba-roll-up-leave-to { opacity: 0; transform: translateY(22px); }
 
 /* ── 响应式 ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .ba-stage { padding: 84px 32px 32px; }
+  .ba-stage { padding: max(118px, calc(var(--ba-nav-bottom, 84px) + 32px)) 32px 32px; }
   .ba-slug { grid-template-columns: 64px minmax(0, 1fr); gap: 20px; }
   .ba-info { display: none; }
 }
 @media (max-width: 720px) {
-  .ba-stage { padding: 72px 20px 24px; }
+  .ba-stage { padding: max(108px, calc(var(--ba-nav-bottom, 84px) + 26px)) 20px 24px; }
   .ba-slug { grid-template-columns: 1fr; }
   .ba-idx { display: none; }
-  .ba-cover { height: min(44vh, 380px); }
-  .ba-caption { min-height: 104px; }
+  .ba-frame { height: 76%; }
+  .ba-review { flex-basis: 40px; height: 40px; }
+  .ba-caption { flex-basis: 96px; height: 96px; }
   .ba-caption__title { font-size: clamp(22px, 6.4vw, 32px); }
   .ba-filters {
     overflow-x: auto;
@@ -3179,9 +3570,16 @@ function onVisibility() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ba-swap-enter-active,
-  .ba-swap-leave-active,
-  .ba-cover-enter-active,
-  .ba-cover-leave-active { transition: none; }
+  .ba-roll-down-enter-active,
+  .ba-roll-down-leave-active,
+  .ba-roll-up-enter-active,
+  .ba-roll-up-leave-active { transition: none; }
+  .ba-frame,
+  .ba-idx__row { transition: none; }
+  .ba-archive.is-exiting .ba-frame,
+  .ba-archive.is-exiting .ba-filters,
+  .ba-archive.is-exiting .ba-review,
+  .ba-archive.is-exiting .ba-caption,
+  .ba-archive.is-exiting .ba-info { transition: none; }
 }
 </style>

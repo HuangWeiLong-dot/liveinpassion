@@ -62,7 +62,8 @@ function formatDate(ts) {
 }
 
 function padIndex(i) {
-  return String(i + 1).padStart(2, '0');
+  // 列表是「最新在上」，但编号是时间顺序：最早发布 = 01，最新 = 最大号
+  return String(posts.value.length - i).padStart(2, '0');
 }
 
 onMounted(load);

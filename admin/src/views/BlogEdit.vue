@@ -68,12 +68,30 @@ const form = ref({
   coverKey: '',
   coverFullKey: '',
   category: 'UNFILED',
-  tags: [],         // 数组；输入框里是逗号分隔文本，保存前拆
-  tagsText: '',
-  rating: null,     // { score, grade, language, emotion, structure, afterglow, verdict, note }
+  tags: [],
+  tagDraft: '',
+  // 新文章也必须有对象：模板里的评分字段是直接绑 form.rating.score 的，
+  // 之前的 null 会让 /blogs/new 整页渲染失败（白屏）
+  rating: {
+    score: null,
+    language: 0,
+    emotion: 0,
+    structure: 0,
+    afterglow: 0,
+    verdict: '',
+    note: '',
+  },
   ratingOn: false,
+  coverRating: {
+    score: null,
+    verdict: '',
+  },
+  coverRatingOn: false,
 });
-const CATEGORY_OPTIONS = ['UNFILED', 'POEM', 'ESSAY', 'LOG', 'CRITIQUE', 'FRAGMENT', 'LETTER'];
+const TAG_LIMIT = 12;
+const TAG_MAX_LEN = 24;
+const CATEGORY_MAX_LEN = 24;
+const categorySuggestions = ref([]);
 const saving = ref(false);
 const uploading = ref(false);
 const error = ref('');
@@ -197,6 +215,56 @@ function onCardTitleInput() {
   if (!slugDirty.value) form.value.slug = toSlug(raw);
 }
 
+// ── Category / Tags / Rating 表单助手 ─────────────────────────────────
+function normalizeCategoryInput(value) {
+  const v = String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+  return (v || 'UNFILED').slice(0, CATEGORY_MAX_LEN);
+}
+
+function applyCategory(value) {
+  form.value.category = value;
+}
+
+function addTag() {
+  const raw = String(form.value.tagDraft || '').trim();
+  if (!raw) return;
+  const parts = raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    const tag = part.replace(/\s+/g, ' ').toUpperCase().slice(0, TAG_MAX_LEN);
+    if (!tag) continue;
+    if (form.value.tags.includes(tag)) continue;
+    if (form.value.tags.length >= TAG_LIMIT) break;
+    form.value.tags.push(tag);
+  }
+  form.value.tagDraft = '';
+}
+
+function removeTag(tag) {
+  form.value.tags = form.value.tags.filter((t) => t !== tag);
+}
+
+function onTagKeydown(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    addTag();
+  } else if (e.key === 'Backspace' && !form.value.tagDraft && form.value.tags.length) {
+    removeTag(form.value.tags[form.value.tags.length - 1]);
+  }
+}
+
+function loadCategorySuggestions() {
+  blogApi.list()
+    .then((data) => {
+      const seen = new Set();
+      for (const p of data.posts || []) {
+        const c = normalizeCategoryInput(p.category);
+        if (c !== 'UNFILED') seen.add(c);
+      }
+      categorySuggestions.value = [...seen].sort();
+    })
+    .catch(() => { /* suggestions are optional */ });
+}
+
 // 正文图片暂存：blobUrl -> File。保存时才真正上传 R2
 const pendingImages = reactive(new Map());
 const imgProgress = ref('');
@@ -205,6 +273,7 @@ const imgProgress = ref('');
 function syncNarrow(e) { isNarrow.value = e.matches; }
 onMounted(() => narrowScreen.addEventListener('change', syncNarrow));
 onUnmounted(() => narrowScreen.removeEventListener('change', syncNarrow));
+onMounted(loadCategorySuggestions);
 
 onMounted(async () => {
   if (!isNew.value) {
@@ -216,16 +285,33 @@ onMounted(async () => {
       form.value.contentMd = data.contentMd || '';
       form.value.coverKey = data.coverKey || '';
       form.value.coverFullKey = data.coverFullKey || '';
-      form.value.category = data.category || 'UNFILED';
-      form.value.tags = Array.isArray(data.tags) ? data.tags : [];
-      form.value.tagsText = form.value.tags.join(', ');
-      if (data.rating && typeof data.rating === 'object' && data.rating.score != null) {
-        form.value.rating = { ...data.rating };
-        form.value.ratingOn = true;
-      } else {
-        form.value.rating = { score: null, language: 0, emotion: 0, structure: 0, afterglow: 0, verdict: '', note: '' };
-        form.value.ratingOn = false;
-      }
+      form.value.category = normalizeCategoryInput(data.category);
+      form.value.tags = Array.isArray(data.tags)
+        ? [...new Set(
+            data.tags
+              .map((t) => String(t || '').trim().toUpperCase().slice(0, TAG_MAX_LEN))
+              .filter(Boolean)
+          )].slice(0, TAG_LIMIT)
+        : [];
+      form.value.tagDraft = '';
+      const r = data.rating && typeof data.rating === 'object' ? data.rating : {};
+      const dims = r.dimensions && typeof r.dimensions === 'object' ? r.dimensions : {};
+      form.value.rating = {
+        score: r.score != null ? Number(r.score) : null,
+        language: Number(r.language ?? dims.language ?? 0) || 0,
+        emotion: Number(r.emotion ?? dims.emotion ?? 0) || 0,
+        structure: Number(r.structure ?? dims.structure ?? 0) || 0,
+        afterglow: Number(r.afterglow ?? dims.afterglow ?? 0) || 0,
+        verdict: r.verdict || '',
+        note: r.note || '',
+      };
+      form.value.ratingOn = form.value.rating.score != null;
+      const cr = data.coverRating && typeof data.coverRating === 'object' ? data.coverRating : {};
+      form.value.coverRating = {
+        score: cr.score != null ? Number(cr.score) : null,
+        verdict: cr.verdict || '',
+      };
+      form.value.coverRatingOn = form.value.coverRating.score != null;
       // 已有内容不参与自动填充
       if (data.title) titleDirty.value = true;
       if (data.slug) slugDirty.value = true;
@@ -286,23 +372,29 @@ async function save(status) {
     }
     imgProgress.value = '';
 
-    // 把 tagsText 拆成数组（后端会再次归一化）
-    const tagsArr = form.value.tagsText
-      .split(/[,\s，、]+/)
-      .map((t) => t.trim().toUpperCase())
-      .filter(Boolean);
+    // 还没按 Enter 的 tag 也要算进去；已加进 form.tags 的保持不动
+    addTag();
+    const tagsArr = form.value.tags.slice(0, TAG_LIMIT);
 
-    // rating：只有评分开关开着且有分数才提交；grade 由后端从 score 重算，
-    // 这里不用传它（保留也无妨，后端会覆盖）
-    const rating = form.value.ratingOn && form.value.rating && form.value.rating.score != null
+    // rating：有分数就提交（即使折叠了评分块也不丢）；grade 由后端从 score 重算
+    const r = form.value.rating;
+    const rating = r && r.score != null
       ? {
-          score: Number(form.value.rating.score),
-          language: Number(form.value.rating.language) || 0,
-          emotion: Number(form.value.rating.emotion) || 0,
-          structure: Number(form.value.rating.structure) || 0,
-          afterglow: Number(form.value.rating.afterglow) || 0,
-          verdict: form.value.rating.verdict || '',
-          note: form.value.rating.note || '',
+          score: Number(r.score),
+          language: Number(r.language) || 0,
+          emotion: Number(r.emotion) || 0,
+          structure: Number(r.structure) || 0,
+          afterglow: Number(r.afterglow) || 0,
+          verdict: r.verdict || '',
+          note: r.note || '',
+        }
+      : null;
+
+    const cr = form.value.coverRating;
+    const coverRating = cr && cr.score != null
+      ? {
+          score: Number(cr.score),
+          verdict: cr.verdict || '',
         }
       : null;
 
@@ -313,9 +405,10 @@ async function save(status) {
       contentMd: form.value.contentMd,
       coverKey: form.value.coverKey,
       coverFullKey: form.value.coverFullKey,
-      category: form.value.category,
+      category: normalizeCategoryInput(form.value.category),
       tags: tagsArr,
       rating,
+      coverRating,
     };
     let id;
     if (isNew.value) {
@@ -1004,7 +1097,7 @@ onUnmounted(() => {
           <input v-model="form.slug" placeholder="in-the-middle-of-the-world" @input="slugDirty = true" />
           <div class="field-hint">URL path, lowercase letters, numbers and hyphens only</div>
         </div>
-        <div class="field field--wide">
+        <div class="field cover-field">
           <label class="field-label">04 / Cover</label>
           <div class="cover-row">
             <div class="cover-preview" :class="{ 'is-empty': !coverPreview }">
@@ -1021,18 +1114,52 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 05 / Category & Tags -->
-        <div class="field">
-          <label class="field-label">05 / Category</label>
-          <select v-model="form.category">
-            <option v-for="c in CATEGORY_OPTIONS" :key="c" :value="c">{{ c }}</option>
-          </select>
-          <div class="field-hint">Which collection this piece belongs to · UNFILED puts it at the end</div>
+        <div class="field tags-field">
+          <label class="field-label">05 / Tags</label>
+          <input
+            v-model="form.tagDraft"
+            class="tag-input"
+            maxlength="80"
+            placeholder="TYPE A TAG, PRESS ENTER"
+            @keydown="onTagKeydown"
+            @blur="addTag"
+          />
+          <div v-if="form.tags.length" class="tag-chips">
+            <button
+              v-for="tag in form.tags"
+              :key="tag"
+              type="button"
+              class="tag-chip"
+              :aria-label="`Remove tag ${tag}`"
+              @click="removeTag(tag)"
+            >
+              {{ tag }} <span class="tag-chip__x">×</span>
+            </button>
+          </div>
+          <div class="field-hint">Enter or comma adds a tag · click to remove · up to 12</div>
         </div>
-        <div class="field">
-          <label class="field-label">06 / Tags</label>
-          <input v-model="form.tagsText" placeholder="LOVE, STRANGERS, DUST" />
-          <div class="field-hint">Comma or space separated · normalized to uppercase · max 12</div>
+
+        <div class="field field--wide">
+          <label class="field-label">06 / Category</label>
+          <input
+            v-model="form.category"
+            class="category-input"
+            maxlength="24"
+            placeholder="TYPE OR PICK A CATEGORY"
+            @blur="form.category = normalizeCategoryInput(form.category)"
+            @keydown.enter.prevent="form.category = normalizeCategoryInput(form.category)"
+          />
+          <div v-if="categorySuggestions.length" class="suggest-row">
+            <button
+              v-for="c in categorySuggestions"
+              :key="c"
+              type="button"
+              class="suggest-chip"
+              :class="{ active: form.category === c }"
+              @click="applyCategory(c)"
+            >{{ c }}</button>
+          </div>
+          <div class="field-hint">Free text · chips are categories already used · empty becomes UNFILED</div>
         </div>
       </div>
 
@@ -1041,13 +1168,13 @@ onUnmounted(() => {
         <summary class="rating-summary">
           <span>07 / Author's Rating</span>
           <span class="rating-summary__hint">
-            <template v-if="form.ratingOn && form.rating && form.rating.score != null">
+            <template v-if="form.rating && form.rating.score != null">
               {{ Number(form.rating.score).toFixed(1) }} / 10
             </template>
             <template v-else>off</template>
           </span>
         </summary>
-        <div class="rating-body">
+        <div class="rating-body" v-if="form.rating">
           <div class="field field--wide">
             <label class="field-label">Score / 10</label>
             <input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.score" placeholder="e.g. 9.1" />
@@ -1063,10 +1190,34 @@ onUnmounted(() => {
               <input v-model="form.rating.verdict" placeholder="One sentence judgment, ≤ 180 chars" maxlength="180" />
             </div>
             <div class="field field--wide">
-              <label class="field-label">Note (中文)</label>
-              <input v-model="form.rating.note" placeholder="一句短评，≤ 120 字" maxlength="120" />
+              <label class="field-label">Short Review (EN)</label>
+              <textarea v-model="form.rating.note" rows="2" placeholder="A short review in English, 120 characters max" maxlength="120"></textarea>
             </div>
           </template>
+        </div>
+      </details>
+
+      <!-- 08 / Cover rating（和正文自评分开；前台显示在封面右上角） -->
+      <details class="rating-block" :open="form.coverRatingOn" @toggle="form.coverRatingOn = $event.target.open">
+        <summary class="rating-summary">
+          <span>08 / Cover Rating</span>
+          <span class="rating-summary__hint">
+            <template v-if="form.coverRating && form.coverRating.score != null">
+              {{ Number(form.coverRating.score).toFixed(1) }} / 10
+            </template>
+            <template v-else>off</template>
+          </span>
+        </summary>
+        <div class="rating-body" v-if="form.coverRating">
+          <div class="field field--wide">
+            <label class="field-label">Cover Score / 10</label>
+            <input type="number" min="0" max="10" step="0.1" v-model.number="form.coverRating.score" placeholder="e.g. 8.6" />
+            <div class="field-hint">Grade is derived from the score (S ≥ 9.0 · A ≥ 8.0 · B ≥ 7.0 · C ≥ 6.0)</div>
+          </div>
+          <div class="field field--wide">
+            <label class="field-label">Cover Verdict (EN)</label>
+            <input v-model="form.coverRating.verdict" maxlength="120" placeholder="One short line about the cover" />
+          </div>
         </div>
       </details>
     </div>
@@ -1252,6 +1403,68 @@ onUnmounted(() => {
 .cover-btn input { display: none; }
 .is-uploading { opacity: 0.6; cursor: wait; }
 
+/* 标签：方形、细边框、mono 大写；点击整块即移除 */
+.tags-field { min-width: 0; }
+.tag-input, .category-input { text-transform: uppercase; }
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 7px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.tag-chip:hover { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg); }
+.tag-chip__x { font-size: 0.66rem; line-height: 1; opacity: 0.6; }
+.tag-chip:hover .tag-chip__x { opacity: 1; }
+
+/* 已用过的分类：方形建议签，点一下填进上面的输入框 */
+.suggest-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.suggest-chip {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.suggest-chip:hover { border-color: var(--text-primary); color: var(--text-primary); }
+.suggest-chip.active { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg); }
+
+@media (hover: none) {
+  .tag-chip, .suggest-chip { min-height: 44px; padding: 0 12px; }
+}
+
 .editor-panel {
   border: 1px solid var(--border);
   margin-bottom: 24px;
@@ -1341,6 +1554,13 @@ onUnmounted(() => {
 @media (hover: none) {
   .tip-fine { display: none; }
   .tip-coarse { display: inline; }
+}
+
+@media (max-width: 900px) {
+  .meta-panel { padding: 20px; }
+  .form-grid { gap: 18px 22px; }
+  .cover-preview { width: 150px; }
+  .rating-block { margin-top: 16px; }
 }
 
 @media (max-width: 700px) {
@@ -1580,67 +1800,62 @@ onUnmounted(() => {
 .md-editor-preview .media-text__media img { display: block; width: 100%; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
 
-/* ── Author's Rating block ──────────────────────────────────────────────── */
+/* ── Author's Rating block：和 CMS 一致，直角 / 细边框 / mono ───────────── */
 .rating-block {
-  margin-top: 16px;
-  border: 1px solid var(--border, #2a2a2c);
-  border-radius: 6px;
-  padding: 0;
-  background: var(--panel-bg, #151518);
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
 }
-.rating-block[open] { padding: 14px 18px 18px; }
 .rating-summary {
   list-style: none;
   cursor: pointer;
-  padding: 14px 18px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  padding: 12px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: var(--fg, #eaeaea);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-primary);
 }
+.rating-block[open] .rating-summary { border-bottom: 1px solid var(--border); }
 .rating-summary::-webkit-details-marker { display: none; }
 .rating-summary::before {
   content: '+';
-  margin-right: 12px;
-  width: 16px;
+  margin-right: 10px;
+  width: 14px;
   display: inline-block;
   text-align: center;
   opacity: 0.6;
   transition: transform 0.18s ease;
 }
-.rating-block[open] .rating-summary::before {
-  content: '−';
-}
+.rating-block[open] .rating-summary::before { content: '−'; }
 .rating-summary__hint {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  opacity: 0.5;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
 }
 .rating-body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px 20px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border, #2a2a2c);
+  padding: 16px;
 }
 .rating-body .field--wide { grid-column: 1 / -1; }
 .rating-body input[type="number"] {
-  width: 100%;
-  background: var(--input-bg, #0e0e10);
-  border: 1px solid var(--border, #2a2a2c);
-  border-radius: 4px;
-  color: var(--fg, #eaeaea);
-  padding: 8px 10px;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  border-radius: 0;
 }
+.rating-body textarea { min-height: 72px; }
 .rating-body input[type="number"]:focus,
 .rating-body input:not([type]):focus {
   outline: none;
-  border-color: var(--accent, #eaeaea);
+  border-color: var(--text-primary);
+  background: var(--bg);
 }
 </style>

@@ -1,7 +1,7 @@
 // Public 只读 API：供前台构建期拉取
 import { Hono } from 'hono';
 import { CDN_BASE } from '../lib/r2.js';
-import { normalizeRating } from '../lib/meta.js';
+import { normalizeRating, normalizeCoverRating } from '../lib/meta.js';
 
 const app = new Hono();
 
@@ -15,7 +15,7 @@ app.get('/posts', async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT slug, card_title, title, content_format, content_html,
-            cover_key, cover_full_key, read_time_min, category, tags_json, rating_json,
+            cover_key, cover_full_key, read_time_min, category, tags_json, rating_json, cover_rating_json,
             published_at
      FROM posts WHERE status='published' ORDER BY published_at DESC`
   ).all();
@@ -30,6 +30,7 @@ app.get('/posts', async (c) => {
     category: row.category || 'UNFILED',
     tags: parseTags(row.tags_json),
     rating: normalizeRating(row.rating_json),
+    coverRating: normalizeCoverRating(row.cover_rating_json),
     image: {
       src: row.cover_key ? `${CDN_BASE}/${row.cover_key}` : null,
       fullSrc: row.cover_full_key ? `${CDN_BASE}/${row.cover_full_key}` : null,
@@ -46,7 +47,7 @@ app.get('/posts/:slug', async (c) => {
   const slug = c.req.param('slug');
   const row = await db.prepare(
     `SELECT slug, card_title, title, content_format, content_html,
-            cover_key, cover_full_key, read_time_min, category, tags_json, rating_json,
+            cover_key, cover_full_key, read_time_min, category, tags_json, rating_json, cover_rating_json,
             published_at
      FROM posts WHERE slug=? AND status='published'`
   ).bind(slug).first();
@@ -63,6 +64,7 @@ app.get('/posts/:slug', async (c) => {
     category: row.category || 'UNFILED',
     tags: parseTags(row.tags_json),
     rating: normalizeRating(row.rating_json),
+    coverRating: normalizeCoverRating(row.cover_rating_json),
     image: {
       src: row.cover_key ? `${CDN_BASE}/${row.cover_key}` : null,
       fullSrc: row.cover_full_key ? `${CDN_BASE}/${row.cover_full_key}` : null,

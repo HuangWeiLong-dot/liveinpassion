@@ -430,6 +430,8 @@ async function tap(sel) {
     const barHit = await json(`(function () {
       var b = document.querySelector('.gallery-editbtn[data-cmd="delete"]');
       if (!b) return null;
+      // 表单变高后，平板首屏不一定直接看到块底部工具条：先像用户一样滚到它，再验证可命中
+      b.scrollIntoView({ block: 'center' });
       var r = b.getBoundingClientRect();
       var top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return { hit: b === top || b.contains(top), inView: r.top >= 0 && r.bottom <= window.innerHeight };

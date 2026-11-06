@@ -27,9 +27,26 @@ const KEY = 'lip:blog-cover-handoff';
 export function rememberCoverHandoff(slug, el, extra = {}) {
   if (!slug || !el || typeof window === 'undefined') return;
   try {
-    const fig = el.querySelector?.('.jb-media') || el.querySelector?.('figure') || el;
-    const r = fig.getBoundingClientRect();
+    const fig = el.querySelector?.('.jb-media')
+      || el.querySelector?.('figure')
+      || el.querySelector?.('img')
+      || el;
+    let r = fig.getBoundingClientRect();
+    // ⚠ 图还没解码时 <img> 是 0×0。以前这里直接 return —— 交接数据整个没有，
+    //   详情页只能硬切、返回也没有落点（用户报的"图没加载完，按 Esc 位置不对"）。
+    //   退回被点的那一格本身（卡片 / ARCHIVE 的相框）就有尺寸了：飞行至少
+    //   从"卡片那一格"起飞、也飞回那一格，比例对不上总比没有落点强。
+    if (!r.width || !r.height) {
+      const box = el.closest?.('.jb-card, .ba-frame') || el;
+      r = box.getBoundingClientRect();
+    }
     if (!r.width || !r.height) return;
+    // 顺带把这张图的真实比例带过去：详情页的媒体盒一开始就按它撑开，
+    // 这样即使详情那张图解码得慢，封面也不会先落在默认的 4/5 盒子上、
+    // 等图一到再突然变形（实测：632px → 379px 的一次瞬跳）。
+    const srcImg = fig.tagName === 'IMG' ? fig : fig.querySelector?.('img');
+    const naturalWidth = srcImg?.naturalWidth || 0;
+    const naturalHeight = srcImg?.naturalHeight || 0;
     const rect = (b) => (b && b.width && b.height
       ? { left: b.left, top: b.top, width: b.width, height: b.height }
       : null);
@@ -43,6 +60,8 @@ export function rememberCoverHandoff(slug, el, extra = {}) {
       index: typeof extra.index === 'number' ? extra.index : null,
       listLeft: typeof extra.listLeft === 'number' ? extra.listLeft : 0,
       rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+      naturalWidth,
+      naturalHeight,
       neighbors,
       // 只收计算后的 rgb()/rgba() 串（getComputedStyle 的输出）；其它形状一律当没有。
       stageBg: typeof extra.stageBg === 'string' && /^rgba?\([\d\s.,%]+\)$/.test(extra.stageBg)

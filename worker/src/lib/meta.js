@@ -12,10 +12,15 @@ export const DIMENSION_LABELS = {
   afterglow: 'AFTERGLOW',
 };
 
-// 只接受白名单，否则回退 UNFILED
+// 分类是自由文本（CMS 里可输入或点选历史分类），这里只做大小写/空白归一化。
+// 早期版本限定白名单，会把作者自己起的分类静默改成 UNFILED。
 export function normalizeCategory(input) {
-  const v = String(input || '').trim().toUpperCase();
-  return CATEGORY_WHITELIST.includes(v) ? v : DEFAULT_CATEGORY;
+  const v = String(input || '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+  return (v || DEFAULT_CATEGORY).slice(0, 24);
 }
 
 // 去空去重统一大写；最多 12 个，每个最长 24 字符（超长后端截断，防止恶意输入）
@@ -85,6 +90,33 @@ export function ratingToStored(rating) {
     note: obj.note,
   };
   return JSON.stringify(stored);
+}
+
+// 封面评分：独立于正文自评，只存 score + grade + verdict。
+// 阈值与正文评分一致，grade 由后端从 score 重算。
+export function normalizeCoverRating(input) {
+  if (!input) return null;
+  let obj = input;
+  if (typeof input === 'string') {
+    try { obj = JSON.parse(input); } catch { return null; }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+
+  const raw = Number(obj.score);
+  if (!Number.isFinite(raw) || raw < 0 || raw > 10) return null;
+  const score = Math.round(raw * 10) / 10;
+  const grade = score >= 9.0 ? 'S'
+    : score >= 8.0 ? 'A'
+    : score >= 7.0 ? 'B'
+    : score >= 6.0 ? 'C'
+    : 'D';
+  const verdict = typeof obj.verdict === 'string' ? obj.verdict.trim().slice(0, 120) : '';
+  return { score, grade, verdict };
+}
+
+export function coverRatingToStored(input) {
+  const obj = normalizeCoverRating(input);
+  return obj ? JSON.stringify(obj) : null;
 }
 
 export function tagsToStored(tags) {

@@ -14,7 +14,7 @@ async function request(path, options = {}) {
   });
   if (res.status === 401 || res.status === 403) {
     redirectToLogin();
-    throw new Error('登录已失效，正在跳转登录页…');
+    throw new Error('Session expired. Redirecting to sign in…');
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -55,7 +55,7 @@ export const uploadApi = {
     const res = await fetch(`${BASE}/api/admin/uploads`, { method: 'POST', body: form });
     if (res.status === 401 || res.status === 403) {
       redirectToLogin();
-      throw new Error('登录已失效，正在跳转登录页…');
+      throw new Error('Session expired. Redirecting to sign in…');
     }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));

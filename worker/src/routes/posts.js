@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { requireAccessAuth } from '../lib/auth.js';
 import { renderMarkdown, sanitizeExistingHtml, estimateReadTime } from '../lib/markdown.js';
 import { triggerRebuild } from '../lib/github.js';
-import { normalizeCategory, normalizeTags, normalizeRating, ratingToStored, tagsToStored } from '../lib/meta.js';
+import { normalizeCategory, normalizeTags, normalizeRating, ratingToStored, tagsToStored, normalizeCoverRating, coverRatingToStored } from '../lib/meta.js';
 
 const app = new Hono();
 
@@ -35,17 +35,18 @@ app.post('/', requireAccessAuth, async (c) => {
   const category = normalizeCategory(body.category);
   const tagsJson = tagsToStored(body.tags);
   const ratingStored = ratingToStored(body.rating);
+  const coverRatingStored = coverRatingToStored(body.coverRating);
 
   try {
     const result = await db.prepare(
       `INSERT INTO posts (slug, card_title, title, status, content_format, content_md, content_html,
-        cover_key, cover_full_key, read_time_min, category, tags_json, rating_json,
+        cover_key, cover_full_key, read_time_min, category, tags_json, rating_json, cover_rating_json,
         published_at, updated_at)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
     ).bind(
       slug, cardTitle, title, format, contentMd || null, contentHtml,
       coverKey || null, coverFullKey || null, readTime,
-      category, tagsJson, ratingStored
+      category, tagsJson, ratingStored, coverRatingStored
     ).run();
 
     return c.json({ id: result.meta.last_row_id, slug }, 201);
@@ -87,18 +88,23 @@ app.put('/:id', requireAccessAuth, async (c) => {
   const hasCategory = 'category' in body;
   const hasTags = 'tags' in body;
   const hasRating = 'rating' in body;
+  const hasCoverRating = 'coverRating' in body;
   const category = hasCategory ? normalizeCategory(body.category) : existing.category;
   const tagsJson = hasTags ? tagsToStored(body.tags) : existing.tags_json;
   let ratingStored = existing.rating_json;
   if (hasRating) {
     ratingStored = body.rating == null ? null : ratingToStored(body.rating);
   }
+  let coverRatingStored = existing.cover_rating_json;
+  if (hasCoverRating) {
+    coverRatingStored = body.coverRating == null ? null : coverRatingToStored(body.coverRating);
+  }
 
   try {
     await db.prepare(
       `UPDATE posts SET slug=?, card_title=?, title=?, content_format=?, content_md=?, content_html=?,
         cover_key=?, cover_full_key=?, read_time_min=?, category=?, tags_json=?, rating_json=?,
-        updated_at=datetime('now')
+        cover_rating_json=?, updated_at=datetime('now')
        WHERE id=?`
     ).bind(
       slug, body.cardTitle || existing.card_title, body.title || existing.title,
@@ -106,7 +112,7 @@ app.put('/:id', requireAccessAuth, async (c) => {
       body.coverKey !== undefined ? body.coverKey : existing.cover_key,
       body.coverFullKey !== undefined ? body.coverFullKey : existing.cover_full_key,
       readTime,
-      category, tagsJson, ratingStored,
+      category, tagsJson, ratingStored, coverRatingStored,
       id
     ).run();
     return c.json({ ok: true });
@@ -152,7 +158,7 @@ app.get('/', requireAccessAuth, async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT id, slug, card_title, title, status, content_format, read_time_min,
-            cover_key, cover_full_key, category, tags_json, rating_json,
+            cover_key, cover_full_key, category, tags_json, rating_json, cover_rating_json,
             published_at, created_at, updated_at
      FROM posts ORDER BY COALESCE(published_at, created_at) DESC`
   ).all();
@@ -188,6 +194,7 @@ function rowToPostAdmin(row, withContent = false) {
     category: row.category || 'UNFILED',
     tags,
     rating,
+    coverRating: normalizeCoverRating(row.cover_rating_json),
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

@@ -94,6 +94,13 @@ function safeRating(raw) {
   if (!raw || typeof raw !== 'object') return null;
   return raw;
 }
+// 封面评分独立于正文自评：只关心 score/grade/verdict，缺字段就当作没有
+function safeCoverRating(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const score = Number(raw.score);
+  if (!Number.isFinite(score)) return null;
+  return { ...raw, score };
+}
 function safeTags(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.map((t) => String(t).toUpperCase());
@@ -302,6 +309,17 @@ function syncRatio(img) {
   apply();
 }
 
+// 用交接数据里那张图的**真实尺寸**先把媒体盒比例定下来。
+// 为什么需要：媒体盒是 `aspect-ratio` 撑的，默认 4/5；如果详情这张图解码慢到
+// 1.5s 兜底先开了场，封面就会落在 4/5 的盒子上，等图一到盒子再变一次 ——
+// 实测 632px → 379px 的一次瞬跳（"闪一下"），慢网下按 Esc 时起点也跟着偏。
+// 列表里那张图与这里**同一张**，交接时已经解码的话尺寸就是准的。
+function applyHandoffRatio() {
+  const w = Number(handoff?.naturalWidth);
+  const h = Number(handoff?.naturalHeight);
+  if (w > 0 && h > 0) ratio.value = `${w} / ${h}`;
+}
+
 function loadFeatured() {
   const img = coverMediaEl()?.querySelector('img');
   if (!img) return;
@@ -428,7 +446,12 @@ let typeTimer = 0;
 let typeSafety = 0;
 let infoSafety = 0; // 入场没跑到打字那一步时的兜底（见 scheduleEnter）
 
+// 拆字/敲字这一套的"代次"：每次 stopTyping 就 +1，正在分批拆字的那条循环
+// 一看代次变了就收工（换篇、退场、停用时都靠它，别让半套 span 继续往 DOM 里塞）。
+let typeRun = 0;
+
 function stopTyping() {
+  typeRun += 1;
   if (typeTimer) {
     clearInterval(typeTimer);
     typeTimer = 0;
@@ -436,14 +459,20 @@ function stopTyping() {
   typing.value = false;
 }
 
-// 把 root 里的文本节点按字符拆成一堆 span（空白照原样留成文本节点，不占节奏）
+// 把 root 里的文本节点按字符拆成一堆 span（空白照原样留成文本节点，不占节奏）。
+// root 也可以直接是一个文本节点（分批拆字时会这么传，见 startTyping）。
 function wrapTextNodes(root) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.nodeValue && n.nodeValue.trim()
-      ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
-  });
+  if (!root) return [];
   const nodes = [];
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+  if (root.nodeType === Node.TEXT_NODE) {
+    if (root.nodeValue && root.nodeValue.trim()) nodes.push(root);
+  } else {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.nodeValue && n.nodeValue.trim()
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+    });
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+  }
   const chars = [];
   nodes.forEach((node) => {
     const frag = document.createDocumentFragment();
@@ -531,6 +560,7 @@ function moveCaret(el) {
 
 function startTyping() {
   stopTyping();
+  const run = typeRun; // 这一代的编号（stopTyping 刚 +1）
   const title = titleRef.value;
   const body = bodyRef.value;
   const info = infoRef.value;
@@ -538,59 +568,95 @@ function startTyping() {
   if (!title || !info) return;
 
   if (body) info.classList.add('is-typing');
-  const stream = [...wrapTextNodes(title), ...(body ? wrapTextNodes(body) : [])];
-  if (!stream.length) {
-    if (body) info.classList.remove('is-typing');
-    return;
-  }
-  // 每一块的第一个字符在流里的位置 —— 打到那儿就把整块（含图）放出来
-  const blocks = body
-    ? [...body.children]
-      .map((el) => ({ el, at: stream.indexOf(el.querySelector('.tw-ch')) }))
-      .filter((b) => b.at >= 0)
-      .sort((a, b) => a.at - b.at)
-    : [];
+  const stream = wrapTextNodes(title);
 
-  const revealAll = () => {
-    stream.forEach((c) => c.classList.add('is-on'));
-    blocks.forEach((b) => b.el.classList.add('is-on'));
-    if (body) info.classList.remove('is-typing');
-  };
-
-  if (reducedMotion) {
-    revealAll();
-    gsap.set(info, { opacity: 1 });
-    return;
-  }
-
-  const rate = Math.min(TW_MAX, Math.max(TW_MIN, stream.length / TW_TARGET));
-  let i = 0;
-  let bi = 0;
-  typing.value = true;
-  // 容器只亮这一次（0.25s）—— 之前"整块淡入 + 逐行淡入"两套叠着演，就是"闪两次"的来源
-  gsap.fromTo(info, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power1', overwrite: true });
-  typeTimer = window.setInterval(() => {
-    const step = Math.max(1, Math.round(rate / 60));
-    for (let k = 0; k < step && i < stream.length; k += 1, i += 1) stream[i].classList.add('is-on');
-    while (bi < blocks.length && blocks[bi].at <= i) {
-      blocks[bi].el.classList.add('is-on');
-      bi += 1;
+  // 拆完之后（以及每一块内部的逐字节奏）都在这里，和下面的分批拆字分开：
+  // 拆字是同步的重活，敲字是每 16ms 一次的轻活。
+  const play = () => {
+    if (run !== typeRun) return; // 已经被换篇/退场顶掉
+    if (!stream.length) {
+      if (body) info.classList.remove('is-typing');
+      return;
     }
-    moveCaret(stream[Math.min(i, stream.length) - 1]);
-    if (i >= stream.length) {
-      revealAll();
-      stopTyping();
-    }
-  }, 16);
+    // 每一块的第一个字符在流里的位置 —— 打到那儿就把整块（含图）放出来
+    const blocks = body
+      ? [...body.children]
+        .map((el) => ({ el, at: stream.indexOf(el.querySelector('.tw-ch')) }))
+        .filter((b) => b.at >= 0)
+        .sort((a, b) => a.at - b.at)
+      : [];
 
-  // 兜底：万一这套没跑起来（异常 / 被打断），2.5s 后把文字全放出来，别留一页空白
-  clearTimeout(typeSafety);
-  typeSafety = window.setTimeout(() => {
-    if (!typing.value) {
+    const revealAll = () => {
+      stream.forEach((c) => c.classList.add('is-on'));
+      blocks.forEach((b) => b.el.classList.add('is-on'));
+      if (body) info.classList.remove('is-typing');
+    };
+
+    if (reducedMotion) {
       revealAll();
       gsap.set(info, { opacity: 1 });
+      return;
     }
-  }, 2500);
+
+    const rate = Math.min(TW_MAX, Math.max(TW_MIN, stream.length / TW_TARGET));
+    let i = 0;
+    let bi = 0;
+    typing.value = true;
+    // 容器只亮这一次（0.25s）—— 之前"整块淡入 + 逐行淡入"两套叠着演，就是"闪两次"的来源
+    gsap.fromTo(info, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power1', overwrite: true });
+    typeTimer = window.setInterval(() => {
+      const step = Math.max(1, Math.round(rate / 60));
+      for (let k = 0; k < step && i < stream.length; k += 1, i += 1) stream[i].classList.add('is-on');
+      while (bi < blocks.length && blocks[bi].at <= i) {
+        blocks[bi].el.classList.add('is-on');
+        bi += 1;
+      }
+      moveCaret(stream[Math.min(i, stream.length) - 1]);
+      if (i >= stream.length) {
+        revealAll();
+        stopTyping();
+      }
+    }, 16);
+
+    // 兜底：万一这套没跑起来（异常 / 被打断），2.5s 后把文字全放出来，别留一页空白
+    clearTimeout(typeSafety);
+    typeSafety = window.setTimeout(() => {
+      if (!typing.value) {
+        revealAll();
+        gsap.set(info, { opacity: 1 });
+      }
+    }, 2500);
+  };
+
+  if (!body) {
+    play();
+    return;
+  }
+
+  // 正文**按块分批拆字**。整篇一次性拆（53 块 / 5000 字）实测是一笔 ~96ms 的主线程
+  // 长任务，而这一拍（TYPE_AT = 0.34s）正好落在封面飞行的中段 —— 逐帧看就是
+  // 画面突然"卡一下"。改成每帧给 8ms 预算、拆完再开始敲：总耗时差不多，
+  // 但摊到十几帧里，最长的一笔降到 8ms 上下，飞行完全不掉帧。
+  const nodes = [...body.childNodes];
+  if (!nodes.length) {
+    play();
+    return;
+  }
+  let cursor = 0;
+  const wrapChunk = () => {
+    if (run !== typeRun) return;
+    const deadline = performance.now() + 8;
+    do {
+      stream.push(...wrapTextNodes(nodes[cursor]));
+      cursor += 1;
+    } while (cursor < nodes.length && performance.now() < deadline);
+    if (cursor < nodes.length) {
+      requestAnimationFrame(wrapChunk);
+      return;
+    }
+    play();
+  };
+  requestAnimationFrame(wrapChunk);
 }
 
 // ── 进入 ────────────────────────────────────────────────────────────────
@@ -915,6 +981,7 @@ function scheduleEnter() {
   //   这么做是安全的：交接矩形是**视口坐标**，不依赖本页布局，所以不必等下一帧；
   //   而终点（媒体盒）要等解码后才量得准，那一部分仍然留在 playEnter 里。
   handoff = readCoverHandoff(route.params.slug);
+  applyHandoffRatio();
   pinStageBg(); // 覆盖层的第一帧底色 = 列表那一页的底色（理由见 pageBg 那段）
   // 窄屏不摆"起点那一格"：封面在左侧抽屉里，不参与入场（见 playEnter 的窄屏分支）。
   // 墙角模式同理不摆 —— 它不做 FLIP，而"起点那一格"会把内层钉成 position: fixed，
@@ -939,6 +1006,7 @@ function scheduleEnter() {
     //   把退场时间线掐掉 —— 用户按了返回，照片却掉头飞回右列。
     if (leaving) return;
     handoff = readCoverHandoff(route.params.slug);
+    applyHandoffRatio();
     playEnter();
   };
   // 窄屏不走"等题图解码再 FLIP"那一套：封面在抽屉里、根本不参与入场，
@@ -1228,22 +1296,28 @@ if (typeof window !== 'undefined') {
               <span class="blog-date">{{ post.date }}</span>
               <span class="bd-tag">{{ post.readTime }}</span>
             </div>
-            <!-- 标签行：点击跳到 ECHOES 的 ARCHIVE 并挂上筛选 -->
-            <div v-if="safeTags(post.tags).length" class="blog-tags">
-              <button
-                v-for="tag in safeTags(post.tags).slice(0, 12)"
-                :key="tag"
-                type="button"
-                class="blog-tag"
-                :aria-label="`查看带标签 ${tag} 的文章`"
-                @click="openTag(tag)"
-              >{{ tag }}</button>
-            </div>
+            <!-- 标签行已挪到全文末尾（见下面 .blog-tags，读完才看到） -->
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
             <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
             <BlogBook v-else :pages="pages" />
+            <!-- 标签：全文末尾。点击跳 ECHOES 的 ARCHIVE 并挂上筛选。
+                 ⚠ 刻意放在正文之外：startTyping 只拆标题与正文的文本节点，
+                 这里不会被"逐字敲"，也不会跟着 is-typing 的逐块揭幕一起闪。 -->
+            <div v-if="safeTags(post.tags).length" class="blog-tags">
+              <span class="blog-tags__label">TAGS</span>
+              <div class="blog-tags__list">
+                <button
+                  v-for="tag in safeTags(post.tags).slice(0, 12)"
+                  :key="tag"
+                  type="button"
+                  class="blog-tag"
+                  :aria-label="`查看带标签 ${tag} 的文章`"
+                  @click="openTag(tag)"
+                >{{ tag }}</button>
+              </div>
+            </div>
           </div>
           <!-- 文章滚到底才看得到的页脚；书页模式下没有滚动，且底部要给翻页控件让位 -->
           <AppFooter v-if="!bookMode" compact />
@@ -1299,6 +1373,18 @@ if (typeof window !== 'undefined') {
                 draggable="false"
                 decoding="async"
               >
+            </div>
+
+            <!-- 封面评分：钉在封面右上角，移动端隐藏（背景层会被正文压住） -->
+            <div v-if="safeCoverRating(post.coverRating)" class="bd-cover-score" aria-label="Cover score">
+              <span class="bd-cover-score__k">COVER SCORE</span>
+              <span class="bd-cover-score__grade">{{ safeCoverRating(post.coverRating).grade }}</span>
+              <span class="bd-cover-score__v">
+                {{ Number(safeCoverRating(post.coverRating).score).toFixed(1) }}<i>/10</i>
+              </span>
+              <span v-if="safeCoverRating(post.coverRating).verdict" class="bd-cover-score__note">
+                {{ safeCoverRating(post.coverRating).verdict }}
+              </span>
             </div>
           </figure>
         </div>
@@ -2295,13 +2381,45 @@ if (typeof window !== 'undefined') {
   }
 }
 
-/* ── 标签行（meta 下方、标题上方）────────────────────────────────────────── */
+/* ── 标签（全文末尾）───────────────────────────────────────────────────────
+   读完正文才遇到，所以做成一枚"文章落款"：一条 hairline + 一枚小标签，
+   标签本身沿用站内的等宽小字。放在 .bd-info 最后，不参与打字机的逐字/逐块揭幕。
+   ⚠ 用站点的真实色板（--border / --text-secondary / --text-primary），
+     不要写 --fg：那是个从未定义过的占位符，`color-mix(var(--fg))` 整条声明
+     会失效，标签会既没有边框也没有 hairline（实测 0px）。 */
 .blog-tags {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 44px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  transition: opacity 0.5s ease;
+}
+/* 打字机还在敲的时候先别亮：标签属于"读完之后"的那一段（is-typing 在
+   revealAll 里摘掉，摘掉的同时这里淡入） */
+.bd-info.is-typing > .blog-tags {
+  opacity: 0;
+}
+.blog-tags__label {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.blog-tags__list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 14px;
-  margin-bottom: 10px;
+}
+/* 书页模式：书页吃掉剩下的高度，标签只留一条窄位（不要那 44px 的画外留白） */
+.bd-info.is-book > .blog-tags {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding-top: 12px;
 }
 .blog-tag {
   font-family: 'Space Mono', ui-monospace, monospace;
@@ -2309,19 +2427,87 @@ if (typeof window !== 'undefined') {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   background: transparent;
-  border: 1px solid color-mix(in oklab, var(--fg) 20%, transparent);
-  color: color-mix(in oklab, var(--fg) 75%, transparent);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   padding: 4px 10px;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 0;
   transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
 }
 .blog-tag:hover,
 .blog-tag:focus-visible {
-  border-color: var(--fg);
+  border-color: var(--text-primary);
   color: var(--bg);
-  background: var(--fg);
+  background: var(--text-primary);
   outline: none;
+}
+
+/* ── 封面评分章（封面右上角，独立于正文作者自评）─────────────────────────── */
+.bd-cover-score {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: "k k" "grade v" "note note";
+  align-items: baseline;
+  gap: 3px 8px;
+  min-width: 104px;
+  max-width: 190px;
+  padding: 9px 11px;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
+  border-radius: 0;
+  color: var(--fg);
+  pointer-events: none;
+}
+.bd-cover-score__k {
+  grid-area: k;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: color-mix(in oklab, var(--fg) 58%, transparent);
+  white-space: nowrap;
+}
+.bd-cover-score__grade {
+  grid-area: grade;
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+}
+.bd-cover-score__v {
+  grid-area: v;
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.bd-cover-score__v i {
+  font-style: normal;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  margin-left: 2px;
+}
+.bd-cover-score__note {
+  grid-area: note;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--fg) 65%, transparent);
+}
+@media (max-width: 1024px) {
+  /* 窄屏封面是整屏背景、正文压在上面，这个角章会被字盖住 */
+  .bd-cover-score { display: none; }
 }
 
 /* ── 作者自评鉴定章（钉在 .bd-right 底部；窄屏仍是整屏底部） ──────────────── */
@@ -2337,7 +2523,7 @@ if (typeof window !== 'undefined') {
   background: color-mix(in oklab, var(--bg) 78%, transparent);
   backdrop-filter: blur(6px);
   border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
-  border-radius: 2px;
+  border-radius: 0;
   color: var(--fg);
   pointer-events: auto;
   animation: bdRatingIn 0.6s ease both;
