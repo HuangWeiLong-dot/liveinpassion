@@ -2,60 +2,20 @@
 
 # LIVEINPASSION
 
-**A quiet record of time, motion, places and attention.**
+**For Her.**
 
-照片、文字、时刻与注意力——一个手写的生活站点。
-
-[![Live](https://img.shields.io/badge/LIVE-liveinpassion.me-000000?style=flat-square&logo=googlechrome&logoColor=white)](https://liveinpassion.me)
-[![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org)
-[![Vite](https://img.shields.io/badge/Vite-8-646cff?style=flat-square&logo=vite&logoColor=white)](https://vite.dev)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
-[![D1 + R2](https://img.shields.io/badge/Data-D1%20%2B%20R2-0b0b0b?style=flat-square&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com)
-[![GitHub Actions](https://img.shields.io/badge/Deploy-GitHub%20Actions-2088ff?style=flat-square&logo=githubactions&logoColor=white)](https://github.com/HuangWeiLong-dot/liveinpassion/actions)
+[![Live](https://img.shields.io/badge/LIVE-liveinpassion.me-000000?style=flat-square\&logo=googlechrome\&logoColor=white)](https://liveinpassion.me)
+[![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat-square\&logo=vue.js\&logoColor=white)](https://vuejs.org)
+[![Vite](https://img.shields.io/badge/Vite-8-646cff?style=flat-square\&logo=vite\&logoColor=white)](https://vite.dev)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?style=flat-square\&logo=cloudflare\&logoColor=white)](https://workers.cloudflare.com)
+[![D1 + R2](https://img.shields.io/badge/Data-D1%20%2B%20R2-0b0b0b?style=flat-square\&logo=cloudflare\&logoColor=white)](https://developers.cloudflare.com)
+[![GitHub Actions](https://img.shields.io/badge/Deploy-GitHub%20Actions-2088ff?style=flat-square\&logo=githubactions\&logoColor=white)](https://github.com/HuangWeiLong-dot/liveinpassion/actions)
 
 <img src="docs/screenshots/home.png" width="880" alt="LIVEINPASSION 首页：封面球与字标" />
 
-<sub>首页 —— 封面铺在缓慢自转的球面上，拖动会变形为十二面体。</sub>
-
 </div>
 
----
-
-## 概览
-
-一个没有模板味的个人站点：开场是一段字标装配动画，进站之后是封面球、轨道式博客墙、
-窗户墙画廊、一台复古 CRT 电视，以及记录睡眠、步数、阅读与地点的 LIFE 面板。
-
-所有内容都不写死在页面里 —— 博客、相册与摄影作品由自建 CMS 写入 **D1**，图片落在
-**R2**，前台构建时从 Worker 拉一份快照，内容改完就走一次 `repository_dispatch`
-重新发布。全站中英混排、深色优先、零圆角、1px 发丝线，动效统一尊重
-`prefers-reduced-motion`。
-
-## 页面
-
-| 路由 | 板块 | 内容 |
-|---|---|---|
-| `/` | HOME | 开场装配动画、3D 封面球、指针拖迹 |
-| `/blogs` · `/blogs/:slug` | BLOGS | LOOKBACK（横向轨道）与 WORLD（作品环）两种浏览方式，正文支持 Photo Layout 图块 |
-| `/photography` · `/photography/:person` | PHOTO | 按人名分组的摄影作品，一扇窗一个人 / 一张照片 |
-| `/gallery` | MOMENTS | 窗户墙照片墙、筛选、胶片条与灯箱 |
-| `/me` · `/me/gallery` · `/me/organization` | ME | 复古电视（ME / GALLERY / FRIENDS 三频道）、照片隧道 |
-| `/life` | LIFE | Live feed、Dashboard、Stats 三种视图与归档页 |
-
-导航固定为 `HOME · BLOGS · PHOTO · LIFE`，末尾那个每日轮换的美德词（BRAVE / HUMBLE / …）
-就是 ME 的入口。
-
-## 技术栈
-
-| 层 | 选型 | 说明 |
-|---|---|---|
-| 前台 | Vue 3 · Vue Router 5 · Vite 8 | 视图静态打包，点击导航无等待 |
-| 动效 | GSAP · Three.js · 原生 Canvas / WebGL | 开场、轨道墙、封面球、页脚字标扭曲 |
-| CMS API | Cloudflare Workers · Hono | `/api/*` 内容接口、`/img/*` 图片边缘缓存与 CORS 转发 |
-| 数据 | Cloudflare D1 | 博客、相册、摄影、LIFE 指标 |
-| 存储 | Cloudflare R2 | 图片（原图 + 压缩版，内容 hash 命名，immutable 缓存） |
-| 后台 | Vue 3 · md-editor-v3 · browser-image-compression | 自建密码登录，零外部资源依赖 |
-| 发布 | GitHub Actions | 前台 → GitHub Pages；Worker + Admin → `wrangler deploy` |
+***
 
 ## 架构
 
@@ -63,69 +23,9 @@
 <img src="docs/site-architecture.png" width="820" alt="站点架构" />
 </div>
 
-前台是纯静态站点（GitHub Pages），内容与写入都在 Cloudflare 一侧：
-
-- **读**：构建时 `app/scripts/fetch-content.mjs` 从 `cms.liveinpassion.me/api` 拉最新博客与相册，
-  写入 `app/src/data/content/*.json` 作为快照；拉取失败时沿用仓库内上一份快照，不阻断构建。
-- **写**：`/admin` 发布后由 Worker 触发 GitHub `repository_dispatch`（`cms-content-changed`），
-  重新跑一次 Pages 构建。
-- **图**：上传时同时生成压缩版，写进 R2；前台经 `worker /img/*` 走边缘缓存，避免 CDN 的
-  CORS 不确定性污染 WebGL 贴图。
-
 <div align="center">
 <img src="docs/life-pipeline.png" width="820" alt="LIFE 数据管线" />
 </div>
-
-## 仓库结构
-
-```text
-.
-├─ app/              # 前台（Vue 3 + Vite）→ GitHub Pages
-│  ├─ src/views/     # HOME / BLOGS / PHOTO / GALLERY / ME / LIFE
-│  ├─ src/components/
-│  ├─ src/composables/   # 动效与交互（useCardFx、useBrandOverlay、useWallEntry…）
-│  └─ scripts/       # fetch-content（构建前拉 CMS 快照）、copy-static
-├─ worker/           # CMS API（Hono on Cloudflare Workers）
-│  ├─ src/routes/    # posts / albums / uploads / public / stats / life
-│  ├─ migrations/    # D1 迁移
-│  └─ wrangler.toml
-├─ admin/            # 管理后台（Vue 3），构建产物进 worker/admin-dist
-├─ backend/          # 旧版 Express 服务（Steam 数据、Alist 代理）
-├─ docs/             # 架构图与 README 截图
-├─ tools/            # 验收 / 对比脚本（headless 浏览器）
-└─ index.html        # 旧站单文件版本（回滚用，仍保留在仓库根）
-```
-
-## 本地开发
-
-```bash
-# 前台（会先拉 CMS 快照）
-cd app && npm install && npm run dev
-
-# CMS API（本地 D1 / R2）
-cd worker && npm install && npm run dev
-
-# 管理后台（单独开发时）
-cd admin && npm install && npm run dev
-```
-
-数据库迁移：
-
-```bash
-cd worker
-npm run db:migrate          # 本地
-npm run db:migrate:remote   # 远端的 liveinpassion-db
-```
-
-## 部署
-
-| 改动范围 | 触发 | 动作 |
-|---|---|---|
-| `app/**`、内容快照 | push `main` / 手动 / CMS 内容变更 | `deploy.yml`：构建 `app/dist` → GitHub Pages |
-| `worker/**`、`admin/**` | push `main` | `deploy-worker.yml`：构建 admin → `npx wrangler deploy` |
-
-Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 Secrets 里；
-`GITHUB_TOKEN` 通过 `wrangler secret put` 注入，用于发布完成后回调 Pages 构建。
 
 ## 链接
 
@@ -134,7 +34,7 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 - 仓库：<https://github.com/HuangWeiLong-dot/liveinpassion>
 - 架构图：[site-architecture.png](docs/site-architecture.png) · [life-pipeline.png](docs/life-pipeline.png)
 
----
+***
 
 ## 更新记录
 
@@ -372,7 +272,7 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 - **指针拖迹**：新增 `composables/useCursorTrail.js` —— 指针每帧朝目标缓动 35%，
   沿路径每 6px 记一个点、最多保留 1500px，线段按位置从 50% 不透明度渐隐到 0；只画
   单色自由曲线，和方块光标共用墨色。只在首页、精确指针、非 reduced-motion 下开。
-- **兜底**：开场循环没起来（极慢的机器 / IO 认为 Hero 不在视口）时，INTRO_MS 之后
+- **兜底**：开场循环没起来（极慢的机器 / IO 认为 Hero 不在视口）时，INTRO\_MS 之后
   检查一次并直接落到终态，球不会永远停在透明态；回首页统一先回顶部，再补开场与
   揭示；离开首页停拖迹、收掉还没松手的球体拖拽。
 
@@ -455,7 +355,7 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 - Worker 登录页整套改英文（`lang`、标题、错误提示、按钮、aria-label）。
 - 新博文 `CONTEMPLATING`（2026-10-31 23:27）。
 
----
+***
 
 ### update: 50 — 2026-10-30
 
@@ -521,7 +421,7 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 - `BlogDetailView` 的页面滚动锁改到 `onDeactivated` 释放：这一页在 keep-alive 里，
   离开时 `onBeforeUnmount` 不会跑，原来会把整站的滚动一直锁死。
 
----
+***
 
 ### update: 49 — 2026-10-29
 
@@ -547,11 +447,12 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
   刷新命中缓存 / 手机横向滚动、格子保底 9px / 日历失败退回 12 周 / 两个源都失败的空态 /
   reduced-motion 无蛇）。
 
----
+***
 
 ### update: 48 — 2026-10-29
 
 #### 新板块 GITHUB ACTIVITY（长页 + 仪表盘都有）
+
 LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库排行。
 
 - **数据**：GitHub 公开事件接口 `api.github.com/users/HuangWeiLong-dot/events/public`，
@@ -573,11 +474,12 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
   刷新命中缓存 / 手机不横向溢出 / 403 时的 RETRY 与退避、零控制台报错）。
   `tools/verify-life.mjs` 的面板数从 9 改成 10，其余断言不变。
 
----
+***
 
 ### update: 47 — 2026-10-29
 
 #### LIFE 仪表盘视图：FEED / DASHBOARD 可切换
+
 同一个 `/life` 现在有两种看法，切换点在 hero 那行元信息里（`FEED` / `DASHBOARD`
 分段按钮），选择记在 `localStorage.lifeViewMode`，也认 `?view=dashboard` 直达。
 
@@ -602,11 +504,12 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
   切回 FEED 恢复 `.life-now` 与 6+9、URL 参数清掉、刷新记住选择、手机与浅色截图、
   零控制台报错）。
 
----
+***
 
 ### update: 46 — 2026-10-27
 
 #### 新页面 `/organization`：这个组织是什么
+
 实验型的**一屏一页**演示页（不滚动），回答的不是「这个网站是什么」，而是
 「LIVEINPASSION 是什么组织」。八屏：封面（`WHAT IS LIVE IN PASSION?`）→ 名字 →
 三条主张 → 第一个项目 `OPEN SOURCE LIFE` → 从记录到模型 → 想做成的那家公司 →
@@ -635,6 +538,7 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
 ### fix: 45.3 — 2026-10-25
 
 #### 今日统计的桌面应用时长显示到分钟
+
 `topApps` 的时长单位是**小时**，`LifeToday` 用 `hoursLabel` 只显示一位小数（`3.4h`），
 分钟被抹掉了；站点、手机用的是 `minutesLabel`，同一张卡里两种写法。
 现在桌面应用换算成分钟再走 `minutesLabel`，显示 `3h 24m`，不足 1 小时显示 `40m`。
@@ -644,12 +548,14 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
 ### fix: 45.2 — 2026-10-24
 
 #### 雷达维度名不再被截断
+
 `button.life-radar-row` 上的 `font: inherit` 把行的 0.58rem 等宽字体冲回 16px，
 `TRANSPORT` 于是被省略号吃掉。去掉这条 reset，其余字距 / 颜色继承保持不变。
 
 ### fix: 45.1 — 2026-10-24
 
 #### 雷达底部的并集不再叫 TRACKED
+
 `UNIQUE TRACKED` 和 KPI 的 `TRACKED HOURS`（只算桌面）撞名，两个数还不一样。
 改名 `UNIQUE TIME`，提示里写清：桌面 `Other` 在并集里、不在七维里，
 所以 `OVERLAP` 是「七维之和 − 并集」的**下限**。
@@ -657,21 +563,24 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
 ### update: 45 — 2026-10-24
 
 #### 七维雷达：把「重复计时」摊开
+
 - 新增 `LifeRadar.vue`：Work / Study / Life / Transport / Leisure / Health / Social 七个维度，
   支持 DAY / ALL / 7D / 30D / YEAR 切换、日期步进与下拉，并与 NEURAL CORE 双向联动。
   点任一维度打开详情：桌面 blocks（应用 / 标题 / 站点）、GPS、手表、手机分列。
 - 七维是**按来源相加**的（电脑和手机同时在用会算两次）。新增 `collapsedHours`
-  = 桌面区块 + 交通 + 锻炼 + 手机区间的**并集**，雷达底部显示 `UNIQUE TRACKED / OVERLAP`。
+  \= 桌面区块 + 交通 + 锻炼 + 手机区间的**并集**，雷达底部显示 `UNIQUE TRACKED / OVERLAP`。
 - 手机上的对话式 AI（DeepSeek / ChatGPT / Claude / Gemini / Copilot / Perplexity）并入 Study；
   Study 详情里单列 PHONE AI，让维度总数和桌面明细对得上。
 
 #### 数据窗口与展示口径
+
 - Worker 的 `/api/life?days=N` 上限从 90 提到 400：雷达的 YEAR 以前其实只有 90 天数据，
   标签和实际窗口对不上。
 - DAILY RHYTHM 的副标题改成实际天数（原来写死 7D，画的是 30 天），
   悬浮提示的 `7D TOTAL` 改成 `DAY TOTAL`；WEEKDAY PROFILE 改成动态天数 + `AVERAGE PER WEEKDAY`。
 
 #### LIFE 页面
+
 - 新增「今日统计」（`LifeToday.vue`）：桌面 / 站点 / 手机 / AI 四类当天累计，
   卡片可点开查看该类完整明细（`LifeDetailModal.vue`）。
 - KPI 改为 4 × 2 bento 共 6 张，`SCREEN-ON HOURS` 可点开逐日桌面 / 手机表。
@@ -684,16 +593,19 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
 - 神经图面板编号从 **00** 挪到 **01**（七维雷达占了 00）；LIFE 页其余面板依次顺延。
 
 #### 分类规则（LifeLogging）
+
 - 浏览器里没命中强信号 → Study（看资料）；PUBG / TslGame → Leisure；
   Antigravity / Cursor 等编辑器助手 → Work。
 - 短切片不再跨应用改写区块分类或标题 —— 之前 PUBG 会被隔壁的 Code/msedge 切片带成 Work。
 
 #### 其它
+
 - `docs/` 增加站点架构与 LIFE 数据链路图（drawio + png）。
 
 ### update: 44 — 2026-10-24
 
 #### 跑步弹窗接上了 GPX / FIT 的逐秒数据
+
 - 两个解析器以前只取经纬度和时间戳，**FIT 里的心率、速度、海拔全被丢掉**，
   数据库里只剩整次平均。现在保留成 `meta.samples`（240 点压缩，`t` 秒 /
   `hr` / `v` m/s / `alt`）。
@@ -708,6 +620,7 @@ LIFE 里多了一块 GitHub 的公开动态：贡献格子图 + 合计 + 仓库�
 ### fix: 43.1 — 2026-10-24
 
 #### 笔记本关机那几天的手表路线能真的画出来了
+
 `update: 43` 把发布搬到了服务器，但地图有两道门把它挡在外面：
 
 - 地图的日期列表只从 `index.kinds.events` 取，而 `watch` 被排除在索引之外 ——
@@ -724,6 +637,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 43 — 2026-10-24
 
 #### 手表路线改由服务器发布
+
 - 地图现在合并两路数据：笔记本发布的 `events` 和服务器每 15 分钟发布的 `watch`
   （中继上 GPX/FIT 的解析结果）。两份按**开始时间**去重，同一次锻炼只画一条。
 - 笔记本关机时手表虚线仍然更新：中继 24 小时收文件，服务器直接解析并写入
@@ -735,6 +649,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 42.3 — 2026-10-24
 
 #### 手表路线：同一次活动的 FIT + GPX 不再重复计数
+
 - Gadgetbridge 对同一次锻炼会导出同名的一对 `.fit` 和 `.gpx`，两个导入脚本
   各写一条 `watch_track`（`source` 不同，events.db 不会去重）。以前两条都算，
   地图上画两条虚线、当天的手表时长翻倍。
@@ -748,6 +663,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 42.2 — 2026-10-22
 
 #### 七维图例 / NOW Steps icon
+
 - `rhythmLegend` 的 zero 判定以前只看桌面 `categories`，所以 Transport/
   Health/Social 在柱子里已经有值、右上角图例却还是灰的。现在和柱子一样
   优先看 `dimensions`，有数据就不再变暗。
@@ -757,6 +673,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 42.1 — 2026-10-22
 
 #### DAILY RHYTHM / WEEKDAY PROFILE 补齐剩余三维
+
 - 两张图从桌面 `categories` 改为优先读 **`dimensions`**：Work/Study/Life/Leisure
   来自桌面，Transport 来自 GPS，Health 来自手表，Social 来自手机——剩下的
   Transport / Health / Social 不再只出现在图例里。
@@ -766,6 +683,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 42 — 2026-10-22
 
 #### 全历史 Best Pace / Longest + GPX 路线
+
 - 聚合新增 `allTime`：直接读 Gadgetbridge `BASE_ACTIVITY_SUMMARY` 的**全部**
   锻炼历史（不是 30 天窗口），给出全历史最快配速、最长单次距离、总次数/总公里。
   `BEST PACE` 卡改为全历史，并显示来自哪天、多久之前、那次跑了多少公里；
@@ -780,6 +698,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 41 — 2026-10-22
 
 #### MOTION · RUNNING 明细 / 心率带
+
 - RUNNING 卡现在可点击（也支持 Enter/Space），打开逐次跑步弹层：日期/时间、
   距离、时长、配速，以及 AVG/MAX HR、热量、爬升、VO2max、训练效果、恢复时间。
 - 聚合新增 `workouts` 数组（来自 `domain=fitness` 的每次锻炼），Worker 校验该字段；
@@ -792,6 +711,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 40.1 — 2026-10-22
 
 #### MOTION 跑步配速
+
 - RUNNING 卡补上**最近一次跑步的配速**；`BEST PACE` 仍然保留全窗口最佳，
   但已经明确显示它来自哪一天、多久之前（例如 `9D AGO · OCT 13`），不再让
   人误以为那是今天的配速。
@@ -799,6 +719,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 40 — 2026-10-22
 
 #### 七维向量（神经系统输入）
+
 - `/api/life` 每天新增 `dimensions`：`Work / Study / Life / Leisure` 来自桌面
   ActivityWatch 分类；`Transport` 来自 GPS 通勤分钟；`Health` 来自手表跑步分钟；
   `Social` 来自手机社交应用分钟。`Other` 不进入七维。
@@ -811,6 +732,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 39 — 2026-10-22
 
 #### LIFE MOTION / WATCH / PLACES / 归档
+
 - MOTION 里加入手表面板：大心跳爱心（爱心压在波纹上、心跳线无限循环不跳）、
   HR AVG/MIN/MAX、最近一次跑步（日期/多久之前/当天次数/距离/时长）、
   BEST PACE 的日期与年龄、VO2MAX、每天心率 MIN–MAX 条带。
@@ -829,12 +751,14 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   补出历史 hrMax，并对旧 Worker 做去掉 hrMax 的兼容重试。
 
 #### 验收
+
 - `verify-life`、`verify-life-now`、`verify-life-archive` 全过（MOTION 状态行、
   地图 LOAD MORE / 缩放、手机无溢出、NOW 旗标）。
 
 ### update: 38 — 2026-10-21
 
 #### 24h 服务器侧实时快照（笔记本关机也继续更新）
+
 - 新增 `server/live-now/live_now_server.py` + systemd service/timer：每 2 分钟在
   24h 服务器上组装 `/api/life/now`，来源是 Dawarich（位置/坐标）、中继 `/events`
   （手机）、中继 `/qa`（实时问答）、中继上的 `gadgetbridge.db`（手表 steps/HR）。
@@ -850,6 +774,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 37.1 — 2026-10-21
 
 #### WATCH 卡停在昨天（明明手表数据已经到了）
+
 - 根因：`publish_live_now.py` 总是优先取中继 `/watch`，而 `push_health.py` 只在
   `run_daily.ps1` 里跑；中继那份停在 10/20。其实本机 `events.db` 已经有 10/21 的
   steps / HR，只是没被用上。
@@ -862,12 +787,13 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 37 — 2026-10-21
 
 #### LIFE：WHAT I'M DOING NOW（实时状态）
+
 - 新增 `app/src/components/LifeNow.vue`，放在 LIFE 顶部 KPI 上方：位置 + 坐标（OSM 链接）、
   实时问答的问题与回答、电脑当前窗口、手机最后应用/解锁数、手表步数/心率。组件自己每 30 秒
   轮询 `/api/life/now`，与 `/api/life` 的 60 秒轮询无关。
 - Worker 新路由 `POST/GET /api/life/now`（R2 `life/now.json`，公开读、no-store、64 KiB 上限、
   顶层字段白名单）；已部署。LifeLogging 新增 `scripts/publish_live_now.py`，在 `run_live.ps1`
-  每轮采集之后发布一份快照：位置来自 events.db，电脑/手表来自 phone_relay 的 `/desktop`/`/watch`，
+  每轮采集之后发布一份快照：位置来自 events.db，电脑/手表来自 phone\_relay 的 `/desktop`/`/watch`，
   问答来自 `/qa`；**发布前用 Translator 翻成英文**（问答原文、窗口标题、地名），
   `max_calls=6` + 本地缓存控制成本。
 - `run_live.ps1` 补上 `normalize.py --date today`：之前只采集不归一化，blocks 不动，站点聚合
@@ -876,6 +802,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   确认五张卡片、坐标、问答、电脑/手机/手表与更新时间。
 
 #### 数字入场
+
 - LIFE 与 STATS 的 KPI 卡片不再作为一个整块 `autoAlpha: 0` 隐藏后统一滑入；卡片保持可见，
   由 `OdometerNumber` 从 0 逐位滚到目标值。首次加载、keep-alive 重进都保留滚动入场。
 - `tools/verify-stats.mjs` 的卡片可见性断言继续通过。
@@ -883,6 +810,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 36.1 — 2026-10-21
 
 #### ENTER WITHOUT MUSIC
+
 - 之前只有鼠标单独点击有效：键盘 Enter 会先触发 document 的 keydown 自动起播；先点过页面背景
   再点它也不会停掉已经开始的音乐。
 - 现在 `data-no-music` + `tryAutoPlay` 目标检查 + `@click.stop` / `@keydown.enter.stop`：
@@ -893,6 +821,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 36 — 2026-10-21
 
 #### LIFE：可交互 3D 神经图（NEURAL CORE）
+
 - 新增 `app/src/components/LifeBrain.vue`（three 场景、镜头与交互）和
   `app/src/data/lifeBrain.js`（确定性图布局 + 日聚合映射）。挂在 LIFE 的 00 号面板，
   数据仍然只来自 `/api/life` 的夜间聚合，不读 raw 坐标或日记。
@@ -929,6 +858,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   与空数据、拖拽时标签让路，零控制台报错。`tools/verify-life.mjs` 的面板断言从 7 改为 8。
 
 #### LIFE：实时聚合（每 2 分钟）
+
 - LifeLogging 新增 `scripts/run_live.ps1` 和 `scripts/setup_live_task.ps1`：注册
   `LifeLogging-Live` 任务，每 2 分钟采集电脑活动 / 手机使用事件，并只把**今天**这一天的
   脱敏聚合 upsert 到 `/api/life`；Dawarich 位置、Gadgetbridge 手表、AI 平台账单每 15 分钟重采。
@@ -949,6 +879,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 35.2 — 2026-10-20
 
 #### 归档页：内容不满一屏时底部漏出 footer 反色条
+
 - 根因是 `.page` 只按内容高度撑开：归档的 TASKS / 短日记 / 空状态比视口矮时，
   固定在底部的全局 footer 会从页面下方露出几十像素，首屏底部一直挂着一条
   白（暗色主题）/黑（浅色主题）的边，看起来像页脚错位。
@@ -962,6 +893,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 35.1 — 2026-10-20
 
 #### HOURS IN TRANSIT：实测 + 推断通勤
+
 - LIFE 的 **HOURS MOVING → HOURS IN TRANSIT**：不再只算 Dawarich 识别到的
   步行/骑行/开车段；把两次停留之间 **4–180min、相距 ≥1km** 的空档补进来，
   并扣除空档里已识别的 transport 段（地铁/地下没有 GPS 点，原来完全漏掉）。
@@ -974,8 +906,9 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 35 — 2026-10-20
 
 #### LIFE 页：轨迹地图 · 单日详情 · 彩色模式
+
 - **03 PLACES 变成真正的轨迹地图**：从公开的 raw events 里取 location domain
-  （track_path / visit / transport / tracked_points），投影成 SVG。停留点按
+  （track\_path / visit / transport / tracked\_points），投影成 SVG。停留点按
   ≈100m 聚合、半径按时长，跨天轨迹按日叠画，最近一天加重；带比例尺、指北、
   地名标签与区级/交通方式侧栏。只在面板进入视口前 700px 懒加载，最多 7 天、
   3 并发，模块内缓存 5 分钟；单天失败只少一条轨迹，不拖垮整张图。
@@ -999,6 +932,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 34.2 — 2026-10-20
 
 #### 归档页：去掉重复/缓慢的转场，首屏即时出内容
+
 - `life ↔ life-archive` 在 `router.beforeEach` 里直接跳过整屏转场板子。
   之前从 LIFE 点归档卡、或在归档内切 tab 都会再演一遍 ARCHIVE 板子，
   守卫里 700–900ms 的等待 + 板子 1.5s，看起来既重复又慢。
@@ -1015,6 +949,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 34.1 — 2026-10-20
 
 #### VAULT：主任务 / 周回顾 / AI 会话
+
 - 归档新增第八个视图 **VAULT**：`vault/04-Tasks/Tasks.md`（主任务清单）、
   `vault/07-Reviews/*.md`（周回顾、成本台账）、`vault/06-AI-Sessions/*.md`
   （每次 AI 会话日志）。Markdown 渲染，任务复选框只读。
@@ -1026,8 +961,9 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 34 — 2026-10-20
 
 #### LIFE 全量归档（/life/archive）
+
 - 新增七个归档视图：JOURNAL（完整日记 Markdown）、NOTES（随手记）、TASKS、
-  Q&A、EVENTS（原始事件长表）、BLOCKS（窗口标题/URL/分类时间块）、REVIEWS
+  Q\&A、EVENTS（原始事件长表）、BLOCKS（窗口标题/URL/分类时间块）、REVIEWS
   （周总结，有则显示）。日期切换、事件 domain 筛选、META 展开、LOAD MORE。
 - LIFE 总览底部新增 **06 THE ARCHIVE** 入口卡片，显示各分区条目数。
 - 隐私边界改为「全量」：坐标、轨迹、窗口标题、URL、包名、日记/随手记/问答
@@ -1036,6 +972,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   页面顶部与底部都写明了这条边界。
 
 #### Worker / 存储
+
 - 新增 `POST /api/life/raw/ingest`（Bearer token）、`GET /api/life/raw/index`、
   `GET /api/life/raw/:kind/:id`。原始数据存 R2 `life/raw/<kind>/<id>.{md,json}`，
   不走 D1（单日事件约 30–50 KB，R2 没有 D1 行大小/SQL 长度限制）。
@@ -1043,12 +980,14 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 鉴权抽成 `lifeAuth()`，聚合与原始写入共用。
 
 #### 工具
+
 - 新增 `tools/verify-life-archive.mjs`：七个 tab、日期切换、日记 HTML、
   随手记、任务、问答、事件筛选/分页、BLOCKS、空周总结、手机无溢出、零报错。
 
 ### update: 33 — 2026-10-20
 
 #### LIFE 页（/life）
+
 - 新增公开 LIFE 页：电脑使用分类、步数/心率/跑步、城市级位置、手机使用、
   AI 花费。数据来自 LifeLogging 每晚发布的脱敏日汇总，前台 60 秒轮询。
 - `LifeView.vue` + 路由 / `pageLabels` / 导航项；CSS 复用 STATS 的
@@ -1059,6 +998,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   keep-alive / reduced-motion / 手机 / 稀疏 / 空数据 / 请求失败。
 
 #### Worker
+
 - D1 `life_days(day, payload, updated_at)`（`migrations/0003_life.sql`）。
 - `GET /api/life?days=30`：公开只读，按天升序返回，30 秒缓存。
 - `POST /api/life/ingest`：Bearer token（`LIFE_INGEST_TOKEN`），字段白名单
@@ -1068,6 +1008,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### fix: 32.2 — 2026-10-19
 
 #### 窗户墙入场焦点居中
+
 - 修复从已滚动页面进入 GALLERY / MY GALLERY 时，首屏焦点窗不在屏幕正中的问题。
   根因是 `prime()` 在 `onActivated` 的 `nextTick` 里早于路由 `scrollBehavior`
   测量墙面，拿到的还是上一页的滚动位置；Windows 上 `innerWidth` 还包含滚动条宽度。
@@ -1085,6 +1026,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 32 — 2026-10-19
 
 #### ME 页滚动体验
+
 - 开场改为 EXPLORE 门禁：首次进入显示 EXPLORE（自动缓慢巡游）与 SKIP TO CARDS；
   进入后滚动解锁。反复进入 ME 不再弹门禁。
 - 「无限纵深」照片隧道：30 张照片各用一张不同图，3D 深度一次性推进 14000px，
@@ -1099,10 +1041,12 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 新增 `tools/verify-me-scroll.mjs`（门禁、隧道、导航、红蓝切换、无页脚等 20 项断言）。
 
 #### 全站
+
 - 首屏 ENTER 下新增 **ENTER WITHOUT MUSIC**：进入时取消首次交互自动起播；
   播放器手动播放仍然可用。
 
 #### 素材与工具
+
 - `me/` 重组为 `cutouts/`（蓝/红抠图 + `_selective` 图层）、`personas/`、
   `posters/`、`individuation.jpg`；删除 `hero_compressed/`，引用同步更新。
 - 新增 `tools/build-cutouts.mjs`：去白边、压暗轮廓、生成蓝/红 selective 图层；
@@ -1112,6 +1056,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 ### update: 31 — 2026-10-18
 
 #### 窗户墙
+
 - GALLERY / MY GALLERY 重做为窗户墙：新增 `window-wall.css`、`useWallPuzzle`、
   `useWallMotion`、窗格入场；网格布局、华容道换位、筛选与月份切换。
 - 新增 `useThumbnails`：fetch → `createImageBitmap` 缩放 → canvas → blob URL，
@@ -1120,19 +1065,22 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   `FriendDetailView`、`GroupPhotosView` 及对应路由。
 
 #### STATS
+
 - `StatsView` 大改：GSAP 入场、逐字标题、数字滚轮、30 天柱线、滚动揭示、
   keep-alive 重播与 reduced-motion；新增 `OdometerNumber` 与 `tools/verify-stats.mjs`。
 
 #### 首页 / ME
+
 - `HeroConcept` 与 `main.css` 大量调整；ME 页改为浏览器窗口式叙事，
   引入 `me/hero_compressed/HuangWeiLong_*.webp`。
 - 博客 CMS 快照更新。
 
----
+***
 
 ### update: 30 — 2026-10-17
 
 #### 音乐资源迁到 Cloudflare R2 / CDN
+
 - 21 首曲目全部上传到 R2 桶 `liveinpassion`，key 为 `music/<原文件名>`，
   对外地址 `https://img.liveinpassion.me/music/…`。已验证 206 Range 分段、
   正确的 `audio/mpeg` / `audio/flac` 与 CORS 响应头。
@@ -1146,18 +1094,21 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   `useMusicPlayer` 保留相对路径兜底。
 
 #### 仓库与构建
+
 - `music/` 加入 `.gitignore` 并从版本库移除（本地文件保留）。
 - `copy-static.mjs` 与 Vite dev 中间件不再处理 `music/`，构建产物不再携带约 432MB 音频。
 
 #### 注意
+
 - update: 29 曾把音频文件提交进 git，历史里仍有这 432MB；要彻底缩小仓库需要重写
   历史（本次未做）。
 
----
+***
 
 ### update: 29 — 2026-10-17
 
 #### 音乐播放
+
 - 修复深链接下音乐播不了：播放列表仍是旧站的相对地址（`music/…`），在 `/blogs`、
   `/me` 等路由直达或刷新时被解析成 `/blogs/music/…`（404 + `Format error`）。
   现在统一按 `import.meta.env.BASE_URL` 拼成站点根开头的绝对地址。
@@ -1174,11 +1125,13 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 修复 `Rolling Over` 的路径少了 `-%20`，此前一直 404。
 
 #### 频谱
+
 - `<audio>` 接入 Web Audio（`MediaElementSource → AnalyserNode → destination`），
   首次播放时在用户手势里惰性建图。
 - 新增 canvas 柱状频谱：对数分箱、跟随主题换色、暂停时只保留静止基线。
 
 #### 歌词
+
 - 新增同步歌词展示：播放/打开播放器时按「曲名 + 主歌手」从 LRCLIB 拉 LRC，
   逐帧对齐当前行。
 - 音乐软件式逐行滚动：当前行居中，上下行淡出（mask），行切换带缓动；
@@ -1188,6 +1141,7 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 服务不可用 / 没有同步歌词时自动只显示频谱，不报错。
 
 #### 底部「正在播放」舞台 / 首屏编排
+
 - 歌词 + 频谱合并到屏幕底部正中的悬浮区：无底板、不拦截点击；
   手机端自动抬到底部 dock 上方。
 - 接入首屏动画：在 `uiReady`（主人格/主体落定、其余 UI 开始浮出）之后，
@@ -1196,11 +1150,12 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   状态写入 `localStorage`，刷新后保持；关闭期间不再请求歌词、也不跑动画。
 
 #### 验证
+
 - dev 与构建后的 preview 均验证：进度条点击/拖拽/拖出松手/暂停拖动、21 首曲目点播、
   频谱像素随播放变化、歌词行推进与卡拉 OK 进度、开关与持久化、首屏浮现时间线；
   全程零控制台报错。
 
----
+***
 
 ### update: 28 — 2026-10-12
 
@@ -1252,13 +1207,16 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
   `verify-shell` 等。
 
 #### fix: 25.1 — 2026-10-11
+
 - 抽出 `useFilmPose` 统一姿态数学，`useFilmStrip` 精简，`BlogsView` 配套。
 
 #### fix: 25.2 — 2026-10-11
+
 - 博客图片迁移到 R2（新增 `worker/scripts/migrate-legacy-images.mjs`、`r2.js` 改动）。
 - 博客数据快照更新。
 
 #### fix: 25.3 — 2026-10-11
+
 - `useFilmStrip` 修复贴图 / 渲染细节（+70/−22）。
 
 ### update: 24 — 2026-10-05
@@ -1266,14 +1224,17 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 后台博客编辑器：Card Title 自动生成 Title / Slug（手动改过的不再覆盖）。
 
 #### update: 24.1 / fix: 24.1 — 2026-10-05
+
 - 编辑器与 Markdown 渲染小修。
 
 #### fix: 24.2 — 2026-10-07
+
 - 后台相册 / 博客列表支持长按拖拽排序（新增 `pressDrag.js`）。
 - 新增 `tools/verify-admin-mobile.mjs`：iPhone/iPad 尺寸 + 触摸仿真下验证
   点按目标、常显控件、拖拽排序，并跑桌面回归。
 
 #### fix: 24.3 — 2026-10-09
+
 - 后台登录页 / Worker 鉴权整理；管理端构建与忽略配置清理。
 
 ### update: 23 — 2026-10-05
@@ -1330,26 +1291,28 @@ FIT 里的心率采样、步频、海拔、卡路里目前都没有被保存。
 - 修复 ME 页重复注册监听器与定时器；新增博客《In the Middle of the World》。
 
 #### fix: 16.1 — 2026-09-25
+
 - `app/src` 细节修复。
 
 ### update: 1–15 — 旧站时期（`index.html` 单文件）
 
 > 这些版本当时只提交了版本号，没有说明；以下按改动内容补录主要节点。
 
-| 版本 | 日期 | 主要改动 |
-|---|---|---|
-| 1 | 2026-05-23 | 首批照片 / 好友数据接入，新增 4 首 Low Roar 曲目，图片目录重整 |
-| 2 | 2026-05-26 | 照片分组与压缩图体系整理（`home / hero / blog / group / graduated` 等） |
-| 3 | 2026-05-26 | Tabler 图标集接入，导航 / 播放器图标替换 |
-| 4 | 2026-05-26 | Hero 照片与压缩图补充 |
-| 5 | 2026-05-26 | `index.html` 交互修复 |
-| 6 | 2026-05-31 | `index.html` 小改 |
-| 7 | 2026-06-01 | Hero / 博客 / 群组照片补充 |
-| 8 | 2026-06-01 | 新增 Express 后端（Steam 数据 + Alist 代理），前端目录重构 |
-| 9 | 2026-06-02 | GitHub Pages 发布工作流，静态资源移回仓库根；`9.1–9.5` 修部署与路径 |
-| 10 | 2026-06-02 | 首页大改（电影海报 / 布局），新增 `movie-posters` |
-| 11 | 2026-07-01 | ME 页图片与内容 |
-| 12 | 2026-07-17 | 后端环境变量 / 忽略规则、favicon、logo；`12.1–12.3` 修复 |
-| 13 | 2026-07-19 | `index.html` 大幅重构（+706/−360） |
-| 14 | 2026-08-21 | 页面结构扩展（+1021/−110）；`14.1–14.2` 修照片子模块 |
-| 15 | 2026-08-25 | 收尾小修；`15.1` 修复 |
+| 版本 | 日期         | 主要改动                                                     |
+| -- | ---------- | -------------------------------------------------------- |
+| 1  | 2026-05-23 | 首批照片 / 好友数据接入，新增 4 首 Low Roar 曲目，图片目录重整                  |
+| 2  | 2026-05-26 | 照片分组与压缩图体系整理（`home / hero / blog / group / graduated` 等） |
+| 3  | 2026-05-26 | Tabler 图标集接入，导航 / 播放器图标替换                                |
+| 4  | 2026-05-26 | Hero 照片与压缩图补充                                            |
+| 5  | 2026-05-26 | `index.html` 交互修复                                        |
+| 6  | 2026-05-31 | `index.html` 小改                                          |
+| 7  | 2026-06-01 | Hero / 博客 / 群组照片补充                                       |
+| 8  | 2026-06-01 | 新增 Express 后端（Steam 数据 + Alist 代理），前端目录重构                |
+| 9  | 2026-06-02 | GitHub Pages 发布工作流，静态资源移回仓库根；`9.1–9.5` 修部署与路径            |
+| 10 | 2026-06-02 | 首页大改（电影海报 / 布局），新增 `movie-posters`                       |
+| 11 | 2026-07-01 | ME 页图片与内容                                                |
+| 12 | 2026-07-17 | 后端环境变量 / 忽略规则、favicon、logo；`12.1–12.3` 修复                |
+| 13 | 2026-07-19 | `index.html` 大幅重构（+706/−360）                             |
+| 14 | 2026-08-21 | 页面结构扩展（+1021/−110）；`14.1–14.2` 修照片子模块                    |
+| 15 | 2026-08-25 | 收尾小修；`15.1` 修复                                           |
+
