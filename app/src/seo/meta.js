@@ -22,8 +22,8 @@ export const STATIC_PAGES = {
     title: `${SITE_NAME} — ${AUTHOR} · Photography, Stories & Friends`,
     description: DEFAULT_DESCRIPTION,
   },
-  blogs: {
-    title: `Blogs — ${SITE_NAME}`,
+  echoes: {
+    title: `Echoes — ${SITE_NAME}`,
     description: 'Poems, notes and stories by Huang Wei Long — moments that were worth keeping.',
   },
   me: {
@@ -164,7 +164,7 @@ function baseGraph(webpage, crumbs = []) {
 }
 
 const STATIC_CRUMBS = {
-  blogs: [['Home', '/'], ['Blogs', '/blogs']],
+  echoes: [['Home', '/'], ['Echoes', '/echoes']],
   me: [['Home', '/'], ['Me', '/me']],
   'me-gallery': [['Home', '/'], ['Me', '/me'], ['Gallery', '/me/gallery']],
   gallery: [['Home', '/'], ['Gallery', '/gallery']],
@@ -188,7 +188,7 @@ export function resolveSeo(name, params, posts = [], albums = []) {
   const defaultImage = posts[0]?.image?.src || `${SITE}/favicon.png`;
   const notFound = STATIC_PAGES['not-found'];
 
-  if (name === 'blog-detail') {
+  if (name === 'echo-detail') {
     const post = posts.find((p) => p.slug === slug);
     if (!post) {
       return {
@@ -212,6 +212,8 @@ export function resolveSeo(name, params, posts = [], albums = []) {
       || Number((post.readTime || '').match(/\d+/)?.[0])
       || 1;
     const keywords = post.keywords || [];
+    const section = post.category || 'Echo';
+    const crumbLabel = section.charAt(0) + section.slice(1).toLowerCase();
     return {
       path,
       url,
@@ -236,7 +238,7 @@ export function resolveSeo(name, params, posts = [], albums = []) {
             wordCount,
             timeRequired: `PT${readingMinutes}M`,
             keywords: keywords.length ? keywords : undefined,
-            articleSection: 'Blog',
+            articleSection: section,
             author: { '@type': 'Person', name: AUTHOR, url: `${SITE}/me` },
             publisher: {
               '@type': 'Organization',
@@ -245,7 +247,7 @@ export function resolveSeo(name, params, posts = [], albums = []) {
             },
             inLanguage: 'en',
           },
-          breadcrumb([['Home', '/'], ['Blogs', '/blogs'], [post.title, path]]),
+          breadcrumb([['Home', '/'], ['Echoes', '/echoes'], [crumbLabel, '/echoes'], [post.title, path]]),
         ],
       },
     };
@@ -326,8 +328,8 @@ function pathOf(name, params) {
   const person = String(params?.person || '');
   const kind = String(params?.kind || 'journal');
   switch (name) {
-    case 'blogs': return '/blogs';
-    case 'blog-detail': return `/blogs/${encodeURIComponent(slug)}`;
+    case 'echoes': return '/echoes';
+    case 'echo-detail': return `/echoes/${encodeURIComponent(slug)}`;
     case 'me': return '/me';
     case 'me-gallery': return '/me/gallery';
     case 'gallery': return '/gallery';

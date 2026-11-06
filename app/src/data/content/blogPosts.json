@@ -1,12 +1,99 @@
 {
   "posts": [
     {
+      "slug": "echoes",
+      "cardTitle": "ECHOES",
+      "cardDate": "NOVEMBER 5, 2026 · 10:50 PM",
+      "title": "Echoes",
+      "date": "November 5, 2026 · 10:50 PM",
+      "readTime": "1 min read",
+      "category": "UNFILED",
+      "tags": [],
+      "rating": null,
+      "image": {
+        "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/714f13d2.jpg",
+        "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/16ac61aa.png"
+      },
+      "body": "<p>How much I want to turn those ineffable words into tangible feelings,<br />As the wind blows a breeze inside your heart.<br />How much I pretend it is the feeling that I cannot carry.<br />How far are you away from me, and how close I am to you.<br />How much I want to hold you.<br />How much I want to tell you.<br />How crazy I am.</p>\n<p>When I meet you again, what would I do.<br />When we gaze at each other, what would that be.</p>\n<p>When the echoes retaliate against me,<br />Where will you be.</p>\n<p>All this fleeting time and fleeting feeling.<br />All these worlds and things.<br />When I'm lost,<br />Will you be there with me.</p>\n",
+      "wordCount": 115,
+      "readingMinutes": 1,
+      "keywords": [
+        "fleeting",
+        "feeling",
+        "echoes",
+        "ineffable",
+        "retaliate",
+        "tangible"
+      ]
+    },
+    {
+      "slug": "head-my-blow",
+      "cardTitle": "HEAD MY BLOW",
+      "cardDate": "NOVEMBER 4, 2026 · 9:30 PM",
+      "title": "Head My Blow",
+      "date": "November 4, 2026 · 9:30 PM",
+      "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "LOVE",
+        "STRANGERS",
+        "DUST",
+        "HEAD"
+      ],
+      "rating": {
+        "score": 8.2,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.2,
+          "structure": 7.5,
+          "afterglow": 8.3
+        },
+        "verdict": "A borrowed song, sung as if the head could open into heaven.",
+        "note": "借莎士比亚的句子写自己的祈求，短而亮。"
+      },
+      "image": {
+        "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/7119fc8f.jpg",
+        "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/d47d5062.png"
+      },
+      "body": "<p>Tell me where is fancy bred,<br />Or in the heart, or in the head?<br />How begot, how nourished?</p>\n<p>Fingers incarnate, piercing through my head.<br />Kill the part that does not belong.<br />Sheer through, as the shadow follows.</p>\n<p>Would I might be dust,<br />Drifting into this place full of strangers.<br />Up to the stars. Oh, my love.</p>\n<p>Would I might be heaven,<br />That with a thousand eyes<br />I might look back on you.</p>\n",
+      "wordCount": 72,
+      "readingMinutes": 1,
+      "keywords": [
+        "head",
+        "might",
+        "nourished",
+        "incarnate",
+        "strangers",
+        "piercing"
+      ]
+    },
+    {
       "slug": "disassociation",
       "cardTitle": "DISASSOCIATION",
       "cardDate": "NOVEMBER 4, 2026 · 10:44 AM",
       "title": "Disassociation",
       "date": "November 4, 2026 · 10:44 AM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "INNER CHILD",
+        "LOSS",
+        "FOG",
+        "HOMECOMING"
+      ],
+      "rating": {
+        "score": 9.1,
+        "grade": "S",
+        "dimensions": {
+          "language": 9,
+          "emotion": 9.4,
+          "structure": 8.4,
+          "afterglow": 9.3
+        },
+        "verdict": "A child runs through the chest and never comes home.",
+        "note": "童稚意象与迷雾并置，短句断得像呼吸。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/0a0eef60.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/83c43e83.png"
@@ -30,6 +117,24 @@
       "title": "Next to Me",
       "date": "November 3, 2026 · 8:36 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "FLEETING",
+        "TOUCH",
+        "FRAGILITY"
+      ],
+      "rating": {
+        "score": 8.5,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.8,
+          "structure": 7.9,
+          "afterglow": 8.7
+        },
+        "verdict": "Two strangers meet in a dim alley and mistake nearness for arrival.",
+        "note": "对视写得克制，脆弱的距离感停在最后一行。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/35e48c7b.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/5c98e781.png"
@@ -53,6 +158,24 @@
       "title": "Rain?",
       "date": "November 2, 2026 · 9:39 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "RAIN",
+        "DISTANCE",
+        "RIPPLE"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.8,
+          "emotion": 8.3,
+          "structure": 8,
+          "afterglow": 8.5
+        },
+        "verdict": "The puddle ripples, and distance is measured in water.",
+        "note": "雨是借来的比喻，扩散比落下更准确。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/31672a26.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/e83c817f.png"
@@ -76,6 +199,24 @@
       "title": "Upward",
       "date": "November 1, 2026 · 9:16 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "REFLECTION",
+        "JUDGEMENT",
+        "DISTANCE"
+      ],
+      "rating": {
+        "score": 7.9,
+        "grade": "B",
+        "dimensions": {
+          "language": 8,
+          "emotion": 7.8,
+          "structure": 7.6,
+          "afterglow": 8.2
+        },
+        "verdict": "Two people see the same surface and call it different skies.",
+        "note": "对话被压成碎片，判断先于理解。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/fd5ebb54.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/91870798.png"
@@ -99,6 +240,25 @@
       "title": "Contemplating",
       "date": "October 31, 2026 · 11:27 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "VOID",
+        "ORIGIN",
+        "LOVE",
+        "SILENCE"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.7,
+          "structure": 8.2,
+          "afterglow": 9
+        },
+        "verdict": "The blank before the Big Bang is also a place to love from.",
+        "note": "从虚空写到爱，尺度拉得很大却不空。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/313dbf37.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/3f72a032.png"
@@ -122,6 +282,24 @@
       "title": "Wandering",
       "date": "October 30, 2026 · 8:21 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "VIOLENCE",
+        "FALL",
+        "SELF"
+      ],
+      "rating": {
+        "score": 7.8,
+        "grade": "B",
+        "dimensions": {
+          "language": 7.7,
+          "emotion": 8.1,
+          "structure": 7.4,
+          "afterglow": 8
+        },
+        "verdict": "Falling becomes a way of learning the ground.",
+        "note": "暴力被写成过程，结尾还没有落地。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/9c29db43.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/ccab6681.jpg"
@@ -145,6 +323,24 @@
       "title": "Pedestrian",
       "date": "October 29, 2026 · 8:51 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "STREET",
+        "STRANGERS",
+        "DISTANCE"
+      ],
+      "rating": {
+        "score": 8.3,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.4,
+          "structure": 7.8,
+          "afterglow": 8.4
+        },
+        "verdict": "Every passing face is a life you almost lived.",
+        "note": "路人视角稳，第一人称的想象没有越界。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/f49ab563.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/155fc290.png"
@@ -168,6 +364,24 @@
       "title": "Afk",
       "date": "October 28, 2026 · 8:29 PM",
       "readTime": "1 min read",
+      "category": "LOG",
+      "tags": [
+        "OFFLINE",
+        "SIGNAL",
+        "RECONSTRUCTION"
+      ],
+      "rating": {
+        "score": 7.7,
+        "grade": "B",
+        "dimensions": {
+          "language": 7.9,
+          "emotion": 7.6,
+          "structure": 7.3,
+          "afterglow": 8
+        },
+        "verdict": "Away from keyboard is still a status the system can read.",
+        "note": "断线写成状态码，机器的静默也有体温。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3c5fd015.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/9fe29545.png"
@@ -191,6 +405,24 @@
       "title": "Digital Apathy",
       "date": "October 27, 2026 · 8:51 PM",
       "readTime": "1 min read",
+      "category": "CRITIQUE",
+      "tags": [
+        "APATHY",
+        "INFRASTRUCTURE",
+        "CARE"
+      ],
+      "rating": {
+        "score": 8.5,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.3,
+          "structure": 8.4,
+          "afterglow": 8.6
+        },
+        "verdict": "Motorways and tramlines are where feeling is traded for carelessness.",
+        "note": "基础设施被写成情绪，冷漠是结构性的。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/19680f33.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/c695ccae.png"
@@ -214,6 +446,24 @@
       "title": "Fuck the Air Fryer",
       "date": "October 26, 2026 · 8:56 PM",
       "readTime": "1 min read",
+      "category": "CRITIQUE",
+      "tags": [
+        "CONSUMPTION",
+        "RAGE",
+        "DOMESTIC"
+      ],
+      "rating": {
+        "score": 7.8,
+        "grade": "B",
+        "dimensions": {
+          "language": 8.2,
+          "emotion": 7.9,
+          "structure": 7,
+          "afterglow": 8.3
+        },
+        "verdict": "Fuck the air fryer; the list is longer than the rage.",
+        "note": "器物清单式的咒骂，力量来自重复而不是脏话。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/d10e2131.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/65a6e034.jpg"
@@ -237,6 +487,24 @@
       "title": "If I Put My Heart Away, Will I Feel Anything?",
       "date": "October 25, 2026 · 10:07 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "APATHY",
+        "MACHINE",
+        "HONESTY"
+      ],
+      "rating": {
+        "score": 8.2,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.4,
+          "emotion": 8.3,
+          "structure": 7.8,
+          "afterglow": 8.2
+        },
+        "verdict": "Away from the heart, the machine is honest and unreal.",
+        "note": "两难被压成短句，答案留在否定里。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/a4f219d6.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/3433a056.png"
@@ -260,6 +528,24 @@
       "title": "Transparent",
       "date": "October 24, 2026 · 10:31 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "OPENNESS",
+        "BUREAUCRACY",
+        "LIFE"
+      ],
+      "rating": {
+        "score": 8.1,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.3,
+          "emotion": 8,
+          "structure": 7.8,
+          "afterglow": 8.4
+        },
+        "verdict": "Open-sourcing a life still leaves the code unread.",
+        "note": "透明的宣言，末句的“地狱”让姿态不退。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/107cbd14.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/6f9b6259.png"
@@ -283,6 +569,24 @@
       "title": "Blood Flows From Sky, Forges My Body",
       "date": "October 23, 2026 · 11:02 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "HUMANITY",
+        "RAIN",
+        "CORPSE"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.8,
+          "emotion": 8.9,
+          "structure": 8,
+          "afterglow": 8.8
+        },
+        "verdict": "Tears become blood rain, and iteration becomes a body.",
+        "note": "大词密集但收得住，荒诞感有源头。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/88859b92.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/1117ea01.png"
@@ -306,6 +610,24 @@
       "title": "Sky Does Not Fall, Tears in My Eye",
       "date": "October 22, 2026 · 9:05 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "TEARS",
+        "RAIN",
+        "BODY"
+      ],
+      "rating": {
+        "score": 7.6,
+        "grade": "B",
+        "dimensions": {
+          "language": 7.8,
+          "emotion": 7.9,
+          "structure": 7.2,
+          "afterglow": 7.8
+        },
+        "verdict": "The sky holds; the face keeps leaking.",
+        "note": "身体细节压过意象，短，但有一枚很准的雨。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/6c446fc2.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/833c01db.png"
@@ -329,6 +651,24 @@
       "title": "No Surprises",
       "date": "October 21, 2026 · 5:38 PM",
       "readTime": "2 min read",
+      "category": "CRITIQUE",
+      "tags": [
+        "POP CULTURE",
+        "NUMBNESS",
+        "CROWD"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.5,
+          "structure": 8,
+          "afterglow": 8.8
+        },
+        "verdict": "In a room full of people the math is always brutal.",
+        "note": "引用被消化成自己的句子，麻木有算术。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/81b969ec.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/b032083b.png"
@@ -352,6 +692,24 @@
       "title": "Cold Start",
       "date": "October 20, 2026 · 9:27 PM",
       "readTime": "2 min read",
+      "category": "LOG",
+      "tags": [
+        "MORNING",
+        "RESISTANCE",
+        "HABIT"
+      ],
+      "rating": {
+        "score": 7.9,
+        "grade": "B",
+        "dimensions": {
+          "language": 8,
+          "emotion": 7.8,
+          "structure": 8.1,
+          "afterglow": 7.8
+        },
+        "verdict": "Every morning boots a system that does not want to start.",
+        "note": "把拖延写成开机阻力，观察细，结论略轻。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/bfaefe8c.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/58e54f41.jpg"
@@ -375,6 +733,24 @@
       "title": "Vibe, Temperament, Autonomy",
       "date": "October 19, 2026 · 8:14 PM",
       "readTime": "2 min read",
+      "category": "CRITIQUE",
+      "tags": [
+        "TASTE",
+        "AUTONOMY",
+        "PERFORMANCE"
+      ],
+      "rating": {
+        "score": 8.3,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.2,
+          "structure": 7.9,
+          "afterglow": 8.5
+        },
+        "verdict": "A vibe cannot be copied; only its receipt can.",
+        "note": "反拼贴式论述，指向自我不是货架。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/4c7341d3.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/76fe2ee6.png"
@@ -398,6 +774,24 @@
       "title": "Intrinsic Motivation",
       "date": "October 18, 2026 · 9:28 PM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "MOTIVATION",
+        "ATTENTION",
+        "MODERN LIFE"
+      ],
+      "rating": {
+        "score": 8.7,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.8,
+          "emotion": 8.6,
+          "structure": 8.8,
+          "afterglow": 9
+        },
+        "verdict": "A couple sits together, each absent; motivation follows attention.",
+        "note": "从咖啡馆写到系统，论证和体温都在。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/fd90504c.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/157756f4.jpg"
@@ -421,6 +815,24 @@
       "title": "Faint",
       "date": "October 17, 2026 · 8:49 PM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "NERVOUS SYSTEM",
+        "COLLAPSE",
+        "DEFENCE"
+      ],
+      "rating": {
+        "score": 9,
+        "grade": "S",
+        "dimensions": {
+          "language": 9,
+          "emotion": 9.1,
+          "structure": 9.2,
+          "afterglow": 8.8
+        },
+        "verdict": "Faint is what remains after the body has tried everything.",
+        "note": "防御级联收束得干净，最后一档有重量。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/abff4bf1.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/c9923062.jpg"
@@ -444,6 +856,24 @@
       "title": "Flight",
       "date": "October 16, 2026 · 7:30 PM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "DEFENCE",
+        "ESCAPE",
+        "BODY"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.6,
+          "structure": 8.7,
+          "afterglow": 8.5
+        },
+        "verdict": "Flight is the body writing distance before the mind agrees.",
+        "note": "动作被写成生理决定，逃也有逻辑。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/9b13b971.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/7d2bb055.jpg"
@@ -467,6 +897,24 @@
       "title": "Life-logging System",
       "date": "October 15, 2026 · 8:44 PM",
       "readTime": "5 min read",
+      "category": "LOG",
+      "tags": [
+        "ARCHIVE",
+        "DATA",
+        "LIVING"
+      ],
+      "rating": {
+        "score": 8.8,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.9,
+          "emotion": 8.6,
+          "structure": 9,
+          "afterglow": 8.9
+        },
+        "verdict": "A life that logs itself still needs someone to read it.",
+        "note": "技术细节与存在焦虑同框，站得住。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/514c2d66.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/d326d141.png"
@@ -490,6 +938,24 @@
       "title": "Freeze",
       "date": "October 14, 2026 · 8:00 PM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "FREEZE",
+        "STILLNESS",
+        "DEFENCE"
+      ],
+      "rating": {
+        "score": 8.7,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.8,
+          "structure": 8.7,
+          "afterglow": 8.7
+        },
+        "verdict": "Freeze is not absence; it is a body holding its breath.",
+        "note": "把静止写成主动防御，误解被拆开。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/98391bb6.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/244ed71c.png"
@@ -513,6 +979,24 @@
       "title": "Fawn",
       "date": "October 13, 2026 · 4:42 PM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "FAWN",
+        "PEOPLE-PLEASING",
+        "DEFENCE"
+      ],
+      "rating": {
+        "score": 8.5,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.6,
+          "structure": 8.4,
+          "afterglow": 8.5
+        },
+        "verdict": "Fawn is survival wearing a smile.",
+        "note": "隐藏的防御被命名，讨好不再是性格。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/861146e7.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/8d057a91.png"
@@ -536,6 +1020,24 @@
       "title": "Fight",
       "date": "October 12, 2026 · 6:31 PM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "FIGHT",
+        "ENERGY",
+        "CONFRONTATION"
+      ],
+      "rating": {
+        "score": 8.2,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.1,
+          "structure": 8.3,
+          "afterglow": 8.2
+        },
+        "verdict": "Confrontation begins where the body decides it is safe enough.",
+        "note": "攻击性被放回神经学，少了口号。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/20ac209c.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/c690ba27.png"
@@ -559,6 +1061,24 @@
       "title": "Shadow",
       "date": "October 11, 2026 · 7:24 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "SELF",
+        "SINCERITY",
+        "FRAGILITY"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.7,
+          "structure": 7.9,
+          "afterglow": 8.7
+        },
+        "verdict": "What is left is not a wound but a mark that still carries.",
+        "note": "不惩罚自己，是这首诗最硬的一行。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/b8d7b9cd.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/8c353f15.png"
@@ -582,6 +1102,24 @@
       "title": "S & N",
       "date": "October 10, 2026 · 11:55 PM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "JUNG",
+        "COMMUNICATION",
+        "IDEALISM"
+      ],
+      "rating": {
+        "score": 8.8,
+        "grade": "A",
+        "dimensions": {
+          "language": 9,
+          "emotion": 8.5,
+          "structure": 9.1,
+          "afterglow": 8.6
+        },
+        "verdict": "The tragedy is not misunderstanding but two functions speaking past each other.",
+        "note": "类型学写得克制，沟通问题落了地。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/4a40b367.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/d3486242.png"
@@ -605,6 +1143,24 @@
       "title": "Mirage",
       "date": "October 9, 2026 · 9:46 PM",
       "readTime": "1 min read",
+      "category": "ESSAY",
+      "tags": [
+        "AVOIDANCE",
+        "CONFESSION",
+        "LEARNING"
+      ],
+      "rating": {
+        "score": 8.3,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.4,
+          "emotion": 8.7,
+          "structure": 7.8,
+          "afterglow": 8.5
+        },
+        "verdict": "A confession too heavy for two weeks, and a mirage that teaches.",
+        "note": "自嘲没有滑向表演，结尾是诚实的。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3cf6521c.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/1cfa039f.jpg"
@@ -628,6 +1184,24 @@
       "title": "Individuation",
       "date": "October 8, 2026 · 10:23 PM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "JUNG",
+        "SELFHOOD",
+        "BECOMING"
+      ],
+      "rating": {
+        "score": 9,
+        "grade": "S",
+        "dimensions": {
+          "language": 9.1,
+          "emotion": 8.9,
+          "structure": 9.2,
+          "afterglow": 9
+        },
+        "verdict": "Individuation is not becoming better; it is becoming actual.",
+        "note": "把“成为自己”从口号里救出来，定义清晰。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/197d30a6.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/c3b1e176.jpg"
@@ -651,6 +1225,24 @@
       "title": "Antithesis",
       "date": "October 7, 2026 · 9:19 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "SOUL",
+        "BODY",
+        "MELANCHOLY"
+      ],
+      "rating": {
+        "score": 8.2,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.3,
+          "structure": 7.5,
+          "afterglow": 8.6
+        },
+        "verdict": "The vessel and the soul argue; melancholy is the third thing.",
+        "note": "二元被写出第三项，短而有余味。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/b2d09cc3.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/eb40a9e5.jpg"
@@ -674,6 +1266,24 @@
       "title": "Observer - Fragment IV",
       "date": "October 6, 2026 · 7:07 AM",
       "readTime": "1 min read",
+      "category": "FRAGMENT",
+      "tags": [
+        "OBSERVER",
+        "DETACHMENT",
+        "SELF"
+      ],
+      "rating": {
+        "score": 8.5,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.4,
+          "structure": 8,
+          "afterglow": 8.9
+        },
+        "verdict": "I do not feel; I take notes while the others burn.",
+        "note": "观察者人格的自画像，冷得有温度。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/f8db08db.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/d892e7cc.png"
@@ -697,6 +1307,24 @@
       "title": "The Fire and The Trap",
       "date": "October 5, 2026 · 12:55 PM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "WARMTH",
+        "COLD",
+        "DEFENCE"
+      ],
+      "rating": {
+        "score": 9.1,
+        "grade": "S",
+        "dimensions": {
+          "language": 8.9,
+          "emotion": 9.3,
+          "structure": 9,
+          "afterglow": 9.2
+        },
+        "verdict": "Warmth feels like a threat when cold has been the teacher.",
+        "note": "冷与暖的悖论写得像生存手册。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/0901eb64.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/3fed2755.png"
@@ -720,6 +1348,24 @@
       "title": "Romanticist - Fragment I",
       "date": "October 4, 2026 · 4:45 PM",
       "readTime": "1 min read",
+      "category": "FRAGMENT",
+      "tags": [
+        "ROMANTICISM",
+        "INTENSITY",
+        "FEELING"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.8,
+          "emotion": 8.9,
+          "structure": 8,
+          "afterglow": 8.7
+        },
+        "verdict": "I feel before I understand; everything arrives at full volume.",
+        "note": "浪漫主义者的自述，句法本身就是音量。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/787de818.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/5bad63d9.png"
@@ -743,6 +1389,24 @@
       "title": "Advocate - Fragment III",
       "date": "October 4, 2026 · 4:42 PM",
       "readTime": "1 min read",
+      "category": "FRAGMENT",
+      "tags": [
+        "ADVOCATE",
+        "FEAR",
+        "ACTION"
+      ],
+      "rating": {
+        "score": 8.3,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.4,
+          "structure": 8.1,
+          "afterglow": 8.4
+        },
+        "verdict": "Acting is what fear looks like when it refuses the alternative.",
+        "note": "行动被拆成恐惧的另一种形态，准确。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/aa929ec9.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/04bfa031.png"
@@ -766,6 +1430,24 @@
       "title": "Idealist - Fragment II",
       "date": "October 4, 2026 · 4:41 PM",
       "readTime": "1 min read",
+      "category": "FRAGMENT",
+      "tags": [
+        "IDEALISM",
+        "DISAPPOINTMENT",
+        "PURITY"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.5,
+          "structure": 7.9,
+          "afterglow": 8.6
+        },
+        "verdict": "Disappointment is the tax on carrying a blueprint.",
+        "note": "理想主义者不是幼稚，是长期缴税的人。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/14f34ce5.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/bdaafc6b.png"
@@ -789,6 +1471,24 @@
       "title": "Urge",
       "date": "October 4, 2026 · 6:19 AM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "URGE",
+        "BODY",
+        "SYMBOL"
+      ],
+      "rating": {
+        "score": 7.9,
+        "grade": "B",
+        "dimensions": {
+          "language": 8.1,
+          "emotion": 8,
+          "structure": 7.4,
+          "afterglow": 8.2
+        },
+        "verdict": "The urge points one way; interpretation points another.",
+        "note": "尸体意象有点过，但方向感很强。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/e8848759.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/f86044b6.jpg"
@@ -812,6 +1512,24 @@
       "title": "Spinning",
       "date": "October 3, 2026 · 8:20 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "VERTIGO",
+        "LOOP",
+        "EXISTENCE"
+      ],
+      "rating": {
+        "score": 8.1,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.3,
+          "emotion": 8.2,
+          "structure": 7.8,
+          "afterglow": 8.3
+        },
+        "verdict": "The room spins, and belief is the first thing thrown out.",
+        "note": "眩晕写成认识论，短句有失控的秩序。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3c11054f.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/5350f8fe.png"
@@ -835,6 +1553,24 @@
       "title": "Contradiction",
       "date": "October 2, 2026 · 5:23 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "CONTRADICTION",
+        "SELF",
+        "LIGHT"
+      ],
+      "rating": {
+        "score": 8.2,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.2,
+          "structure": 7.8,
+          "afterglow": 8.3
+        },
+        "verdict": "A walking contradiction is still a walk.",
+        "note": "撕开的自我还在走路，这个意象救住了全篇。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/fdd052c4.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/d6a04818.jpg"
@@ -858,6 +1594,24 @@
       "title": "Indecision",
       "date": "October 2, 2026 · 11:23 AM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "HESITATION",
+        "SILENCE",
+        "DESIRE"
+      ],
+      "rating": {
+        "score": 8.7,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.9,
+          "emotion": 9,
+          "structure": 8.2,
+          "afterglow": 8.8
+        },
+        "verdict": "Hesitation is a prayer kept warm and unlit.",
+        "note": "未说出口的话被写成祈愿，克制很高级。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/01aeb078.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/d47ce9b1.jpg"
@@ -881,6 +1635,24 @@
       "title": "Tell Me, What Is the Voice Inside Me",
       "date": "October 1, 2026 · 6:16 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "INNER VOICE",
+        "SCAR",
+        "ANSWER"
+      ],
+      "rating": {
+        "score": 8.3,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.4,
+          "structure": 7.9,
+          "afterglow": 8.5
+        },
+        "verdict": "The voice answers in scar tissue, not words.",
+        "note": "自问自答没有闭合，留白是对的。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/58205716.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202610/87938728.png"
@@ -904,6 +1676,24 @@
       "title": "Small",
       "date": "September 30, 2026 · 5:16 PM",
       "readTime": "2 min read",
+      "category": "ESSAY",
+      "tags": [
+        "SELF-ERASURE",
+        "LOVE",
+        "QUIETNESS"
+      ],
+      "rating": {
+        "score": 9,
+        "grade": "S",
+        "dimensions": {
+          "language": 9,
+          "emotion": 9.2,
+          "structure": 8.9,
+          "afterglow": 9.1
+        },
+        "verdict": "Becoming easier to love is a way of disappearing politely.",
+        "note": "把讨好写成变小，疼得很安静。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/4393db92.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/1b5e734c.jpg"
@@ -927,6 +1717,24 @@
       "title": "Heavy",
       "date": "September 29, 2026 · 7:28 PM",
       "readTime": "1 min read",
+      "category": "POEM",
+      "tags": [
+        "INTENSITY",
+        "SURFACE",
+        "HONESTY"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.8,
+          "structure": 8.2,
+          "afterglow": 8.7
+        },
+        "verdict": "Heavy is what honesty weighs when it refuses small talk.",
+        "note": "自我介绍式宣言，重复反而站稳。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/0d0a99c2.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/49325e99.jpg"
@@ -950,6 +1758,24 @@
       "title": "Who I Am When No One Is Watching - I Can't Hold Someone's Trust And Not Give It Back",
       "date": "September 28, 2026 · 5:58 PM",
       "readTime": "3 min read",
+      "category": "LETTER",
+      "tags": [
+        "SUBWAY",
+        "TRUST",
+        "WATCHING"
+      ],
+      "rating": {
+        "score": 8.5,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.7,
+          "structure": 8.3,
+          "afterglow": 8.6
+        },
+        "verdict": "A stranger's stop, a bag held, and a self caught being good.",
+        "note": "叙事干净，道德感没有说教。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/5ba4b5e9.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/be8a56db.png"
@@ -973,6 +1799,24 @@
       "title": "I Sentenced Myself for Two Years",
       "date": "September 27, 2026 · 1:38 PM",
       "readTime": "1 min read",
+      "category": "LOG",
+      "tags": [
+        "DISCIPLINE",
+        "ISOLATION",
+        "TRACK"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.5,
+          "emotion": 8.6,
+          "structure": 8.2,
+          "afterglow": 8.4
+        },
+        "verdict": "Two years of training, and the verdict was still self-imposed.",
+        "note": "跑道上的自我审判，细节使它可信。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/ff1663e0.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/c2fd3b8d.jpg"
@@ -996,6 +1840,24 @@
       "title": "In the Middle of the World",
       "date": "September 25, 2026 · 7:06 PM",
       "readTime": "2 min read",
+      "category": "CRITIQUE",
+      "tags": [
+        "FILM",
+        "MOONLIGHT",
+        "BLUE"
+      ],
+      "rating": {
+        "score": 9.1,
+        "grade": "S",
+        "dimensions": {
+          "language": 9.2,
+          "emotion": 9.3,
+          "structure": 9,
+          "afterglow": 9.2
+        },
+        "verdict": "A laptop makes Moonlight smaller; it still grows.",
+        "note": "影评写出了屏幕与光的对抗，细而不腻。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/fbee9668.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/34bb2a83.jpg"
@@ -1019,6 +1881,24 @@
       "title": "Before Heading Out",
       "date": "August 21, 2026 · 11:24 AM",
       "readTime": "3 min read",
+      "category": "ESSAY",
+      "tags": [
+        "RETURN",
+        "SCHOOL",
+        "LONELINESS"
+      ],
+      "rating": {
+        "score": 8.8,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.9,
+          "emotion": 8.8,
+          "structure": 8.7,
+          "afterglow": 8.9
+        },
+        "verdict": "A year away is not a date; it is a question of whether to return.",
+        "note": "离开学校的时间感写得诚实，没有励志尾巴。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/d33bf3a7.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/e45f3c3d.jpg"
@@ -1042,6 +1922,24 @@
       "title": "Don't Be a Dick",
       "date": "June 1, 2026 · 7:14 PM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "BASKETBALL",
+        "KINDNESS",
+        "MASCULINITY"
+      ],
+      "rating": {
+        "score": 8.6,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.7,
+          "emotion": 8.5,
+          "structure": 8.6,
+          "afterglow": 8.8
+        },
+        "verdict": "The court is a laboratory for how men decide to be decent.",
+        "note": "球场叙事松弛，结论不廉价。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/aec7f953.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/07fcd46a.jpg"
@@ -1065,6 +1963,24 @@
       "title": "May 25 – Just Another Timeline? No.",
       "date": "May 25, 2026 · 2:47 PM",
       "readTime": "1 min read",
+      "category": "LETTER",
+      "tags": [
+        "BIRTHDAY",
+        "TIMELINE",
+        "CHOICE"
+      ],
+      "rating": {
+        "score": 8.4,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.6,
+          "emotion": 8.7,
+          "structure": 8.1,
+          "afterglow": 8.6
+        },
+        "verdict": "Today is not a second chance; it is the only line you get.",
+        "note": "写给某人的生日，时间被写成一列火车。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/585c93e6.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/68284824.jpg"
@@ -1088,6 +2004,24 @@
       "title": "The Two Halves of a Heart",
       "date": "May 23, 2026 · 5:21 AM",
       "readTime": "4 min read",
+      "category": "ESSAY",
+      "tags": [
+        "DREAM",
+        "HEART",
+        "SCHOOL"
+      ],
+      "rating": {
+        "score": 8.7,
+        "grade": "A",
+        "dimensions": {
+          "language": 8.8,
+          "emotion": 8.8,
+          "structure": 8.6,
+          "afterglow": 8.8
+        },
+        "verdict": "A dream returns to a school desk to halve the heart.",
+        "note": "梦境叙事有房间感，细节比象征更响。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/b0164814.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/4af9fe00.jpg"
@@ -1111,6 +2045,24 @@
       "title": "Life is a Fantasy",
       "date": "May 22, 2026 · 2:53 AM",
       "readTime": "2 min read",
+      "category": "ESSAY",
+      "tags": [
+        "REALITY",
+        "FANTASY",
+        "JOURNEY"
+      ],
+      "rating": {
+        "score": 7.8,
+        "grade": "B",
+        "dimensions": {
+          "language": 8,
+          "emotion": 7.8,
+          "structure": 7.5,
+          "afterglow": 8.1
+        },
+        "verdict": "Reality as a dream is a familiar door; the walk through it is yours.",
+        "note": "命题偏熟，但旅程的写法还留着体温。"
+      },
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/f4788252.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/f8023233.jpg"

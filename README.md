@@ -148,6 +148,33 @@ Worker 所需的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 存在仓库 S
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 58 — 2026-11-06
+
+#### ECHOES：博客分类 / 标签 / 作者自评 + ARCHIVE 卷轴，BLOGS 改名
+
+- **CMS**：`0005_post_meta.sql` 给 posts 表加 `category` / `tags_json` / `rating_json`
+  三列与分类索引；`0006_echo_seed.sql` 按 slug 给 49 篇文章回填分类、标签与评级。
+  远端两批内容实际已执行过，本次把迁移记录补登记进 `d1_migrations`。
+- **Worker**：新增 `src/lib/meta.js` 统一归一化规则 —— 分类白名单
+  （POEM / ESSAY / LOG / CRITIQUE / FRAGMENT / LETTER，其余兜底 UNFILED）、标签大写去重
+  （≤12 个、每个 ≤24 字符）、评级 grade 由 score 重算（S≥9.0 · A≥8.0 · B≥7.0 · C≥6.0），
+  不信任前端传的 grade。posts 路由支持新字段的写入与局部更新（没传保留、显式 null 才清
+  评级）；public API 的列表与详情都返回 category / tags / rating。
+- **Admin**：BlogEdit 新增 Category 下拉、Tags 输入（逗号/空格分隔，保存前归一化）与
+  「Author's Rating」折叠块（score + 四维 + verdict EN + note 中文，只有开关打开且有分数
+  才提交）；BlogList 行内显示分类徽标与评级（S 9.1 这种格式）。
+- **改名**：路由 `/blogs` → `/echoes`、`blog-detail` → `echo-detail`；旧地址由 router
+  重定向接管，且 `copy-static.mjs` 为 `/blogs` 与每篇旧文章生成 meta refresh 跳转页
+  （canonical 指新址、noindex、保留 query/hash），让搜索权重迁到 /echoes。导航、
+  SiteStats、pageLabels、RSS 同步改名；localStorage 的 `blogs-view` 自动迁移到
+  `echoes-view`。
+- **ARCHIVE 视图**：BlogsView 新增第三种浏览方式 —— 分类 tabs + tag 筛选的作品卷轴，
+  VIEW 按钮改为 LOOKBACK → WORLD → ARCHIVE 循环；详情页新增标签行（点击跳 ARCHIVE
+  带筛选）与钉在封面墙底边的评级鉴定章（grade / 分数 / 四维）。BlogPosting 结构化数据的
+  `articleSection` 改用真实分类，面包屑加分类层。
+- **MeView**：移除 EXPLORE 无限照片回廊（-1059 行），这一页只剩 CRT 电视一屏，不再有
+  纵向叙事、滚动锁与自动推进。
+
 ### update: 57 — 2026-11-04
 
 #### BLOGS 版面适配：49 篇封面不互插、矮屏还高度给卡片

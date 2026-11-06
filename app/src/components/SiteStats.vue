@@ -220,7 +220,7 @@ const pathRows = computed(() => {
 function pathName(p) {
   const names = {
     '/': 'HOME',
-    '/blogs': 'BLOGS',
+    '/echoes': 'ECHOES',
     '/me': 'ME',
     '/me/gallery': 'ME — GALLERY',
     '/gallery': 'GALLERY',

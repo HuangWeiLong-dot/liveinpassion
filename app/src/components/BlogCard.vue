@@ -18,7 +18,7 @@ onMounted(() => loadImage(imgRef.value));
 // ⚠ 不能叫 open：模板里 `@click="open"` 会解析成全局 window.open，
 // 点下去只是调用了一个空窗口，页面不跳也不报错。见 views/BlogsView.vue 同类注释。
 function openPost() {
-  router.push(`/blogs/${props.post.slug}`);
+  router.push(`/echoes/${props.post.slug}`);
 }
 </script>
 

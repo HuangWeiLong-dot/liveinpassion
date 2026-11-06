@@ -67,12 +67,17 @@ const form = ref({
   contentMd: '',
   coverKey: '',
   coverFullKey: '',
+  category: 'UNFILED',
+  tags: [],         // 数组；输入框里是逗号分隔文本，保存前拆
+  tagsText: '',
+  rating: null,     // { score, grade, language, emotion, structure, afterglow, verdict, note }
+  ratingOn: false,
 });
+const CATEGORY_OPTIONS = ['UNFILED', 'POEM', 'ESSAY', 'LOG', 'CRITIQUE', 'FRAGMENT', 'LETTER'];
 const saving = ref(false);
 const uploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
-
 const editorRef = ref(null);
 
 // 分页：正文里的一行 <div class="page-break"></div> 就是页与页的分隔。
@@ -211,6 +216,16 @@ onMounted(async () => {
       form.value.contentMd = data.contentMd || '';
       form.value.coverKey = data.coverKey || '';
       form.value.coverFullKey = data.coverFullKey || '';
+      form.value.category = data.category || 'UNFILED';
+      form.value.tags = Array.isArray(data.tags) ? data.tags : [];
+      form.value.tagsText = form.value.tags.join(', ');
+      if (data.rating && typeof data.rating === 'object' && data.rating.score != null) {
+        form.value.rating = { ...data.rating };
+        form.value.ratingOn = true;
+      } else {
+        form.value.rating = { score: null, language: 0, emotion: 0, structure: 0, afterglow: 0, verdict: '', note: '' };
+        form.value.ratingOn = false;
+      }
       // 已有内容不参与自动填充
       if (data.title) titleDirty.value = true;
       if (data.slug) slugDirty.value = true;
@@ -271,6 +286,26 @@ async function save(status) {
     }
     imgProgress.value = '';
 
+    // 把 tagsText 拆成数组（后端会再次归一化）
+    const tagsArr = form.value.tagsText
+      .split(/[,\s，、]+/)
+      .map((t) => t.trim().toUpperCase())
+      .filter(Boolean);
+
+    // rating：只有评分开关开着且有分数才提交；grade 由后端从 score 重算，
+    // 这里不用传它（保留也无妨，后端会覆盖）
+    const rating = form.value.ratingOn && form.value.rating && form.value.rating.score != null
+      ? {
+          score: Number(form.value.rating.score),
+          language: Number(form.value.rating.language) || 0,
+          emotion: Number(form.value.rating.emotion) || 0,
+          structure: Number(form.value.rating.structure) || 0,
+          afterglow: Number(form.value.rating.afterglow) || 0,
+          verdict: form.value.rating.verdict || '',
+          note: form.value.rating.note || '',
+        }
+      : null;
+
     const payload = {
       slug: form.value.slug,
       cardTitle: form.value.cardTitle,
@@ -278,6 +313,9 @@ async function save(status) {
       contentMd: form.value.contentMd,
       coverKey: form.value.coverKey,
       coverFullKey: form.value.coverFullKey,
+      category: form.value.category,
+      tags: tagsArr,
+      rating,
     };
     let id;
     if (isNew.value) {
@@ -982,7 +1020,55 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+
+        <!-- 05 / Category & Tags -->
+        <div class="field">
+          <label class="field-label">05 / Category</label>
+          <select v-model="form.category">
+            <option v-for="c in CATEGORY_OPTIONS" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <div class="field-hint">Which collection this piece belongs to · UNFILED puts it at the end</div>
+        </div>
+        <div class="field">
+          <label class="field-label">06 / Tags</label>
+          <input v-model="form.tagsText" placeholder="LOVE, STRANGERS, DUST" />
+          <div class="field-hint">Comma or space separated · normalized to uppercase · max 12</div>
+        </div>
       </div>
+
+      <!-- 07 / Author's rating (collapsible) -->
+      <details class="rating-block" :open="form.ratingOn" @toggle="form.ratingOn = $event.target.open">
+        <summary class="rating-summary">
+          <span>07 / Author's Rating</span>
+          <span class="rating-summary__hint">
+            <template v-if="form.ratingOn && form.rating && form.rating.score != null">
+              {{ Number(form.rating.score).toFixed(1) }} / 10
+            </template>
+            <template v-else>off</template>
+          </span>
+        </summary>
+        <div class="rating-body">
+          <div class="field field--wide">
+            <label class="field-label">Score / 10</label>
+            <input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.score" placeholder="e.g. 9.1" />
+            <div class="field-hint">Grade is derived from this (S ≥ 9.0 · A ≥ 8.0 · B ≥ 7.0 · C ≥ 6.0)</div>
+          </div>
+          <template v-if="form.ratingOn">
+            <div class="field"><label class="field-label">Language</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.language" /></div>
+            <div class="field"><label class="field-label">Emotion</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.emotion" /></div>
+            <div class="field"><label class="field-label">Structure</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.structure" /></div>
+            <div class="field"><label class="field-label">Afterglow</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.afterglow" /></div>
+            <div class="field field--wide">
+              <label class="field-label">Verdict (EN)</label>
+              <input v-model="form.rating.verdict" placeholder="One sentence judgment, ≤ 180 chars" maxlength="180" />
+            </div>
+            <div class="field field--wide">
+              <label class="field-label">Note (中文)</label>
+              <input v-model="form.rating.note" placeholder="一句短评，≤ 120 字" maxlength="120" />
+            </div>
+          </template>
+        </div>
+      </details>
     </div>
 
     <div class="editor-panel">
@@ -1250,7 +1336,6 @@ onUnmounted(() => {
 }
 .page-insert { white-space: nowrap; }
 
-
 /* 触屏上没有 Ctrl+S，"paste / drop" 也不成立，换成触摸版的提示 */
 .tip-coarse { display: none; }
 @media (hover: none) {
@@ -1494,4 +1579,68 @@ onUnmounted(() => {
 .md-editor-preview figure.media-text__media { display: block; margin: 0; }
 .md-editor-preview .media-text__media img { display: block; width: 100%; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
+
+/* ── Author's Rating block ──────────────────────────────────────────────── */
+.rating-block {
+  margin-top: 16px;
+  border: 1px solid var(--border, #2a2a2c);
+  border-radius: 6px;
+  padding: 0;
+  background: var(--panel-bg, #151518);
+}
+.rating-block[open] { padding: 14px 18px 18px; }
+.rating-summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 18px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--fg, #eaeaea);
+}
+.rating-summary::-webkit-details-marker { display: none; }
+.rating-summary::before {
+  content: '+';
+  margin-right: 12px;
+  width: 16px;
+  display: inline-block;
+  text-align: center;
+  opacity: 0.6;
+  transition: transform 0.18s ease;
+}
+.rating-block[open] .rating-summary::before {
+  content: '−';
+}
+.rating-summary__hint {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0.5;
+}
+.rating-body {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px 20px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border, #2a2a2c);
+}
+.rating-body .field--wide { grid-column: 1 / -1; }
+.rating-body input[type="number"] {
+  width: 100%;
+  background: var(--input-bg, #0e0e10);
+  border: 1px solid var(--border, #2a2a2c);
+  border-radius: 4px;
+  color: var(--fg, #eaeaea);
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+}
+.rating-body input[type="number"]:focus,
+.rating-body input:not([type]):focus {
+  outline: none;
+  border-color: var(--accent, #eaeaea);
+}
 </style>

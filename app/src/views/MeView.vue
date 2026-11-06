@@ -1,42 +1,15 @@
 <script setup>
-// ME 页：一条纵向滚动叙事，最后落在一台复古电视机上。
-//
-//   0. 进来先停在一张 EXPLORE 屏上：背景照片**一开始是隐藏的**，点击 EXPLORE
-//      之后才逐张浮现（近处先出现、远处后出现），浮现完镜头才开始向前推进。
-//      点击之前滚动被锁住，页面停在起点。
-//   1. 隧道舞台 sticky 在整个 main 的顶部：30 张照片各自在 3D 空间里有一个
-//      X/Y 偏移和深度 z（-5000 … +500）。滚动时 z 整体一次性推进 10000px。
-//      每张照片是一张被风吹着的纸片：不同初始倾角、各自的风向漂移、持续扇动
-//      + skew，加上不规则摆动的旗帜轮廓，从不同角度翻进镜头，不再循环重置。
-//   2. 照片全部飞出去之后，一台**方角复古 CRT 电视机**平滑浮上来：ME / GALLERY /
-//      FRIENDS 是屏幕内的三个频道，首屏只播 ME，底部按钮切换；切换时出现雪花
-//      花屏 + 横向撕裂的故障效果。机身是中性灰塑料，上沿右侧写着
-//      where are you my love? / searching for meaning，下沿只保留有实际功能的按键。
-//   3. 这一页不挂全局页脚：固定页脚会和 sticky 舞台的行程打架。
-//
-// 隧道照片来自 CMS 快照里的 Me 相册（264 张）。用 thumbUrl 先缩到 900px 左右
-// 再上屏：原压缩图是 4895×6528，直接把 30 张原图解码会把内存和合成器拖垮。
-import {
-  nextTick,
-  onActivated,
-  onBeforeUnmount,
-  onDeactivated,
-  onMounted,
-  ref,
-} from 'vue';
+// ME 页：一台方角复古 CRT 电视机，屏幕里三个频道（ME / GALLERY / FRIENDS）。
+// 原来的「EXPLORE 无限回廊」（30 张照片在 3D 隧道里飞、滚动推进整页）已整体移除：
+// 这一页现在只有电视一屏，不再有纵向叙事、滚动锁和自动推进。
+// 屏幕里保留雪花花屏 + 横向撕裂的换台故障；画面之上叠 RGB 荧光栅格与色散。
+import { onActivated, onBeforeUnmount, onDeactivated, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useVirtue } from '../composables/useVirtue.js';
 import { meQuotes } from '../data/quotes.js';
 import { blogPosts } from '../data/blogPosts.js';
-import { mePhotos, mePhotoByName } from '../data/mePhotos.js';
-import { CDN_BASE } from '../data/cdn.js';
-import { thumbUrl } from '../composables/useThumbnails.js';
 import SteamGameModal from '../components/SteamGameModal.vue';
 import MeModals from '../components/MeModals.vue';
-
-gsap.registerPlugin(ScrollTrigger);
 
 const router = useRouter();
 const { virtue } = useVirtue();
@@ -44,7 +17,6 @@ const { virtue } = useVirtue();
 const reduceMotion = () => (
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 );
-const REDUCED = reduceMotion();
 
 // 电视里的三个频道：首屏只放 ME，下面的频道按钮负责切换
 const CHANNELS = [
@@ -54,359 +26,8 @@ const CHANNELS = [
 ];
 const activeChannel = ref(0);
 const switching = ref(false);
-
-// ── 隧道照片池 ──────────────────────────────────────────────────────────
-// 30 张卡片各用一张不同的图：从相册里等距抽 30 张，避免画面里出现重复。
-// 上屏前统一缩到 900px（见 requestTunnelPhotos），30 张也不会撑爆显存。
-// 抽不到 CMS 数据时退回仓库里那几张本地图。
-const TUNNEL_CARD_COUNT = 30;
-const TUNNEL_PHOTO_COUNT = TUNNEL_CARD_COUNT;
-const LOCAL_FALLBACK = [
-  '/me/personas/advocate.jpg',
-  '/me/personas/idealist.jpg',
-  '/me/personas/observer.jpg',
-  '/me/personas/romanticist.jpg',
-  '/me/posters/dead_poets_society.jpg',
-  '/me/posters/ok_computer.jpg',
-];
-const tunnelPool = (() => {
-  if (!mePhotos.length) {
-    return LOCAL_FALLBACK.map((src) => ({ key: src, src }));
-  }
-  const count = Math.min(TUNNEL_PHOTO_COUNT, mePhotos.length);
-  return Array.from({ length: count }, (_, i) => {
-    const index = Math.floor(((i + 0.5) * mePhotos.length) / count);
-    const filename = mePhotos[index];
-    const urls = mePhotoByName(filename) || {};
-    return {
-      key: filename,
-      src: urls.src || `${CDN_BASE}/Me/compressed_me/${filename}`,
-    };
-  });
-})();
-
-const tunnelPhotos = ref(tunnelPool.map((p) => ({ ...p, thumb: '' })));
-const tunnelCards = Array.from({ length: TUNNEL_CARD_COUNT }, (_, i) => ({
-  key: `tunnel-${i}`,
-  photo: i % Math.max(1, tunnelPool.length),
-}));
-
-// ── 隧道：3D 卡片 + 循环推进 ────────────────────────────────────────────
-// 舞台 sticky 在整个 main 顶部，ScrollTrigger 的触发器就是整页。
-const pageRef = ref(null);
-const tunnelStageRef = ref(null);
-const cardEls = [];
-function setCardEl(i) {
-  return (el) => {
-    if (el) cardEls[i] = el;
-  };
-}
-
-
-
-// 深度区间：-5000（最深）→ +500（已经擦过镜头）
-const Z_FAR = -5000;
-const Z_NEAR = 500;
-// 整页滚完推进 10000px：最远的一张（-5000）在约 55% 进度时也飞过镜头了，
-// 之后画面里不会再有照片，复古电视机才开始升上来。
-const TRAVEL = 10000;
-
-const travelPercent = ref(0);
-let travelPctLast = -1;
-
-const cardStates = Array.from({ length: TUNNEL_CARD_COUNT }, () => {
-  const state = {
-    x: 0,
-    y: 0,
-    baseZ: 0,
-    rx: 0,
-    ry: 0,
-    rz: 0,
-    revealDelay: 0,
-    flutterAmp: 0,
-    flutterSpeed: 0,
-    flutterPhase: 0,
-    windAngle: 0,
-    windPower: 0,
-  };
-  randomizeCard(state, true);
-  return state;
-});
-
-/** 随机一点 X/Y 偏移，避开画面正中心那一小块 */
-function randomizeCardXY(state) {
-  const angle = Math.random() * Math.PI * 2;
-  const radius = 18 + Math.random() * 62; // 18vw ~ 80vw
-  state.x = Math.cos(angle) * radius;
-  state.y = Math.sin(angle) * radius;
-}
-
-function randomizeCard(state, initial) {
-  randomizeCardXY(state);
-  if (initial) {
-    state.baseZ = -500 - Math.random() * 4500;
-    // 浮现顺序按深度错开：离镜头越近越早出现（远处最后从黑暗里浮出来）
-    const depth = (state.baseZ - Z_FAR) / (0 - Z_FAR); // 0 最远 → 1 最近
-    state.revealDelay = Math.min(0.55, (1 - depth) * 0.55);
-
-    // 纸片姿态：每张卡从不同角度翻进来，不是正面平推
-    state.rx = (Math.random() - 0.5) * 20;
-    state.ry = (Math.random() - 0.5) * 26;
-    state.rz = (Math.random() - 0.5) * 12;
-
-    // 每张纸有自己的风速 / 相位 / 风向，推进时不会整齐划一地摆动
-    state.flutterAmp = 5 + Math.random() * 4.5;
-    state.flutterSpeed = 0.55 + Math.random() * 0.9;
-    state.flutterPhase = Math.random() * Math.PI * 2;
-    state.windAngle = Math.random() * Math.PI * 2;
-    state.windPower = 3 + Math.random() * 5;
-  }
-}
-
-let tunnelProgress = 0;
-let tunnelTween = null;
-let tunnelProxy = null;
-// 点 EXPLORE 之后的一小段「阵风」：风速先大后小，照片像被吹起来
-let windGustStart = 0;
-
-// 开场浮现：0 → 1。未点 EXPLORE 时保持 0，照片完全不出现。
-const TUNNEL_REVEAL_SECONDS = 1.5;
-const tunnelReveal = { v: 0 };
-let tunnelRevealTween = null;
-
-function killRevealTween() {
-  if (tunnelRevealTween) {
-    tunnelRevealTween.kill();
-    tunnelRevealTween = null;
-  }
-}
-
-function renderTunnel(progress) {
-  tunnelProgress = progress;
-  const travel = progress * TRAVEL;
-  const reveal = tunnelReveal.v;
-  const now = performance.now();
-  const t = now / 1000;
-  const gustAge = windGustStart ? now - windGustStart : 9999;
-  const gust = 1 + Math.max(0, 1 - gustAge / 1800) * 0.55;
-
-  for (let i = 0; i < cardStates.length; i += 1) {
-    const el = cardEls[i];
-    if (!el) continue;
-    const state = cardStates[i];
-
-    // 一次性推进：不循环、不重置。所有照片一路飞出镜头，
-    // 飞过 500px 之后就不再回来（滚动往回才按同一条轨迹倒放）。
-    const rawZ = state.baseZ + travel;
-    const z = Math.min(rawZ, Z_NEAR);
-    // 0 → 500 之间淡出，越贴近镜头越透明
-    const baseOpacity = rawZ > 0 ? Math.max(0, 1 - rawZ / Z_NEAR) : 1;
-
-    // 每张照片按自己的深度错开浮现；easeInOut 让出现不是线性淡入
-    const delay = state.revealDelay || 0;
-    const local = delay >= 0.999
-      ? 1
-      : Math.max(0, Math.min(1, (reveal - delay) / (1 - delay)));
-    const eased = local * local * (3 - 2 * local);
-    const opacity = baseOpacity * eased;
-    const scale = 0.88 + 0.12 * eased;
-
-    // 风感：时间相位 + 每张纸自己的风向，旗帜式来回扇动 + 横向剪切
-    const flutter = Math.sin(t * state.flutterSpeed + state.flutterPhase);
-    const flutterB = Math.cos(t * state.flutterSpeed * 0.77 + state.flutterPhase);
-    const flutterC = Math.sin(t * state.flutterSpeed * 1.6 + state.flutterPhase * 1.3);
-    const amp = state.flutterAmp * gust;
-    const windDriftX = Math.cos(state.windAngle) * progress * state.windPower;
-    const windDriftY = Math.sin(state.windAngle) * progress * state.windPower;
-    const swayX = Math.sin(t * 0.62 + state.flutterPhase) * 1.4;
-    const swayY = Math.cos(t * 0.51 + state.flutterPhase * 1.2) * 1.1;
-    const rx = state.rx + flutter * amp;
-    const ry = state.ry + flutterB * amp * 1.15;
-    const rz = state.rz + flutter * amp * 0.7;
-    // 像旗面被风扯动：整张纸做一点 skew，再配合 3D 倾倒和风向漂移
-    const skewY = flutterC * (amp * 0.6);
-    const skewX = flutterB * (amp * 0.25);
-    const liftZ = Math.sin(t * 0.9 + state.flutterPhase) * 14;
-
-    el.style.transform = `translate(-50%, -50%) translate3d(${(state.x + windDriftX + swayX).toFixed(2)}vw, ${(state.y + windDriftY + swayY).toFixed(2)}vw, ${(z + liftZ).toFixed(1)}px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) rotateZ(${rz.toFixed(2)}deg) skewY(${skewY.toFixed(2)}deg) skewX(${skewX.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
-    el.style.opacity = opacity.toFixed(3);
-    el.style.visibility = opacity < 0.002 ? 'hidden' : 'visible';
-
-    // 不规则的旗帜轮廓：上下边缘轻微起伏，右侧自由边随时间摆动
-    if (opacity > 0.01) {
-      const clipPhase = t * 2.1 + state.flutterPhase;
-      const clip = ['0% 0%'];
-      for (let k = 1; k <= 4; k += 1) {
-        const x = k * 25;
-        const y = Math.sin(clipPhase + k * 0.8) * 1.2;
-        clip.push(`${x}% ${y.toFixed(2)}%`);
-      }
-      for (let k = 1; k <= 6; k += 1) {
-        const y = (k * 100) / 7;
-        const x = 100 - 1.5 - Math.sin(clipPhase + k * 1.15) * 3.5;
-        clip.push(`${x.toFixed(2)}% ${y.toFixed(2)}%`);
-      }
-      clip.push('100% 100%');
-      for (let k = 3; k >= 1; k -= 1) {
-        const x = k * 25;
-        const y = 100 + Math.sin(clipPhase + k * 0.7) * 1.2;
-        clip.push(`${x}% ${y.toFixed(2)}%`);
-      }
-      clip.push('0% 100%');
-      el.style.clipPath = `polygon(${clip.join(', ')})`;
-    }
-
-  }
-
-  tunnelStageRef.value?.style.setProperty('--tunnel-progress', progress.toFixed(4));
-
-  const pct = Math.round(progress * 100);
-  if (pct !== travelPctLast) {
-    travelPctLast = pct;
-    travelPercent.value = pct;
-  }
-}
-
-function requestTunnelPhotos() {
-  if (TUNNEL_PHOTOS_REQUESTED) return;
-  TUNNEL_PHOTOS_REQUESTED = true;
-  if (!tunnelPhotos.value.length) return;
-
-  const width = window.innerWidth <= 900 ? 640 : 900;
-
-  // 先取最靠近镜头的那几张：首屏不会先看到一堆空框
-  const order = tunnelPhotos.value
-    .map((_, i) => i)
-    .sort((a, b) => cardStates[b].baseZ - cardStates[a].baseZ);
-
-  for (const i of order) {
-    const photo = tunnelPhotos.value[i];
-    if (!photo?.src) continue;
-    thumbUrl(photo.src, width).then((url) => {
-      const current = tunnelPhotos.value[i];
-      if (!current) return;
-      current.thumb = url || photo.src;
-      tunnelPhotos.value = [...tunnelPhotos.value];
-    });
-  }
-}
-let TUNNEL_PHOTOS_REQUESTED = false;
-
-// 某张图真的加载失败时退回占位框，避免只剩一条 1px 边框
-function onTunnelImageError(index) {
-  const photo = tunnelPhotos.value[index];
-  if (photo) photo.thumb = '';
-}
-
-function buildTunnel() {
-  killTunnel();
-  renderTunnel(0);
-  if (reduceMotion() || window.innerWidth <= 900 || !pageRef.value || !tunnelStageRef.value) return;
-
-  // 触发器是整页：窗口阶段背景里的照片也还在继续飞（只是被压暗了）。
-  tunnelProxy = { p: 0 };
-  tunnelTween = gsap.to(tunnelProxy, {
-    p: 1,
-    duration: 1,
-    ease: 'none',
-    onUpdate: () => renderTunnel(tunnelProxy.p),
-    scrollTrigger: {
-      trigger: pageRef.value,
-      start: 'top top',
-      end: 'bottom bottom',
-      scrub: 0.8,
-      invalidateOnRefresh: true,
-    },
-  });
-}
-
-function killTunnel() {
-  if (tunnelTween) {
-    tunnelTween.scrollTrigger?.kill();
-    tunnelTween.kill();
-    tunnelTween = null;
-  }
-  tunnelProxy = null;
-}
-
-// ── 复古电视机：机身平滑浮现，屏幕内容再淡入 ────────────────────────────
-const cardsRef = ref(null);
-const tvRef = ref(null);
+// 换台雪花用的画布（模板里的 <canvas ref="noiseRef">）
 const noiseRef = ref(null);
-const cardTimelines = [];
-
-function tvScreenParts() {
-  const root = tvRef.value;
-  if (!root) return {};
-  return {
-    inner: root.querySelector('.me-tv__screen-inner'),
-  };
-}
-
-function buildCards() {
-  killCards();
-  tunnelStageRef.value?.style.setProperty('--cards-in', '0');
-
-  const reduced = reduceMotion() || window.innerWidth <= 900;
-  if (reduced) {
-    if (tvRef.value) gsap.set(tvRef.value, { clearProps: 'transform,opacity,visibility' });
-    const { inner } = tvScreenParts();
-    if (inner) gsap.set(inner, { clearProps: 'transform,opacity,visibility' });
-    return;
-  }
-  if (!cardsRef.value || !tvRef.value) return;
-
-  const { inner } = tvScreenParts();
-
-  gsap.set(tvRef.value, { y: 46, autoAlpha: 0, scale: 0.985 });
-  if (inner) gsap.set(inner, { autoAlpha: 0 });
-
-  const tl = gsap.timeline({
-    scrollTrigger: {
-      trigger: cardsRef.value,
-      start: 'top bottom',
-      end: 'top 8%',
-      scrub: 0.8,
-      invalidateOnRefresh: true,
-    },
-  });
-
-  // 机身先平滑悬浮上来（位移 + 轻微缩放，不做硬切）
-  tl.to(tvRef.value, {
-    y: 0, autoAlpha: 1, scale: 1, duration: 0.7, ease: 'power2.out',
-  }, 0);
-
-  // 屏幕内容随后淡入，不做白闪 / 跳变
-  if (inner) {
-    tl.to(inner, { autoAlpha: 1, duration: 0.45, ease: 'power1.out' }, 0.18);
-  }
-
-  cardTimelines.push(tl);
-
-  // 电视进场时隧道 HUD / 进度线退场（照片这时已经全部飞出镜头）
-  const proxy = { v: 0 };
-  const fade = gsap.to(proxy, {
-    v: 1,
-    ease: 'none',
-    onUpdate: () => tunnelStageRef.value?.style.setProperty('--cards-in', proxy.v.toFixed(3)),
-    scrollTrigger: {
-      trigger: cardsRef.value,
-      start: 'top bottom',
-      end: 'top 55%',
-      scrub: 0.8,
-      invalidateOnRefresh: true,
-    },
-  });
-  cardTimelines.push(fade);
-}
-
-function killCards() {
-  for (const tl of cardTimelines) {
-    tl.scrollTrigger?.kill();
-    tl.kill();
-  }
-  cardTimelines.length = 0;
-}
 
 // ── 频道切换：雪花花屏 + 横向撕裂的故障效果 ─────────────────────────────
 let noiseRAF = 0;
@@ -498,261 +119,14 @@ function switchChannel(index) {
   }, 470);
 }
 
-function pageScrollRange() {
-  const main = pageRef.value;
-  return main ? Math.max(0, main.offsetHeight - window.innerHeight) : 0;
-}
-
-// 跳到电视这一屏的顶部。桌面上刚好等于整页滚到底；手机上电视按内容
-// 高度铺开、可能比一屏更高，必须落到 section 顶部而不是页尾。
-function cardsScrollTop() {
-  const el = cardsRef.value;
-  if (!el) return pageScrollRange();
-  return Math.max(0, el.getBoundingClientRect().top + window.scrollY);
-}
-
-function scrollToContent() {
-  window.scrollTo({
-    top: pageScrollRange(),
-    left: 0,
-    behavior: reduceMotion() ? 'instant' : 'smooth',
-  });
-}
-
-// ── EXPLORE 入口 ────────────────────────────────────────────────────────
-// 点击之前锁住滚动：wheel / touch / 键盘滚动的兜底都在这里。
-// 舞台保持在第 0 帧、照片保持隐藏，点击之后才浮现并进入整页的推进。
-const explored = ref(false);
-
-function blockExploreEvent(event) {
-  if (!explored.value) event.preventDefault();
-}
-
-function guardExploreScroll() {
-  if (!explored.value) {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }
-}
-
-function attachExploreLock() {
-  cancelAutoScroll();
-  killRevealTween();
-  tunnelReveal.v = 0;
-  explored.value = false;
-  renderTunnel(0);
-  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  window.addEventListener('wheel', blockExploreEvent, { passive: false });
-  window.addEventListener('touchmove', blockExploreEvent, { passive: false });
-  window.addEventListener('scroll', guardExploreScroll, { passive: true });
-}
-
-function detachExploreLock() {
-  window.removeEventListener('wheel', blockExploreEvent);
-  window.removeEventListener('touchmove', blockExploreEvent);
-  window.removeEventListener('scroll', guardExploreScroll);
-}
-
-// 自己实现的自动滚动：不依赖 ScrollToPlugin，而且用户一动滚轮就停
-let autoScrollRAF = 0;
-let autoScrollCancel = null;
-let exploreStartTimer = 0;
-let exploreStartCleanup = null;
-
-function cancelScheduledScroll() {
-  if (exploreStartTimer) {
-    clearTimeout(exploreStartTimer);
-    exploreStartTimer = 0;
-  }
-  if (exploreStartCleanup) {
-    exploreStartCleanup();
-    exploreStartCleanup = null;
-  }
-}
-
-function cancelAutoScroll() {
-  cancelScheduledScroll();
-  if (autoScrollRAF) cancelAnimationFrame(autoScrollRAF);
-  autoScrollRAF = 0;
-  if (autoScrollCancel) {
-    window.removeEventListener('wheel', autoScrollCancel);
-    window.removeEventListener('touchstart', autoScrollCancel);
-    window.removeEventListener('pointerdown', autoScrollCancel);
-    autoScrollCancel = null;
-  }
-}
-
-function autoScrollTo(target, duration = 7600) {
-  cancelAutoScroll();
-  const from = window.scrollY;
-  const distance = target - from;
-  if (Math.abs(distance) < 2) return;
-
-  autoScrollCancel = () => cancelAutoScroll();
-  window.addEventListener('wheel', autoScrollCancel, { passive: true });
-  window.addEventListener('touchstart', autoScrollCancel, { passive: true });
-  window.addEventListener('pointerdown', autoScrollCancel, { passive: true });
-
-  const started = performance.now();
-  const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
-  const step = (now) => {
-    const t = Math.min(1, (now - started) / duration);
-    window.scrollTo({
-      top: from + distance * ease(t),
-      left: 0,
-      behavior: 'instant',
-    });
-    if (t < 1) autoScrollRAF = requestAnimationFrame(step);
-    else {
-      autoScrollRAF = 0;
-      cancelAutoScroll();
-    }
-  };
-  autoScrollRAF = requestAnimationFrame(step);
-}
-
-// 照片浮现完再开始推进；这段时间里用户自己一动滚轮，就取消自动推进
-function scheduleExploreScroll(target) {
-  cancelScheduledScroll();
-  const cancel = () => cancelScheduledScroll();
-
-  exploreStartCleanup = () => {
-    window.removeEventListener('wheel', cancel);
-    window.removeEventListener('keydown', cancel);
-    window.removeEventListener('touchstart', cancel);
-    window.removeEventListener('pointerdown', cancel);
-  };
-
-  window.addEventListener('wheel', cancel, { passive: true });
-  window.addEventListener('keydown', cancel, { passive: true });
-  window.addEventListener('touchstart', cancel, { passive: true });
-  window.addEventListener('pointerdown', cancel, { passive: true });
-
-  // 和 TUNNEL_REVEAL_SECONDS 对齐：照片全部浮现之后镜头才真正开始推进
-  exploreStartTimer = setTimeout(() => {
-    cancelScheduledScroll();
-    autoScrollTo(target);
-  }, TUNNEL_REVEAL_SECONDS * 1000);
-}
-
-// EXPLORE：照片逐张浮现 → 镜头推进 → 复古电视机升起
-function startExplore() {
-  explored.value = true;
-  detachExploreLock();
-  const target = pageScrollRange();
-
-  // 减少动态 / 手机：没有隧道可飞，直接落到窗口
-  if (REDUCED || window.innerWidth <= 900) {
-    killRevealTween();
-    tunnelReveal.v = 1;
-    renderTunnel(tunnelProgress);
-    window.scrollTo({ top: cardsScrollTop(), left: 0, behavior: 'instant' });
-    return;
-  }
-
-  cancelAutoScroll();
-  killRevealTween();
-  tunnelReveal.v = 0;
-  windGustStart = performance.now();
-  renderTunnel(tunnelProgress);
-
-  tunnelRevealTween = gsap.to(tunnelReveal, {
-    v: 1,
-    duration: TUNNEL_REVEAL_SECONDS,
-    ease: 'power2.out',
-    onUpdate: () => renderTunnel(tunnelProgress),
-    onComplete: () => {
-      tunnelRevealTween = null;
-    },
-  });
-
-  scheduleExploreScroll(target);
-}
-
-// SKIP：跳过隧道，直接到电视机
-function skipToCards() {
-  explored.value = true;
-  detachExploreLock();
-  cancelAutoScroll();
-  killRevealTween();
-  tunnelReveal.v = 1;
-  renderTunnel(tunnelProgress);
-  window.scrollTo({ top: cardsScrollTop(), left: 0, behavior: 'instant' });
-}
-
 // ── 生命周期 ────────────────────────────────────────────────────────────
-let activationCount = 0;
-let resizeTimer = 0;
-let lastNarrow = window.innerWidth <= 900;
+// 换台时还没播完的雪花 / 定时器：离开这一页就收掉
+onDeactivated(cancelChannelSwitch);
+onBeforeUnmount(cancelChannelSwitch);
 
-function onResize() {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    // 跨过 900px 断点时必须重建：桌面端的 GSAP 会把电视设成 autoAlpha 0，
-    // 直接切到手机布局会留下一台透明的电视。
-    const narrow = window.innerWidth <= 900;
-    if (narrow !== lastNarrow) {
-      lastNarrow = narrow;
-      buildTunnel();
-      buildCards();
-    }
-    ScrollTrigger.refresh();
-    renderTunnel(tunnelProgress);
-  }, 180);
-}
-
-onMounted(() => {
-  requestTunnelPhotos();
-  attachExploreLock();
-  window.addEventListener('resize', onResize);
-  nextTick(() => {
-    buildTunnel();
-    buildCards();
-    ScrollTrigger.refresh();
-  });
-  document.fonts?.ready
-    ?.then(() => ScrollTrigger.refresh())
-    .catch(() => {});
-});
-
+// 每次回到这一页换一句引言（原来的行为，和回廊无关）
 onActivated(() => {
-  activationCount += 1;
-  if (activationCount > 1) {
-    quote.value = meQuotes[Math.floor(Math.random() * meQuotes.length)];
-  }
-  // 已经 Explore 过就不再弹入口；只有第一次进入（或上次没点就离开）才显示
-  if (explored.value) {
-    cancelAutoScroll();
-    detachExploreLock();
-    tunnelReveal.v = 1;
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  } else {
-    attachExploreLock();
-  }
-  nextTick(() => {
-    buildTunnel();
-    buildCards();
-    ScrollTrigger.refresh();
-  });
-});
-
-onDeactivated(() => {
-  cancelAutoScroll();
-  detachExploreLock();
-  cancelChannelSwitch();
-  killRevealTween();
-  killTunnel();
-  killCards();
-});
-
-onBeforeUnmount(() => {
-  cancelAutoScroll();
-  detachExploreLock();
-  cancelChannelSwitch();
-  killRevealTween();
-  killTunnel();
-  killCards();
-  clearTimeout(resizeTimer);
-  window.removeEventListener('resize', onResize);
+  quote.value = meQuotes[Math.floor(Math.random() * meQuotes.length)];
 });
 
 // ── 内容 ────────────────────────────────────────────────────────────────
@@ -771,82 +145,10 @@ function copyWeChat() {
 </script>
 
 <template>
-  <main ref="pageRef" class="page active me-intro-page" :class="{ 'is-reduced': REDUCED }">
-    <!-- 点击 EXPLORE 才进入：在那之前滚动被拦住，照片保持隐藏 -->
-    <Transition name="me-explore-fade">
-      <div
-        v-if="!explored"
-        class="me-explore"
-        @wheel.prevent
-        @touchmove.prevent
-      >
-        <div class="me-explore__panel">
-          <p class="me-explore__kicker">ME</p>
-          <p class="me-explore__title">LIVE IN PASSION</p>
-          <button class="me-explore__button" type="button" @click="startExplore">
-            EXPLORE <span aria-hidden="true">↗</span>
-          </button>
-          <button class="me-explore__skip" type="button" @click="skipToCards">
-            SKIP TO CARDS
-          </button>
-          <p class="me-explore__hint">SCROLL TO FLY THROUGH</p>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- 整页最后落在一台复古电视上：这层隧道 sticky 在整个 main 的顶部 -->
-    <div ref="tunnelStageRef" class="me-tunnel__stage" aria-label="Photo tunnel">
-      <div class="me-tunnel__layers" aria-hidden="true">
-        <figure
-          v-for="(card, i) in tunnelCards"
-          :key="card.key"
-          :ref="setCardEl(i)"
-          class="me-tunnel__card"
-        >
-          <!-- 占位框决定卡片高度；真正的纸面叠在它上面 -->
-          <span class="me-tunnel__placeholder" />
-
-          <div class="me-tunnel__paper">
-            <!-- 完整照片：整张纸保持完整，只随风扇动 / 倾斜 -->
-            <img
-              v-if="tunnelPhotos[card.photo]?.thumb"
-              class="me-tunnel__paper-source"
-              :src="tunnelPhotos[card.photo].thumb"
-              alt=""
-              decoding="async"
-              draggable="false"
-              @error="onTunnelImageError(card.photo)"
-            >
-          </div>
-        </figure>
-      </div>
-
-      <div class="me-tunnel__vignette" aria-hidden="true" />
-
-      <div v-if="explored" class="me-tunnel__hud">
-        <div class="me-tunnel__hud-top">
-          <span>ME</span>
-          <span>BE {{ virtue }}</span>
-        </div>
-        <div class="me-tunnel__hud-bottom">
-          <button class="me-tunnel__scroll" type="button" @click="scrollToContent">
-            SCROLL <span aria-hidden="true">↓</span>
-          </button>
-          <span class="me-tunnel__count">
-            {{ String(travelPercent).padStart(2, '0') }}%
-          </span>
-        </div>
-      </div>
-
-      <div v-if="explored" class="me-tunnel__meter" aria-hidden="true"><i /></div>
-    </div>
-
-    <!-- 摄像机先飞完，一台复古电视机随后升起来 -->
-    <div class="me-tunnel__runway" aria-hidden="true" />
-
+  <main class="page active me-intro-page">
     <!-- ── 一台电视里的三个频道：ME / GALLERY / FRIENDS ─────────────────── -->
-    <section ref="cardsRef" class="me-tv-stage" aria-label="ME, Gallery and Friends">
-      <div ref="tvRef" class="me-tv">
+    <section class="me-tv-stage" aria-label="ME, Gallery and Friends">
+      <div class="me-tv">
         <!-- 机身上沿：品牌 / 型号 / 信号灯 -->
         <div class="me-tv__bezel">
           <span class="me-tv__brand">
@@ -953,6 +255,9 @@ function copyWeChat() {
           <span class="me-tv__glare" aria-hidden="true" />
           <span class="me-tv__scanlines" aria-hidden="true" />
           <span class="me-tv__rollbar" aria-hidden="true" />
+          <!-- CRT 光学层：RGB 荧光栅格（含屏幕中间那团磷光辉光）+ 玻璃暗角 -->
+          <span class="me-tv__rgb" aria-hidden="true" />
+          <span class="me-tv__vignette" aria-hidden="true" />
           <canvas ref="noiseRef" class="me-tv__noise" aria-hidden="true" />
         </div>
 
@@ -1022,291 +327,10 @@ function copyWeChat() {
 
 <style scoped>
 .me-intro-page {
-  --me-line: var(--border-color);
   position: relative;
   background: var(--bg);
   color: var(--text-primary);
-  /* .page 的 overflow-x: hidden 会把整个 main 变成滚动容器，
-     隧道里的 position: sticky 因此失效（舞台会跟着页面滚走）。
-     本页的横向溢出由根元素兜住，这里必须放开。 */
   overflow: visible;
-}
-
-/* ── EXPLORE 入口 ─────────────────────────────────────────────────────── */
-.me-explore-fade-leave-active {
-  transition: opacity 0.55s ease;
-}
-
-.me-explore-fade-leave-to {
-  opacity: 0;
-}
-
-.me-explore {
-  position: fixed;
-  inset: 0;
-  z-index: 60; /* 低于全局 header(100)，上面那行导航仍然可点 */
-  display: grid;
-  place-items: center;
-  /* 照片默认是隐藏的，门禁本身就是一张干净的纯色屏 —— 不再用半透明径向遮罩，
-     手机上电视也不会提前透出来 */
-  background: var(--bg);
-}
-
-.me-explore__panel {
-  display: grid;
-  justify-items: center;
-  gap: 1.15rem;
-  padding: 2rem;
-  text-align: center;
-}
-
-.me-explore__kicker,
-.me-explore__hint {
-  margin: 0;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.me-explore__title {
-  margin: 0;
-  font-family: 'Oswald', sans-serif;
-  font-weight: 700;
-  font-size: clamp(2rem, 5.2vw, 4.8rem);
-  line-height: 0.95;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-}
-
-.me-explore__button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 14px 44px;
-  border: 1px solid var(--text-primary);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease;
-}
-
-.me-explore__button:hover,
-.me-explore__button:focus-visible {
-  background: var(--text-primary);
-  color: var(--bg);
-}
-
-.me-explore__skip {
-  margin-top: 0.35rem;
-  padding: 6px 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  text-decoration: underline;
-  text-underline-offset: 5px;
-  text-decoration-thickness: 1px;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.me-explore__skip:hover,
-.me-explore__skip:focus-visible {
-  color: var(--text-primary);
-}
-
-/* ── 照片隧道 ─────────────────────────────────────────────────────────── */
-/* 舞台 sticky 在 main 顶部、一直跟到整页结束；后面的 runway 和窗口
-   从它上面滚过去。整页只有一个窗口，没有「跳到下一屏」。 */
-.me-tunnel__stage {
-  position: sticky;
-  top: 0;
-  z-index: 0;
-  height: 100vh;
-  height: 100svh;
-  overflow: hidden;
-  isolation: isolate;
-  background: var(--bg);
-  /* 30 张卡片真的在 3D 空间里：近大远小、互相遮挡都由透视矩阵算，
-     滚动期间只改每张卡片的 translate3d，不触发重排。 */
-  perspective: 1000px;
-  perspective-origin: 50% 50%;
-}
-
-/* 摄像机飞完的行程；复古电视机紧接在后面。
-   200vh 让电视在照片全部飞出后不久就开始浮现，衔接更顺 */
-.me-tunnel__runway {
-  height: 200vh;
-  pointer-events: none;
-}
-
-.me-tunnel__layers {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  transform-style: preserve-3d;
-  /* 窗口上来时照片整体淡出：不是压暗，是平滑消失 */
-  opacity: calc(1 - var(--cards-in, 0));
-}
-
-.me-tunnel__card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: clamp(160px, 17vw, 300px);
-  margin: 0;
-  transform-style: preserve-3d;
-  transform-origin: 50% 50%;
-  /* JS 第一次渲染之前先藏起来，避免 30 张图叠在正中间闪一帧 */
-  opacity: 0;
-  will-change: transform, opacity, clip-path;
-  backface-visibility: hidden;
-  pointer-events: none;
-  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.42));
-}
-
-.me-tunnel__placeholder {
-  display: block;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--text-primary) 7%, transparent),
-      transparent 60%
-    ),
-    var(--background-secondary);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-}
-
-/* 纸面盖在占位框上；高度仍由占位框决定 */
-.me-tunnel__paper {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--text-primary) 7%, transparent),
-      transparent 60%
-    ),
-    var(--background-secondary);
-}
-
-/* 整张照片：保持完整，只随卡片一起倾斜 / 扇动 */
-.me-tunnel__paper-source {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-
-
-.me-tunnel__vignette {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  opacity: calc(1 - var(--cards-in, 0));
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    transparent 26%,
-    color-mix(in srgb, var(--bg) 42%, transparent) 74%,
-    var(--bg) 100%
-  );
-}
-
-.me-tunnel__hud {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: clamp(74px, 10vh, 118px) clamp(20px, 4vw, 52px) clamp(30px, 5vh, 58px);
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  pointer-events: none;
-  opacity: calc(1 - var(--cards-in, 0));
-}
-
-.me-tunnel__hud-top,
-.me-tunnel__hud-bottom {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.2rem;
-}
-
-.me-tunnel__scroll {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55em;
-  padding: 6px 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.me-tunnel__scroll span {
-  display: inline-block;
-  animation: me-scroll-bob 1.8s ease-in-out infinite;
-}
-
-@keyframes me-scroll-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(5px); }
-}
-
-.me-tunnel__count {
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.me-tunnel__meter {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 3;
-  height: 1px;
-  background: var(--me-line);
-  pointer-events: none;
-  opacity: calc(1 - var(--cards-in, 0));
-}
-
-.me-tunnel__meter i {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--text-primary);
-  transform: scaleX(var(--tunnel-progress, 0));
-  transform-origin: 0 50%;
 }
 
 /* ── 复古电视机：整台机器就是三个板块的容器 ──────────────────────────── */
@@ -1346,10 +370,12 @@ function copyWeChat() {
       var(--tv-plastic) 38%,
       color-mix(in srgb, #000 26%, var(--tv-plastic)) 100%
     );
+  /* 只留内凹的高光/阴影和一条 4px 的硬投影。
+     原来那条 `0 28px 60px rgba(0, 0, 0, 0.5)` 的 60px 模糊投影在深色底上
+     会读成一圈"圆角背景"糊在电视后面 —— 机身是直角的，投影也不该是圆的。 */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.26),
     inset 0 -5px 10px rgba(0, 0, 0, 0.4),
-    0 28px 60px rgba(0, 0, 0, 0.5),
     0 4px 0 rgba(0, 0, 0, 0.35);
   will-change: transform, opacity;
 }
@@ -1437,6 +463,8 @@ function copyWeChat() {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: clamp(10px, 1.4vw, 18px) clamp(12px, 1.8vw, 24px) clamp(8px, 1.2vw, 14px);
+  /* 屏幕里所有文字带一点红/蓝分离：CRT 三枪对不齐的那点色散 */
+  text-shadow: 0.5px 0 rgba(255, 70, 70, 0.3), -0.5px 0 rgba(70, 130, 255, 0.3);
 }
 
 .me-tv__osd {
@@ -1533,6 +561,46 @@ function copyWeChat() {
   animation: me-tv-roll 9s linear infinite;
 }
 
+/* ── CRT 光学层 ────────────────────────────────────────────────────────
+   竖条是红/绿/蓝三枪的次像素荧光栅格（3px 一组）；中间那团径向光是
+   "屏幕正中亮着"的磷光辉光。文字上的红蓝分离（色散）见
+   .me-tv__screen-inner / .me-channel__word 的 text-shadow。 */
+.me-tv__rgb {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      62% 58% at 50% 50%,
+      rgba(244, 240, 232, 0.09),
+      transparent 72%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 46, 46, 0.085) 0 1px,
+      rgba(46, 255, 122, 0.07) 1px 2px,
+      rgba(46, 96, 255, 0.085) 2px 3px
+    );
+  background-size: 100% 100%, 3px 100%;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+/* 玻璃暗角：四角压暗、中心留亮，撑出老 CRT 的凸面感 */
+.me-tv__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(
+    118% 96% at 50% 50%,
+    transparent 56%,
+    rgba(0, 0, 0, 0.2) 78%,
+    rgba(0, 0, 0, 0.52) 100%
+  );
+}
+
 @keyframes me-tv-roll {
   0% { transform: translateY(0); }
   100% { transform: translateY(560%); }
@@ -1565,29 +633,22 @@ function copyWeChat() {
   align-items: center;
   gap: 0.35rem;
   padding: clamp(6px, 0.8vh, 8px) clamp(8px, 1vw, 12px);
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  /* 扁平化：没有描边、没有渐变、没有高光/投影，只有一块纯色底 + 反色 hover */
+  border: 0;
   border-radius: 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, #fff 14%, var(--tv-plastic)),
-    color-mix(in srgb, #000 12%, var(--tv-plastic))
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    0 2px 0 rgba(0, 0, 0, 0.18);
+  background: color-mix(in srgb, #000 12%, var(--tv-plastic));
   color: color-mix(in srgb, var(--text-primary) 62%, var(--tv-plastic));
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 7.5px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .me-tv__key:hover {
   background: var(--text-primary);
   color: var(--bg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .me-tv__key span {
@@ -1677,7 +738,11 @@ function copyWeChat() {
 .me-channel__word {
   position: relative;
   color: var(--tv-paper);
-  text-shadow: 0 0 26px rgba(244, 240, 232, 0.12);
+  /* CRT 色散：红/蓝两条 0.9px 的错位影子 + 一点磷光辉光 */
+  text-shadow:
+    0.9px 0 rgba(255, 70, 70, 0.5),
+    -0.9px 0 rgba(70, 130, 255, 0.5),
+    0 0 26px rgba(244, 240, 232, 0.12);
 }
 
 .me-channel__ghost {
@@ -1758,7 +823,7 @@ function copyWeChat() {
   color: rgba(244, 240, 232, 0.45);
 }
 
-/* CTA 是真正的链接按钮：方角、细边、hover 反色 */
+/* CTA 是真正的链接按钮：扁平化后只剩一块纯色底，hover 反色 */
 .me-channel__cta {
   display: inline-flex;
   align-items: center;
@@ -1766,21 +831,20 @@ function copyWeChat() {
   gap: 0.55rem;
   margin: 0.7rem 0 0;
   padding: 0.5rem 0.8rem;
-  border: 1px solid rgba(244, 240, 232, 0.45);
+  border: 0;
   border-radius: 0;
-  background: transparent;
+  background: rgba(244, 240, 232, 0.14);
   color: var(--tv-paper);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 8px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   text-decoration: none;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .me-channel__cta:hover {
   background: var(--tv-paper);
-  border-color: var(--tv-paper);
   color: var(--tv-ink);
 }
 
@@ -1806,7 +870,8 @@ function copyWeChat() {
   align-items: center;
   gap: 0.4rem;
   padding: 0.3rem 0.55rem;
-  border: 1px solid rgba(244, 240, 232, 0.3);
+  /* 扁平化：不描边；静息透明，hover 一层薄底，选中整块反色 */
+  border: 0;
   border-radius: 0;
   background: transparent;
   color: rgba(244, 240, 232, 0.6);
@@ -1815,7 +880,7 @@ function copyWeChat() {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .me-tv__tab b {
@@ -1823,13 +888,11 @@ function copyWeChat() {
 }
 
 .me-tv__tab:hover {
-  border-color: rgba(244, 240, 232, 0.7);
-  background: rgba(244, 240, 232, 0.08);
+  background: rgba(244, 240, 232, 0.1);
   color: var(--tv-paper);
 }
 
 .me-tv__tab.is-active {
-  border-color: var(--tv-paper);
   background: var(--tv-paper);
   color: var(--tv-ink);
 }
@@ -1869,12 +932,7 @@ function copyWeChat() {
 
 /* ── 响应式 ───────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  /* 手机 / 平板：隐藏隧道，电视按屏幕比例铺开 */
-  .me-tunnel__stage,
-  .me-tunnel__runway {
-    display: none;
-  }
-
+  /* 手机 / 平板：电视按屏幕比例铺开 */
   .me-tv-stage {
     --tv-w: calc(100vw - 20px);
     display: flex;
@@ -2066,10 +1124,6 @@ function copyWeChat() {
     animation: none;
   }
 
-  .me-tunnel__scroll span {
-    animation: none;
-  }
-
   .me-channel__cta,
   .me-tv__key,
   .me-tv__tab {
@@ -2077,14 +1131,4 @@ function copyWeChat() {
   }
 }
 
-/* 减少动态：隐藏隧道，电视按普通流居中 */
-.is-reduced .me-tunnel__stage,
-.is-reduced .me-tunnel__runway {
-  display: none;
-}
-
-.is-reduced .me-tv-stage {
-  min-height: 100vh;
-  min-height: 100svh;
-}
 </style>

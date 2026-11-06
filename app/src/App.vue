@@ -50,7 +50,7 @@ const route = useRoute();
 // ORGANIZATION 现在是 ME 的子页，它不滚动（一屏一页），页脚那块"文档末尾占位"
 // 会凭空把文档撑高、让滚轮有东西可滚，翻页手势就废了 —— 这一页也不挂。
 const showGlobalFooter = computed(
-  () => !['blog-detail', 'me', 'me-organization'].includes(route.name)
+  () => !['echo-detail', 'me', 'me-organization'].includes(route.name)
 );
 
 // 同一批键盘快捷键都走这一个入口：

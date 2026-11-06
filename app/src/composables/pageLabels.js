@@ -16,7 +16,7 @@ import albumContent from '../data/content/albums.json';
 // 小写会和四角那些 Oswald 大写标签打架。
 const SECTIONS = {
   home: 'HOME',
-  blogs: 'BLOGS',
+  echoes: 'ECHOES',
   me: 'ME',
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
@@ -39,7 +39,7 @@ export function sectionLabelFor(to) {
 
   // 博客详情：显示这篇的标题（S & N / MIRAGE …）。
   // 正文标题里带 `&`、`-` 这类符号，大写之后仍然好读，直接沿用。
-  if (name === 'blog-detail') {
+  if (name === 'echo-detail') {
     const post = blogBySlug[to.params?.slug];
     if (post?.title) return post.title.toUpperCase();
   }

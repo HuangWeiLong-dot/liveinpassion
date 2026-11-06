@@ -46,19 +46,25 @@ const pageActive = ref(false);
 // ── 视图切换：LOOKBACK（原来的横向轨道）/ WORLD（参考站的作品环）────────
 // 两种呈现都常驻同一个页面：切到世界时原轨道只是被盖住、没有卸载，
 // 滚动位置与图片缓存都还在，切回来原地继续。
-const VIEW_KEY = 'blogs-view';
+const VIEW_KEY = 'echoes-view';
 const viewMode = ref('lookback');
 try {
   const fromUrl = new URLSearchParams(window.location.search).get('view');
-  const stored = localStorage.getItem(VIEW_KEY);
-  if (fromUrl === 'world' || fromUrl === 'lookback') viewMode.value = fromUrl;
+  // 先读新 key；没有再读旧的 blogs-view（升级兼容）。读一次就把旧值迁过来。
+  const stored = localStorage.getItem(VIEW_KEY) || localStorage.getItem('blogs-view');
+  if (fromUrl === 'world' || fromUrl === 'lookback' || fromUrl === 'archive') viewMode.value = fromUrl;
   else if (stored === 'world') viewMode.value = 'world';
+  else if (stored === 'archive') viewMode.value = 'archive';
+  // 迁移旧 key
+  if (!localStorage.getItem(VIEW_KEY) && stored) {
+    try { localStorage.setItem(VIEW_KEY, stored); } catch { /* ignore */ }
+  }
 } catch {
   /* 隐私模式下 localStorage 可能不可用 */
 }
 
 function setViewMode(mode) {
-  if (mode !== 'world' && mode !== 'lookback') return;
+  if (mode !== 'world' && mode !== 'lookback' && mode !== 'archive') return;
   if (viewMode.value === mode) return;
   viewMode.value = mode;
   try {
@@ -69,8 +75,8 @@ function setViewMode(mode) {
   // URL 同步（replaceState 不触发路由），方便直接分享到某一种视图
   try {
     const url = new URL(window.location.href);
-    if (mode === 'world') url.searchParams.set('view', 'world');
-    else url.searchParams.delete('view');
+    if (mode === 'lookback') url.searchParams.delete('view');
+    else url.searchParams.set('view', mode);
     window.history.replaceState(window.history.state, '', url);
   } catch {
     /* ignore */
@@ -86,7 +92,23 @@ function setViewMode(mode) {
 }
 
 function toggleView() {
-  setViewMode(viewMode.value === 'lookback' ? 'world' : 'lookback');
+  // LOOKBACK → WORLD → ARCHIVE → LOOKBACK
+  setViewMode(viewMode.value === 'lookback' ? 'world'
+    : viewMode.value === 'world' ? 'archive'
+    : 'lookback');
+}
+
+// ARCHIVE 里从索引行进详情（没有封面交接，不能复用 openPost）
+function onArchiveOpen(post, el) {
+  if (opening.value || !post) return;
+  opening.value = true;
+  setCoverCurtain(true);
+  skipNextPageTransition();
+  // 没有封面 handoff 就按缺省入场，直接 replace
+  router
+    .push({ name: 'echo-detail', params: { slug: post.slug } })
+    .catch(() => {})
+    .finally(() => { opening.value = false; });
 }
 
 // 世界视图里点"READ ENTRY"：把展开层那张大图当作交接起点，封面照常飞进详情页
@@ -127,6 +149,167 @@ const loopCards = computed(() => {
   return out;
 });
 const current = computed(() => blogPosts[activeIndex.value] || null);
+
+// ── ARCHIVE：east64films 式「作品卷轴」───────────────────────────────────
+// 中间一张封面，左栏是序号索引，右栏是这一篇的元信息，下方标题随封面切换做动效。
+// 结构是「外层高 + sticky 舞台」：滚动一步换一部作品，不换页、不卸载已加载的图。
+const CATEGORY_TABS = [
+  { key: 'ALL',      label: 'ALL' },
+  { key: 'POEM',     label: 'POEM' },
+  { key: 'ESSAY',    label: 'ESSAY' },
+  { key: 'LOG',      label: 'LOG' },
+  { key: 'CRITIQUE', label: 'CRITIQUE' },
+  { key: 'FRAGMENT', label: 'FRAGMENT' },
+  { key: 'LETTER',   label: 'LETTER' },
+];
+
+const activeArchiveCat = ref('ALL');
+const activeTag = ref('');
+
+try {
+  const params = new URLSearchParams(window.location.search);
+  const fromCat = params.get('cat');
+  const fromTag = params.get('tag');
+  if (fromCat && CATEGORY_TABS.some((t) => t.key === fromCat.toUpperCase())) {
+    activeArchiveCat.value = fromCat.toUpperCase();
+  }
+  if (fromTag) activeTag.value = fromTag.trim().toUpperCase();
+} catch { /* ignore */ }
+
+function syncArchiveUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (activeArchiveCat.value !== 'ALL') url.searchParams.set('cat', activeArchiveCat.value);
+    else url.searchParams.delete('cat');
+    if (activeTag.value) url.searchParams.set('tag', activeTag.value);
+    else url.searchParams.delete('tag');
+    window.history.replaceState(window.history.state, '', url);
+  } catch { /* ignore */ }
+}
+
+function setArchiveCat(key) {
+  activeArchiveCat.value = key;
+  syncArchiveUrl();
+}
+
+function setTag(tag) {
+  activeTag.value = String(tag || '').trim().toUpperCase();
+  syncArchiveUrl();
+}
+
+function normalizeArchiveEntry(p) {
+  return {
+    ...p,
+    category: (p.category || 'UNFILED').toUpperCase(),
+    tags: Array.isArray(p.tags) ? p.tags.map((t) => String(t).toUpperCase()) : [],
+    rating: p.rating || null,
+    year: yearOf(p.cardDate || p.date),
+  };
+}
+
+// 扁平作品列表：按分类 + tag 过滤，保留发布时间顺序（desc）
+const archiveWorks = computed(() => {
+  const list = blogPosts.map(normalizeArchiveEntry);
+  return list.filter((p) => {
+    if (activeArchiveCat.value !== 'ALL' && p.category !== activeArchiveCat.value) return false;
+    if (activeTag.value && !p.tags.includes(activeTag.value)) return false;
+    return true;
+  });
+});
+
+// 滚动步长：一步 = 视口高度的 62%。51 篇 ≈ 32 屏，比每篇一整屏短得多。
+const ARCHIVE_STEP = 0.62;
+
+const archiveIndex = ref(0);
+const archiveReel = ref(null);
+
+const activeWork = computed(
+  () => archiveWorks.value[Math.min(archiveIndex.value, archiveWorks.value.length - 1)] || null,
+);
+
+// 外层要够长，舞台才能一路 sticky；最后一步还要留满一屏给舞台停住。
+const archiveReelStyle = computed(() => {
+  const n = archiveWorks.value.length;
+  if (!n) return { height: '100vh' };
+  return { height: `calc(${((n - 1) * ARCHIVE_STEP * 100).toFixed(2)}vh + 100vh)` };
+});
+
+// 左栏只露当前附近的 7 个序号：51 条全铺会把索引列撑爆。
+const archiveIndexWindow = computed(() => {
+  const list = archiveWorks.value;
+  const n = list.length;
+  const span = 7;
+  if (!n) return [];
+  let start = Math.max(0, archiveIndex.value - Math.floor(span / 2));
+  let end = Math.min(n, start + span);
+  if (end - start < span) start = Math.max(0, end - span);
+  return list.slice(start, end).map((w, k) => ({ work: w, no: start + k }));
+});
+
+function archiveStepPx() {
+  return window.innerHeight * ARCHIVE_STEP;
+}
+
+function syncArchiveIndex() {
+  const reel = archiveReel.value;
+  const n = archiveWorks.value.length;
+  if (!reel || !n) return;
+  const offset = Math.max(0, -reel.getBoundingClientRect().top);
+  const idx = Math.max(0, Math.min(n - 1, Math.round(offset / archiveStepPx())));
+  if (idx !== archiveIndex.value) archiveIndex.value = idx;
+}
+
+// 跳某一步。smooth=false 用于"刚切进 ARCHIVE"的定位，避免页面自己滑一段。
+function jumpToArchive(i, smooth = true) {
+  const reel = archiveReel.value;
+  if (!reel) return;
+  const top = reel.getBoundingClientRect().top + window.scrollY;
+  const target = top + Math.max(0, i) * archiveStepPx();
+  window.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function onArchiveScroll() {
+  if (viewMode.value !== 'archive') return;
+  syncArchiveIndex();
+}
+
+function bindArchiveScroll() {
+  window.removeEventListener('scroll', onArchiveScroll);
+  window.addEventListener('scroll', onArchiveScroll, { passive: true });
+}
+
+function unbindArchiveScroll() {
+  window.removeEventListener('scroll', onArchiveScroll);
+}
+
+// 换分类/清标签后回到第一部，否则 index 会停在超出新列表长度的位置。
+watch([activeArchiveCat, activeTag], async () => {
+  archiveIndex.value = 0;
+  await nextTick();
+  jumpToArchive(0, false);
+});
+
+// 进出 ARCHIVE：进时先对齐到当前进度，出时把监听摘掉。
+watch(viewMode, async (mode) => {
+  if (mode === 'archive') {
+    bindArchiveScroll();
+    await nextTick();
+    syncArchiveIndex();
+    jumpToArchive(archiveIndex.value, false);
+  } else {
+    unbindArchiveScroll();
+  }
+});
+
+function yearOf(dateStr) {
+  const m = String(dateStr || '').match(/(\d{4})/);
+  return m ? m[1] : '';
+}
+function gradeOf(rating) { return rating?.grade || ''; }
+function scoreOf(rating) {
+  if (!rating?.score) return '';
+  return Number(rating.score).toFixed(1);
+}
 
 // 序号补零：卡片上是 01–21，计数器和进度条上也是同一套。
 function pad(n) {
@@ -244,7 +427,7 @@ function openPost(post, el = null, query = null, instant = false) {
     recordHandoff(); // 重新记一次（见上）
     skipNextPageTransition();
     router
-      .push({ name: 'blog-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
+      .push({ name: 'echo-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
       .catch(() => {})
       .finally(() => { opening.value = false; });
   }, TAKEOVER_MS);
@@ -570,7 +753,7 @@ let warpPhase = 0;
 // 实测（诊断打点）离开时 savedScroll=17235，返回时同一个变量读到 0，于是
 // 位置/进度条/计数器/封面落点一起被重置。dev 的 HMR、以及换一次构建，
 // 都会让模块被重新求值；只存内存里就会跟着一起丢。
-const SCROLL_KEY = 'lip:blogs-scroll';
+const SCROLL_KEY = 'lip:echoes-scroll';
 function saveScroll(v) {
   if (!(v > 0)) return; // 0 一律当作"没量到/已被摘出文档"，不覆盖记住的位置
   savedScroll = v;
@@ -1349,7 +1532,7 @@ const RETURN_FADE = 1.0;
 watch(
   () => route.path,
   async (p) => {
-    if (p !== '/blogs' || !consumeReturningFromDetail()) return;
+    if (p !== '/echoes' || !consumeReturningFromDetail()) return;
     await nextTick(); // 等列表的 DOM 真的回到文档里，再去找元素
     const els = document.querySelectorAll(RETURN_FADE_SELECTOR);
     if (els.length && !reduceMotion) {
@@ -1394,6 +1577,11 @@ onMounted(async () => {
   observeCovers();
   syncTarget();
   if (scroller.value && scroller.value.scrollLeft === 0) restoreScroll();
+  if (viewMode.value === 'archive') {
+    bindArchiveScroll();
+    await nextTick();
+    syncArchiveIndex();
+  }
 });
 
 // keep-alive 复用时 onMounted 不会重跑：轨道重新挂进文档、宽度变了都得重来一遍
@@ -1413,6 +1601,7 @@ onDeactivated(() => {
   pageActive.value = false;
   deactivate();
   unbindClickCapture();
+  unbindArchiveScroll();
   lazyObserver?.disconnect();
   releaseObserver?.disconnect();
   loadedSet.clear();
@@ -1431,6 +1620,7 @@ onUnmounted(() => {
   unbindClickCapture();
   window.removeEventListener('resize', onResize);
   document.removeEventListener('visibilitychange', onVisibility);
+  unbindArchiveScroll();
   clearTimeout(resizeTimer);
   stopLoop();
 });
@@ -1474,7 +1664,7 @@ function onVisibility() {
 </script>
 
 <template>
-  <main class="page active blogs-lookback-page" :class="{ 'is-world': viewMode === 'world' }">
+  <main class="page active blogs-lookback-page" :class="{ 'is-world': viewMode === 'world', 'is-archive': viewMode === 'archive' }">
     <!-- 世界视图：参考 oumahi.art 的作品环。盖在原轨道上而不是把轨道卸掉 ——
          原版的滚动位置、图片缓存、交接数据都还在，切回去原地继续。 -->
     <BlogWorld
@@ -1495,7 +1685,7 @@ function onVisibility() {
            下面一行是描述（条数取自数据）。两行错时揭幕（纯 CSS 动画，不占 JS）。
            用 h1：这一页本来就没有一级标题。 -->
       <header class="jb-wordmark" ref="wmRef">
-        <h1 class="jb-wm-title"><span>BLOGS</span></h1>
+        <h1 class="jb-wm-title"><span>ECHOES</span></h1>
         <p class="jb-wm-desc">Stories, notes and things I don't want to forget · {{ total }} entries</p>
       </header>
 
@@ -1651,16 +1841,152 @@ function onVisibility() {
       </div>
     </section>
 
-    <!-- 视图切换：两种呈现都常驻同一个 URL，选择记在 localStorage -->
+    <!-- ARCHIVE：east64films 式作品卷轴 —— 中图、左序号、右信息、下方标题动效 -->
+    <section
+      v-if="viewMode === 'archive'"
+      ref="archiveReel"
+      class="ba-archive"
+      :style="archiveReelStyle"
+      role="region"
+      aria-label="Echo archive"
+    >
+      <div class="ba-stage">
+        <!-- 顶部：分类细条（保持原有筛选能力，但降到参考站导航的视觉重量） -->
+        <nav class="ba-filters" aria-label="Filter by category">
+          <button
+            v-for="tab in CATEGORY_TABS"
+            :key="tab.key"
+            type="button"
+            class="ba-filter"
+            :class="{ 'is-active': activeArchiveCat === tab.key }"
+            :aria-pressed="activeArchiveCat === tab.key"
+            @click="setArchiveCat(tab.key)"
+          >{{ tab.label }}</button>
+          <span v-if="activeTag" class="ba-filter__tag">
+            {{ activeTag }}
+            <button type="button" class="ba-filter__clear" aria-label="清除标签" @click="setTag('')">×</button>
+          </span>
+          <span class="ba-filters__count">{{ archiveWorks.length }} / {{ total }}</span>
+        </nav>
+
+        <div v-if="activeWork" class="ba-slug">
+          <!-- 左栏：序号索引；当前这一部才带标题 -->
+          <aside class="ba-idx" aria-label="Index">
+            <button
+              v-for="row in archiveIndexWindow"
+              :key="row.work.slug"
+              type="button"
+              class="ba-idx__row"
+              :class="{ 'is-active': row.no === archiveIndex }"
+              :aria-current="row.no === archiveIndex ? 'true' : undefined"
+              @click="jumpToArchive(row.no)"
+            >
+              <span class="ba-idx__no">{{ String(row.no + 1).padStart(2, '0') }}</span>
+              <span v-if="row.no === archiveIndex" class="ba-idx__label">{{ row.work.category }}</span>
+            </button>
+          </aside>
+
+          <!-- 中间：封面 + 下方标题（切图时两段各自过渡） -->
+          <div class="ba-center">
+            <div
+              class="ba-cover"
+              role="link"
+              tabindex="0"
+              :aria-label="`打开 ${activeWork.cardTitle}`"
+              @click="onArchiveOpen(activeWork)"
+              @keydown.enter.prevent="onArchiveOpen(activeWork)"
+              @keydown.space.prevent="onArchiveOpen(activeWork)"
+            >
+              <Transition name="ba-cover" mode="out-in">
+                <img
+                  v-if="activeWork.image?.fullSrc || activeWork.image?.src"
+                  :key="activeWork.slug"
+                  :src="activeWork.image.fullSrc || activeWork.image.src"
+                  :alt="activeWork.cardTitle"
+                  loading="eager"
+                  decoding="async"
+                />
+                <div v-else :key="activeWork.slug" class="ba-cover__blank">
+                  {{ String(archiveIndex + 1).padStart(2, '0') }}
+                </div>
+              </Transition>
+              <span class="ba-cover__hint">VIEW ↗</span>
+            </div>
+
+            <div class="ba-caption">
+              <Transition name="ba-swap" mode="out-in">
+                <div :key="activeWork.slug" class="ba-caption__inner">
+                  <h2 class="ba-caption__title">{{ activeWork.cardTitle }}</h2>
+                  <p v-if="activeWork.title && activeWork.title !== activeWork.cardTitle" class="ba-caption__sub">
+                    {{ activeWork.title }}
+                  </p>
+                  <p class="ba-caption__meta">
+                    {{ activeWork.category }}
+                    <template v-if="activeWork.tags.length"> / {{ activeWork.tags.join(' · ') }}</template>
+                  </p>
+                </div>
+              </Transition>
+            </div>
+          </div>
+
+          <!-- 右栏：这一篇的元信息 -->
+          <aside class="ba-info" aria-label="Entry information">
+            <div class="ba-info__col">
+              <span class="ba-info__k">TYPE</span>
+              <span class="ba-info__v">{{ activeWork.category }}</span>
+            </div>
+            <div class="ba-info__col">
+              <span class="ba-info__k">DATE</span>
+              <span class="ba-info__v">{{ monthOf(activeWork.cardDate) }} {{ activeWork.year }}</span>
+            </div>
+            <div class="ba-info__col">
+              <span class="ba-info__k">SCORE</span>
+              <span class="ba-info__v">
+                <template v-if="gradeOf(activeWork.rating)">
+                  {{ gradeOf(activeWork.rating) }}
+                  <template v-if="scoreOf(activeWork.rating)"> · {{ scoreOf(activeWork.rating) }}</template>
+                </template>
+                <template v-else>—</template>
+              </span>
+            </div>
+            <div class="ba-info__col">
+              <span class="ba-info__k">READ</span>
+              <span class="ba-info__v">{{ activeWork.readTime || '—' }}</span>
+            </div>
+            <div v-if="activeWork.tags.length" class="ba-info__tags">
+              <button
+                v-for="tag in activeWork.tags.slice(0, 8)"
+                :key="tag"
+                type="button"
+                class="ba-chip"
+                :class="{ 'is-active': tag === activeTag }"
+                @click="setTag(tag === activeTag ? '' : tag)"
+              >{{ tag }}</button>
+            </div>
+          </aside>
+        </div>
+
+        <p v-else class="ba-empty">No entries match.</p>
+
+        <!-- 右下：进度（参考站那枚 02 / 24） -->
+        <div v-if="archiveWorks.length" class="ba-progress">
+          {{ String(archiveIndex + 1).padStart(2, '0') }}
+          <span>/</span>
+          {{ String(archiveWorks.length).padStart(2, '0') }}
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图切换：三种呈现都常驻同一个 URL，选择记在 localStorage -->
     <button
       class="jb-viewtoggle"
       type="button"
-      :aria-pressed="viewMode === 'world'"
-      :aria-label="viewMode === 'world' ? '切换回轨道视图' : '切换到世界视图'"
+      :aria-pressed="viewMode !== 'lookback'"
+      :aria-label="`当前视图 ${viewMode.toUpperCase()}，点击切换`"
       @click="toggleView"
     >
       <span class="jb-viewtoggle__k">VIEW</span>
-      <span class="jb-viewtoggle__v">{{ viewMode === 'lookback' ? 'LOOKBACK' : 'WORLD' }}</span>
+      <span class="jb-viewtoggle__v">{{ viewMode === 'lookback' ? 'LOOKBACK' : viewMode === 'world' ? 'WORLD' : 'ARCHIVE' }}</span>
       <svg
         class="jb-viewtoggle__icon"
         viewBox="0 0 24 24"
@@ -1681,6 +2007,17 @@ function onVisibility() {
 /* ── 页面底层：把 .page 的纵向滚动关掉，这一页只有横向轨道 ──────────────── */
 .blogs-lookback-page {
   overflow: hidden;
+}
+.blogs-lookback-page.is-archive {
+  overflow: visible;
+  min-height: 100vh;
+}
+/* ARCHIVE 是独立的 section，LOOKBACK/WORLD 的舞台元素收掉；但 VIEW 按钮要永远可见 */
+.blogs-lookback-page.is-archive .jb-stage {
+  display: none;
+}
+.blogs-lookback-page.is-archive .jb-viewtoggle {
+  z-index: 10;
 }
 
 /* ── 这一页自己的调色板（亮/暗两套）──────────────────────────────────────
@@ -2507,5 +2844,344 @@ function onVisibility() {
   .jb-viewtoggle__k {
     display: none;
   }
+}
+
+/* ── ARCHIVE（east64films 式作品卷轴）──────────────────────────────────────
+   sticky 舞台：中间是封面，左边是序号索引，右边是这一篇的元信息，
+   封面下方的大标题随滚动换篇做文字动效。外层高度由 JS 按条数算，
+   滚动一步 = 换一部作品，图片一直留在 DOM 里，不会重复请求。 */
+.ba-archive {
+  position: relative;
+  background: var(--jb-bg, #0b0b0c);
+  color: var(--jb-fg, #f5f5f5);
+}
+.ba-stage {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 88px 56px 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* 顶部筛选：压到参考站导航那种细字重 */
+.ba-filters {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+}
+.ba-filter {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  color: color-mix(in srgb, var(--jb-fg) 42%, transparent);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+.ba-filter:first-child { padding-left: 0; }
+.ba-filter:hover { color: var(--jb-fg); }
+.ba-filter.is-active {
+  color: var(--jb-fg);
+  box-shadow: inset 0 -1px 0 var(--jb-fg);
+}
+.ba-filter__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding-left: 12px;
+  border-left: 1px solid var(--jb-line);
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--jb-fg);
+}
+.ba-filter__clear {
+  background: transparent;
+  border: none;
+  color: var(--jb-faint);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+.ba-filter__clear:hover { color: var(--jb-fg); }
+.ba-filters__count {
+  margin-left: auto;
+  padding-right: 0;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--jb-faint);
+}
+
+/* 三栏：左索引 / 中封面 / 右信息 */
+.ba-slug {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 46vw) minmax(120px, 1fr);
+  align-items: center;
+  gap: 32px;
+}
+
+/* 左：只露当前附近的序号 */
+.ba-idx {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  align-self: center;
+}
+.ba-idx__row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 5px 0;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--jb-fg) 26%, transparent);
+  transition: color 0.2s ease;
+}
+.ba-idx__row:hover { color: color-mix(in srgb, var(--jb-fg) 70%, transparent); }
+.ba-idx__row.is-active { color: var(--jb-fg); }
+.ba-idx__no {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+}
+.ba-idx__label {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding-left: 12px;
+  border-left: 1px solid var(--jb-line);
+}
+
+/* 中：封面 + 标题 */
+.ba-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  min-width: 0;
+}
+.ba-cover {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  height: min(52vh, 560px);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--jb-fg) 6%, transparent);
+  cursor: pointer;
+}
+.ba-cover img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.ba-cover__blank {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: clamp(48px, 7vw, 96px);
+  color: color-mix(in srgb, var(--jb-fg) 22%, transparent);
+}
+.ba-cover__hint {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.ba-cover:hover .ba-cover__hint,
+.ba-cover:focus-visible .ba-cover__hint { opacity: 1; }
+.ba-cover:focus-visible { outline: 1px solid var(--jb-fg); outline-offset: 3px; }
+
+/* 标题块：和中图同宽、居中；切换时整块淡出上移、新块自下而上 */
+.ba-caption {
+  width: 100%;
+  max-width: 760px;
+  min-height: 118px;
+  text-align: center;
+}
+.ba-caption__title {
+  font-family: 'Times New Roman', 'Songti SC', Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(26px, 2.9vw, 46px);
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.ba-caption__sub {
+  font-family: 'Times New Roman', 'Songti SC', Georgia, serif;
+  font-size: clamp(16px, 1.5vw, 24px);
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--jb-fg) 78%, transparent);
+  margin: 6px 0 0;
+}
+.ba-caption__meta {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--jb-faint);
+  margin: 12px 0 0;
+}
+
+/* 右：元信息（label 在上、值在下） */
+.ba-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
+  justify-self: end;
+  align-self: center;
+  max-width: 300px;
+}
+.ba-info__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ba-info__k {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.26em;
+  color: var(--jb-faint);
+}
+.ba-info__v {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--jb-fg) 88%, transparent);
+}
+.ba-info__tags {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 标签 chip */
+.ba-chip {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--jb-fg) 20%, transparent);
+  color: color-mix(in srgb, var(--jb-fg) 60%, transparent);
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+.ba-chip:hover,
+.ba-chip:focus-visible {
+  border-color: var(--jb-fg);
+  color: var(--jb-fg);
+  outline: none;
+}
+.ba-chip.is-active {
+  background: var(--jb-fg);
+  color: var(--jb-bg);
+  border-color: var(--jb-fg);
+}
+
+/* 右下角进度 */
+.ba-progress {
+  position: absolute;
+  right: 56px;
+  bottom: 32px;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--jb-faint);
+  font-variant-numeric: tabular-nums;
+}
+.ba-progress span {
+  margin: 0 4px;
+  color: color-mix(in srgb, var(--jb-fg) 30%, transparent);
+}
+
+/* 空状态 */
+.ba-empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--jb-faint);
+}
+
+/* 切换动效：标题（上出下入）与封面（交叉淡入 + 微缩放） */
+.ba-swap-enter-active,
+.ba-swap-leave-active {
+  transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ba-swap-enter-from { opacity: 0; transform: translateY(16px); }
+.ba-swap-leave-to { opacity: 0; transform: translateY(-16px); }
+
+.ba-cover-enter-active,
+.ba-cover-leave-active {
+  transition: opacity 0.5s ease, transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ba-cover-enter-from { opacity: 0; transform: scale(1.04); }
+.ba-cover-leave-to { opacity: 0; transform: scale(0.985); }
+
+/* ── 响应式 ─────────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .ba-stage { padding: 84px 32px 32px; }
+  .ba-slug { grid-template-columns: 64px minmax(0, 1fr); gap: 20px; }
+  .ba-info { display: none; }
+}
+@media (max-width: 720px) {
+  .ba-stage { padding: 72px 20px 24px; }
+  .ba-slug { grid-template-columns: 1fr; }
+  .ba-idx { display: none; }
+  .ba-cover { height: min(44vh, 380px); }
+  .ba-caption { min-height: 104px; }
+  .ba-caption__title { font-size: clamp(22px, 6.4vw, 32px); }
+  .ba-filters {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .ba-filters::-webkit-scrollbar { display: none; }
+  .ba-filter { flex: 0 0 auto; }
+  .ba-filters__count { display: none; }
+  .ba-progress { right: 20px; bottom: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ba-swap-enter-active,
+  .ba-swap-leave-active,
+  .ba-cover-enter-active,
+  .ba-cover-leave-active { transition: none; }
 }
 </style>

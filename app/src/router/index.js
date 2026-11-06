@@ -20,8 +20,16 @@ import NotFoundView from '../views/NotFoundView.vue';
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
-  { path: '/blogs', name: 'blogs', component: BlogsView },
-  { path: '/blogs/:slug', name: 'blog-detail', component: BlogDetailView },
+  { path: '/echoes', name: 'echoes', component: BlogsView },
+  { path: '/echoes/:slug', name: 'echo-detail', component: BlogDetailView },
+  // 旧路由 → 新地址重定向（保留 query / hash）
+  { path: '/blogs', redirect: (to) => ({ name: 'echoes', query: to.query, hash: to.hash }) },
+  { path: '/blogs/:slug', redirect: (to) => ({
+    name: 'echo-detail',
+    params: { slug: to.params.slug },
+    query: to.query,
+    hash: to.hash,
+  }) },
   { path: '/me', name: 'me', component: MeView },
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },

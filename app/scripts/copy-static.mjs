@@ -69,7 +69,7 @@ const albums = readSnapshot('albums.json')?.albums || [];
 // ── 路由清单：静态页 + 博客 slug + 摄影人名 + LIFE 归档 ─────────────────
 const routes = [
   { name: 'home', params: {} },
-  { name: 'blogs', params: {} },
+  { name: 'echoes', params: {} },
   { name: 'me', params: {} },
   { name: 'me-gallery', params: {} },
   { name: 'gallery', params: {} },
@@ -83,7 +83,7 @@ for (const kind of LIFE_ARCHIVE_KINDS) {
 }
 
 for (const post of posts) {
-  if (post?.slug) routes.push({ name: 'blog-detail', params: { slug: post.slug } });
+  if (post?.slug) routes.push({ name: 'echo-detail', params: { slug: post.slug } });
 }
 
 const seenPersons = new Set();
@@ -156,7 +156,7 @@ function patchHtml(html, meta) {
 // 站点导航 + 这一页的真实内容索引（博客正文、相册人名与照片数）。
 // 正常访客完全看不到，也不会额外请求图片。
 const NAV_LINKS = [
-  ['Home', '/'], ['Blogs', '/blogs'], ['Photography', '/photography'],
+  ['Home', '/'], ['Echoes', '/echoes'], ['Photography', '/photography'],
   ['Gallery', '/gallery'], ['Life', '/life'], ['Me', '/me'],
 ];
 
@@ -189,20 +189,20 @@ function noscriptHtml(route, meta) {
 
   let body = '';
 
-  if (route.name === 'blogs') {
-    body = '<h1>Blogs</h1><ul>'
+  if (route.name === 'echoes') {
+    body = '<h1>Echoes</h1><ul>'
       + posts.map((post) => (
-        `<li><a href="/blogs/${encodeURIComponent(post.slug)}">${escapeHtml(post.title)}</a>`
+        `<li><a href="/echoes/${encodeURIComponent(post.slug)}">${escapeHtml(post.title)}</a>`
         + ` — ${escapeHtml(post.date || post.cardDate || '')}</li>`
       )).join('')
       + '</ul>';
-  } else if (route.name === 'blog-detail') {
+  } else if (route.name === 'echo-detail') {
     const post = posts.find((p) => p.slug === route.params.slug);
     body = post
       ? `<h1>${escapeHtml(post.title)}</h1>`
         + `<p>${escapeHtml(post.date || post.cardDate || '')} · ${escapeHtml(post.readTime || '')}</p>`
         + `<article>${escapeHtml(bodyText(post.body)).replace(/\n/g, '<br>')}</article>`
-        + '<p><a href="/blogs">All stories</a></p>'
+        + '<p><a href="/echoes">All echoes</a></p>'
       : `<h1>${escapeHtml(meta.title)}</h1>`;
   } else if (route.name === 'photography') {
     const list = albums.filter((a) => a.kind === 'photography' && a.photos?.length);
@@ -259,6 +259,50 @@ for (const route of routes) {
   const targetDir = path.join(distDir, ...cleanPath.split('/'));
   fs.mkdirSync(targetDir, { recursive: true });
   fs.writeFileSync(path.join(targetDir, 'index.html'), html);
+  written += 1;
+}
+
+// ── 旧 /blogs → /echoes 跳转页（GitHub Pages 做不到真 301，用 meta refresh + JS） ────
+// 这些页 canonical 指向新址、robots=noindex、保留 query/hash 传给新 URL，
+// 让搜索引擎把权重传递到 /echoes 而不是留在旧地址
+function redirectHtml(fromPath, toPath) {
+  const fromFull = `${SITE}${fromPath}`;
+  const toFull = `${SITE}${toPath}`;
+  return [
+    '<!DOCTYPE html>',
+    '<html lang="en">',
+    '<head>',
+    '  <meta charset="UTF-8">',
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+    '  <meta http-equiv="refresh" content="0;url=' + escapeAttr(toPath) + '">',
+    '  <meta name="robots" content="noindex, follow">',
+    '  <link rel="canonical" href="' + escapeAttr(toFull) + '">',
+    `  <title>Echoes — ${SITE_NAME}</title>`,
+    '</head>',
+    '<body style="margin:0;padding:0;background:#0b0b0c;color:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh">',
+    '  <div style="text-align:center">',
+    `    <h1 style="font-size:18px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase">Echoes has moved</h1>`,
+    `    <p style="margin-top:12px;opacity:0.7">You are being redirected to <a href="${escapeAttr(toPath)}" style="color:#f5f5f5">${escapeAttr(toPath)}</a></p>`,
+    '  </div>',
+    '  <script>location.replace(' + JSON.stringify(toPath) + ' + window.location.search + window.location.hash);</script>',
+    '</body>',
+    '</html>',
+  ].join('\n');
+}
+
+// /blogs/ → /echoes/
+const blogsIndexDir = path.join(distDir, 'blogs');
+fs.mkdirSync(blogsIndexDir, { recursive: true });
+fs.writeFileSync(path.join(blogsIndexDir, 'index.html'), redirectHtml('/blogs', '/echoes'));
+written += 1;
+
+// /blogs/<slug>/ → /echoes/<slug>/
+for (const post of posts) {
+  if (!post?.slug) continue;
+  const slug = encodeURIComponent(post.slug);
+  const dir = path.join(distDir, 'blogs', slug);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), redirectHtml(`/blogs/${slug}`, `/echoes/${slug}`));
   written += 1;
 }
 
@@ -360,8 +404,8 @@ const rss = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<rss version="2.0">',
   '  <channel>',
-  `    <title>${SITE_NAME} — Blogs</title>`,
-  `    <link>${SITE}/blogs</link>`,
+  `    <title>${SITE_NAME} — Echoes</title>`,
+  `    <link>${SITE}/echoes</link>`,
   `    <description>Poems, notes and stories by ${AUTHOR}.</description>`,
   '    <language>en</language>',
   rssItems,

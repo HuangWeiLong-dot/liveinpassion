@@ -378,7 +378,7 @@ onBeforeUnmount(() => {
     <!-- 这页的身份、条数与操作提示：全部排在右上角 VIEW 按钮的正下方，
          右对齐成一列，跟着那枚按钮一起成为"世界视图的说明栏" -->
     <div class="bw-head">
-      <span class="bw-eyebrow">BLOGS — WORLD VIEW</span>
+      <span class="bw-eyebrow">ECHOES — WORLD VIEW</span>
       <span class="bw-eyebrow bw-head__count">{{ padNo(N - 1) }} ENTRIES</span>
       <span class="bw-head__hint">DRAG · SCROLL · CLICK A PIECE</span>
     </div>

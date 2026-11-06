@@ -1375,7 +1375,7 @@ async function onTileClick(event, config) {
   // （详情页原来是靠 view-transition-name 的共享元素形变接的；那套已经换成
   //   GSAP + 这条 sessionStorage 交接，所以这里必须补上，否则从首页进来封面没有起点。）
   rememberCoverHandoff(config.slug, event.currentTarget);
-  await navigateWithViewTransition(router, { name: 'blog-detail', params: { slug: config.slug } });
+  await navigateWithViewTransition(router, { name: 'echo-detail', params: { slug: config.slug } });
   forcedAssembled.value = null;
 }
 
@@ -2044,7 +2044,7 @@ onBeforeUnmount(() => {
       <div ref="orbitEl" class="orbit">
         <div v-for="g in groups" :key="g.config.id" class="orbit__slot">
           <router-link
-            :to="{ name: 'blog-detail', params: { slug: g.config.slug } }"
+            :to="{ name: 'echo-detail', params: { slug: g.config.slug } }"
             custom
             v-slot="{ href }"
           >

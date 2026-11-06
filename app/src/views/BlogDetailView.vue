@@ -89,6 +89,26 @@ function revealCoverGlitch() {
 // 解码前先给个 4/5 兜底，免得盒子塌成 0。
 const ratio = ref('4 / 5');
 
+// rating / tags 来自快照，做一次兜底规整
+function safeRating(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return raw;
+}
+function safeTags(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map((t) => String(t).toUpperCase());
+  return [];
+}
+
+// 点 tag → 跳 echoes 的 archive 视图并挂上筛选
+function openTag(tag) {
+  if (!tag) return;
+  markReturningFromDetail();
+  setCoverCurtain(false);
+  skipNextPageTransition();
+  router.push({ name: 'echoes', query: { view: 'archive', tag: String(tag).toUpperCase() } }).catch(() => {});
+}
+
 const post = computed(() => blogBySlug[route.params.slug] || null);
 const index = computed(() => blogPosts.findIndex((p) => p.slug === route.params.slug));
 const prevPost = computed(() => (index.value > 0 ? blogPosts[index.value - 1] : null));
@@ -139,7 +159,7 @@ const isCorner = computed(() => route.query.view === 'corner' && !isNarrow.value
 const isCoverView = computed(() => route.query.view === 'cover' && !isNarrow.value);
 const anyView = computed(() => isCorner.value || isCoverView.value);
 function goView(v) {
-  router.replace({ name: 'blog-detail', params: route.params, query: v ? { view: v } : {} });
+  router.replace({ name: 'echo-detail', params: route.params, query: v ? { view: v } : {} });
 }
 const cornerAngle = ref(153); // 默认每堵墙折起 13.5°（用户要的 13~14 那一档）
 const roomZoom = ref(0.78);   // 整个房间的缩放：调小 → 两堵墙都进画面，看到全貌
@@ -187,7 +207,7 @@ watch([cornerAngle, roomZoom, roomPitch, roomShift, cvTitleX, cvTitleY, cvFont],
 });
 // 摊平 = 回到普通详情（replace，别往历史里堆）
 function exitCorner() {
-  router.replace({ name: 'blog-detail', params: route.params });
+  router.replace({ name: 'echo-detail', params: route.params });
 }
 
 const reducedMotion = typeof window !== 'undefined'
@@ -227,7 +247,6 @@ const bodyHtml = computed(() => {
   if (bookMode.value) return '';
   return pages.value.length > 1 ? pages.value.join('') : (post.value?.body || '');
 });
-
 
 const detailRef = ref(null);      // 挂 .is-bg-off 的那一层
 // 封面背景开着没有。**只有窄屏读它** —— 宽屏那份样式里没有任何 .is-bg-off 规则。
@@ -708,7 +727,7 @@ async function go(dir) {
   // 用 replace 不是 push：翻篇是"在同一个面板里换内容"，不该往历史里堆一摞文章。
   // 还要跳过站点的通用转场（黑场滑块），详情页这条路由自己就是一套转场。
   skipNextPageTransition();
-  await router.replace({ name: 'blog-detail', params: { slug: target.slug } });
+  await router.replace({ name: 'echo-detail', params: { slug: target.slug } });
   await nextTick();
   scrollRef.value?.scrollTo({ top: 0, behavior: 'instant' });
   loadFeatured();
@@ -763,7 +782,7 @@ function close() {
         skipNextPageTransition();
         markReturningFromDetail();
         if (window.history.state && window.history.state.back) router.back();
-        else router.push('/blogs');
+        else router.push('/echoes');
       },
     });
     return;
@@ -781,7 +800,7 @@ function close() {
     skipNextPageTransition();
     markReturningFromDetail();
     if (window.history.state && window.history.state.back) router.back();
-    else router.push('/blogs');
+    else router.push('/echoes');
   };
 
   if (!inner || !panel || reducedMotion || !back) {
@@ -1209,6 +1228,17 @@ if (typeof window !== 'undefined') {
               <span class="blog-date">{{ post.date }}</span>
               <span class="bd-tag">{{ post.readTime }}</span>
             </div>
+            <!-- 标签行：点击跳到 ECHOES 的 ARCHIVE 并挂上筛选 -->
+            <div v-if="safeTags(post.tags).length" class="blog-tags">
+              <button
+                v-for="tag in safeTags(post.tags).slice(0, 12)"
+                :key="tag"
+                type="button"
+                class="blog-tag"
+                :aria-label="`查看带标签 ${tag} 的文章`"
+                @click="openTag(tag)"
+              >{{ tag }}</button>
+            </div>
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
@@ -1313,6 +1343,30 @@ if (typeof window !== 'undefined') {
             <path d="M4 4l6 6" />
           </svg>
         </button>
+
+        <!-- 作者自评鉴定章：钉在右侧封面墙底边；窄屏时仍钉在底部（整屏背景之上） -->
+        <div v-if="safeRating(post.rating)" class="bd-rating" aria-label="Author's score">
+          <div class="bd-rating__grade">{{ safeRating(post.rating).grade }}</div>
+          <div class="bd-rating__core">
+            <div class="bd-rating__score">
+              <span class="bd-rating__score-k">AUTHOR'S SCORE</span>
+              <span class="bd-rating__score-v">{{ Number(safeRating(post.rating).score).toFixed(1) }} / 10</span>
+            </div>
+            <div v-if="safeRating(post.rating).language != null" class="bd-rating__dims">
+              <template v-for="([label, key]) in [['LANGUAGE','language'],['EMOTION','emotion'],['STRUCTURE','structure'],['AFTERGLOW','afterglow']]" :key="key">
+                <div class="bd-rating__dim">
+                  <span class="bd-rating__dim-k">{{ label }}</span>
+                  <span class="bd-rating__dim-v">{{ Number(safeRating(post.rating)[key]).toFixed(1) }}</span>
+                  <span class="bd-rating__bar" aria-hidden="true">
+                    <span class="bd-rating__bar-fill" :style="{ width: `${Math.min(100, Number(safeRating(post.rating)[key]) * 10)}%` }"></span>
+                  </span>
+                </div>
+              </template>
+            </div>
+            <p v-if="safeRating(post.rating).verdict" class="bd-rating__verdict">“{{ safeRating(post.rating).verdict }}”</p>
+            <p v-if="safeRating(post.rating).note" class="bd-rating__note">{{ safeRating(post.rating).note }}</p>
+          </div>
+        </div>
       </div>
       </div><!-- /.bd-room -->
     </section>
@@ -1321,7 +1375,7 @@ if (typeof window !== 'undefined') {
       <h1 class="blog-detail-title">POST NOT FOUND</h1>
       <div class="blog-detail-content">
         <p>没有这篇：{{ route.params.slug }}</p>
-        <p><router-link to="/blogs">← 回到 BLOGS</router-link></p>
+        <p><router-link to="/echoes">← 回到 ECHOES</router-link></p>
       </div>
     </section>
   </main>
@@ -2238,6 +2292,176 @@ if (typeof window !== 'undefined') {
   /* 减少动态效果下不敲字（startTyping 里直接全放出来），光标也不该闪 */
   .tw-caret {
     animation: none;
+  }
+}
+
+/* ── 标签行（meta 下方、标题上方）────────────────────────────────────────── */
+.blog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  margin-bottom: 10px;
+}
+.blog-tag {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid color-mix(in oklab, var(--fg) 20%, transparent);
+  color: color-mix(in oklab, var(--fg) 75%, transparent);
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+.blog-tag:hover,
+.blog-tag:focus-visible {
+  border-color: var(--fg);
+  color: var(--bg);
+  background: var(--fg);
+  outline: none;
+}
+
+/* ── 作者自评鉴定章（钉在 .bd-right 底部；窄屏仍是整屏底部） ──────────────── */
+.bd-rating {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 18px 20px;
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
+  border-radius: 2px;
+  color: var(--fg);
+  pointer-events: auto;
+  animation: bdRatingIn 0.6s ease both;
+}
+@keyframes bdRatingIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.bd-rating__grade {
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: clamp(56px, 8vw, 96px);
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  min-width: 60px;
+  text-align: center;
+  border-right: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+  padding-right: 20px;
+  flex-shrink: 0;
+}
+.bd-rating__core {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bd-rating__score {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.bd-rating__score-k {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--fg) 58%, transparent);
+}
+.bd-rating__score-v {
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+}
+.bd-rating__dims {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+}
+.bd-rating__dim {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+.bd-rating__dim-k {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--fg) 55%, transparent);
+  white-space: nowrap;
+}
+.bd-rating__dim-v {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.bd-rating__bar {
+  display: block;
+  height: 1px;
+  background: color-mix(in oklab, var(--fg) 20%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+.bd-rating__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--fg);
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bd-rating__verdict {
+  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  font-style: italic;
+  margin: 0;
+  color: var(--fg);
+}
+.bd-rating__note {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  margin: 0;
+  color: color-mix(in oklab, var(--fg) 65%, transparent);
+}
+
+/* 窄屏：鉴定章整块横铺、不钉在封面墙上（封面墙此时是整屏背景，面板压在其上） */
+@media (max-width: 1024px) {
+  .bd-rating {
+    position: static;
+    margin: 28px 24px 88px;
+    left: auto; right: auto;
+  }
+}
+@media (max-width: 640px) {
+  .bd-rating {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .bd-rating__grade {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
+    padding-bottom: 12px;
+    align-self: flex-start;
+  }
+  .bd-rating__dims {
+    grid-template-columns: 1fr;
   }
 }
 </style>
