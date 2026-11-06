@@ -1450,7 +1450,6 @@ if (typeof window !== 'undefined') {
               </template>
             </div>
             <p v-if="safeRating(post.rating).verdict" class="bd-rating__verdict">“{{ safeRating(post.rating).verdict }}”</p>
-            <p v-if="safeRating(post.rating).note" class="bd-rating__note">{{ safeRating(post.rating).note }}</p>
           </div>
         </div>
       </div>
@@ -2614,13 +2613,6 @@ if (typeof window !== 'undefined') {
   font-style: italic;
   margin: 0;
   color: var(--fg);
-}
-.bd-rating__note {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  margin: 0;
-  color: color-mix(in oklab, var(--fg) 65%, transparent);
 }
 
 /* 窄屏：鉴定章整块横铺、不钉在封面墙上（封面墙此时是整屏背景，面板压在其上） */

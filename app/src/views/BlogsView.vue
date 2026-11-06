@@ -421,7 +421,6 @@ function yearOf(dateStr) {
 }
 function gradeOf(rating) { return rating?.grade || ''; }
 function verdictOf(rating) { return rating?.verdict || ''; }
-function noteOf(rating) { return rating?.note || ''; }
 function scoreOf(rating) {
   if (!rating?.score) return '';
   return Number(rating.score).toFixed(1);
@@ -2038,9 +2037,6 @@ function onVisibility() {
                   <p v-if="verdictOf(activeWork.rating)" class="ba-review__en">
                     {{ verdictOf(activeWork.rating) }}
                   </p>
-                  <p v-if="noteOf(activeWork.rating)" class="ba-review__zh">
-                    {{ noteOf(activeWork.rating) }}
-                  </p>
                 </div>
               </Transition>
             </div>
@@ -3282,16 +3278,6 @@ function onVisibility() {
   letter-spacing: 0.04em;
   color: color-mix(in srgb, var(--jb-fg) 62%, transparent);
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ba-review__zh {
-  font-family: var(--font-body, 'Noto Sans SC', sans-serif);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: color-mix(in srgb, var(--jb-fg) 46%, transparent);
-  margin: 4px 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
