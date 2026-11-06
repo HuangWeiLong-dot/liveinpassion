@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed } from 'vue';
+import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { MdEditor, config } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
@@ -72,6 +72,83 @@ const saving = ref(false);
 const uploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
+
+const editorRef = ref(null);
+
+// 分页：正文里的一行 <div class="page-break"></div> 就是页与页的分隔。
+// 前台会按它把 content_html 切成书页；这里负责插入标记、跳到某一页。
+const PAGE_BREAK_INSERT = '\n\n<div class="page-break"></div>\n\n';
+const PAGE_BREAK_RE = /<div[^>]*class="[^"]*page-break[^"]*"[^>]*>\s*<\/div>/gi;
+
+function splitMdPages(md) {
+  const text = md || '';
+  const all = [];
+  const re = new RegExp(PAGE_BREAK_RE.source, 'gi');
+  let start = 0;
+  for (const m of text.matchAll(re)) {
+    all.push({ start, end: m.index, text: text.slice(start, m.index) });
+    start = m.index + m[0].length;
+  }
+  all.push({ start, end: text.length, text: text.slice(start) });
+  // 编辑侧保留空页：刚插入分页符时页码要立刻变成 2/2，光标也确实在第二页。
+  // 前台切页时会过滤空页（见 BlogDetailView 的 splitHtmlPages）。
+  return all;
+}
+
+const mdPageInfo = computed(() => splitMdPages(form.value.contentMd));
+const mdPageCount = computed(() => mdPageInfo.value.length);
+const pageIndex = ref(0);
+
+watch(mdPageCount, (n) => {
+  if (pageIndex.value > n - 1) pageIndex.value = Math.max(0, n - 1);
+});
+
+function padPage(n) {
+  return String(n).padStart(2, '0');
+}
+
+function editorView() {
+  return editorRef.value?.getEditorView?.() || null;
+}
+
+// 页首偏移：跳过标记后面的空行，光标落在正文第一行
+function pageOffset(i) {
+  const info = mdPageInfo.value[i];
+  const md = form.value.contentMd || '';
+  if (!info) return 0;
+  let off = info.start;
+  while (off < info.end && /\s/.test(md[off])) off += 1;
+  return off;
+}
+
+function jumpToPage(i) {
+  const total = mdPageCount.value;
+  const idx = Math.max(0, Math.min(total - 1, i));
+  pageIndex.value = idx;
+  const view = editorView();
+  if (!view) return;
+  view.dispatch({ selection: { anchor: pageOffset(idx) }, scrollIntoView: true });
+  view.focus();
+}
+
+function insertPageBreak() {
+  const view = editorView();
+  if (!view) {
+    form.value.contentMd += PAGE_BREAK_INSERT;
+    pageIndex.value = mdPageCount.value - 1;
+    return;
+  }
+  view.dispatch(view.state.replaceSelection(PAGE_BREAK_INSERT));
+  view.focus();
+  // 插入后按新的文档内容算光标落在第几页，不能等 computed 追上来
+  const text = view.state.doc.toString();
+  const infos = splitMdPages(text);
+  const head = view.state.selection.main.head;
+  let idx = 0;
+  infos.forEach((info, i) => { if (head >= info.start) idx = i; });
+  pageIndex.value = Math.max(0, Math.min(infos.length - 1, idx));
+  nextTick(() => view.dispatch({ scrollIntoView: true }));
+}
 
 // 编辑器扩展按内容按需加载：照片博客里通常没有代码/公式/流程图，
 // 不写这些内容时就不要从 unpkg 拉 highlight.js / katex / mermaid
@@ -295,6 +372,32 @@ const PhotoLayoutTrigger = defineComponent({
   },
 });
 const photoLayoutToolbar = h(PhotoLayoutTrigger);
+
+// 分页：工具栏上的一页纸图标，点一下在光标处插入 page-break 分隔块。
+// 不需要 insert(generate)：CodeMirror 的 view 已经通过 MdEditor 暴露出来。
+const PAGE_BREAK_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+  '<rect x="5" y="3" width="14" height="18" rx="1.5"/>' +
+  '<path d="M8 8h8M8 16h5"/>' +
+  '<path d="M3 12h18" stroke-dasharray="2 2" opacity=".7"/></svg>';
+
+const PageBreakTrigger = defineComponent({
+  name: 'PageBreakTrigger',
+  setup() {
+    return () =>
+      h(
+        'div',
+        {
+          class: 'md-editor-toolbar-item',
+          title: 'Insert Page Break',
+          onClick: insertPageBreak,
+        },
+        [h('span', { class: 'md-page-break-btn', innerHTML: PAGE_BREAK_SVG })]
+      );
+  },
+});
+const pageBreakToolbar = h(PageBreakTrigger);
 
 // 选择多张照片：仍是本地暂存（保存时才上传），与普通插图共用 pendingImages
 function onLayoutFiles(e) {
@@ -895,10 +998,11 @@ onUnmounted(() => {
         </span>
       </div>
       <MdEditor
+        ref="editorRef"
         v-model="form.contentMd"
         :on-upload-img="onEditorUploadImg"
         :on-save="onEditorSave"
-        :def-toolbars="[photoLayoutToolbar]"
+        :def-toolbars="[photoLayoutToolbar, pageBreakToolbar]"
         language="en-US"
         :theme="isDark ? 'dark' : 'light'"
         :preview="!isNarrow"
@@ -912,7 +1016,7 @@ onUnmounted(() => {
         :toolbars="[
           'bold', 'underline', 'italic', 'strikeThrough', 'sub', 'sup', '-',
           'title', 'quote', 'unorderedList', 'orderedList', 'task', '-',
-          'codeRow', 'code', 'link', 'image', 0, 'table', 'mermaid', 'katex', '-',
+          'codeRow', 'code', 'link', 'image', 0, 1, 'table', 'mermaid', 'katex', '-',
           'revoke', 'next', '-',
           'save', 'prettier', '=',
           'preview', 'previewOnly', 'htmlPreview', 'catalog', 'pageFullscreen', 'fullscreen',
@@ -922,6 +1026,26 @@ onUnmounted(() => {
     </div>
 
     <div class="action-bar">
+      <div class="action-bar__pages">
+        <button
+          type="button"
+          class="page-nav"
+          aria-label="Previous page"
+          :disabled="pageIndex <= 0"
+          @click="jumpToPage(pageIndex - 1)"
+        >←</button>
+        <span class="page-count">{{ padPage(pageIndex + 1) }} / {{ padPage(mdPageCount) }}</span>
+        <button
+          type="button"
+          class="page-nav"
+          aria-label="Next page"
+          :disabled="pageIndex >= mdPageCount - 1"
+          @click="jumpToPage(pageIndex + 1)"
+        >→</button>
+        <button type="button" class="btn btn-sm btn-secondary page-insert" @click="insertPageBreak">
+          + Page Break
+        </button>
+      </div>
       <span class="action-bar__hint">Ctrl+S saves a draft</span>
       <div class="action-bar__btns">
         <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
@@ -1090,6 +1214,43 @@ onUnmounted(() => {
 }
 .action-bar__btns { display: flex; gap: 12px; }
 
+/* 分页导航：和站点按钮同一套直角/反色语言 */
+.action-bar__pages {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.page-nav {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.page-nav:hover:not(:disabled) { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg); }
+.page-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+.page-count {
+  min-width: 62px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.page-insert { white-space: nowrap; }
+
+
 /* 触屏上没有 Ctrl+S，"paste / drop" 也不成立，换成触摸版的提示 */
 .tip-coarse { display: none; }
 @media (hover: none) {
@@ -1100,10 +1261,16 @@ onUnmounted(() => {
 @media (max-width: 700px) {
   .form-grid { grid-template-columns: 1fr; gap: 20px; }
   .field--wide { grid-column: auto; }
+  .action-bar { flex-wrap: wrap; row-gap: 10px; }
   .action-bar__hint { display: none; }
+  .action-bar__pages { width: 100%; }
   .action-bar__btns { width: 100%; }
   .action-bar__btns .btn { flex: 1; }
   .cover-preview { width: 100%; max-width: 260px; }
+}
+
+@media (hover: none) {
+  .page-nav { width: 44px; height: 44px; }
 }
 
 /* 排版弹窗 */
@@ -1186,11 +1353,36 @@ onUnmounted(() => {
 <!-- 编辑器工具栏自定义图标 + 预览区内的排版样式（非 scoped；scoped 样式无法作用到 h() 创建的元素）
      与 app/src/styles/main.css 中的 .blog-detail-content 排版规则保持一致 -->
 <style>
-.md-editor-toolbar-wrapper .md-photo-layout-btn {
+.md-editor-toolbar-wrapper .md-photo-layout-btn,
+.md-editor-toolbar-wrapper .md-page-break-btn {
   display: flex; align-items: center; justify-content: center;
   width: 24px; height: 24px;
 }
-.md-editor-toolbar-wrapper .md-photo-layout-btn svg { width: 20px; height: 20px; display: block; }
+.md-editor-toolbar-wrapper .md-photo-layout-btn svg,
+.md-editor-toolbar-wrapper .md-page-break-btn svg { width: 20px; height: 20px; display: block; }
+
+/* 编辑预览里的分页线：和前台书页的分隔同一套语言（发丝线 + 小号 mono 标签） */
+.md-editor-preview .page-break {
+  display: block;
+  position: relative;
+  height: 1px;
+  margin: 34px 0;
+  background: var(--border);
+}
+.md-editor-preview .page-break::after {
+  content: 'PAGE BREAK';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 10px;
+  background: var(--md-bk-color, var(--bg));
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
 
 .md-editor-preview .gallery { margin: 32px 0; }
 .md-editor-preview .gallery img { display: block; width: 100%; height: 100%; object-fit: cover; }

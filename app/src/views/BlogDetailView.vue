@@ -26,6 +26,7 @@ import { useLightbox } from '../composables/useLightbox.js';
 import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
 import AppFooter from '../components/AppFooter.vue';
+import BlogBook from '../components/BlogBook.vue';
 
 gsap.registerPlugin(CustomEase);
 
@@ -205,6 +206,28 @@ const isNarrow = ref(narrowMql ? narrowMql.matches : false);
 function syncNarrow(e) {
   isNarrow.value = e.matches;
 }
+
+// ── 分页 / 书页模式 ─────────────────────────────────────────────────────
+// CMS 正文里的 <div class="page-break"></div> 就是页分隔；前台按它切页。
+// 只有"宽屏 + 平铺视图 + 至少两页"才进书页；窄屏、墙角、封面视图继续用整篇流式正文，
+// 页分隔直接拿掉，不打断阅读。
+const PAGE_BREAK_RE = /<div[^>]*class="[^"]*page-break[^"]*"[^>]*>\s*<\/div>/gi;
+function splitHtmlPages(html) {
+  if (!html) return [''];
+  const re = new RegExp(PAGE_BREAK_RE.source, 'gi');
+  const parts = html.split(re).map((s) => s.trim()).filter(Boolean);
+  return parts.length ? parts : [html];
+}
+const pages = computed(() => splitHtmlPages(post.value?.body || ''));
+const bookMode = computed(
+  () => pages.value.length > 1 && !isNarrow.value && !anyView.value
+);
+// 书页模式下正文由 BlogBook 自己按页渲染；其余模式把页拼回一整篇
+const bodyHtml = computed(() => {
+  if (bookMode.value) return '';
+  return pages.value.length > 1 ? pages.value.join('') : (post.value?.body || '');
+});
+
 
 const detailRef = ref(null);      // 挂 .is-bg-off 的那一层
 // 封面背景开着没有。**只有窄屏读它** —— 宽屏那份样式里没有任何 .is-bg-off 规则。
@@ -492,24 +515,27 @@ function startTyping() {
   const title = titleRef.value;
   const body = bodyRef.value;
   const info = infoRef.value;
-  if (!title || !body || !info) return;
+  // 书页模式下没有可敲的正文节点（body 为 null），只敲标题；书页自己已经在场
+  if (!title || !info) return;
 
-  info.classList.add('is-typing'); // 正文各块先整块藏着，打到它才放出来（图不会抢跑）
-  const stream = [...wrapTextNodes(title), ...wrapTextNodes(body)];
+  if (body) info.classList.add('is-typing');
+  const stream = [...wrapTextNodes(title), ...(body ? wrapTextNodes(body) : [])];
   if (!stream.length) {
-    info.classList.remove('is-typing');
+    if (body) info.classList.remove('is-typing');
     return;
   }
   // 每一块的第一个字符在流里的位置 —— 打到那儿就把整块（含图）放出来
-  const blocks = [...body.children]
-    .map((el) => ({ el, at: stream.indexOf(el.querySelector('.tw-ch')) }))
-    .filter((b) => b.at >= 0)
-    .sort((a, b) => a.at - b.at);
+  const blocks = body
+    ? [...body.children]
+      .map((el) => ({ el, at: stream.indexOf(el.querySelector('.tw-ch')) }))
+      .filter((b) => b.at >= 0)
+      .sort((a, b) => a.at - b.at)
+    : [];
 
   const revealAll = () => {
     stream.forEach((c) => c.classList.add('is-on'));
     blocks.forEach((b) => b.el.classList.add('is-on'));
-    info.classList.remove('is-typing');
+    if (body) info.classList.remove('is-typing');
   };
 
   if (reducedMotion) {
@@ -1175,8 +1201,8 @@ if (typeof window !== 'undefined') {
       <div class="bd-room">
       <!-- ── 左：正文面板（换篇时它整块交叉淡，位置不动）────────────────── -->
       <div ref="panelRef" class="bd-panel">
-        <div ref="scrollRef" class="bd-panel-inner">
-          <div ref="infoRef" class="bd-info">
+        <div ref="scrollRef" class="bd-panel-inner" :class="{ 'is-book': bookMode }">
+          <div ref="infoRef" class="bd-info" :class="{ 'is-book': bookMode }">
             <!-- 没有 Close 按钮（已按需求删掉）：退出的路是 —— 点封面以外的空白、Esc、
                  浏览器返回。阅读时长并进日期那一行，不再单独占一条。 -->
             <div class="blog-meta">
@@ -1186,10 +1212,11 @@ if (typeof window !== 'undefined') {
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
-            <div ref="bodyRef" class="blog-detail-content" v-html="post.body"></div>
+            <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
+            <BlogBook v-else :pages="pages" />
           </div>
-          <!-- 文章滚到底才看得到的页脚；正文面板有固定行宽，所以用紧凑版 -->
-          <AppFooter compact />
+          <!-- 文章滚到底才看得到的页脚；书页模式下没有滚动，且底部要给翻页控件让位 -->
+          <AppFooter v-if="!bookMode" compact />
         </div>
 
         <!-- 打字机光标：fixed 定位，位置由 moveCaret() 每帧写；打完自己收起来 -->
@@ -1862,6 +1889,19 @@ if (typeof window !== 'undefined') {
   max-width: var(--bd-measure);
   margin-inline: auto;
 }
+
+/* 书页模式：标题/日期在上，书页吃掉剩下的高度；超高内容在纸内滚，不推整体版面 */
+.bd-info.is-book {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: var(--bd-measure);
+  margin-inline: auto;
+}
+.bd-info.is-book > .blog-meta,
+.bd-info.is-book > .blog-detail-title { flex-shrink: 0; }
+.bd-panel-inner.is-book { overflow: hidden; }
 
 /* 被"敲"出来的字符：版面一开始就是最终状态，只有可见性在变（见 startTyping）。
 
