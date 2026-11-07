@@ -103,6 +103,11 @@ app.put('/:id', requireAccessAuth, async (c) => {
       category, tagsJson,
       id
     ).run();
+    // 已发布文章的任何编辑（分类 / 标签 / 正文 / 封面）都要重建前台；
+    // 不调用 setStatus，所以 published_at 不变，历史编号与排序保留。
+    if (existing.status === 'published') {
+      c.executionCtx.waitUntil(triggerRebuild(c.env, `post ${id} updated`).catch(() => {}));
+    }
     return c.json({ ok: true });
   } catch (err) {
     if (String(err.message).includes('UNIQUE')) {
@@ -121,9 +126,11 @@ app.patch('/:id/status', requireAccessAuth, async (c) => {
     return c.json({ error: 'status must be draft or published' }, 400);
   }
   const isPublished = status === 'published';
+  // 只有从未发布过的草稿才写入 now；重新发布、或发布后再取消，日期都保留，
+  // 这样前台的编号 / 排序不会因为一次状态切换被改写。
   const sql = isPublished
-    ? `UPDATE posts SET status='published', published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`
-    : `UPDATE posts SET status='draft', published_at=NULL, updated_at=datetime('now') WHERE id=?`;
+    ? `UPDATE posts SET status='published', published_at=COALESCE(published_at, datetime('now')), updated_at=datetime('now') WHERE id=?`
+    : `UPDATE posts SET status='draft', updated_at=datetime('now') WHERE id=?`;
   const result = await db.prepare(sql).bind(id).run();
   if (result.meta.changes === 0) return c.json({ error: 'Post not found' }, 404);
   // 触发前台重建（waitUntil 注册：响应返回后 Worker 仍会执行完 GitHub 调用）

@@ -4,6 +4,7 @@ import { albumApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
 import AdminIcon from '../components/AdminIcon.vue';
+import { askDeleteGuard } from '../composables/useDeleteGuard.js';
 
 const albums = ref([]);
 const activeAlbumId = ref(null);
@@ -107,7 +108,7 @@ async function createAlbum() {
 }
 
 async function deleteAlbum() {
-  if (!confirm(`Delete album "${activeAlbum.value.name}"? Photo records will be removed (R2 files are kept).`)) return;
+  if (!(await askDeleteGuard(activeAlbum.value.name))) return;
   try {
     await albumApi.remove(activeAlbumId.value);
     activeAlbumId.value = null;
@@ -163,7 +164,7 @@ async function onFileSelect(e) {
 }
 
 async function removePhoto(photo) {
-  if (!confirm(`Remove "${photo.fileName}" from this album? (R2 files are kept)`)) return;
+  if (!(await askDeleteGuard(photo.fileName))) return;
   try {
     await albumApi.removePhoto(photo.id);
     await loadPhotos();

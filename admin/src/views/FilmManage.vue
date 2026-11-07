@@ -5,6 +5,7 @@
 // 以后加新片时，新片需要一个自己的页面（或外部链接），把地址填在这里。
 import { onMounted, reactive, ref } from 'vue';
 import { filmApi } from '../api.js';
+import { askDeleteGuard } from '../composables/useDeleteGuard.js';
 
 const POSTER_BASE = 'https://cms.liveinpassion.me/img/';
 
@@ -113,7 +114,7 @@ async function submit() {
 }
 
 async function remove(film) {
-  if (!confirm(`Delete "${film.title}"? This removes the record, not the R2 files.`)) return;
+  if (!(await askDeleteGuard(film.title))) return;
   try {
     await filmApi.remove(film.id);
     await load();

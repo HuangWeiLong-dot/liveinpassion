@@ -77,6 +77,8 @@ const TAG_MAX_LEN = 24;
 const CATEGORY_MAX_LEN = 24;
 const categorySuggestions = ref([]);
 const saving = ref(false);
+// 当前文章在服务端的状态：已发布的文章只显示 Update，编辑后重建前台但不改发布日期。
+const postStatus = ref('draft');
 const uploading = ref(false);
 const error = ref('');
 const coverPreview = ref('');
@@ -264,6 +266,7 @@ onMounted(async () => {
     try {
       const data = await blogApi.get(route.params.id);
       form.value.slug = data.slug;
+      postStatus.value = data.status || 'draft';
       form.value.cardTitle = data.cardTitle;
       form.value.title = data.title;
       form.value.contentMd = data.contentMd || '';
@@ -309,9 +312,37 @@ async function onCoverUpload(e) {
   }
 }
 
+// Metadata-only update for an already published post: category / tags / title /
+// cover change and the frontend rebuilds, but the body (content_html) and the
+// original published_at are untouched. Use "Save changes" when the body changed.
+async function saveMeta() {
+  if (isNew.value) return;
+  saving.value = true;
+  error.value = '';
+  try {
+    addTag();
+    await blogApi.update(route.params.id, {
+      slug: form.value.slug,
+      cardTitle: form.value.cardTitle,
+      title: form.value.title,
+      coverKey: form.value.coverKey,
+      coverFullKey: form.value.coverFullKey,
+      category: normalizeCategoryInput(form.value.category),
+      tags: form.value.tags.slice(0, TAG_LIMIT),
+    });
+    alert('Updated. Pages will rebuild in 1-2 minutes.');
+    router.push('/');
+  } catch (e) {
+    error.value = e.message;
+  } finally {
+    saving.value = false;
+  }
+}
+
 async function save(status) {
   saving.value = true;
   error.value = '';
+  const wasPublished = postStatus.value === 'published';
   try {
     // 清理已从正文中删除的暂存图片
     for (const [blobUrl] of [...pendingImages.entries()]) {
@@ -360,10 +391,21 @@ async function save(status) {
       await blogApi.update(route.params.id, payload);
       id = route.params.id;
     }
-    if (status) {
+    // 只有状态真的变化才调 setStatus。已发布文章点 Update 时走 update 路由，
+    // Worker 会触发重建，但不会碰 published_at —— 历史编号/排序保留。
+    if (status && status !== postStatus.value) {
       await blogApi.setStatus(id, status);
+      postStatus.value = status;
     }
-    alert(status === 'published' ? 'Published. Pages will rebuild in 1-2 minutes.' : 'Saved as draft.');
+    if (status === 'published') {
+      alert(wasPublished
+        ? 'Updated. Pages will rebuild in 1-2 minutes.'
+        : 'Published. Pages will rebuild in 1-2 minutes.');
+    } else if (wasPublished) {
+      alert('Updated. Pages will rebuild in 1-2 minutes.');
+    } else {
+      alert('Saved as draft.');
+    }
     router.push('/');
   } catch (e) {
     error.value = e.message;
@@ -1171,10 +1213,26 @@ onUnmounted(() => {
           + Page Break
         </button>
       </div>
-      <span class="action-bar__hint">Ctrl+S saves a draft</span>
+      <span class="action-bar__hint">{{ !isNew && postStatus === 'published' ? 'Ctrl+S saves body changes to the live post' : 'Ctrl+S saves a draft' }}</span>
       <div class="action-bar__btns">
-        <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
-        <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
+        <template v-if="!isNew && postStatus === 'published'">
+          <button
+            class="btn btn-secondary"
+            :disabled="saving"
+            title="Update category, tags and other metadata without changing the body or the publish date"
+            @click="saveMeta()"
+          >Update</button>
+          <button
+            class="btn btn-primary"
+            :disabled="saving"
+            title="Save body and metadata without changing the original publish date"
+            @click="save()"
+          >Save changes</button>
+        </template>
+        <template v-else>
+          <button class="btn btn-secondary" :disabled="saving" @click="save()">Save Draft</button>
+          <button class="btn btn-primary" :disabled="saving" @click="save('published')">Publish</button>
+        </template>
       </div>
     </div>
 

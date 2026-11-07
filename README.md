@@ -48,6 +48,19 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 65 — 2026-11-08
+
+#### CMS：删除保护 + 已发布文章安全更新
+
+- **删除保护**：Posts / Albums / 照片 / Films 的 Delete 先弹出确认框，要求输入
+  作者生日（`2007-05-25`）才执行；确认框全英文。
+- **已发布文章 Update**：编辑已发布文章时显示 `Update`（只改 Category / Tags /
+  标题 / 封面，不动正文）和 `Save changes`（正文 + 元数据）；两者都触发前台重建，
+  但**不改 `published_at`**，历史编号与排序保留。
+- **Worker**：已发布文章的 PUT 自动触发 Pages 重建；PATCH status 重新发布 /
+  取消再发布时保留原 `published_at`，只有首次发布才写入当前时间。
+- **Admin 文案**：Showcase / Films 剩余的中文描述改为英文。
+
 ### update: 64 — 2026-11-08
 
 #### 早期文章回填 Markdown + 管理端图标统一 + 飞行层 CORS 修复

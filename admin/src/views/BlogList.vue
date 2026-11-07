@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { blogApi } from '../api.js';
+import { askDeleteGuard } from '../composables/useDeleteGuard.js';
 
 const router = useRouter();
 const posts = ref([]);
@@ -25,7 +26,7 @@ async function load() {
 }
 
 async function removePost(post) {
-  if (!confirm(`Delete "${post.title}"? This cannot be undone.`)) return;
+  if (!(await askDeleteGuard(post.title || post.cardTitle || post.slug))) return;
   try {
     await blogApi.remove(post.id);
     await load();

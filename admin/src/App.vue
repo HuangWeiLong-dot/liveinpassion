@@ -4,6 +4,7 @@ import { RouterLink, RouterView } from 'vue-router';
 import AdminFooter from './components/AdminFooter.vue';
 import { isDark, toggleTheme } from './theme.js';
 import AdminIcon from './components/AdminIcon.vue';
+import DeleteGuardModal from './components/DeleteGuardModal.vue';
 
 // 前台头部滚动后才落一条发丝线；这里用 rAF 节流，滚动本身不做别的活
 const scrolled = ref(false);
@@ -80,4 +81,5 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll));
 
     <AdminFooter />
   </div>
+  <DeleteGuardModal />
 </template>
