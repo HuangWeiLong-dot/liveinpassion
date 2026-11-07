@@ -7,9 +7,10 @@
 //   - **不锁 body 滚动**
 //   - 用 img.decode() 把解码移出主线程
 //
-// 打开不做"窗口克隆飞到屏幕中间"的过渡，也不再垫一层模糊缩略图：
-// 点击之后直接就是这张图本身在自己的位置上做故障揭示。
-// 关闭同样只让遮罩和大图一起淡出，不再生成一个飞回窗口的克隆。
+// 开 / 关都交给 body 上那块 CoverFlight：
+//   打开：墙上的小图 → 灯箱大图，落地同一帧再交还大图并做故障揭示；
+//   关闭：灯箱大图 → **现场量**的那扇窗（墙面华容道移动过也准）。
+// 整趟只有一张图、一个 URL（anonymous CORS），不会多下一次。
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import {

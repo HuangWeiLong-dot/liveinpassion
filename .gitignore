@@ -41,3 +41,7 @@ example/
 # 音乐已迁到 Cloudflare R2 / CDN（https://img.liveinpassion.me/music/…），
 # 本地源文件不入库，也不再由 copy-static 复制进 dist
 music/
+
+# 验收工具的截图输出，不入库
+.screenshots/
+

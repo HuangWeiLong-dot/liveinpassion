@@ -156,7 +156,7 @@ onMounted(load);
         <label>
           <span class="field-label">Slug</span>
           <input v-model="form.slug" placeholder="the-projection" />
-          <span class="field-hint">小写字母、数字、连字符</span>
+          <span class="field-hint">Lowercase letters, numbers, hyphens</span>
         </label>
 
         <label>
@@ -172,7 +172,7 @@ onMounted(load);
         <label>
           <span class="field-label">Card link (path)</span>
           <input v-model="form.path" placeholder="/projection" />
-          <span class="field-hint">首页展示卡点开后去哪；站内路径或 https:// 外链</span>
+          <span class="field-hint">Where the showcase card links to; an internal path or an https:// URL</span>
         </label>
 
         <label>
@@ -246,7 +246,7 @@ onMounted(load);
 
     <div v-else class="empty">
       <span class="empty-en">No films yet</span>
-      <span class="empty-cn">＋ New Film 添加第一部</span>
+      <span class="empty-cn">Click New Film to add the first one.</span>
     </div>
   </div>
 </template>

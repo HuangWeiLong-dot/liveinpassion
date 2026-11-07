@@ -48,6 +48,23 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 64 — 2026-11-08
+
+#### 早期文章回填 Markdown + 管理端图标统一 + 飞行层 CORS 修复
+
+- **6 篇早期文章回填 Markdown**：`0010_legacy_html_to_md.sql`——这些文章是
+  `content_format='html'`、`content_md=NULL`，后台 Markdown 编辑器打开是空的，
+  改动保存不到正文。把 HTML 转成 Markdown 写进 `content_md` 并切到 md 格式；
+  只补空值、不动 `content_html`，线上仍是旧渲染，直到后台各保存一次。
+- **AdminIcon**：管理端统一 Tabler 风格线性 SVG 图标组件，替换 + / − / × / ✓
+  字符按钮；App / AlbumManage / BlogEdit / FilmManage / ShowcaseManage 同步接入。
+- **飞行层与预取的 CORS 修复**：CoverFlight 的 `<img>` 与 useRouteProgress 的预取
+  统一 `crossorigin="anonymous"`，对齐站内卡片 / 详情 / 灯箱的 CORS 模式——否则
+  同一个 URL 会被浏览器当成两份缓存键，预取白做、飞行时再下再解一遍。
+- **ARCHIVE 序号固定**：改为全站时间序号（最早发布 = 01，最新 = 最大号），
+  筛选 / 滚动 / 无限轨道复位都不再改变编号（此前用的是行号，筛选后会变）。
+- **杂项**：`.gitignore` 排除 `.screenshots/`（验收工具截图输出）。
+
 ### update: 63 — 2026-11-08
 
 #### CoverFlight：全站唯一一块封面飞行层

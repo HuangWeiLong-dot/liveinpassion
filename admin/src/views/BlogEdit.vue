@@ -7,6 +7,7 @@ import { blogApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
 import { isDark } from '../theme.js';
+import AdminIcon from '../components/AdminIcon.vue';
 
 // 编辑器预览内置 js-xss 过滤，默认会：
 //   1) 剥离非白名单协议（blob: 不在其列）→ 编辑期暂存图片无法显示
@@ -669,14 +670,17 @@ function refreshPreviewEl() {
   return previewEl;
 }
 
+const SVG_PLUS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const SVG_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
 const EDITBAR_BUTTONS = [
   { cmd: 'masonry', label: 'M', title: 'Switch to Masonry' },
   { cmd: 'justified', label: 'J', title: 'Switch to Justified' },
   { cmd: 'collage', label: 'C', title: 'Switch to Collage' },
   { cmd: 'bento', label: 'B', title: 'Switch to Bento' },
   { cmd: 'media', label: 'T', title: 'Switch to Text + Photo' },
-  { cmd: 'add', label: '+', title: 'Add photos into this block' },
-  { cmd: 'delete', label: '×', title: 'Delete this block' },
+  { cmd: 'add', icon: SVG_PLUS, title: 'Add photos into this block' },
+  { cmd: 'delete', icon: SVG_X, title: 'Delete this block' },
 ];
 
 function buildEditbar() {
@@ -688,7 +692,7 @@ function buildEditbar() {
     btn.className = 'gallery-editbtn';
     btn.dataset.cmd = b.cmd;
     btn.title = b.title;
-    btn.textContent = b.label;
+    btn.innerHTML = b.icon || b.label;
     bar.appendChild(btn);
   }
   return bar;
@@ -954,7 +958,7 @@ function initPreviewEditing() {
   removeFly = document.createElement('button');
   removeFly.type = 'button';
   removeFly.className = 'gallery-img-remove';
-  removeFly.textContent = '×';
+  removeFly.innerHTML = SVG_X;
   removeFly.hidden = true;
   removeFly.addEventListener('click', onFlyClick);
   removeFly.addEventListener('mouseenter', () => { if (flyHideTimer) clearTimeout(flyHideTimer); });
@@ -1074,7 +1078,7 @@ onUnmounted(() => {
               :aria-label="`Remove tag ${tag}`"
               @click="removeTag(tag)"
             >
-              {{ tag }} <span class="tag-chip__x">×</span>
+              {{ tag }} <span class="tag-chip__x"><AdminIcon name="x" :size="10" /></span>
             </button>
           </div>
           <div class="field-hint">Enter or comma adds a tag · click to remove · up to 12</div>
@@ -1179,7 +1183,7 @@ onUnmounted(() => {
       <div class="layout-dialog">
         <div class="layout-dialog-head">
           <span>Photo Layout</span>
-          <button class="layout-x" @click="closeLayoutModal">×</button>
+          <button class="layout-x" aria-label="Close" @click="closeLayoutModal"><AdminIcon name="x" :size="16" /></button>
         </div>
 
         <div class="layout-section">
@@ -1198,7 +1202,7 @@ onUnmounted(() => {
               @pointerdown="onThumbPointerDown(idx, $event)"
             >
               <img :src="item.blobUrl" alt="" draggable="false">
-              <button class="layout-thumb-x" aria-label="Remove photo" @click="removeLayoutFile(idx)">×</button>
+              <button class="layout-thumb-x" aria-label="Remove photo" @click="removeLayoutFile(idx)"><AdminIcon name="x" :size="12" /></button>
             </div>
           </div>
           <div class="field-hint">Photos stay on this device until you save the post.</div>
@@ -1316,7 +1320,7 @@ onUnmounted(() => {
   transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 .tag-chip:hover { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg); }
-.tag-chip__x { font-size: 0.66rem; line-height: 1; opacity: 0.6; }
+.tag-chip__x { display: inline-flex; align-items: center; font-size: 0.66rem; line-height: 1; opacity: 0.6; }
 .tag-chip:hover .tag-chip__x { opacity: 1; }
 
 /* 已用过的分类：方形建议签，点一下填进上面的输入框 */
@@ -1480,6 +1484,8 @@ onUnmounted(() => {
   letter-spacing: 0.2em; text-transform: uppercase;
 }
 .layout-x, .layout-thumb-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
   border: none; background: transparent; cursor: pointer; line-height: 1; color: var(--text-secondary);
 }
 .layout-x { font-size: 1.4rem; }
@@ -1596,18 +1602,22 @@ onUnmounted(() => {
 }
 .block-editable:hover > .gallery-editbar { opacity: 1; }
 .gallery-editbtn {
+  display: flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; padding: 0; border: none; border-radius: 0;
   background: transparent; color: #fff; cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.66rem; line-height: 22px; text-align: center;
 }
+.gallery-editbtn svg { width: 14px; height: 14px; }
 .gallery-editbtn:hover { background: rgba(255, 255, 255, 0.25); }
 .gallery-editbtn[data-cmd='delete']:hover { background: #c0392b; }
 .gallery-img-remove {
+  display: flex; align-items: center; justify-content: center;
   position: fixed; z-index: 1500; width: 22px; height: 22px; padding: 0;
   border: none; border-radius: 0; background: rgba(0, 0, 0, 0.72); color: #fff;
   font-family: var(--font-mono); font-size: 0.9rem; line-height: 1; cursor: pointer;
 }
+.gallery-img-remove svg { width: 14px; height: 14px; }
 
 /* ============ 触屏（hover: none） ============
    这里的控件原先全靠 :hover 现身：排版块工具条 opacity 0 → hover 1；

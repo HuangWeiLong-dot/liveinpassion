@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import AdminFooter from './components/AdminFooter.vue';
 import { isDark, toggleTheme } from './theme.js';
+import AdminIcon from './components/AdminIcon.vue';
 
 // 前台头部滚动后才落一条发丝线；这里用 rAF 节流，滚动本身不做别的活
 const scrolled = ref(false);
@@ -66,7 +67,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll));
         </button>
 
         <form method="POST" action="/api/logout" class="nav-logout-form">
-          <button type="submit" class="nav-item nav-item--logout">Logout <span class="nav-en">×</span></button>
+          <button type="submit" class="nav-item nav-item--logout">Logout <span class="nav-en"><AdminIcon name="logout" :size="12" /></span></button>
         </form>
       </nav>
     </header>

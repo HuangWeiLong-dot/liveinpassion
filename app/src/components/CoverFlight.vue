@@ -19,7 +19,11 @@ onBeforeUnmount(() => registerCoverFlight(null, null));
 <template>
   <Teleport to="body">
     <div ref="host" class="cover-flight" aria-hidden="true">
-      <img ref="img" alt="" decoding="async" draggable="false">
+      <!-- ⚠ 必须和站内其它大图用同一个 CORS 模式（anonymous）：
+           列表卡片、详情封面、灯箱、thumbUrl 的 fetch 都是 CORS 请求。
+           飞行层如果走 no-cors，同一个 URL 会被浏览器当成另一份缓存键，
+           点击一次就会多下/多解一遍 —— 那就违背了"每张图首次只加载一次"。 -->
+      <img ref="img" alt="" decoding="async" crossorigin="anonymous" draggable="false">
     </div>
   </Teleport>
 </template>

@@ -7,6 +7,7 @@
 //   · 选了但超出上限的条目会保留在清单里，只是首页不显示 —— 调整上限即可恢复。
 import { computed, onMounted, ref } from 'vue';
 import { showcaseApi } from '../api.js';
+import AdminIcon from '../components/AdminIcon.vue';
 
 const KINDS = [
   { id: 'echo', label: 'Echo' },
@@ -219,14 +220,14 @@ onMounted(load);
               <span class="sc-row__actions">
                 <button class="btn btn-sm btn-secondary" :disabled="index === 0" @click="move(index, -1)" aria-label="Move up">↑</button>
                 <button class="btn btn-sm btn-secondary" :disabled="index === items.length - 1" @click="move(index, 1)" aria-label="Move down">↓</button>
-                <button class="btn btn-sm btn-danger" @click="remove(index)" aria-label="Remove">×</button>
+                <button class="btn btn-sm btn-danger" @click="remove(index)" aria-label="Remove"><AdminIcon name="x" :size="12" /></button>
               </span>
             </li>
           </ol>
 
           <div v-else class="empty">
             <span class="empty-en">Nothing selected</span>
-            <span class="empty-cn">从右侧三类里点 + 添加</span>
+            <span class="empty-cn">Choose an item from the three categories on the right to add it.</span>
           </div>
         </section>
 
@@ -264,13 +265,15 @@ onMounted(load);
                   class="btn btn-sm"
                   :class="isSelected(kind.id, option.refId) ? 'btn-primary' : 'btn-secondary'"
                   @click="toggle(kind.id, option)"
-                >{{ isSelected(kind.id, option.refId) ? '✓' : '+' }}</button>
+                >
+                  <AdminIcon :name="isSelected(kind.id, option.refId) ? 'check' : 'plus'" :size="12" />
+                </button>
               </li>
             </ul>
 
             <div v-else class="empty empty--small">
               <span class="empty-en">No {{ kind.label }}</span>
-              <span class="empty-cn">这一类还没有可选内容</span>
+              <span class="empty-cn">No selectable items in this category yet.</span>
             </div>
           </div>
         </section>

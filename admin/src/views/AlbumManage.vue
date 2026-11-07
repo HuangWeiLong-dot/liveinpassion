@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { albumApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
+import AdminIcon from '../components/AdminIcon.vue';
 
 const albums = ref([]);
 const activeAlbumId = ref(null);
@@ -331,7 +332,7 @@ onMounted(loadAlbums);
             <img :src="p.compressedUrl || p.originalUrl" :alt="p.fileName" draggable="false"
                  loading="lazy" decoding="async" fetchpriority="low" />
             <span class="photo-index">{{ padIndex(idx) }}</span>
-            <button class="photo-remove" title="Remove from album" aria-label="Remove from album" @click="removePhoto(p)">×</button>
+            <button class="photo-remove" title="Remove from album" aria-label="Remove from album" @click="removePhoto(p)"><AdminIcon name="x" :size="12" /></button>
           </div>
         </div>
 

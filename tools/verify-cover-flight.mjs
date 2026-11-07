@@ -81,7 +81,7 @@ async function navigateAndEnter(url) {
     await evaluate(`document.querySelector('.brand__enter')?.click()`);
     await sleep(200);
   }
-  await sleep(800);
+  await sleep(2200);
 }
 
 const distance = (a, b) => (a && b
@@ -184,6 +184,8 @@ const distance = (a, b) => (a && b
     ]) {
       console.log(`\n${label} 灯箱:`);
       await navigateAndEnter(url);
+      // 量矩形和点击必须在**同一次求值**里：墙面入场 / 华容道过渡期间格子会移动，
+      // 分两次求值会量到一个已经过时的位置（实测差 293px）。
       const card = await evaluate(`(() => {
         const el = [...document.querySelectorAll('${cardSel}')].find((e) => {
           const r = e.getBoundingClientRect();
@@ -193,18 +195,12 @@ const distance = (a, b) => (a && b
         if (!el) return null;
         const img = el.querySelector('img') || el;
         const r = img.getBoundingClientRect();
-        return JSON.stringify({ x: r.x, y: r.y, w: r.width, h: r.height });
+        const rect = { x: r.x, y: r.y, w: r.width, h: r.height };
+        el.click();
+        return JSON.stringify(rect);
       })()`);
       check('找到可点的照片窗', Boolean(card));
       const cardRect = card ? JSON.parse(card) : null;
-      await evaluate(`(() => {
-        const el = [...document.querySelectorAll('${cardSel}')].find((e) => {
-          const r = e.getBoundingClientRect();
-          return r.width > 40 && r.height > 40 && r.right > 0 && r.left < innerWidth
-            && r.bottom > 40 && r.top < innerHeight - 40;
-        });
-        el?.click();
-      })()`);
       await sleep(90);
       const openFlight = await evaluate(FLIGHT);
       check('打开：飞行层从窗口起飞', openFlight.visible, JSON.stringify(openFlight.rect));

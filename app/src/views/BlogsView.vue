@@ -195,15 +195,17 @@ const current = computed(() => blogPosts[activeIndex.value] || null);
 // ── ARCHIVE：east64films 式「作品卷轴」───────────────────────────────────
 // 中间一张封面，左栏是序号索引，右栏是这一篇的元信息，下方标题随封面切换做动效。
 // 结构是「外层高 + sticky 舞台」：滚动一步换一部作品，不换页、不卸载已加载的图。
-function normalizeArchiveEntry(p) {
+function normalizeArchiveEntry(p, globalIndex) {
   return {
     ...p,
+    // 全站时间序号：最早发布 = 01，最新 = 最大。筛选/滚动都不能改变这个号。
+    globalIndex,
     year: yearOf(p.cardDate || p.date),
   };
 }
 
 // 扁平作品列表，保留发布时间顺序（desc）
-const archiveWorks = computed(() => blogPosts.map(normalizeArchiveEntry));
+const archiveWorks = computed(() => blogPosts.map((p, i) => normalizeArchiveEntry(p, i)));
 
 const archiveIndex = ref(0);
 // 当前项上下的邻居：做成竖向预览框（参考站中图上下会露出前后作品）。
@@ -2135,7 +2137,7 @@ function onVisibility() {
               :aria-current="row.d === 0 ? 'true' : undefined"
               @click="setArchiveIndex(row.no)"
             >
-              <span class="ba-idx__no">{{ String(row.no + 1).padStart(2, '0') }}</span>
+              <span class="ba-idx__no">{{ pad(row.work.globalIndex) }}</span>
               <span class="ba-idx__title">{{ row.work.cardTitle }}</span>
             </button>
           </aside>
@@ -2160,8 +2162,9 @@ function onVisibility() {
                   :alt="f.work.cardTitle"
                   :loading="Math.abs(f.d) <= 1 ? 'eager' : 'lazy'"
                   decoding="async"
+                  crossorigin="anonymous"
                 />
-                <span v-else class="ba-frame__blank">{{ String(f.no + 1).padStart(2, '0') }}</span>
+                <span v-else class="ba-frame__blank">{{ pad(f.work.globalIndex) }}</span>
                 <span v-if="f.d === 0" class="ba-frame__hint">VIEW ↗</span>
               </button>
             </div>

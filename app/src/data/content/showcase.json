@@ -16,7 +16,7 @@
     "href": "/photography/HanYong"
   },
   "limits": {
-    "echo": 4,
+    "echo": 5,
     "photography": 3,
     "film": 2
   },
@@ -28,6 +28,46 @@
       "meta": "FILM",
       "image": "https://cms.liveinpassion.me/img/films/the-projection-poster.jpg",
       "href": "/projection"
+    },
+    {
+      "kind": "echo",
+      "refId": 53,
+      "title": "PLEASE LISTEN TO ME CAREFULLY",
+      "meta": "UNFILED · 2026.11",
+      "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/c9a6dd59.jpg",
+      "href": "/echoes/please-listen-to-me-carefully"
+    },
+    {
+      "kind": "echo",
+      "refId": 49,
+      "title": "DISASSOCIATION",
+      "meta": "UNFILED · 2026.11",
+      "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/0a0eef60.jpg",
+      "href": "/echoes/disassociation"
+    },
+    {
+      "kind": "echo",
+      "refId": 41,
+      "title": "DIGITAL APATHY",
+      "meta": "UNFILED · 2026.10",
+      "image": "https://cms.liveinpassion.me/img/blog/202610/_compressed/19680f33.jpg",
+      "href": "/echoes/digital-apathy"
+    },
+    {
+      "kind": "echo",
+      "refId": 39,
+      "title": "IF I PUT MY HEART AWAY, WILL I FEEL ANYTHING?",
+      "meta": "UNFILED · 2026.10",
+      "image": "https://cms.liveinpassion.me/img/blog/202610/_compressed/a4f219d6.jpg",
+      "href": "/echoes/if-i-put-my-heart-away-will-i-feel-anything"
+    },
+    {
+      "kind": "echo",
+      "refId": 12,
+      "title": "INDECISION",
+      "meta": "UNFILED · 2026.10",
+      "image": "https://cms.liveinpassion.me/img/blog/202610/_compressed/01aeb078.jpg",
+      "href": "/echoes/indecision"
     }
   ]
 }

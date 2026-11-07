@@ -1,7 +1,13 @@
 <script setup>
 // 主灯箱（旧 index.html L5466-L5474 的标记 + L7702-L7749 的逻辑）。
 // 打开方式变了：旧版靠模块级的 currentGalleryData/currentIndex，新版由调用方
-// 传列表与起始索引（useLightbox.open(list, index)），不再有隐式全局状态。
+// 传列表与起始索引（useLightbox.open(list, index, from)），不再有隐式全局状态。
+//
+// 开 / 关都交给 CoverFlight（body 上唯一的飞行层）：
+//   打开：窗口里那张图 → 灯箱舞台；灯箱自己的 <img> 先藏起来，落地同一帧交还。
+//   关闭：灯箱舞台 → **现场量**的来源窗口（筛选 / 华容道位移之后再量也准）。
+// 两段用的是同一个 URL、同一个 CORS 模式（anonymous），所以整趟只有一次网络加载。
+// ←/→ 切图仍然走灯箱自己的交叉淡入；没有"第二个克隆元素飞回去"那套。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useLightbox } from '../composables/useLightbox.js';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
@@ -129,7 +135,7 @@ function settleIfCached() {
 }
 
 // 图就绪后立刻在舞台上播一次「抖色 + 逐行揭示」：
-// 开图不做窗口飞行动画，点击后看到的第一帧就该是这张图自己在故障里长出来。
+// 图就绪后做一次故障揭示。开图时它会推迟到飞行层落地那一刻（见 landFlight）。
 function revealIfNeeded() {
   const img = imgEl.value;
   if (!img || !img.complete || !img.naturalWidth) return;
@@ -197,9 +203,8 @@ function handleError() {
   onImageSettled();
 }
 
-// 打开：直接让大图在灯箱舞台上做一次故障揭示。
-// 不再做"窗口克隆飞到大图位置"的过渡 —— 那个克隆只是点击图的一张替代品，
-// 点击之后应该看到的就是这张图本身逐渐加载出来。
+// 打开：有来源窗口时由 CoverFlight 从窗口飞过来（落地再揭示）；
+// 没有来源（首页 / 博客里直接开）时退回"大图在原位做故障揭示"的旧路。
 watch(isOpen, async (open) => {
   if (!open) {
     // 关闭飞行自己拥有飞行层，别在这里把它收掉

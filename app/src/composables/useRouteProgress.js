@@ -143,6 +143,10 @@ function start(to) {
   for (const url of urls) {
     const img = new Image();
     img.decoding = 'async';
+    // 和站内真正显示这些图时的 CORS 模式对齐（卡片 / 详情 / 灯箱都是
+    // anonymous）。不写这一行的话预取是 no-cors，浏览器会把它当成另一份
+    // 缓存键 —— 预取一次、真正显示时再下一次，"提前加载"就白做了。
+    img.crossOrigin = 'anonymous';
     // 失败也算一格：404 / CDN 抖动不能让条子永远停住
     img.onload = onOne;
     img.onerror = onOne;

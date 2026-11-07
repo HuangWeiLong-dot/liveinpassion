@@ -118,6 +118,8 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
   transition: color 0.2s ease;
 }
 .nav-item .nav-en {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-size: 0.5rem;
   letter-spacing: 0.08em;

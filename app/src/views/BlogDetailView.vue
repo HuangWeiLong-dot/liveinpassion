@@ -11,10 +11,13 @@
 //   · ⚠ 它那种"左列三格、两侧半裁的卡片当翻篇控件"**已经按需求撤掉了** ——
 //     详情页不再有可见的翻篇控件，只保留键盘 ←/→ 与触摸横滑。
 //
-// ── 为什么封面用 GSAP 手写 FLIP，而不是浏览器的共享元素 ──────────────────
-// 起点在**另一个视图**里（列表那一格，元素早就没了），只能把起点矩形用
-// sessionStorage 交接过来，然后 translate + scale 补间过去（不是补间
-// width/height/left/top —— 后者每帧都要重排）。
+// ── 主路径：CoverFlight（body 上的唯一飞行层）────────────────────────────
+// 正常从列表点进来时，封面在点击那一刻就交给 App 层的飞行层（useCoverFlight）；
+// 这一页只负责量右列盒子的终点、在飞行途中淡入面板/打字，落地同一帧把图
+// 从飞行层交还给自己的封面。**主路径不读 sessionStorage 的旧矩形**。
+//
+// 下面的 GSAP FLIP 仍然保留，作为窄屏 / 墙角 / 封面视图 / reduced-motion /
+// 直接打开这些没有飞行层的路径的兜底 —— 它们各自有对应的早期分支。
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { gsap } from 'gsap';
