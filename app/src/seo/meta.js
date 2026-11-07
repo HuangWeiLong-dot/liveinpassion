@@ -54,6 +54,10 @@ export const STATIC_PAGES = {
     title: `Organization — ${SITE_NAME}`,
     description: 'The structure behind the life of Huang Wei Long — eight screens, one system.',
   },
+  projection: {
+    title: `The Projection — ${SITE_NAME}`,
+    description: 'A short film by Huang Wei Long, screened on a vintage television set.',
+  },
   'not-found': {
     title: `Not Found — ${SITE_NAME}`,
     description: 'This page does not exist.',
@@ -338,6 +342,7 @@ function pathOf(name, params) {
     case 'life': return '/life';
     case 'life-archive': return `/life/archive/${kind}`;
     case 'me-organization': return '/me/organization';
+    case 'projection': return '/projection';
     default: return '/';
   }
 }

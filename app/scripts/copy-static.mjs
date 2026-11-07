@@ -76,6 +76,7 @@ const routes = [
   { name: 'photography', params: {} },
   { name: 'life', params: {} },
   { name: 'me-organization', params: {} },
+  { name: 'projection', params: {} },
 ];
 
 for (const kind of LIFE_ARCHIVE_KINDS) {

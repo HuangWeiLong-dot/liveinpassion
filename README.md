@@ -48,6 +48,12 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 62.1 — 2026-11-07
+
+- `/projection` 直连 404：路由与页面在 update 62 里上线了，但 SEO 三处注册被漏掉——
+  `copy-static.mjs` 的静态路由清单、`meta.js` 的 `STATIC_PAGES` 与 `pathOf`。
+  补上后构建会生成 `dist/projection/index.html`（预渲染 head），sitemap 收录该页。
+
 ### update: 62 — 2026-11-07
 
 #### 评级系统整体移除 + 首页 SHOWCASE + 路由进度条
