@@ -71,6 +71,7 @@ const scrollRef = ref(null);
 const bodyRef = ref(null);
 const infoRef = ref(null);
 const titleRef = ref(null);
+const bookRef = ref(null);
 const outRef = ref(null);
 const coverWrapRef = ref(null);
 
@@ -88,33 +89,6 @@ function revealCoverGlitch() {
 // 封面盒子的比例 = 图自身的比例（盒子的高度是 aspect-ratio 撑的）。
 // 解码前先给个 4/5 兜底，免得盒子塌成 0。
 const ratio = ref('4 / 5');
-
-// rating / tags 来自快照，做一次兜底规整
-function safeRating(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  return raw;
-}
-// 封面评分独立于正文自评：只关心 score/grade/verdict，缺字段就当作没有
-function safeCoverRating(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const score = Number(raw.score);
-  if (!Number.isFinite(score)) return null;
-  return { ...raw, score };
-}
-function safeTags(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map((t) => String(t).toUpperCase());
-  return [];
-}
-
-// 点 tag → 跳 echoes 的 archive 视图并挂上筛选
-function openTag(tag) {
-  if (!tag) return;
-  markReturningFromDetail();
-  setCoverCurtain(false);
-  skipNextPageTransition();
-  router.push({ name: 'echoes', query: { view: 'archive', tag: String(tag).toUpperCase() } }).catch(() => {});
-}
 
 const post = computed(() => blogBySlug[route.params.slug] || null);
 const index = computed(() => blogPosts.findIndex((p) => p.slug === route.params.slug));
@@ -940,6 +914,12 @@ function onKeydown(e) {
   //   会**一边关灯箱、一边把这一篇也退掉**（两处 keydown 都挂在 document 上，
   //   谁也拦不住谁）；←/→ 更糟 —— 灯箱盖着，背后的文章却在偷偷翻篇。
   if (lightboxOpen.value) return;
+  // 书页模式：←/→ 先翻页，翻到头才换成"上一篇 / 下一篇"。
+  // 以前这里直接 go()，所以文章里按 → 会直接跳走，而不是翻到下一页。
+  if (bookMode.value && bookRef.value?.handleKey(e)) {
+    e.preventDefault();
+    return;
+  }
   if (e.key === 'Escape') {
     // 窄屏上不再有"先收抽屉"这一拍（封面就是背景，没有可收的东西）——
     // Esc 一个动作：离开这一篇。
@@ -963,6 +943,8 @@ function onTouchEnd(e) {
   const dx = e.changedTouches[0].clientX - touchStartPt.x;
   const dy = e.changedTouches[0].clientY - touchStartPt.y;
   touchStartPt = null;
+  // 书页模式：翻页由 BlogBook 自己的 pointer 拖拽处理，这里别再插一手（会翻两页）
+  if (bookMode.value) return;
   if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
   go(dx < 0 ? 1 : -1);
 }
@@ -1143,6 +1125,8 @@ if (typeof window !== 'undefined') {
   window.__bd = {
     go,
     close,
+    // 书页状态：自动化断言用（翻页 / 重排后页数）
+    book: () => bookRef.value?.pageState() || null,
     // 窄屏封面背景：自动化断言用（tools/blog-shots.mjs 那一路）
     bg: () => ({ on: bgOn.value, narrow: isNarrow.value }),
     setBg: (v) => { bgOn.value = !!v; },
@@ -1287,7 +1271,7 @@ if (typeof window !== 'undefined') {
            平铺模式下它就是一层普通容器（网格布局挂在它身上，和原来一模一样）。 -->
       <div class="bd-room">
       <!-- ── 左：正文面板（换篇时它整块交叉淡，位置不动）────────────────── -->
-      <div ref="panelRef" class="bd-panel">
+      <div ref="panelRef" class="bd-panel" :class="{ 'is-book': bookMode }">
         <div ref="scrollRef" class="bd-panel-inner" :class="{ 'is-book': bookMode }">
           <div ref="infoRef" class="bd-info" :class="{ 'is-book': bookMode }">
             <!-- 没有 Close 按钮（已按需求删掉）：退出的路是 —— 点封面以外的空白、Esc、
@@ -1296,28 +1280,11 @@ if (typeof window !== 'undefined') {
               <span class="blog-date">{{ post.date }}</span>
               <span class="bd-tag">{{ post.readTime }}</span>
             </div>
-            <!-- 标签行已挪到全文末尾（见下面 .blog-tags，读完才看到） -->
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
             <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
-            <BlogBook v-else :pages="pages" />
-            <!-- 标签：全文末尾。点击跳 ECHOES 的 ARCHIVE 并挂上筛选。
-                 ⚠ 刻意放在正文之外：startTyping 只拆标题与正文的文本节点，
-                 这里不会被"逐字敲"，也不会跟着 is-typing 的逐块揭幕一起闪。 -->
-            <div v-if="safeTags(post.tags).length" class="blog-tags">
-              <span class="blog-tags__label">TAGS</span>
-              <div class="blog-tags__list">
-                <button
-                  v-for="tag in safeTags(post.tags).slice(0, 12)"
-                  :key="tag"
-                  type="button"
-                  class="blog-tag"
-                  :aria-label="`查看带标签 ${tag} 的文章`"
-                  @click="openTag(tag)"
-                >{{ tag }}</button>
-              </div>
-            </div>
+            <BlogBook v-else ref="bookRef" :pages="pages" />
           </div>
           <!-- 文章滚到底才看得到的页脚；书页模式下没有滚动，且底部要给翻页控件让位 -->
           <AppFooter v-if="!bookMode" compact />
@@ -1375,17 +1342,6 @@ if (typeof window !== 'undefined') {
               >
             </div>
 
-            <!-- 封面评分：钉在封面右上角，移动端隐藏（背景层会被正文压住） -->
-            <div v-if="safeCoverRating(post.coverRating)" class="bd-cover-score" aria-label="Cover score">
-              <span class="bd-cover-score__k">COVER SCORE</span>
-              <span class="bd-cover-score__grade">{{ safeCoverRating(post.coverRating).grade }}</span>
-              <span class="bd-cover-score__v">
-                {{ Number(safeCoverRating(post.coverRating).score).toFixed(1) }}<i>/10</i>
-              </span>
-              <span v-if="safeCoverRating(post.coverRating).verdict" class="bd-cover-score__note">
-                {{ safeCoverRating(post.coverRating).verdict }}
-              </span>
-            </div>
           </figure>
         </div>
       </div>
@@ -1430,28 +1386,6 @@ if (typeof window !== 'undefined') {
           </svg>
         </button>
 
-        <!-- 作者自评鉴定章：钉在右侧封面墙底边；窄屏时仍钉在底部（整屏背景之上） -->
-        <div v-if="safeRating(post.rating)" class="bd-rating" aria-label="Author's score">
-          <div class="bd-rating__grade">{{ safeRating(post.rating).grade }}</div>
-          <div class="bd-rating__core">
-            <div class="bd-rating__score">
-              <span class="bd-rating__score-k">AUTHOR'S SCORE</span>
-              <span class="bd-rating__score-v">{{ Number(safeRating(post.rating).score).toFixed(1) }} / 10</span>
-            </div>
-            <div v-if="safeRating(post.rating).language != null" class="bd-rating__dims">
-              <template v-for="([label, key]) in [['LANGUAGE','language'],['EMOTION','emotion'],['STRUCTURE','structure'],['AFTERGLOW','afterglow']]" :key="key">
-                <div class="bd-rating__dim">
-                  <span class="bd-rating__dim-k">{{ label }}</span>
-                  <span class="bd-rating__dim-v">{{ Number(safeRating(post.rating)[key]).toFixed(1) }}</span>
-                  <span class="bd-rating__bar" aria-hidden="true">
-                    <span class="bd-rating__bar-fill" :style="{ width: `${Math.min(100, Number(safeRating(post.rating)[key]) * 10)}%` }"></span>
-                  </span>
-                </div>
-              </template>
-            </div>
-            <p v-if="safeRating(post.rating).verdict" class="bd-rating__verdict">“{{ safeRating(post.rating).verdict }}”</p>
-          </div>
-        </div>
       </div>
       </div><!-- /.bd-room -->
     </section>
@@ -1532,6 +1466,10 @@ if (typeof window !== 'undefined') {
   max-width: none;
   margin: 0;
   background: transparent;
+  /* 纸页可以翻出面板边界，但不能翻出屏幕：裁在覆盖层这里，
+     既保留"整张纸飞起来"的效果，又不让文档产生横向溢出/滚动条。 */
+  overflow: hidden;
+  overflow: clip;
 }
 
 /* ══ 墙角视图 ══════════════════════════════════════════════════════════
@@ -2040,7 +1978,30 @@ if (typeof window !== 'undefined') {
 }
 .bd-info.is-book > .blog-meta,
 .bd-info.is-book > .blog-detail-title { flex-shrink: 0; }
-.bd-panel-inner.is-book { overflow: hidden; }
+
+/* 书页模式是"读"的模式：标题收一档、日期靠近标题，把高度让给正文。
+   窗口矮的时候这一点直接决定一页能不能完整放下（1280×720 差这 30px）。 */
+/* 阅读模式整体居中（用户要求：不靠左）：
+   日期/时长、标题、书页正文、文末标签都在中线上。 */
+.bd-info.is-book > .blog-meta {
+  margin-bottom: 16px;
+  justify-content: center;
+}
+.bd-info.is-book > .blog-detail-title {
+  font-size: clamp(1.5rem, 2.6vw, 2.35rem);
+  line-height: 1.1;
+  letter-spacing: 0.005em;
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+/* 书页模式：纸要能翻出面板/滚动容器的边界，不能被裁成"框内翻"。
+   z-index 让翻起来的纸压在右侧封面之上。 */
+.bd-panel.is-book {
+  overflow: visible;
+  z-index: 20;
+}
+.bd-panel-inner.is-book { overflow: visible; }
 
 /* 被"敲"出来的字符：版面一开始就是最终状态，只有可见性在变（见 startTyping）。
 
@@ -2380,266 +2341,4 @@ if (typeof window !== 'undefined') {
   }
 }
 
-/* ── 标签（全文末尾）───────────────────────────────────────────────────────
-   读完正文才遇到，所以做成一枚"文章落款"：一条 hairline + 一枚小标签，
-   标签本身沿用站内的等宽小字。放在 .bd-info 最后，不参与打字机的逐字/逐块揭幕。
-   ⚠ 用站点的真实色板（--border / --text-secondary / --text-primary），
-     不要写 --fg：那是个从未定义过的占位符，`color-mix(var(--fg))` 整条声明
-     会失效，标签会既没有边框也没有 hairline（实测 0px）。 */
-.blog-tags {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 44px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border);
-  transition: opacity 0.5s ease;
-}
-/* 打字机还在敲的时候先别亮：标签属于"读完之后"的那一段（is-typing 在
-   revealAll 里摘掉，摘掉的同时这里淡入） */
-.bd-info.is-typing > .blog-tags {
-  opacity: 0;
-}
-.blog-tags__label {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.blog-tags__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-/* 书页模式：书页吃掉剩下的高度，标签只留一条窄位（不要那 44px 的画外留白） */
-.bd-info.is-book > .blog-tags {
-  flex: 0 0 auto;
-  margin-top: 12px;
-  padding-top: 12px;
-}
-.blog-tag {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  padding: 4px 10px;
-  cursor: pointer;
-  border-radius: 0;
-  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
-}
-.blog-tag:hover,
-.blog-tag:focus-visible {
-  border-color: var(--text-primary);
-  color: var(--bg);
-  background: var(--text-primary);
-  outline: none;
-}
-
-/* ── 封面评分章（封面右上角，独立于正文作者自评）─────────────────────────── */
-.bd-cover-score {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: auto auto;
-  grid-template-areas: "k k" "grade v" "note note";
-  align-items: baseline;
-  gap: 3px 8px;
-  min-width: 104px;
-  max-width: 190px;
-  padding: 9px 11px;
-  background: color-mix(in oklab, var(--bg) 78%, transparent);
-  backdrop-filter: blur(6px);
-  border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
-  border-radius: 0;
-  color: var(--fg);
-  pointer-events: none;
-}
-.bd-cover-score__k {
-  grid-area: k;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: color-mix(in oklab, var(--fg) 58%, transparent);
-  white-space: nowrap;
-}
-.bd-cover-score__grade {
-  grid-area: grade;
-  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
-  font-weight: 500;
-  font-size: 28px;
-  line-height: 0.9;
-  letter-spacing: 0.02em;
-}
-.bd-cover-score__v {
-  grid-area: v;
-  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-.bd-cover-score__v i {
-  font-style: normal;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.1em;
-  opacity: 0.55;
-  margin-left: 2px;
-}
-.bd-cover-score__note {
-  grid-area: note;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  line-height: 1.5;
-  color: color-mix(in oklab, var(--fg) 65%, transparent);
-}
-@media (max-width: 1024px) {
-  /* 窄屏封面是整屏背景、正文压在上面，这个角章会被字盖住 */
-  .bd-cover-score { display: none; }
-}
-
-/* ── 作者自评鉴定章（钉在 .bd-right 底部；窄屏仍是整屏底部） ──────────────── */
-.bd-rating {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 24px;
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  padding: 18px 20px;
-  background: color-mix(in oklab, var(--bg) 78%, transparent);
-  backdrop-filter: blur(6px);
-  border: 1px solid color-mix(in oklab, var(--fg) 18%, transparent);
-  border-radius: 0;
-  color: var(--fg);
-  pointer-events: auto;
-  animation: bdRatingIn 0.6s ease both;
-}
-@keyframes bdRatingIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: none; }
-}
-.bd-rating__grade {
-  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
-  font-weight: 500;
-  font-size: clamp(56px, 8vw, 96px);
-  line-height: 0.9;
-  letter-spacing: 0.02em;
-  min-width: 60px;
-  text-align: center;
-  border-right: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
-  padding-right: 20px;
-  flex-shrink: 0;
-}
-.bd-rating__core {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.bd-rating__score {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-.bd-rating__score-k {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--fg) 58%, transparent);
-}
-.bd-rating__score-v {
-  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
-  font-weight: 500;
-  font-size: 28px;
-  letter-spacing: 0.02em;
-}
-.bd-rating__dims {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 16px;
-}
-.bd-rating__dim {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 8px;
-  align-items: center;
-}
-.bd-rating__dim-k {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: color-mix(in oklab, var(--fg) 55%, transparent);
-  white-space: nowrap;
-}
-.bd-rating__dim-v {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  font-variant-numeric: tabular-nums;
-}
-.bd-rating__bar {
-  display: block;
-  height: 1px;
-  background: color-mix(in oklab, var(--fg) 20%, transparent);
-  position: relative;
-  overflow: hidden;
-}
-.bd-rating__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--fg);
-  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.bd-rating__verdict {
-  font-family: 'Oswald', 'Helvetica Neue', Arial, sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.02em;
-  font-style: italic;
-  margin: 0;
-  color: var(--fg);
-}
-
-/* 窄屏：鉴定章整块横铺、不钉在封面墙上（封面墙此时是整屏背景，面板压在其上） */
-@media (max-width: 1024px) {
-  .bd-rating {
-    position: static;
-    margin: 28px 24px 88px;
-    left: auto; right: auto;
-  }
-}
-@media (max-width: 640px) {
-  .bd-rating {
-    flex-direction: column;
-    gap: 16px;
-    padding: 16px;
-    margin-left: 16px;
-    margin-right: 16px;
-  }
-  .bd-rating__grade {
-    border-right: none;
-    padding-right: 0;
-    border-bottom: 1px solid color-mix(in oklab, var(--fg) 22%, transparent);
-    padding-bottom: 12px;
-    align-self: flex-start;
-  }
-  .bd-rating__dims {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

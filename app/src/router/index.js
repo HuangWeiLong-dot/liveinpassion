@@ -16,6 +16,7 @@ import PhotographyView from '../views/PhotographyView.vue';
 import LifeView from '../views/LifeView.vue';
 import LifeArchiveView from '../views/LifeArchiveView.vue';
 import OrganizationView from '../views/OrganizationView.vue';
+import ProjectionView from '../views/ProjectionView.vue';
 import NotFoundView from '../views/NotFoundView.vue';
 
 const routes = [
@@ -30,6 +31,8 @@ const routes = [
     query: to.query,
     hash: to.hash,
   }) },
+  // 短片放映页：独立作品，不是站点的普通内容页（见 views/ProjectionView.vue）
+  { path: '/projection', name: 'projection', component: ProjectionView },
   { path: '/me', name: 'me', component: MeView },
   { path: '/me/gallery', name: 'me-gallery', component: MeGalleryView },
   { path: '/gallery', name: 'gallery', component: GalleryView },

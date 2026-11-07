@@ -4,6 +4,7 @@
 // 页脚是全局的（App.vue），不在这里挂：它固定在底部，被首页内容盖住，
 // 滚到页尾才露出来。
 import HeroConcept from '../components/HeroConcept.vue';
+import HomeShowcase from '../components/HomeShowcase.vue';
 </script>
 
 <template>
@@ -11,6 +12,10 @@ import HeroConcept from '../components/HeroConcept.vue';
     <!-- 页面标题：可见字标是逐字动画的装饰元素（aria-hidden），这里给搜索与读屏一份真实 H1 -->
     <h1 class="sr-only">LIVEINPASSION — Huang Wei Long · Photography, Stories &amp; Friends</h1>
     <HeroConcept />
+
+    <!-- 右侧悬浮展示（LATEST ECHO / LATEST PHOTO / SELECTED）。
+         固定在视口右侧，不参与 Hero 的布局；手机上收成底部横条。 -->
+    <HomeShowcase />
   </main>
 </template>
 

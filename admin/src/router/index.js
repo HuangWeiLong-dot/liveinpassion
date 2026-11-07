@@ -5,6 +5,8 @@ const routes = [
   { path: '/blogs/new', name: 'blog-new', component: () => import('../views/BlogEdit.vue') },
   { path: '/blogs/:id', name: 'blog-edit', component: () => import('../views/BlogEdit.vue'), props: true },
   { path: '/albums', name: 'albums', component: () => import('../views/AlbumManage.vue') },
+  { path: '/showcase', name: 'showcase', component: () => import('../views/ShowcaseManage.vue') },
+  { path: '/films', name: 'films', component: () => import('../views/FilmManage.vue') },
 ];
 
 export default createRouter({

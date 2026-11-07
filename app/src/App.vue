@@ -15,6 +15,7 @@ import AuthorSection from './components/AuthorSection.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
 import Lightbox from './components/Lightbox.vue';
 import BlockCursor from './components/BlockCursor.vue';
+import RouteProgress from './components/RouteProgress.vue';
 import AppFooter from './components/AppFooter.vue';
 import { useBrandOverlay } from './composables/useBrandOverlay.js';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -49,8 +50,9 @@ const route = useRoute();
 // 所以那一页不挂全局页脚。
 // ORGANIZATION 现在是 ME 的子页，它不滚动（一屏一页），页脚那块"文档末尾占位"
 // 会凭空把文档撑高、让滚轮有东西可滚，翻页手势就废了 —— 这一页也不挂。
+// PROJECTION 是整屏放映页，页脚会露在黑场下面，同样不挂。
 const showGlobalFooter = computed(
-  () => !['echo-detail', 'me', 'me-organization'].includes(route.name)
+  () => !['echo-detail', 'me', 'me-organization', 'projection'].includes(route.name)
 );
 
 // 同一批键盘快捷键都走这一个入口：
@@ -105,6 +107,10 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 
   <!-- 首屏进入用的品牌遮罩（旧的 AppLoader 已被它取代） -->
   <BrandOverlay />
+
+  <!-- 顶部加载进度：点导航即开始预取目标页首屏图片（见 composables/useRouteProgress.js）。
+       自己 Teleport 到 body、z-index 压过转场板子，主题色跟着 --text-primary 走。 -->
+  <RouteProgress />
 
   <router-view v-slot="{ Component }">
     <keep-alive>

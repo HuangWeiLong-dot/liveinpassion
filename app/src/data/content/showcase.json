@@ -1,0 +1,33 @@
+{
+  "latestEcho": {
+    "kind": "echo",
+    "refId": 0,
+    "title": "PLEASE LISTEN TO ME CAREFULLY",
+    "meta": "UNFILED · 2026.11",
+    "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/c9a6dd59.jpg",
+    "href": "/echoes/please-listen-to-me-carefully"
+  },
+  "latestPhotography": {
+    "kind": "photography",
+    "refId": 9,
+    "title": "Han Yong",
+    "meta": "PHOTOGRAPHY",
+    "image": "https://cms.liveinpassion.me/img/photography/HanYong/202312/_compressed/d6714a31.jpg",
+    "href": "/photography/HanYong"
+  },
+  "limits": {
+    "echo": 4,
+    "photography": 3,
+    "film": 2
+  },
+  "selected": [
+    {
+      "kind": "film",
+      "refId": 1,
+      "title": "The Projection",
+      "meta": "FILM",
+      "image": "https://cms.liveinpassion.me/img/films/the-projection-poster.jpg",
+      "href": "/projection"
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { requireAccessAuth } from '../lib/auth.js';
 import { renderMarkdown, sanitizeExistingHtml, estimateReadTime } from '../lib/markdown.js';
 import { triggerRebuild } from '../lib/github.js';
-import { normalizeCategory, normalizeTags, normalizeRating, ratingToStored, tagsToStored, normalizeCoverRating, coverRatingToStored } from '../lib/meta.js';
+import { normalizeCategory, normalizeTags, tagsToStored } from '../lib/meta.js';
 
 const app = new Hono();
 
@@ -34,19 +34,17 @@ app.post('/', requireAccessAuth, async (c) => {
   const readTime = estimateReadTime(contentMd || body.contentHtml || '');
   const category = normalizeCategory(body.category);
   const tagsJson = tagsToStored(body.tags);
-  const ratingStored = ratingToStored(body.rating);
-  const coverRatingStored = coverRatingToStored(body.coverRating);
 
   try {
     const result = await db.prepare(
       `INSERT INTO posts (slug, card_title, title, status, content_format, content_md, content_html,
-        cover_key, cover_full_key, read_time_min, category, tags_json, rating_json, cover_rating_json,
+        cover_key, cover_full_key, read_time_min, category, tags_json,
         published_at, updated_at)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
     ).bind(
       slug, cardTitle, title, format, contentMd || null, contentHtml,
       coverKey || null, coverFullKey || null, readTime,
-      category, tagsJson, ratingStored, coverRatingStored
+      category, tagsJson
     ).run();
 
     return c.json({ id: result.meta.last_row_id, slug }, 201);
@@ -84,27 +82,17 @@ app.put('/:id', requireAccessAuth, async (c) => {
 
   const readTime = estimateReadTime(contentMd || contentHtml);
 
-  // category/tags/rating 允许局部更新：没传就保留现有值，显式 null/undefined 才清空评级
+  // category/tags 允许局部更新：没传就保留现有值
   const hasCategory = 'category' in body;
   const hasTags = 'tags' in body;
-  const hasRating = 'rating' in body;
-  const hasCoverRating = 'coverRating' in body;
   const category = hasCategory ? normalizeCategory(body.category) : existing.category;
   const tagsJson = hasTags ? tagsToStored(body.tags) : existing.tags_json;
-  let ratingStored = existing.rating_json;
-  if (hasRating) {
-    ratingStored = body.rating == null ? null : ratingToStored(body.rating);
-  }
-  let coverRatingStored = existing.cover_rating_json;
-  if (hasCoverRating) {
-    coverRatingStored = body.coverRating == null ? null : coverRatingToStored(body.coverRating);
-  }
 
   try {
     await db.prepare(
       `UPDATE posts SET slug=?, card_title=?, title=?, content_format=?, content_md=?, content_html=?,
-        cover_key=?, cover_full_key=?, read_time_min=?, category=?, tags_json=?, rating_json=?,
-        cover_rating_json=?, updated_at=datetime('now')
+        cover_key=?, cover_full_key=?, read_time_min=?, category=?, tags_json=?,
+        updated_at=datetime('now')
        WHERE id=?`
     ).bind(
       slug, body.cardTitle || existing.card_title, body.title || existing.title,
@@ -112,7 +100,7 @@ app.put('/:id', requireAccessAuth, async (c) => {
       body.coverKey !== undefined ? body.coverKey : existing.cover_key,
       body.coverFullKey !== undefined ? body.coverFullKey : existing.cover_full_key,
       readTime,
-      category, tagsJson, ratingStored, coverRatingStored,
+      category, tagsJson,
       id
     ).run();
     return c.json({ ok: true });
@@ -158,7 +146,7 @@ app.get('/', requireAccessAuth, async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT id, slug, card_title, title, status, content_format, read_time_min,
-            cover_key, cover_full_key, category, tags_json, rating_json, cover_rating_json,
+            cover_key, cover_full_key, category, tags_json,
             published_at, created_at, updated_at
      FROM posts ORDER BY COALESCE(published_at, created_at) DESC`
   ).all();
@@ -179,7 +167,6 @@ app.get('/:id', requireAccessAuth, async (c) => {
 function rowToPostAdmin(row, withContent = false) {
   let tags = [];
   try { tags = row.tags_json ? JSON.parse(row.tags_json) : []; } catch { tags = []; }
-  const rating = normalizeRating(row.rating_json);
 
   const post = {
     id: row.id,
@@ -193,8 +180,6 @@ function rowToPostAdmin(row, withContent = false) {
     coverFullKey: row.cover_full_key,
     category: row.category || 'UNFILED',
     tags,
-    rating,
-    coverRating: normalizeCoverRating(row.cover_rating_json),
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

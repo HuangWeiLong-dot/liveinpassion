@@ -7,9 +7,11 @@
         :root {
             --bg: #FAFAFA;
             --text-primary: #1A1A1A;
-            --text-secondary: #6B7280;
-            --border-color: #E5E7EB;
-            --border: #E5E7EB;
+            /* 亮色下原来这套灰太浅：正文 / 导航 / 日期在暖白纸和 #FAFAFA 上几乎糊成一片。
+               把次级文字和边框各压深一档，整体对比度提上来。 */
+            --text-secondary: #4B5563;
+            --border-color: #D1D5DB;
+            --border: #D1D5DB;
             --background-secondary: #F3F4F6;
             --accent-color: #3B82F6;
             --accent: #3B82F6;
@@ -17,6 +19,11 @@
             --font-sans: 'Poppins', sans-serif;
             --font-body: 'Poppins', sans-serif;
             --invert: 0;
+            /* 阅读器纸页（BlogBook）：亮色是比 #FAFAFA 更白的暖纸，边框更深 */
+            --book-paper: #FFFDF8;
+            --book-paper-deep: #EFE9DD;
+            --book-paper-line: #8E939A;
+            --book-paper-edge: color-mix(in srgb, var(--text-primary) 22%, transparent);
         }
 
         :root.dark {
@@ -29,6 +36,10 @@
             --background-secondary: #2D2D2D;
             --accent-color: #60A5FA;
             --invert: 1;
+            --book-paper: color-mix(in srgb, var(--bg) 96%, #d8c9a3 4%);
+            --book-paper-deep: color-mix(in srgb, var(--bg) 86%, #000 14%);
+            --book-paper-line: color-mix(in srgb, var(--border) 68%, var(--text-primary) 32%);
+            --book-paper-edge: color-mix(in srgb, var(--text-primary) 18%, transparent);
         }
 
         #friend-detail-page,
@@ -249,6 +260,18 @@
            类由 BlogsView 的 activate/deactivate 挂在 <html> 上，离开即恢复。 */
         html.blogs-lookback .author-tower {
             display: none;
+        }
+
+        /* 详情页一定要有：从列表点进文章时，blogs-lookback 偶尔会晚一拍才摘掉，
+           那条 display:none 就会把左下角头像一起带走。blog-detail-open 权重大、
+           且在详情页始终存在，写在这里兜底。 */
+        html.blog-detail-open .author-tower {
+            display: block;
+        }
+
+        /* ARCHIVE 视图（默认视图）也有左下角头像；索引给头像让出 112px 底部空间 */
+        html.echoes-locked .author-tower {
+            display: block;
         }
 
         .author-tower__avatar {

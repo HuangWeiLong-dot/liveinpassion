@@ -47,7 +47,7 @@ const pageActive = ref(false);
 // 两种呈现都常驻同一个页面：切到世界时原轨道只是被盖住、没有卸载，
 // 滚动位置与图片缓存都还在，切回来原地继续。
 const VIEW_KEY = 'echoes-view';
-const viewMode = ref('lookback');
+const viewMode = ref('archive'); // 没有 URL / 本地偏好时，ECHOES 首次进入默认看 ARCHIVE
 try {
   const fromUrl = new URLSearchParams(window.location.search).get('view');
   // 先读新 key；没有再读旧的 blogs-view（升级兼容）。读一次就把旧值迁过来。
@@ -55,6 +55,7 @@ try {
   if (fromUrl === 'world' || fromUrl === 'lookback' || fromUrl === 'archive') viewMode.value = fromUrl;
   else if (stored === 'world') viewMode.value = 'world';
   else if (stored === 'archive') viewMode.value = 'archive';
+  else if (stored === 'lookback') viewMode.value = 'lookback'; // 真选过 LOOKBACK 的仍尊重偏好
   // 迁移旧 key
   if (!localStorage.getItem(VIEW_KEY) && stored) {
     try { localStorage.setItem(VIEW_KEY, stored); } catch { /* ignore */ }
@@ -184,82 +185,15 @@ const current = computed(() => blogPosts[activeIndex.value] || null);
 // ── ARCHIVE：east64films 式「作品卷轴」───────────────────────────────────
 // 中间一张封面，左栏是序号索引，右栏是这一篇的元信息，下方标题随封面切换做动效。
 // 结构是「外层高 + sticky 舞台」：滚动一步换一部作品，不换页、不卸载已加载的图。
-const CATEGORY_TABS = [
-  { key: 'ALL',      label: 'ALL' },
-  { key: 'POEM',     label: 'POEM' },
-  { key: 'ESSAY',    label: 'ESSAY' },
-  { key: 'LOG',      label: 'LOG' },
-  { key: 'CRITIQUE', label: 'CRITIQUE' },
-  { key: 'FRAGMENT', label: 'FRAGMENT' },
-  { key: 'LETTER',   label: 'LETTER' },
-];
-
-// 分类是 CMS 里自由填写的：固定的常用项后面，再补上文章里实际出现过的自定义分类
-const categoryTabs = computed(() => {
-  const seen = new Set(CATEGORY_TABS.map((t) => t.key));
-  const extras = [];
-  for (const p of blogPosts) {
-    const c = String(p.category || '').trim().toUpperCase();
-    if (!c || c === 'UNFILED' || seen.has(c)) continue;
-    seen.add(c);
-    extras.push({ key: c, label: c });
-  }
-  return [...CATEGORY_TABS, ...extras.sort((a, b) => a.key.localeCompare(b.key))];
-});
-
-const activeArchiveCat = ref('ALL');
-const activeTag = ref('');
-
-try {
-  const params = new URLSearchParams(window.location.search);
-  const fromCat = params.get('cat');
-  const fromTag = params.get('tag');
-  if (fromCat) {
-    activeArchiveCat.value = String(fromCat).trim().toUpperCase();
-  }
-  if (fromTag) activeTag.value = fromTag.trim().toUpperCase();
-} catch { /* ignore */ }
-
-function syncArchiveUrl() {
-  try {
-    const url = new URL(window.location.href);
-    if (activeArchiveCat.value !== 'ALL') url.searchParams.set('cat', activeArchiveCat.value);
-    else url.searchParams.delete('cat');
-    if (activeTag.value) url.searchParams.set('tag', activeTag.value);
-    else url.searchParams.delete('tag');
-    window.history.replaceState(window.history.state, '', url);
-  } catch { /* ignore */ }
-}
-
-function setArchiveCat(key) {
-  activeArchiveCat.value = key;
-  syncArchiveUrl();
-}
-
-function setTag(tag) {
-  activeTag.value = String(tag || '').trim().toUpperCase();
-  syncArchiveUrl();
-}
-
 function normalizeArchiveEntry(p) {
   return {
     ...p,
-    category: (p.category || 'UNFILED').toUpperCase(),
-    tags: Array.isArray(p.tags) ? p.tags.map((t) => String(t).toUpperCase()) : [],
-    rating: p.rating || null,
     year: yearOf(p.cardDate || p.date),
   };
 }
 
-// 扁平作品列表：按分类 + tag 过滤，保留发布时间顺序（desc）
-const archiveWorks = computed(() => {
-  const list = blogPosts.map(normalizeArchiveEntry);
-  return list.filter((p) => {
-    if (activeArchiveCat.value !== 'ALL' && p.category !== activeArchiveCat.value) return false;
-    if (activeTag.value && !p.tags.includes(activeTag.value)) return false;
-    return true;
-  });
-});
+// 扁平作品列表，保留发布时间顺序（desc）
+const archiveWorks = computed(() => blogPosts.map(normalizeArchiveEntry));
 
 const archiveIndex = ref(0);
 // 当前项上下的邻居：做成竖向预览框（参考站中图上下会露出前后作品）。
@@ -381,11 +315,6 @@ function unbindArchiveControls() {
   window.removeEventListener('resize', syncHeaderOffset);
 }
 
-// 换分类/清标签后回到第一部。
-watch([activeArchiveCat, activeTag], () => {
-  archiveIndex.value = 0;
-});
-
 // 进出 ARCHIVE：进时锁住页面并接管滚轮/键盘，出时把这些控制还回去。
 watch(viewMode, async (mode) => {
   const locked = mode === 'archive';
@@ -419,13 +348,6 @@ function yearOf(dateStr) {
   const m = String(dateStr || '').match(/(\d{4})/);
   return m ? m[1] : '';
 }
-function gradeOf(rating) { return rating?.grade || ''; }
-function verdictOf(rating) { return rating?.verdict || ''; }
-function scoreOf(rating) {
-  if (!rating?.score) return '';
-  return Number(rating.score).toFixed(1);
-}
-
 // 序号补零：列表按最新在上排，但编号是时间顺序 —— 最早发布 = 01，最新 = 最大号。
 function pad(n) {
   return String(blogPosts.length - n).padStart(2, '0');
@@ -1985,31 +1907,6 @@ function onVisibility() {
       @touchend.passive="onArchiveTouchEnd"
     >
       <div class="ba-stage">
-        <!-- 左上：分类筛选（label + 条目两行，细字重）。
-             ⚠ 必须用 div，不能用 <header>：main.css 里有一条裸 header 选择器，
-               会把所有 <header> 强制 fixed 到页面顶部，正好压在导航栏上。 -->
-        <div class="ba-filters">
-          <div class="ba-filters__head">
-            <span class="ba-filters__label">CATEGORY</span>
-            <span class="ba-filters__count">{{ archiveWorks.length }} / {{ total }} PIECES</span>
-          </div>
-          <div class="ba-filters__list" role="group" aria-label="Filter by category">
-            <button
-              v-for="tab in categoryTabs"
-              :key="tab.key"
-              type="button"
-              class="ba-filter"
-              :class="{ 'is-active': activeArchiveCat === tab.key }"
-              :aria-pressed="activeArchiveCat === tab.key"
-              @click="setArchiveCat(tab.key)"
-            >{{ tab.label }}</button>
-            <span v-if="activeTag" class="ba-filter__tag">
-              TAG · {{ activeTag }}
-              <button type="button" class="ba-filter__clear" aria-label="清除标签" @click="setTag('')">×</button>
-            </span>
-          </div>
-        </div>
-
         <div v-if="activeWork" class="ba-slug">
           <!-- 左栏：序号 + 文章名，整列跟着中间的卷轴一起上下滚 -->
           <aside class="ba-idx" aria-label="Index">
@@ -2025,22 +1922,11 @@ function onVisibility() {
             >
               <span class="ba-idx__no">{{ String(row.no + 1).padStart(2, '0') }}</span>
               <span class="ba-idx__title">{{ row.work.cardTitle }}</span>
-              <span v-if="row.d === 0" class="ba-idx__label">{{ row.work.category }}</span>
             </button>
           </aside>
 
           <!-- 中间：上方小字短评（固定槽）+ 主图与上下预览 + 下方大标题（固定槽） -->
           <div class="ba-center">
-            <div class="ba-review">
-              <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
-                <div :key="activeWork.slug" class="ba-review__inner">
-                  <p v-if="verdictOf(activeWork.rating)" class="ba-review__en">
-                    {{ verdictOf(activeWork.rating) }}
-                  </p>
-                </div>
-              </Transition>
-            </div>
-
             <div class="ba-reel">
               <button
                 v-for="f in archiveFrames"
@@ -2079,36 +1965,12 @@ function onVisibility() {
             <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
               <div :key="activeWork.slug" class="ba-info__inner">
                 <div class="ba-info__col">
-                  <span class="ba-info__k">TYPE</span>
-                  <span class="ba-info__v">{{ activeWork.category }}</span>
-                </div>
-                <div class="ba-info__col">
                   <span class="ba-info__k">DATE</span>
                   <span class="ba-info__v">{{ monthOf(activeWork.cardDate) }}</span>
                 </div>
                 <div class="ba-info__col">
-                  <span class="ba-info__k">SCORE</span>
-                  <span class="ba-info__v">
-                    <template v-if="gradeOf(activeWork.rating)">
-                      {{ gradeOf(activeWork.rating) }}
-                      <template v-if="scoreOf(activeWork.rating)"> · {{ scoreOf(activeWork.rating) }}</template>
-                    </template>
-                    <template v-else>—</template>
-                  </span>
-                </div>
-                <div class="ba-info__col">
                   <span class="ba-info__k">READ</span>
                   <span class="ba-info__v">{{ activeWork.readTime || '—' }}</span>
-                </div>
-                <div v-if="activeWork.tags.length" class="ba-info__tags">
-                  <button
-                    v-for="tag in activeWork.tags.slice(0, 8)"
-                    :key="tag"
-                    type="button"
-                    class="ba-chip"
-                    :class="{ 'is-active': tag === activeTag }"
-                    @click="setTag(tag === activeTag ? '' : tag)"
-                  >{{ tag }}</button>
                 </div>
               </div>
             </Transition>
@@ -2188,9 +2050,9 @@ function onVisibility() {
 :global(html.blogs-lookback) {
   --jb-bg: #fafafa;
   --jb-fg: #16161a;
-  --jb-dim: #6b7280;
-  --jb-line: #e5e7eb;
-  --jb-faint: #b4b4ba;
+  --jb-dim: #4b5563;
+  --jb-line: #d1d5db;
+  --jb-faint: #8b8f96;
   /* World 视图环心那层 LIVEINPASSION 的浓度：字带里的封面留了 58% 不透明，
      字只有 42% 能透出来，所以这里要比 Hero 那档更重才读得清 */
   --jb-wordmark: 0.34;
@@ -3091,92 +2953,6 @@ function onVisibility() {
   overflow: hidden;
 }
 
-/* 左上：分类筛选，两行结构（label + 条目） */
-.ba-filters {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin-bottom: 14px;
-  max-width: 100%;
-}
-.ba-filters__head {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-}
-.ba-filters__label {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: var(--jb-fg);
-  border-left: 2px solid var(--jb-fg);
-  padding-left: 8px;
-  line-height: 1;
-}
-.ba-filters__count {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--jb-faint);
-}
-.ba-filters__list {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 22px;
-  max-width: 100%;
-}
-.ba-filter {
-  position: relative;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  background: transparent;
-  border: none;
-  color: color-mix(in srgb, var(--jb-fg) 38%, transparent);
-  padding: 5px 0 6px;
-  cursor: pointer;
-  transition: color 0.18s ease;
-}
-.ba-filter:hover { color: var(--jb-fg); }
-.ba-filter.is-active {
-  color: var(--jb-fg);
-}
-.ba-filter.is-active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: var(--jb-fg);
-}
-.ba-filter__tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 14px;
-  border-left: 1px solid var(--jb-line);
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  color: var(--jb-fg);
-}
-.ba-filter__clear {
-  background: transparent;
-  border: none;
-  color: var(--jb-faint);
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-}
-.ba-filter__clear:hover { color: var(--jb-fg); }
-
 /* 三栏：左索引 / 中封面 / 右信息 */
 .ba-slug {
   flex: 1 1 auto;
@@ -3195,6 +2971,11 @@ function onVisibility() {
   align-self: stretch;
   height: 100%;
   overflow: hidden;
+}
+/* 左下角 Ava 塔固定在 32px 高处：归档索引的底部留出 112px，
+   最后几行不会被头像压住。 */
+.blogs-lookback-page.is-archive .ba-idx {
+  height: calc(100% - 112px);
 }
 .ba-idx__row {
   position: absolute;
@@ -3237,16 +3018,6 @@ function onVisibility() {
   min-width: 0;
 }
 .ba-idx__row.is-active .ba-idx__title { font-weight: 500; }
-.ba-idx__label {
-  flex: 0 0 auto;
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding-left: 10px;
-  border-left: 1px solid var(--jb-line);
-  color: var(--jb-faint);
-}
 
 /* 中：上方小字短评（固定槽）+ 主图卷轴 + 下方大标题（固定槽）
    两个槽的高度都是写死的，文字动画只在槽内动，绝不改变中图尺寸 */
@@ -3256,31 +3027,6 @@ function onVisibility() {
   gap: 16px;
   min-width: 0;
   height: 100%;
-}
-/* 上方：作者短评，小字 */
-.ba-review {
-  flex: 0 0 46px;
-  height: 46px;
-  width: 100%;
-  max-width: 700px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-.ba-review__inner {
-  width: 100%;
-}
-.ba-review__en {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--jb-fg) 62%, transparent);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* 卷轴窗口：上下各露出前后作品，超出部分裁掉 */
 .ba-reel {
@@ -3366,12 +3112,10 @@ function onVisibility() {
 /* 点开一篇时沿用 LOOKBACK 的幕布：除被点的那张照片外全部渐隐，
    照片本身不动，交给详情页的封面 FLIP 从它的真实矩形接手。
    ⚠ `html` 这一段必须写在 :global() **里面**（和 BlogDetailView 那几条一样）：
-   写成 `:global(html.bd-taking-cover) .ba-filters` 时，Vue 的 scoped 编译器
+   写成 `:global(html.bd-taking-cover) .ba-caption` 时，Vue 的 scoped 编译器
    会把 :global() 之后的整串丢掉，只留赤裸的 `html.bd-taking-cover { opacity: 0 }`
    —— 于是整篇文档（连详情页）都被淡成 0，画布露出默认白色，就是点封面后那一下
    "白屏"（实测：连续 3–4 帧纯白，返程同样会白）。 */
-:global(html.bd-taking-cover .ba-filters),
-:global(html.bd-taking-cover .ba-review),
 :global(html.bd-taking-cover .ba-caption),
 :global(html.bd-taking-cover .ba-idx),
 :global(html.bd-taking-cover .ba-info),
@@ -3389,8 +3133,6 @@ function onVisibility() {
   transform: translate3d(calc(-50% + 46vw), -50%, 0) scale(1.08);
   opacity: 0;
 }
-.ba-archive.is-exiting .ba-filters,
-.ba-archive.is-exiting .ba-review,
 .ba-archive.is-exiting .ba-caption,
 .ba-archive.is-exiting .ba-info,
 .ba-archive.is-exiting .ba-progress {
@@ -3454,38 +3196,6 @@ function onVisibility() {
   text-transform: uppercase;
   color: color-mix(in srgb, var(--jb-fg) 88%, transparent);
 }
-.ba-info__tags {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* 标签 chip */
-.ba-chip {
-  font-family: 'Space Mono', ui-monospace, monospace;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--jb-fg) 20%, transparent);
-  color: color-mix(in srgb, var(--jb-fg) 60%, transparent);
-  padding: 4px 10px;
-  cursor: pointer;
-  border-radius: 0;
-  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
-}
-.ba-chip:hover,
-.ba-chip:focus-visible {
-  border-color: var(--jb-fg);
-  color: var(--jb-fg);
-  outline: none;
-}
-.ba-chip.is-active {
-  background: var(--jb-fg);
-  color: var(--jb-bg);
-  border-color: var(--jb-fg);
-}
 
 /* 右下角进度 */
 .ba-progress {
@@ -3541,17 +3251,8 @@ function onVisibility() {
   .ba-slug { grid-template-columns: 1fr; }
   .ba-idx { display: none; }
   .ba-frame { height: 76%; }
-  .ba-review { flex-basis: 40px; height: 40px; }
   .ba-caption { flex-basis: 96px; height: 96px; }
   .ba-caption__title { font-size: clamp(22px, 6.4vw, 32px); }
-  .ba-filters {
-    overflow-x: auto;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .ba-filters::-webkit-scrollbar { display: none; }
-  .ba-filter { flex: 0 0 auto; }
-  .ba-filters__count { display: none; }
   .ba-progress { right: 20px; bottom: 16px; }
 }
 
@@ -3563,9 +3264,7 @@ function onVisibility() {
   .ba-frame,
   .ba-idx__row { transition: none; }
   .ba-archive.is-exiting .ba-frame,
-  .ba-archive.is-exiting .ba-filters,
-  .ba-archive.is-exiting .ba-review,
-  .ba-archive.is-exiting .ba-caption,
+    .ba-archive.is-exiting .ba-caption,
   .ba-archive.is-exiting .ba-info { transition: none; }
 }
 </style>

@@ -45,6 +45,20 @@ export const albumApi = {
   reorder: (id, orders) => request(`/api/admin/albums/${id}/photos/reorder`, { method: 'PUT', body: JSON.stringify({ orders }) }),
 };
 
+// 首页展示（LATEST ECHO / LATEST PHOTO / AUTHOR'S SELECTED）
+export const showcaseApi = {
+  get: () => request('/api/admin/showcase'),
+  save: (data) => request('/api/admin/showcase', { method: 'PUT', body: JSON.stringify(data) }),
+};
+
+// 影片库（只管理元数据，视频/封面是 R2 key）
+export const filmApi = {
+  list: () => request('/api/admin/films'),
+  create: (data) => request('/api/admin/films', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/api/admin/films/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id) => request(`/api/admin/films/${id}`, { method: 'DELETE' }),
+};
+
 // 上传
 export const uploadApi = {
   upload: async (file, compressedFile, type) => {

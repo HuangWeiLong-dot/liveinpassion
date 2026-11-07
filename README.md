@@ -48,6 +48,58 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 62 — 2026-11-07
+
+#### 评级系统整体移除 + 首页 SHOWCASE + 路由进度条
+
+- **移除评级**：`0008_remove_rating.sql` DROP `rating_json` 与 `cover_rating_json`；
+  worker 删掉 `normalizeRating` / `ratingToStored` 与所有读写；admin 移除「Author's Rating」
+  与「Cover Rating」编辑块、列表评级列；前台移除详情页鉴定章与封面评分角标；
+  快照不再含 rating / coverRating。update 60 的"只留英文"被这一步取代——与其改文案，
+  不如整个拿掉。
+- **HOME 右侧 SHOWCASE**：`0009_home_showcase.sql` 建 `films` / `showcase_items` /
+  `showcase_settings` 三表；worker 新增 `routes/showcase.js`（admin CRUD + public 聚合）
+  与 `lib/showcase.js`（统一卡片形状：kind / title / meta / image / href）。
+  首页右侧悬浮 LATEST ECHO / LATEST PHOTO / SELECTED，手机上收成底部横条；
+  fetch-content 同步拉取 `showcase.json` 快照。
+- **FILMS 影片库**：worker `routes/films.js` + admin FilmManage —— 影片元信息
+  （slug / 标题 / video_key / poster_key / 跳转 path / 发布状态）入库管理，
+  视频本体仍直传 R2 `films/` 前缀；《The Projection》作为首条记录随 0009 登记。
+- **路由进度条**：新增 RouteProgress 组件 + `useRouteProgress` + `routeAssets` ——
+  点导航那一刻开始预取目标页首屏图片，条子走的是真实完成比例而非定时器；
+  注册顺序必须在 installPageTransition 之前，否则要等转场板子走完才开始下载。
+  省流 / 2G 下退化为纯导航指示器。
+- **杂项**：`seo/meta.js` 的 articleSection 兜底把 UNFILED 归为 'Echo'；
+  验收脚本新增 verify-projection / verify-route-progress / verify-home-showcase。
+
+### update: 61 — 2026-11-07
+
+#### PROJECTION：短片《The Projection》的独立放映页
+
+- 新增 `/projection`（导航 `FILM`）：整页是一台复古电视机（沿用 ME 页的机身语言），
+  标题卡 → 正片 → 回标题卡两个状态都在屏幕里完成。
+- 片源上传到 R2：`films/the-projection.mp4`（134 MB 原片直连，支持 Range，可拖动）。
+  仓库里不放视频。
+- 屏幕只负责显示：标题卡上只有 `THE PROJECTION`（按字母拆开，进场时一道光从左扫到右，
+  13 个字母依次淡入）。机身下沿是扁平实体键：上一集 / 播放暂停 / 下一集｜复古分段
+  进度条（可点、可拖、可用方向键）｜停止 / 全屏 / 音量刻度尺（收音机调频式，左右拖，
+  带 `VOL 80` 读数）；只有一部片子，上一集/下一集暂时禁用。
+- 进片不换版式：影片直接在电视机屏幕里播，头部和四周都不动。
+- 片子本身混得极轻（平均 −39 dB），用 Web Audio 补 +12 dB；音量旋钮调的是这个增益。
+- 唯一的动态光是跟着鼠标走的镜头光晕：指针甩得快时亮一下再衰减，像镜头扫到阳光。
+  没有彩色光斑、没有自动扫过的耀斑、没有游走鬼影；屏幕里是高噪点颗粒 + 扫描线。
+- 进片时头部、左下角 Ava 塔、音乐播放器与歌词层一起让开；进站点 ENTER 起播的站点音乐
+  在这一页暂停。自定义控制条（播放 / 进度 / 静音 / 全屏 / 退出），快捷键 Space / Esc / M / F；
+  keep-alive 失活自动暂停。
+- 新增 `tools/verify-projection.mjs`：电视在、标题在屏幕正中、字母入场、光晕跟随鼠标、
+  外壳让开、播放与 Esc、1100px 导航不撞 LOGO、手机不溢出、零 console 报错。
+
+### update: 60 — 2026-11-06
+
+#### 去掉中文评价
+
+- ARCHIVE 的小字短评与详情页鉴定章只保留英文评语（此前中英并排）。
+
 ### update: 59 — 2026-11-06
 
 #### 封面评分、自由分类、标签胶囊，封面交接补漏

@@ -70,23 +70,6 @@ const form = ref({
   category: 'UNFILED',
   tags: [],
   tagDraft: '',
-  // 新文章也必须有对象：模板里的评分字段是直接绑 form.rating.score 的，
-  // 之前的 null 会让 /blogs/new 整页渲染失败（白屏）
-  rating: {
-    score: null,
-    language: 0,
-    emotion: 0,
-    structure: 0,
-    afterglow: 0,
-    verdict: '',
-    note: '',
-  },
-  ratingOn: false,
-  coverRating: {
-    score: null,
-    verdict: '',
-  },
-  coverRatingOn: false,
 });
 const TAG_LIMIT = 12;
 const TAG_MAX_LEN = 24;
@@ -215,7 +198,7 @@ function onCardTitleInput() {
   if (!slugDirty.value) form.value.slug = toSlug(raw);
 }
 
-// ── Category / Tags / Rating 表单助手 ─────────────────────────────────
+// ── Category / Tags 表单助手 ─────────────────────────────────
 function normalizeCategoryInput(value) {
   const v = String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
   return (v || 'UNFILED').slice(0, CATEGORY_MAX_LEN);
@@ -294,24 +277,6 @@ onMounted(async () => {
           )].slice(0, TAG_LIMIT)
         : [];
       form.value.tagDraft = '';
-      const r = data.rating && typeof data.rating === 'object' ? data.rating : {};
-      const dims = r.dimensions && typeof r.dimensions === 'object' ? r.dimensions : {};
-      form.value.rating = {
-        score: r.score != null ? Number(r.score) : null,
-        language: Number(r.language ?? dims.language ?? 0) || 0,
-        emotion: Number(r.emotion ?? dims.emotion ?? 0) || 0,
-        structure: Number(r.structure ?? dims.structure ?? 0) || 0,
-        afterglow: Number(r.afterglow ?? dims.afterglow ?? 0) || 0,
-        verdict: r.verdict || '',
-        note: r.note || '',
-      };
-      form.value.ratingOn = form.value.rating.score != null;
-      const cr = data.coverRating && typeof data.coverRating === 'object' ? data.coverRating : {};
-      form.value.coverRating = {
-        score: cr.score != null ? Number(cr.score) : null,
-        verdict: cr.verdict || '',
-      };
-      form.value.coverRatingOn = form.value.coverRating.score != null;
       // 已有内容不参与自动填充
       if (data.title) titleDirty.value = true;
       if (data.slug) slugDirty.value = true;
@@ -376,28 +341,6 @@ async function save(status) {
     addTag();
     const tagsArr = form.value.tags.slice(0, TAG_LIMIT);
 
-    // rating：有分数就提交（即使折叠了评分块也不丢）；grade 由后端从 score 重算
-    const r = form.value.rating;
-    const rating = r && r.score != null
-      ? {
-          score: Number(r.score),
-          language: Number(r.language) || 0,
-          emotion: Number(r.emotion) || 0,
-          structure: Number(r.structure) || 0,
-          afterglow: Number(r.afterglow) || 0,
-          verdict: r.verdict || '',
-          note: r.note || '',
-        }
-      : null;
-
-    const cr = form.value.coverRating;
-    const coverRating = cr && cr.score != null
-      ? {
-          score: Number(cr.score),
-          verdict: cr.verdict || '',
-        }
-      : null;
-
     const payload = {
       slug: form.value.slug,
       cardTitle: form.value.cardTitle,
@@ -407,8 +350,6 @@ async function save(status) {
       coverFullKey: form.value.coverFullKey,
       category: normalizeCategoryInput(form.value.category),
       tags: tagsArr,
-      rating,
-      coverRating,
     };
     let id;
     if (isNew.value) {
@@ -1163,63 +1104,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 07 / Author's rating (collapsible) -->
-      <details class="rating-block" :open="form.ratingOn" @toggle="form.ratingOn = $event.target.open">
-        <summary class="rating-summary">
-          <span>07 / Author's Rating</span>
-          <span class="rating-summary__hint">
-            <template v-if="form.rating && form.rating.score != null">
-              {{ Number(form.rating.score).toFixed(1) }} / 10
-            </template>
-            <template v-else>off</template>
-          </span>
-        </summary>
-        <div class="rating-body" v-if="form.rating">
-          <div class="field field--wide">
-            <label class="field-label">Score / 10</label>
-            <input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.score" placeholder="e.g. 9.1" />
-            <div class="field-hint">Grade is derived from this (S ≥ 9.0 · A ≥ 8.0 · B ≥ 7.0 · C ≥ 6.0)</div>
-          </div>
-          <template v-if="form.ratingOn">
-            <div class="field"><label class="field-label">Language</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.language" /></div>
-            <div class="field"><label class="field-label">Emotion</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.emotion" /></div>
-            <div class="field"><label class="field-label">Structure</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.structure" /></div>
-            <div class="field"><label class="field-label">Afterglow</label><input type="number" min="0" max="10" step="0.1" v-model.number="form.rating.afterglow" /></div>
-            <div class="field field--wide">
-              <label class="field-label">Verdict (EN)</label>
-              <input v-model="form.rating.verdict" placeholder="One sentence judgment, ≤ 180 chars" maxlength="180" />
-            </div>
-            <div class="field field--wide">
-              <label class="field-label">Short Review (EN)</label>
-              <textarea v-model="form.rating.note" rows="2" placeholder="A short review in English, 120 characters max" maxlength="120"></textarea>
-            </div>
-          </template>
-        </div>
-      </details>
-
-      <!-- 08 / Cover rating（和正文自评分开；前台显示在封面右上角） -->
-      <details class="rating-block" :open="form.coverRatingOn" @toggle="form.coverRatingOn = $event.target.open">
-        <summary class="rating-summary">
-          <span>08 / Cover Rating</span>
-          <span class="rating-summary__hint">
-            <template v-if="form.coverRating && form.coverRating.score != null">
-              {{ Number(form.coverRating.score).toFixed(1) }} / 10
-            </template>
-            <template v-else>off</template>
-          </span>
-        </summary>
-        <div class="rating-body" v-if="form.coverRating">
-          <div class="field field--wide">
-            <label class="field-label">Cover Score / 10</label>
-            <input type="number" min="0" max="10" step="0.1" v-model.number="form.coverRating.score" placeholder="e.g. 8.6" />
-            <div class="field-hint">Grade is derived from the score (S ≥ 9.0 · A ≥ 8.0 · B ≥ 7.0 · C ≥ 6.0)</div>
-          </div>
-          <div class="field field--wide">
-            <label class="field-label">Cover Verdict (EN)</label>
-            <input v-model="form.coverRating.verdict" maxlength="120" placeholder="One short line about the cover" />
-          </div>
-        </div>
-      </details>
     </div>
 
     <div class="editor-panel">
@@ -1560,7 +1444,6 @@ onUnmounted(() => {
   .meta-panel { padding: 20px; }
   .form-grid { gap: 18px 22px; }
   .cover-preview { width: 150px; }
-  .rating-block { margin-top: 16px; }
 }
 
 @media (max-width: 700px) {
@@ -1800,62 +1683,4 @@ onUnmounted(() => {
 .md-editor-preview .media-text__media img { display: block; width: 100%; }
 .md-editor-preview .media-text__body p:last-child { margin-bottom: 0; }
 
-/* ── Author's Rating block：和 CMS 一致，直角 / 细边框 / mono ───────────── */
-.rating-block {
-  margin-top: 20px;
-  border: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
-}
-.rating-summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-primary);
-}
-.rating-block[open] .rating-summary { border-bottom: 1px solid var(--border); }
-.rating-summary::-webkit-details-marker { display: none; }
-.rating-summary::before {
-  content: '+';
-  margin-right: 10px;
-  width: 14px;
-  display: inline-block;
-  text-align: center;
-  opacity: 0.6;
-  transition: transform 0.18s ease;
-}
-.rating-block[open] .rating-summary::before { content: '−'; }
-.rating-summary__hint {
-  font-family: var(--font-mono);
-  font-size: 0.55rem;
-  letter-spacing: 0.06em;
-  color: var(--text-secondary);
-}
-.rating-body {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px 20px;
-  padding: 16px;
-}
-.rating-body .field--wide { grid-column: 1 / -1; }
-.rating-body input[type="number"] {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  border-radius: 0;
-}
-.rating-body textarea { min-height: 72px; }
-.rating-body input[type="number"]:focus,
-.rating-body input:not([type]):focus {
-  outline: none;
-  border-color: var(--text-primary);
-  background: var(--bg);
-}
 </style>

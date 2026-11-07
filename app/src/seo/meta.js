@@ -212,7 +212,7 @@ export function resolveSeo(name, params, posts = [], albums = []) {
       || Number((post.readTime || '').match(/\d+/)?.[0])
       || 1;
     const keywords = post.keywords || [];
-    const section = post.category || 'Echo';
+    const section = post.category && post.category !== 'UNFILED' ? post.category : 'Echo';
     const crumbLabel = section.charAt(0) + section.slice(1).toLowerCase();
     return {
       path,

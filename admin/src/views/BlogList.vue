@@ -112,13 +112,6 @@ onMounted(load);
               <i />
               <span class="post-row__cat">{{ p.category }}</span>
             </template>
-            <template v-if="p.rating && p.rating.grade">
-              <i />
-              <span class="post-row__rate">
-                <strong>{{ p.rating.grade }}</strong>
-                <span v-if="p.rating.score">· {{ Number(p.rating.score).toFixed(1) }}</span>
-              </span>
-            </template>
             <span :class="['post-row__status', p.status === 'published' ? 'is-published' : 'is-draft']">
               {{ p.status === 'published' ? 'Published' : 'Draft' }}
             </span>
@@ -298,8 +291,7 @@ onMounted(load);
   }
 }
 
-.post-row__cat,
-.post-row__rate {
+.post-row__cat {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.12em;
@@ -310,9 +302,5 @@ onMounted(load);
 .post-row__cat {
   border: 1px solid rgba(255,255,255,0.14);
   opacity: 0.75;
-}
-.post-row__rate strong {
-  font-weight: 700;
-  color: var(--accent, #eaeaea);
 }
 </style>

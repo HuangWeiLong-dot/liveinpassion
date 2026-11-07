@@ -44,13 +44,16 @@ function safeWrite(file, data) {
 async function main() {
   let blogOk = false;
   let albumsOk = false;
+  let showcaseOk = false;
 
   // 拉取博客
   try {
     const data = await fetchJson('/api/posts');
+    // 旧版 Worker 还可能带 rating / coverRating；评级系统已删除，构建快照里也不再保留。
+    data.posts = (data.posts || []).map(({ rating, coverRating, ...post }) => post);
     // 正文 SEO 增强：标题层级、标题锚点、图片 alt/lazy、词数与关键词。
     // 新文章上传后由 CMS 触发重建，下一次构建会自动跑到这里。
-    data.posts = enhancePosts(data.posts || []);
+    data.posts = enhancePosts(data.posts);
     safeWrite(resolve(contentDir, 'blogPosts.json'), data);
     blogOk = true;
   } catch (err) {
@@ -81,7 +84,18 @@ async function main() {
     console.warn('    Keeping existing albums.json snapshot.');
   }
 
-  if (!blogOk || !albumsOk) {
+  // 首页右侧展示（latest echo / latest photo / author's selected）
+  // 失败时同样保留上一份快照：不能让一次 404（旧 Worker 还没部署新路由）把首页展示清空。
+  try {
+    const data = await fetchJson('/api/showcase');
+    safeWrite(resolve(contentDir, 'showcase.json'), data);
+    showcaseOk = true;
+  } catch (err) {
+    console.warn(`  ⚠ Showcase fetch failed: ${err.message}`);
+    console.warn('    Keeping existing showcase.json snapshot.');
+  }
+
+  if (!blogOk || !albumsOk || !showcaseOk) {
     console.warn('\n⚠ Some content fetches failed. Build will use last committed snapshot.');
     // 不退出非零：让构建继续使用快照，不阻断发布
   } else {

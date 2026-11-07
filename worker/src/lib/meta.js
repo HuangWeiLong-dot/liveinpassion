@@ -1,16 +1,7 @@
-// 共享辅助：分类白名单 / 标签归一化 / 评级等级重算
-// 前端与 CMS 共用同一套规则，避免 grade 与 score 不一致
+// 共享辅助：分类 / 标签归一化
 
 export const CATEGORY_WHITELIST = ['POEM', 'ESSAY', 'LOG', 'CRITIQUE', 'FRAGMENT', 'LETTER'];
 export const DEFAULT_CATEGORY = 'UNFILED';
-
-export const DIMENSIONS = ['language', 'emotion', 'structure', 'afterglow'];
-export const DIMENSION_LABELS = {
-  language: 'LANGUAGE',
-  emotion: 'EMOTION',
-  structure: 'STRUCTURE',
-  afterglow: 'AFTERGLOW',
-};
 
 // 分类是自由文本（CMS 里可输入或点选历史分类），这里只做大小写/空白归一化。
 // 早期版本限定白名单，会把作者自己起的分类静默改成 UNFILED。
@@ -41,82 +32,6 @@ export function normalizeTags(input) {
     if (out.length >= 12) break;
   }
   return out;
-}
-
-// 把后端 rating_json / 前端传入对象都规整成统一结构，grade 由 score 推出（不信任前端传的 grade）
-export function normalizeRating(input) {
-  if (!input) return null;
-  let obj = input;
-  if (typeof input === 'string') {
-    try { obj = JSON.parse(input); } catch { return null; }
-  }
-  if (!obj || typeof obj !== 'object') return null;
-
-  const rawScore = Number(obj.score);
-  const score = Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 10
-    ? Math.round(rawScore * 10) / 10
-    : null;
-
-  const dims = {};
-  for (const d of DIMENSIONS) {
-    const v = Number(obj[d]);
-    if (Number.isFinite(v) && v >= 0 && v <= 10) dims[d] = Math.round(v * 10) / 10;
-  }
-
-  const verdict = typeof obj.verdict === 'string' ? obj.verdict.trim().slice(0, 180) : '';
-  const note = typeof obj.note === 'string' ? obj.note.trim().slice(0, 120) : '';
-
-  let grade = null;
-  if (score !== null) {
-    grade = score >= 9.0 ? 'S'
-      : score >= 8.0 ? 'A'
-      : score >= 7.0 ? 'B'
-      : score >= 6.0 ? 'C'
-      : 'D';
-  }
-
-  return { score, grade, dimensions: dims, verdict, note };
-}
-
-export function ratingToStored(rating) {
-  if (!rating) return null;
-  const obj = normalizeRating(rating);
-  if (!obj) return null;
-  const stored = {
-    score: obj.score,
-    grade: obj.grade,
-    ...obj.dimensions,
-    verdict: obj.verdict,
-    note: obj.note,
-  };
-  return JSON.stringify(stored);
-}
-
-// 封面评分：独立于正文自评，只存 score + grade + verdict。
-// 阈值与正文评分一致，grade 由后端从 score 重算。
-export function normalizeCoverRating(input) {
-  if (!input) return null;
-  let obj = input;
-  if (typeof input === 'string') {
-    try { obj = JSON.parse(input); } catch { return null; }
-  }
-  if (!obj || typeof obj !== 'object') return null;
-
-  const raw = Number(obj.score);
-  if (!Number.isFinite(raw) || raw < 0 || raw > 10) return null;
-  const score = Math.round(raw * 10) / 10;
-  const grade = score >= 9.0 ? 'S'
-    : score >= 8.0 ? 'A'
-    : score >= 7.0 ? 'B'
-    : score >= 6.0 ? 'C'
-    : 'D';
-  const verdict = typeof obj.verdict === 'string' ? obj.verdict.trim().slice(0, 120) : '';
-  return { score, grade, verdict };
-}
-
-export function coverRatingToStored(input) {
-  const obj = normalizeCoverRating(input);
-  return obj ? JSON.stringify(obj) : null;
 }
 
 export function tagsToStored(tags) {

@@ -17,6 +17,7 @@ import albumContent from '../data/content/albums.json';
 const SECTIONS = {
   home: 'HOME',
   echoes: 'ECHOES',
+  projection: 'PROJECTION',
   me: 'ME',
   'me-gallery': 'PHOTOS',
   gallery: 'GALLERY',
