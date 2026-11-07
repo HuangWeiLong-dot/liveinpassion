@@ -220,22 +220,38 @@ function leaveWindow() {
 }
 
 // ── 打开 ────────────────────────────────────────────────────────────────
-function openPhoto(index) {
+function openPhoto(index, event = null) {
   const list = detailPhotos.value.map(({ filename, src, fullSrc, date }) => ({
     filename, src, fullSrc, date,
   }));
   if (!list[index]) return;
-  openLightbox(list, index);
+
+  // 来源窗口（CoverFlight 的开/关都从这一格的图量矩形）
+  const el = event?.currentTarget || null;
+  const img = el?.querySelector?.('.win__img') || el?.querySelector?.('img') || null;
+  const r = (img || el)?.getBoundingClientRect?.();
+  const from = r && r.width && r.height
+    ? {
+      rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+      src: img?.currentSrc || img?.src || '',
+      aspect: img?.naturalWidth && img?.naturalHeight
+        ? img.naturalWidth / img.naturalHeight
+        : r.width / r.height,
+      sourceEl: el,
+    }
+    : null;
+
+  openLightbox(list, index, from);
 }
 
-function openWindow(item) {
+function openWindow(item, event = null) {
   hideTip();
   clearBlockCursorHot();
   if (item.kind === 'album') {
     router.push({ name: 'photography-person', params: { person: albumPerson(item.album) } });
     return;
   }
-  openPhoto(item.photoIndex);
+  openPhoto(item.photoIndex, event);
 }
 
 // ── 首屏入场（和 GALLERY 一致）─────────────────────────────────────────
@@ -359,7 +375,7 @@ onBeforeUnmount(() => {
               :style="{ '--win-i': index }"
               type="button"
               :aria-label="item.kind === 'album' ? `${item.title} · ${item.count} photos` : item.title"
-              @click="openWindow(item)"
+              @click="openWindow(item, $event)"
               @pointerenter="enterWindow(item, $event)"
               @pointerleave="leaveWindow"
             >

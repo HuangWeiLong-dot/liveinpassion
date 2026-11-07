@@ -48,6 +48,27 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 63 — 2026-11-08
+
+#### CoverFlight：全站唯一一块封面飞行层
+
+- 新增 `CoverFlight.vue` + `useCoverFlight.js`：一块 Teleport 到 body 的 fixed 元素
+  （没有 transform 祖先），统管所有"列表 → 详情 → 列表"与"缩略图 → 灯箱 → 缩略图"
+  的封面飞行。两个端点只负责给矩形：列表在点下去时交出封面、返回时量出**当前**
+  目标格；详情 / 灯箱挂上后量出终点，飞完再把图交还给自己的 `<img>`。
+- 取代 `useCoverHandoff` 的 sessionStorage 矩形交接——旧方案里列表与详情是两棵 DOM，
+  换页那一帧比例 / object-fit / hover 缩放都可能变，看起来就是一下"跳"；退出时也
+  拿不到"现在的卡片在哪"，切篇 / 改窗口 / 无限轨道复位都会落偏。
+- 生命周期：`beginCoverFlight()` → 可选 `liftCoverFlightTo()`（列表淡出的 240ms 里
+  先轻微起势，避免"点下去先愣一下"）→ `animateCoverFlightTo(dest)` → 同帧
+  `hideCoverFlight()` 并显示目标自己的封面。灯箱落地时若大图未解码完会多等一拍，
+  揭示动画挪到落地那一刻再演；图始终是同一张（同一个 URL），不会闪出第二份请求。
+- ECHOES ⇄ 详情专用这一份飞行层：路由离开 `/echoes`（点导航、浏览器跳转）立即收掉，
+  不让它浮在下一个页面上。各灯箱（Lightbox / MePhotoLightbox）与 GALLERY / ME GALLERY /
+  PHOTOGRAPHY / PROJECTION 的缩略图来源矩形同步接入。
+- BlogBook 随之大幅简化（净 -500 行左右，交接逻辑全部上移）；新增验收脚本
+  `tools/verify-cover-flight.mjs`。
+
 ### fix: 62.1 — 2026-11-07
 
 - `/projection` 直连 404：路由与页面在 update 62 里上线了，但 SEO 三处注册被漏掉——

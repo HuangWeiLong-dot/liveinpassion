@@ -20,6 +20,16 @@ import { gsap } from 'gsap';
 import { loadImage } from '../composables/useImageLoader.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
 import { rememberCoverHandoff, consumeReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
+import {
+  animateCoverFlightTo,
+  beginCoverFlight,
+  getCoverFlightMeta,
+  getCoverFlightMode,
+  getCoverFlightSlug,
+  hideCoverFlight,
+  isCoverFlightActive,
+  liftCoverFlightTo,
+} from '../composables/useCoverFlight.js';
 // 轨道的姿态数学（纯数学，不依赖 three / WebGL）：整排卡片贴在圆柱上的位置、
 // 转角、后退与投影。**已经没有 WebGL overlay 了**，见那个文件的头注释。
 import {
@@ -407,6 +417,29 @@ const TAKEOVER_MS = 240;
 //   canvas 扭曲层删掉之后它就没有任何读取方了 —— 别再照着旧注释"补"一个回来，
 //   真正要对齐的只有上面那一个 TAKEOVER_MS。
 
+// 被点元素里的"封面那一格"：LOOKBACK 是 .jb-media，ARCHIVE 是 frame 里的 img，
+// WORLD 的展开层可能直接给 img / figure。
+function coverElOf(el) {
+  if (!el) return null;
+  if (el.matches?.('img')) return el;
+  return el.querySelector?.('.jb-media')
+    || el.querySelector?.('.ba-frame img, .bw-piece img, figure img, img')
+    || el;
+}
+
+function rectSnapshot(r) {
+  return r && r.width && r.height
+    ? { left: r.left, top: r.top, width: r.width, height: r.height }
+    : null;
+}
+
+/** 列表页这一屏的底色（详情覆盖层第一帧要顶着它，避免整屏亮/暗一档） */
+function listStageBg() {
+  const stage = document.querySelector('.ba-archive') || document.querySelector('.jb-stage');
+  const c = stage ? getComputedStyle(stage).backgroundColor : '';
+  return c && c !== 'rgba(0, 0, 0, 0)' ? c : null;
+}
+
 function openPost(post, el = null, query = null, instant = false) {
   if (opening.value || !post) return;
   opening.value = true;
@@ -423,45 +456,102 @@ function openPost(post, el = null, query = null, instant = false) {
   const clicked = el
     || cards.find((c) => Number(c.dataset.postIndex) === i)   // 探针调用时退回第一份
     || null;
-  // 被点的那张**不参与渐隐**：它要一直亮着，等详情页那张封面从同一个矩形接手
-  // （见 BlogDetailView 的 .jb-card:not(.is-flying)）。
-  clicked?.classList.add('is-flying');
 
+  // 桌面默认详情才交给飞行层。窄屏 / 墙角 / 封面视图 / reduced-motion 保持原路
+  // （它们各自的封面版面不是"右列那一格"，飞行层没有意义）。
+  const narrow = typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(max-width: 1024px)').matches;
+  const wantFlight = !reduceMotion && !narrow && !query?.view;
 
-  // 相邻那两格也一起带过去：详情页左列是三格（上一篇/当前/下一篇），
-  // 两侧的封面也从列表里各自那一格飞过去（stagger 0.035）。同样按 DOM 相邻取。
-  // ⚠ 这段放在函数里、等跳转前**再跑一次**：TAKEOVER_MS 里轨道可能还在惯性滑动，
-  //   起点矩形要以"跳转那一刻"的位置为准，否则封面会从旧位置起飞。
-  const recordHandoff = () => {
-    const di = clicked ? cards.indexOf(clicked) : -1;
-    const neighbors = di >= 0
-      ? [di - 1, di + 1]
-        .filter((k) => k >= 0 && k < cards.length)
-        .map((k) => ({
-          slug: blogPosts[Number(cards[k].dataset.postIndex) || 0]?.slug,
-          rect: cards[k].querySelector('.jb-media')?.getBoundingClientRect(),
-        }))
-        .filter((n) => n.slug)
-      : [];
-    // 这一页的底色也带走一份（详情页在交接这段时间要顶着同一个底色）。
-    // ⚠ 现场读 .jb-stage 的计算值，别把 #0b0b0c 抄到 JS 里：那一档颜色归
-    //   scoped 样式里的 --jb-bg 管，抄一份出来迟早会和主题/改色对不上。
-    const stage = document.querySelector('.ba-archive') || document.querySelector('.jb-stage');
-    rememberCoverHandoff(post.slug, clicked, {
-      index: i,
-      listLeft: scroller.value?.scrollLeft ?? 0,
-      neighbors,
-      stageBg: stage ? getComputedStyle(stage).backgroundColor : null,
-    });
-  };
-  recordHandoff();
+  let flightStarted = false;
+  let startRect = null;
+  if (wantFlight && clicked) {
+    const cover = coverElOf(clicked);
+    startRect = rectSnapshot(cover?.getBoundingClientRect?.());
+    const coverImg = cover?.matches?.('img') ? cover : cover?.querySelector?.('img');
+    const src = coverImg?.currentSrc || coverImg?.src || post.image?.src || '';
+    if (startRect && src) {
+      flightStarted = beginCoverFlight({
+        src,
+        slug: post.slug,
+        mode: 'enter',
+        rect: startRect,
+        naturalWidth: coverImg?.naturalWidth || 0,
+        naturalHeight: coverImg?.naturalHeight || 0,
+        stageBg: listStageBg(),
+        sourceEl: clicked,
+        sourceSlug: post.slug,
+      });
+    }
+    if (flightStarted) {
+      // 封面已经由飞行层接管：列表里那一格把图藏掉，整格跟着幕布一起淡出。
+      clicked.classList.add('is-flying', 'is-flight-source');
+      // 列表淡出的 240ms 里先轻微起势 —— 点下去就有东西在动，不再"愣一下"。
+      // 后面的 fly 会从当前矩形接着走，不会跳。
+      const grow = 1.045;
+      const w = startRect.width * grow;
+      const h = startRect.height * grow;
+      liftCoverFlightTo({
+        left: startRect.left - (w - startRect.width) / 2 + 6,
+        top: startRect.top - (h - startRect.height) / 2,
+        width: w,
+        height: h,
+      }, { duration: TAKEOVER_MS / 1000, ease: 'power1.out' });
+    }
+  }
 
-  // 跳转等这一拍演完（TAKEOVER_MS）。不留这段时间的话路由立刻换页，keep-alive
-  // 把列表整个摘出文档 —— 卡片是"啪"一下没的，根本没有渐隐可言。
-  // 详情覆盖层自己负责动画；这一跳不需要路由转场，否则两套动画会打架。
+  // 没有飞行层（窄屏 / 视图模式 / reduced-motion / 接管失败）：
+  // 保留原来的 sessionStorage 交接，详情页走它自己的分支。
+  if (!flightStarted) {
+    clicked?.classList.add('is-flying');
+
+    // 相邻那两格也一起带过去：详情页左列是三格（上一篇/当前/下一篇），
+    // 两侧的封面也从列表里各自那一格飞过去（stagger 0.035）。同样按 DOM 相邻取。
+    // ⚠ 这段放在函数里、等跳转前**再跑一次**：TAKEOVER_MS 里轨道可能还在惯性滑动，
+    //   起点矩形要以"跳转那一刻"的位置为准，否则封面会从旧位置起飞。
+    const recordHandoff = () => {
+      const di = clicked ? cards.indexOf(clicked) : -1;
+      const neighbors = di >= 0
+        ? [di - 1, di + 1]
+          .filter((k) => k >= 0 && k < cards.length)
+          .map((k) => ({
+            slug: blogPosts[Number(cards[k].dataset.postIndex) || 0]?.slug,
+            rect: cards[k].querySelector('.jb-media')?.getBoundingClientRect(),
+          }))
+          .filter((n) => n.slug)
+        : [];
+      // 这一页的底色也带走一份（详情页在交接这段时间要顶着同一个底色）。
+      // ⚠ 现场读 .jb-stage 的计算值，别把 #0b0b0c 抄到 JS 里：那一档颜色归
+      //   scoped 样式里的 --jb-bg 管，抄一份出来迟早会和主题/改色对不上。
+      rememberCoverHandoff(post.slug, clicked, {
+        index: i,
+        listLeft: scroller.value?.scrollLeft ?? 0,
+        neighbors,
+        stageBg: listStageBg(),
+      });
+    };
+    recordHandoff();
+
+    // 跳转等这一拍演完（TAKEOVER_MS）。不留这段时间的话路由立刻换页，keep-alive
+    // 把列表整个摘出文档 —— 卡片是"啪"一下没的，根本没有渐隐可言。
+    // 详情覆盖层自己负责动画；这一跳不需要路由转场，否则两套动画会打架。
+    clearTimeout(holdTimer);
+    holdTimer = window.setTimeout(() => {
+      recordHandoff(); // 重新记一次（见上）
+      skipNextPageTransition();
+      router
+        .push({ name: 'echo-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
+        .catch(() => {})
+        .finally(() => { opening.value = false; });
+    }, TAKEOVER_MS);
+    return;
+  }
+
+  // 飞行层已经在动：等列表幕布淡完再换页，图继续留在 body 上的那一份里，
+  // 换页这一帧不碰它。
   clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
-    recordHandoff(); // 重新记一次（见上）
     skipNextPageTransition();
     router
       .push({ name: 'echo-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
@@ -1492,6 +1582,11 @@ function activate() {
   setCoverCurtain(false);
   document.documentElement.classList.remove('blog-detail-open');
   clearTimeout(holdTimer);
+  // 非返程的重新进入（比如从详情切到别的页面、再回 ECHOES）：把上一次飞行
+  // 留在卡片上的标记清掉，否则那张图会一直是 opacity: 0。返程的目标标记由
+  // route watcher 在下一拍挂上，这里先清不会误伤。
+  document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying, .is-flight-source')
+    .forEach((el) => el.classList.remove('is-flying', 'is-flight-source'));
   // 从详情返回这一趟：周围元素渐入（规则见上面的 html.bd-return-fade 那组）。
   //
   // 判据是详情在退出时置的**内存标记**；触发点见下面的 route watcher ——
@@ -1557,7 +1652,9 @@ function deactivate() {
 //   就位，不会先闪一帧。
 // 被点的那张卡排除在外：封面正从它那一格飞回来，它得先亮着接手，否则是个洞。
 const RETURN_FADE_SELECTOR = [
-  '.jb-wordmark', '.jb-rail', '.jb-end', 'header',
+  // ⚠ 不再把 header 放进 GSAP 补间：它由 .shell.is-ready > #header 的 CSS 过渡
+  //   负责（activate 摘掉幕布类时自己会淡回来）。两边同时写 opacity 会互相覆盖。
+  '.jb-wordmark', '.jb-rail', '.jb-end',
   '.jb-card:not(.is-flying)',
 ].join(', ');
 
@@ -1566,17 +1663,131 @@ const RETURN_FADE_SELECTOR = [
 // 不会让落点那一格变慢 —— 慢下来的只是"周围重新长出来"这一下。
 const RETURN_FADE = 1.0;
 
+// 详情里换篇时把 ARCHIVE 的焦点同步过去（事件从 BlogDetailView 发）。
+// keep-alive 让列表即使不在屏幕上也能更新，返回时相框已经在正确的位置上。
+function onDetailSlug(event) {
+  const slug = event?.detail?.slug;
+  if (!slug || viewMode.value !== 'archive') return;
+  const idx = blogPosts.findIndex((p) => p.slug === slug);
+  if (idx >= 0 && archiveIndex.value !== idx) archiveIndex.value = idx;
+}
+
+// ── 飞行层返程：落点现场量 ────────────────────────────────────────────────
+// 不再用"进入时的那个矩形"：切篇、改窗口、无限轨道复位、归档上下翻页
+// 都会让旧坐标失效。这里直接找**当前这一篇**对应的 DOM 格，量它此刻的矩形。
+function coverRectOf(el) {
+  return rectSnapshot(coverElOf(el)?.getBoundingClientRect?.());
+}
+
+/** LOOKBACK：同一篇在轨道里铺了三份，挑屏幕上露得最多、离中心最近的那一份 */
+function flightCardByIndex(idx) {
+  const vw = window.innerWidth;
+  let best = null;
+  let bestScore = -Infinity;
+  for (const card of document.querySelectorAll('.jb-card')) {
+    if (Number(card.dataset.postIndex) !== idx) continue;
+    const rect = coverRectOf(card);
+    if (!rect) continue;
+    const overlap = Math.max(0, Math.min(rect.left + rect.width, vw) - Math.max(rect.left, 0));
+    const center = Math.abs(rect.left + rect.width / 2 - vw / 2);
+    const score = overlap * rect.height - center * 120;
+    if (score > bestScore) {
+      bestScore = score;
+      best = card;
+    }
+  }
+  return best;
+}
+
+/** 找返程落点（不要求此刻已经有非零矩形，后面再等布局） */
+function flightTargetFor(slug) {
+  if (!slug) return null;
+  const meta = getCoverFlightMeta();
+
+  if (viewMode.value === 'archive') {
+    // 当前这一篇的相框：切篇后它可能只是上下预览（scale 0.86），
+    // 但相框本身就是按图的比例撑的，落上去仍然是同一张图。
+    const frame = document.querySelector(`.ba-frame[data-slug="${CSS.escape(slug)}"]`);
+    if (frame) return frame;
+    return document.querySelector('.ba-frame.is-active') || null;
+  }
+
+  if (viewMode.value === 'world') {
+    if (meta.sourceEl && meta.sourceEl.isConnected) return meta.sourceEl;
+    return null;
+  }
+
+  const idx = blogPosts.findIndex((p) => p.slug === slug);
+  const card = idx >= 0 ? flightCardByIndex(idx) : null;
+  if (card) return card;
+  if (meta.sourceEl && meta.sourceEl.isConnected) return meta.sourceEl;
+  return null;
+}
+
 watch(
   () => route.path,
   async (p) => {
     if (p !== '/echoes' || !consumeReturningFromDetail()) return;
+    const slug = getCoverFlightSlug();
+    const willLand = isCoverFlightActive() && getCoverFlightMode() === 'exit';
+
     await nextTick(); // 等列表的 DOM 真的回到文档里，再去找元素
+
+    // 先清掉上一趟的标记，再给这一趟的目标挂上（图先藏起来，等飞行层落地）
+    document.querySelectorAll('.is-flying, .is-flight-source').forEach((el) => {
+      el.classList.remove('is-flying', 'is-flight-source');
+    });
+
+    let target = null;
+    if (willLand) target = flightTargetFor(slug);
+    if (target) target.classList.add('is-flying');
+
+    // 周围元素渐入**和返程飞行并行**（不再是"飞完再淡"）。
+    // 目标那一格被 .is-flying 排除在外：它要立刻亮着接住封面。
     const els = document.querySelectorAll(RETURN_FADE_SELECTOR);
     if (els.length && !reduceMotion) {
       gsap.fromTo(els, { opacity: 0 }, {
         opacity: 1, duration: RETURN_FADE, ease: 'power2.out', overwrite: true,
         onComplete: () => { gsap.set(els, { clearProps: 'opacity' }); },
       });
+    }
+
+    if (willLand) {
+      if (!target) {
+        hideCoverFlight();
+      } else {
+        // 等布局 / restoreScroll 落定后再量矩形；最多等 12 帧。
+        // 归档相框有 0.5s 的 transform 过渡 —— 切篇时它可能还在移动，
+        // 所以只在**矩形稳定**之后才起飞（连续两帧一致）。
+        let prev = null;
+        let rect = null;
+        for (let k = 0; k < 12; k += 1) {
+          rect = coverRectOf(target);
+          if (rect && prev
+            && Math.abs(rect.left - prev.left) < 0.5
+            && Math.abs(rect.top - prev.top) < 0.5
+            && Math.abs(rect.width - prev.width) < 0.5) break;
+          prev = rect;
+          await new Promise((r) => requestAnimationFrame(r));
+        }
+        rect = coverRectOf(target);
+        if (rect) {
+          animateCoverFlightTo(rect, {
+            duration: reduceMotion ? 0 : 0.78,
+            ease: 'power2.inOut',
+            // 归档里切篇之后，当前这一篇可能只是上下预览（frame opacity 0.38）：
+            // 飞行层跟着暗到同一档，落地再交还时亮度不变。
+            opacity: Number(getComputedStyle(target).opacity) || 1,
+            onComplete: () => {
+              hideCoverFlight();
+              target.classList.remove('is-flying');
+            },
+          });
+        } else {
+          hideCoverFlight();
+          target.classList.remove('is-flying');
+        }
+      }
     }
     // ⚠ 这里原本还有一段"胶片那层的封面跟着一起淡回来"（canvas 不吃 CSS 的 opacity，
     //   所以以前要单独补一次）。WebGL 那层删掉之后 `film` 已经不存在了，
@@ -1599,6 +1810,9 @@ onMounted(async () => {
   if (viewMode.value === 'archive') document.documentElement.classList.add('echoes-locked');
   activate();
   window.addEventListener('resize', onResize);
+  // 详情页换篇时同步 ARCHIVE 焦点（见 onDetailSlug）。这个监听要一直挂着 ——
+  // 详情打开时列表是 deactivated 状态，但仍然需要接收这个事件。
+  window.addEventListener('echoes-detail-slug', onDetailSlug);
   // 切到别的标签页时停掉主循环：留着只是白烧 CPU/电，
   // 回来时 onActivated 的路径会把 target 咬回真实 scrollLeft。
   document.addEventListener('visibilitychange', onVisibility);
@@ -1670,6 +1884,7 @@ onUnmounted(() => {
   deactivate();
   unbindClickCapture();
   window.removeEventListener('resize', onResize);
+  window.removeEventListener('echoes-detail-slug', onDetailSlug);
   document.removeEventListener('visibilitychange', onVisibility);
   unbindArchiveControls();
   document.documentElement.classList.remove('echoes-locked');
@@ -1934,6 +2149,7 @@ function onVisibility() {
                 type="button"
                 class="ba-frame"
                 :class="{ 'is-active': f.d === 0 }"
+                :data-slug="f.work.slug"
                 :style="{ '--d': String(f.d), '--s': f.d === 0 ? 1 : 0.86, zIndex: 10 - Math.abs(f.d) }"
                 :aria-label="f.d === 0 ? `打开 ${f.work.cardTitle}` : `切换到 ${f.work.cardTitle}`"
                 @click="f.d === 0 ? onArchiveOpen(f.work, $event.currentTarget) : setArchiveIndex(f.no)"
@@ -3126,6 +3342,22 @@ function onVisibility() {
 :global(html.bd-taking-cover .ba-frame:not(.is-flying)) {
   opacity: 0;
   transition: opacity 0.34s ease;
+}
+
+/* 飞行层接管之后：被点的那一格不再"保持亮着等照片回来"（照片已经不在它里面了），
+   整格跟着幕布一起淡出。权重压过上面那条 :not(.is-flying) 的豁免。 */
+:global(html.bd-taking-cover .ba-frame.is-flying.is-flight-source),
+:global(html.bd-taking-cover .jb-card.is-flying.is-flight-source) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+/* 飞行期间，来源格 / 落点格自己的图先藏起来：
+   画面上只有 body 上那一张，不会出现"卡片里一张、飞行层一张"的双边。 */
+.jb-card.is-flying .jb-media img,
+.ba-frame.is-flying img {
+  opacity: 0;
 }
 
 /* 切换到别的视图：整页向右退场 */

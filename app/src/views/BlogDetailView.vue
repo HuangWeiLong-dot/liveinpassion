@@ -25,6 +25,17 @@ import { playGlitchReveal } from '../composables/useCardFx.js';
 import { useLightbox } from '../composables/useLightbox.js';
 import { readCoverHandoff, markReturningFromDetail, setCoverCurtain } from '../composables/useCoverHandoff.js';
 import { skipNextPageTransition } from '../composables/usePageTransition.js';
+import {
+  animateCoverFlightTo,
+  beginCoverFlight,
+  getCoverFlightMeta,
+  getCoverFlightMode,
+  getCoverFlightRect,
+  getCoverFlightSlug,
+  hideCoverFlight,
+  isCoverFlightActive,
+  liftCoverFlightTo,
+} from '../composables/useCoverFlight.js';
 import AppFooter from '../components/AppFooter.vue';
 import BlogBook from '../components/BlogBook.vue';
 
@@ -98,6 +109,8 @@ const nextPost = computed(() => (
 ));
 
 let handoff = null;
+// 列表交给飞行层的底色（dark 下列表比站点默认更深一档）。没走飞行层时退回 handoff。
+let flightStageBg = null;
 let timeline = null;
 let leaving = false;
 let touchStartPt = null;
@@ -316,6 +329,13 @@ function loadFeatured() {
 // 媒体盒是 `width: 100%; aspect-ratio: <图的比例>; max-height: 100%`，所以解码完
 // 之后直接量这个盒子就是终点 —— 不用旧版那套"按 naturalWidth 反算可用区域"的数学，
 // 而且更准：盒子的比例本来就是图的比例。
+function rectFromEl(el) {
+  const r = el?.getBoundingClientRect?.();
+  return r && r.width && r.height
+    ? { left: r.left, top: r.top, width: r.width, height: r.height }
+    : null;
+}
+
 function coverBox() {
   const el = coverMediaEl();
   if (!el) return null;
@@ -373,14 +393,15 @@ function pinStageBg() {
   stageBgTween?.kill();
   stageBgTween = null;
   if (!detailRef.value) return;
-  if (handoff?.stageBg) gsap.set(detailRef.value, { backgroundColor: handoff.stageBg });
+  const from = flightStageBg || handoff?.stageBg;
+  if (from) gsap.set(detailRef.value, { backgroundColor: from });
   else gsap.set(detailRef.value, { clearProps: 'backgroundColor' });
 }
 
 /** 走到本页自己的底色（入场）。`at` 与面板淡入同拍。 */
 function toPageBg(duration, at = 0) {
   const to = pageBg();
-  if (!handoff?.stageBg || !detailRef.value || !to) return;
+  if (!(flightStageBg || handoff?.stageBg) || !detailRef.value || !to) return;
   stageBgTween?.kill();
   stageBgTween = gsap.to(detailRef.value, {
     backgroundColor: to,
@@ -392,7 +413,7 @@ function toPageBg(duration, at = 0) {
 
 /** 走回列表那一页的底色（退场）：走完这一趟，覆盖层和列表同色。 */
 function toStageBg(duration) {
-  const from = handoff?.stageBg;
+  const from = flightStageBg || handoff?.stageBg;
   if (!from || !detailRef.value) return;
   stageBgTween?.kill();
   stageBgTween = gsap.to(detailRef.value, {
@@ -742,6 +763,69 @@ function playEnter() {
   }, at(CURTAIN_AT));
 }
 
+// ── 飞行层入场 ──────────────────────────────────────────────────────────
+// 封面已经在 body 上（列表点的瞬间交出去的）。这里只做三件事：
+//   ① 量出右列媒体盒的矩形，把飞行层飞过去；
+//   ② 同一拍里淡入左侧面板、开始打字、撤幕布（全部叠在飞行途中）；
+//   ③ 落地同一帧隐藏飞行层、显示详情自己的封面。
+// 右列封面从头到尾是 opacity: 0 的占位，不存在"两个元素换手"的那一帧。
+function playFlightEnter(box) {
+  const inner = coverInnerEl();
+  const panel = panelRef.value;
+  if (!inner || !panel) {
+    hideCoverFlight();
+    revealStaticEnter();
+    return;
+  }
+  timeline?.kill();
+  disableTilt();
+  toPageBg(T_PANEL, PANEL_AT);
+  const at = (s) => (reducedMotion ? 0 : s);
+
+  timeline = gsap.timeline();
+  timeline.to(panel, { opacity: 1, duration: at(T_PANEL), ease: 'power1' }, at(PANEL_AT));
+  timeline.add(() => startTyping(), at(TYPE_AT));
+  timeline.add(() => { setCoverCurtain(false); }, at(CURTAIN_AT));
+
+  animateCoverFlightTo(box, {
+    duration: reducedMotion ? 0 : T_MAIN,
+    ease: EASE_TRAVEL,
+    onComplete: () => {
+      hideCoverFlight();
+      inner.classList.remove('is-flipping', 'is-measuring');
+      gsap.set(inner, {
+        clearProps: 'position,left,top,right,bottom,margin,width,height,transform',
+        opacity: 1,
+      });
+      const img = inner.querySelector('img');
+      if (img) gsap.set(img, { clearProps: 'width,height,maxWidth,maxHeight' });
+      inner.dataset.settled = '1';
+      enableTilt();
+      revealCoverGlitch();
+    },
+  });
+}
+
+/** 量不到终点 / 飞行层不可用时的兜底：封面直接落位，面板与打字照常 */
+function revealStaticEnter() {
+  const inner = coverInnerEl();
+  const panel = panelRef.value;
+  if (inner) {
+    inner.classList.remove('is-measuring', 'is-flipping');
+    gsap.set(inner, {
+      clearProps: 'position,left,top,right,bottom,margin,width,height,transform',
+      opacity: 1,
+    });
+    const img = inner.querySelector('img');
+    if (img) gsap.set(img, { clearProps: 'width,height,maxWidth,maxHeight' });
+  }
+  if (panel) gsap.set(panel, { opacity: 1 });
+  setCoverCurtain(false);
+  document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying, .is-flight-source')
+    .forEach((el) => el.classList.remove('is-flying', 'is-flight-source'));
+  startTyping();
+}
+
 // ── 换篇（只有键盘 ←/→ 与触摸横滑；页面上没有可见的翻篇控件）─────────────
 // 面板**不动**：旧正文整块淡出、新的从 0.35s 起淡入（两段同时存在才叫交叉淡）；
 // 封面交叉淡一下换成新图。
@@ -827,6 +911,58 @@ function close() {
     });
     return;
   }
+  // ── 飞行层退场 ────────────────────────────────────────────────────────
+  // 非窄屏、非 reduced-motion：把封面交给 body 上的飞行层，面板淡出的同时
+  // 就开始退场，很快换回列表；列表在飞行层底下恢复布局，再量出**当前这一篇**
+  // 的落点（切篇 / 改窗口 / 轨道复位都不会偏）。
+  if (!reducedMotion) {
+    const innerEl = coverInnerEl();
+    const panelEl = panelRef.value;
+    const coverImg = innerEl?.querySelector('img');
+    const src = post.value?.image?.src || coverImg?.currentSrc || '';
+    const liveRect = isCoverFlightActive() ? getCoverFlightRect() : null;
+    const startRect = liveRect || rectFromEl(coverImg || innerEl);
+    let started = isCoverFlightActive();
+    if (!started && startRect && src) {
+      started = beginCoverFlight({
+        src,
+        slug: route.params.slug,
+        mode: 'exit',
+        rect: startRect,
+        stageBg: flightStageBg,
+      });
+    }
+    if (started) {
+      if (innerEl) gsap.set(innerEl, { opacity: 0 });
+      timeline?.kill();
+      stopTyping();
+      disableTilt();
+      toStageBg(0.24);
+      gsap.to(panelEl, { opacity: 0, duration: 0.24, ease: 'power1' });
+      // 起势：面板淡出的 0.24s 里先轻微缩一点 —— 飞行层一直在动，不再"等列表"。
+      const now = getCoverFlightRect() || startRect;
+      if (now) {
+        const s = 0.985;
+        const w = now.width * s;
+        const h = now.height * s;
+        liftCoverFlightTo({
+          left: now.left + (now.width - w) / 2,
+          top: now.top + (now.height - h) / 2,
+          width: w,
+          height: h,
+        }, { duration: 0.24, ease: 'power1.inOut' });
+      }
+      // 等面板淡完再换页（否则左半边会被硬切）。换页后列表立刻开始量落点。
+      window.setTimeout(() => {
+        skipNextPageTransition();
+        markReturningFromDetail();
+        if (window.history.state && window.history.state.back) router.back();
+        else router.push('/echoes');
+      }, 200);
+      return;
+    }
+  }
+
   const inner = coverInnerEl();
   const panel = panelRef.value;
   const back = handoff?.rect;
@@ -956,13 +1092,63 @@ function onTouchEnd(e) {
 function scheduleEnter() {
   if (enterArmed) return; // 首挂载会来两次（见 enterArmed 的注释）
   enterArmed = true;
-  // ⚠ 这里**同步**把交接矩形读出来、并把封面摆到"卡片那一格"（可见）。
-  //   这一页挂上来时列表已经被 keep-alive 从文档里摘走了，而封面在 CSS 里是
-  //   opacity: 0 —— 要是等下面那两个 rAF 才摆，中间那 2–3 帧整屏是空的，
-  //   就是点卡片时那一下"闪烁"。
-  //   这么做是安全的：交接矩形是**视口坐标**，不依赖本页布局，所以不必等下一帧；
-  //   而终点（媒体盒）要等解码后才量得准，那一部分仍然留在 playEnter 里。
-  handoff = readCoverHandoff(route.params.slug);
+
+  // ── 飞行层接管：封面已经在 body 上飞着了 ───────────────────────────────
+  // 详情页自己的封面保持透明、只在最终版面上占位；量到右列矩形后把飞行层
+  // 接过去，落地的同一帧再把图还给这里。两条链路之间没有元素交接。
+  const flightEntry = isCoverFlightActive()
+    && getCoverFlightMode() === 'enter'
+    && getCoverFlightSlug() === route.params.slug;
+
+  if (flightEntry) {
+    const meta = getCoverFlightMeta();
+    handoff = null;
+    flightStageBg = meta?.stageBg || null;
+    const w = Number(meta?.naturalWidth);
+    const h = Number(meta?.naturalHeight);
+    if (w > 0 && h > 0) ratio.value = `${w} / ${h}`;
+
+    pinStageBg(); // 覆盖层第一帧顶着列表那一页的底色
+    gsap.set(panelRef.value, { opacity: 0 });
+    gsap.set(infoRef.value, { opacity: 0 });
+    const inner = coverInnerEl();
+    if (inner) {
+      inner.classList.remove('is-flipping', 'is-measuring');
+      gsap.set(inner, {
+        clearProps: 'position,left,top,right,bottom,margin,width,height,transform',
+        opacity: 0,
+      });
+      const img = inner.querySelector('img');
+      if (img) gsap.set(img, { clearProps: 'width,height,maxWidth,maxHeight' });
+    }
+    clearTimeout(infoSafety);
+    infoSafety = window.setTimeout(() => {
+      if (!typing.value) gsap.set(infoRef.value, { opacity: 1 });
+    }, 3000);
+
+    requestAnimationFrame(() => requestAnimationFrame(async () => {
+      if (leaving) return;
+      await nextTick();
+      const box = coverBox();
+      if (!box) {
+        // 量不到右列（窗口被关掉 / 布局异常）：别把图永远留在飞行层上
+        hideCoverFlight();
+        revealStaticEnter();
+        return;
+      }
+      playFlightEnter(box);
+    }));
+    return;
+  }
+
+  // ── 没有飞行层（直接打开 / 窄屏 / 墙角 / 封面视图 / reduced-motion）─────
+  // 直接打开时**不再读** sessionStorage 里的旧矩形：那份数据是上一次访问留下的，
+  // 会让封面从一个过期位置起飞。这里让 handoff = null，下面的 FLIP 退化成
+  // "从终点到终点"的静态落位，只保留面板淡入与打字。
+  const directOpen = !isNarrow.value && !isCorner.value && !isCoverView.value;
+  handoff = directOpen ? null : readCoverHandoff(route.params.slug);
+  // 非飞行路径（墙角 / 封面视图 / 窄屏）也把列表底色带过来，退场时别让整屏跳一档
+  flightStageBg = handoff?.stageBg || null;
   applyHandoffRatio();
   pinStageBg(); // 覆盖层的第一帧底色 = 列表那一页的底色（理由见 pageBg 那段）
   // 窄屏不摆"起点那一格"：封面在左侧抽屉里，不参与入场（见 playEnter 的窄屏分支）。
@@ -987,7 +1173,7 @@ function scheduleEnter() {
     //   和一条 1.5s 兜底定时器）。那时再补一遍入场，会把正在往回飞的封面重新摆回起点、
     //   把退场时间线掐掉 —— 用户按了返回，照片却掉头飞回右列。
     if (leaving) return;
-    handoff = readCoverHandoff(route.params.slug);
+    if (!directOpen) handoff = readCoverHandoff(route.params.slug);
     applyHandoffRatio();
     playEnter();
   };
@@ -1105,6 +1291,11 @@ onBeforeUnmount(() => {
 
 watch(() => route.params.slug, async () => {
   handoff = readCoverHandoff(route.params.slug) || handoff;
+  // 详情里用 ←/→ 换篇时，让还活着的 ECHOES 把 ARCHIVE 的焦点也跟着移过去。
+  // 这样按 Esc 返回时，封面落的是**当前这一篇**的正中相框，而不是上一篇的预览。
+  window.dispatchEvent(new CustomEvent('echoes-detail-slug', {
+    detail: { slug: route.params.slug },
+  }));
   await nextTick();
 });
 

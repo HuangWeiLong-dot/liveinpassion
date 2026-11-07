@@ -16,10 +16,12 @@ import MusicPlayer from './components/MusicPlayer.vue';
 import Lightbox from './components/Lightbox.vue';
 import BlockCursor from './components/BlockCursor.vue';
 import RouteProgress from './components/RouteProgress.vue';
+import CoverFlight from './components/CoverFlight.vue';
 import AppFooter from './components/AppFooter.vue';
 import { useBrandOverlay } from './composables/useBrandOverlay.js';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { hideCoverFlight } from './composables/useCoverFlight.js';
 
 // 品牌遮罩揭开之后：主体和四个人格先出来（它们在 Hero 里），
 // 头部／播放器／左下角那座 Ava 塔这批晚一步 —— 先把注意力留给画面。
@@ -93,6 +95,15 @@ watch(chromeHidden, (v) => {
   document.documentElement.classList.toggle('is-chrome-hidden', v);
 });
 
+// 飞行层只属于 ECHOES ⇄ 详情这一对路由。中途从别处离开（点导航、浏览器跳转）时
+// 立刻收掉，别让它浮在下一个页面上。
+watch(
+  () => route.fullPath,
+  (path) => {
+    if (!path.startsWith('/echoes')) hideCoverFlight();
+  }
+);
+
 onMounted(() => document.addEventListener('keydown', onKeydown));
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 </script>
@@ -111,6 +122,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
   <!-- 顶部加载进度：点导航即开始预取目标页首屏图片（见 composables/useRouteProgress.js）。
        自己 Teleport 到 body、z-index 压过转场板子，主题色跟着 --text-primary 走。 -->
   <RouteProgress />
+
+  <!-- ECHOES ⇄ 详情之间那张会飞的封面。整站唯一一份，两个视图只负责给矩形。 -->
+  <CoverFlight />
 
   <router-view v-slot="{ Component }">
     <keep-alive>

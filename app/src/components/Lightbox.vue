@@ -6,6 +6,13 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useLightbox } from '../composables/useLightbox.js';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import { photoDate } from '../data/photoUtils.js';
+import {
+  animateCoverFlightTo,
+  beginCoverFlight,
+  getCoverFlightRect,
+  hideCoverFlight,
+  isCoverFlightActive,
+} from '../composables/useCoverFlight.js';
 
 const {
   isOpen,
@@ -28,6 +35,29 @@ const stageEl = ref(null);
 // 紧接着 load 事件仍可能再来一次，不挡住就会把画布重建、揭示重播一遍。
 let revealedFor = '';
 let detachTilt = null;
+
+// ── CoverFlight：缩略图 → 灯箱大图 → 缩略图 ─────────────────────────────
+// 和 ECHOES 共用 body 上的那一块飞行层。打开时先把大图藏起来、让飞行层从
+// 来源窗口飞过来；关闭时反过来飞回去。图始终是同一张（同一个 URL）。
+const flightHidden = ref(false);
+const flightPending = ref(false);
+const closingFlight = ref(false);
+const reducedMotion = typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function rectOf(el) {
+  const r = el?.getBoundingClientRect?.();
+  return r && r.width && r.height
+    ? { left: r.left, top: r.top, width: r.width, height: r.height }
+    : null;
+}
+
+function sourceRectOf(el) {
+  if (!el) return null;
+  const img = el.matches?.('img') ? el : el.querySelector?.('img');
+  return rectOf(img || el);
+}
 
 // ── 详情舞台 ────────────────────────────────────────────────────────────
 // 舞台的宽高由照片比例算出来（而不是让 <img> 自己撑开）：
@@ -103,10 +133,36 @@ function settleIfCached() {
 function revealIfNeeded() {
   const img = imgEl.value;
   if (!img || !img.complete || !img.naturalWidth) return;
+  // 飞行期间舞台是空的（只有飞行层那张图）：揭示挪到落地那一刻再演
+  if (flightHidden.value || flightPending.value) return;
   const key = img.getAttribute('src') || '';
   if (!key || key === revealedFor) return;
   revealedFor = key;
   playGlitchReveal(img, stageEl.value);
+}
+
+/** 飞行层落地：把大图交还给灯箱自己的 <img>；图还没解码完就多等一拍 */
+function landFlight() {
+  const img = imgEl.value;
+  if (img && img.complete && img.naturalWidth) {
+    flightHidden.value = false;
+    flightPending.value = false;
+    hideCoverFlight();
+    if (!loaded.value) {
+      loaded.value = true;
+      onImageSettled();
+    }
+    revealIfNeeded();
+    return;
+  }
+  // 大图还在路上：飞行层继续顶着，别让骨架屏闪一下
+  flightPending.value = true;
+  window.setTimeout(() => {
+    if (!flightPending.value) return;
+    flightPending.value = false;
+    flightHidden.value = false;
+    hideCoverFlight();
+  }, 900);
 }
 
 function handleLoad(event) {
@@ -121,6 +177,12 @@ function handleLoad(event) {
     loaded.value = true;
     failed.value = false;
     onImageSettled();
+    // 飞行层在等这张图：解码完就把舞台还回来，再演揭示
+    if (flightPending.value) {
+      flightPending.value = false;
+      flightHidden.value = false;
+      hideCoverFlight();
+    }
     // 解码完成立刻来一次抖色揭示（开图和 ← → 切图都是这条路径）
     revealIfNeeded();
   };
@@ -139,22 +201,68 @@ function handleError() {
 // 不再做"窗口克隆飞到大图位置"的过渡 —— 那个克隆只是点击图的一张替代品，
 // 点击之后应该看到的就是这张图本身逐渐加载出来。
 watch(isOpen, async (open) => {
-  if (!open) return;
+  if (!open) {
+    // 关闭飞行自己拥有飞行层，别在这里把它收掉
+    if (closingFlight.value) return;
+    if (isCoverFlightActive()) hideCoverFlight();
+    flightHidden.value = false;
+    flightPending.value = false;
+    return;
+  }
+
   revealedFor = '';
   loaded.value = false;
   failed.value = false;
+  const from = origin.value;
+  const willFly = !reducedMotion && Boolean(from?.rect) && Boolean(currentSrc.value);
+  flightHidden.value = willFly;
+  flightPending.value = false;
+  closingFlight.value = false;
+
   await nextTick();
   settleIfCached();
   probeAspect(currentSrc.value);
   const img = imgEl.value;
-  if (!img) return;
+  if (!img) {
+    flightHidden.value = false;
+    hideCoverFlight();
+    return;
+  }
   // 先按来源窗口里那张图的比例把舞台撑好，故障揭示才有正确的尺寸；
   // 大图解码完成后再由 handleLoad 用真实比例校正
-  const from = origin.value;
   const a = from?.aspect
     || (img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0)
     || (from?.rect ? from.rect.width / from.rect.height : 0);
   if (a > 0) aspect.value = a;
+
+  if (!willFly) return;
+
+  // 从来源窗口飞到大图舞台。大图自己的 <img> 先藏着（flightHidden），
+  // 落地同一帧再交还 —— 中间不存在第二个元素换手。
+  const started = beginCoverFlight({
+    src: resolve(currentSrc.value),
+    mode: 'enter',
+    rect: from.rect,
+    sourceEl: from.sourceEl || null,
+  });
+  if (!started) {
+    flightHidden.value = false;
+    return;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!isOpen.value) return;
+    const box = rectOf(stageEl.value);
+    if (!box) {
+      flightHidden.value = false;
+      hideCoverFlight();
+      return;
+    }
+    animateCoverFlightTo(box, {
+      duration: 0.72,
+      ease: 'power2.inOut',
+      onComplete: landFlight,
+    });
+  }));
 });
 
 // 切换照片：骨架屏重新盖住舞台，新图解码完成后再淡入并重新揭示
@@ -178,6 +286,46 @@ function onResize() {
 // 替代品飞回去，看起来就是闪一下；和开图那边一致地只做淡出才顺。
 function requestClose() {
   if (!isOpen.value) return;
+
+  // 有关闭飞行：从大图舞台飞回来源窗口。来源窗口现场量 —— 筛选、华容道
+  // 位移、窗口 resize 之后它的位置都可能和打开时不同。
+  const from = origin.value;
+  if (!reducedMotion && from?.rect && currentSrc.value) {
+    const starting = (isCoverFlightActive() && getCoverFlightRect())
+      || rectOf(stageEl.value)
+      || rectOf(imgEl.value);
+    const src = resolve(currentSrc.value);
+    if (starting && src) {
+      closingFlight.value = true;
+      flightHidden.value = true;
+      flightPending.value = false;
+      if (!isCoverFlightActive()) {
+        beginCoverFlight({
+          src,
+          mode: 'exit',
+          rect: starting,
+          sourceEl: from.sourceEl || null,
+        });
+      }
+      const target = sourceRectOf(from.sourceEl) || from.rect;
+      animateCoverFlightTo(target, {
+        duration: 0.72,
+        ease: 'power2.inOut',
+        opacity: 1,
+        onComplete: () => {
+          hideCoverFlight();
+          closingFlight.value = false;
+        },
+      });
+      // 遮罩和大图一起淡出；飞行层始终压在它们上面
+      close();
+      return;
+    }
+  }
+
+  if (isCoverFlightActive()) hideCoverFlight();
+  flightHidden.value = false;
+  flightPending.value = false;
   close();
 }
 
@@ -202,7 +350,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="lightbox" id="lightbox" ref="rootEl" :class="{ active: isOpen, 'has-strip': stripOn }">
+  <div
+    class="lightbox"
+    id="lightbox"
+    ref="rootEl"
+    :class="{ active: isOpen, 'has-strip': stripOn, 'is-flight': flightHidden }"
+  >
     <div class="lightbox-bg" id="lightboxBg" @click="requestClose"></div>
     <div class="lightbox-nav lightbox-prev" id="lightboxPrev" @click="prev"></div>
     <div class="lightbox-nav lightbox-next" id="lightboxNext" @click="next"></div>
@@ -212,7 +365,7 @@ onUnmounted(() => {
         <img
           ref="imgEl"
           class="lightbox-img"
-          :class="{ 'is-loaded': loaded }"
+          :class="{ 'is-loaded': loaded, 'is-flight-hidden': flightHidden }"
           :src="currentSrc ? resolve(currentSrc) : null"
           alt="Lightbox Image"
           id="lightboxImg"
@@ -239,3 +392,14 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 飞行层接管的这段时间：舞台上的大图和骨架都先别露出来 */
+.lightbox-img.is-flight-hidden {
+  opacity: 0 !important;
+}
+
+.lightbox.is-flight .lightbox-skeleton {
+  opacity: 0 !important;
+}
+</style>

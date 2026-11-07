@@ -455,6 +455,7 @@ function originFromEvent(event, selector = '.win__img') {
     aspect: img?.naturalWidth && img?.naturalHeight
       ? img.naturalWidth / img.naturalHeight
       : r.width / r.height,
+    sourceEl: el || null,
   };
 }
 

@@ -19,11 +19,6 @@
             --font-sans: 'Poppins', sans-serif;
             --font-body: 'Poppins', sans-serif;
             --invert: 0;
-            /* 阅读器纸页（BlogBook）：亮色是比 #FAFAFA 更白的暖纸，边框更深 */
-            --book-paper: #FFFDF8;
-            --book-paper-deep: #EFE9DD;
-            --book-paper-line: #8E939A;
-            --book-paper-edge: color-mix(in srgb, var(--text-primary) 22%, transparent);
         }
 
         :root.dark {
@@ -36,10 +31,6 @@
             --background-secondary: #2D2D2D;
             --accent-color: #60A5FA;
             --invert: 1;
-            --book-paper: color-mix(in srgb, var(--bg) 96%, #d8c9a3 4%);
-            --book-paper-deep: color-mix(in srgb, var(--bg) 86%, #000 14%);
-            --book-paper-line: color-mix(in srgb, var(--border) 68%, var(--text-primary) 32%);
-            --book-paper-edge: color-mix(in srgb, var(--text-primary) 18%, transparent);
         }
 
         #friend-detail-page,

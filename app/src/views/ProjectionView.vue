@@ -15,7 +15,7 @@
 // 片源在 R2：img.liveinpassion.me/films/the-projection.mp4（134 MB，带 Range，
 // 可以自由拖动）。海报底图用片尾云隙光的同一帧，压暗、模糊后当光晕用。
 
-import { computed, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
 import { useMusicPlayer } from '../composables/useMusicPlayer.js';
 
 const FILM_SRC = 'https://img.liveinpassion.me/films/the-projection.mp4';
@@ -346,13 +346,22 @@ function onKeydown(event) {
   }
 }
 
+// ── 页面级主题类 ─────────────────────────────────────────────────────────
+// ⚠ 这一页是 keep-alive 的：`onBeforeUnmount` 在"去别的页面"时**不会**跑。
+//   以前只在 unmount 里摘 `projection-page`，于是从 FILM 回 HOME 之后：
+//   `html.projection-page` 还在 —— 头部的字色被固定成浅色（浅色主题下直接
+//   看不见），左下角 Avatar / 音乐播放器被隐藏。必须在 onDeactivated 里摘，
+//   回来时在 onActivated 里重新挂上。
+function applyProjectionPage(on) {
+  document.documentElement.classList.toggle('projection-page', on);
+  if (!on) document.documentElement.classList.remove('projection-immersive');
+}
+
 // ── 生命周期 ──────────────────────────────────────────────────────────────
 onMounted(() => {
-  document.documentElement.classList.add('projection-page');
+  applyProjectionPage(true);
   document.addEventListener('keydown', onKeydown);
   document.addEventListener('fullscreenchange', onFullscreenChange);
-  // 进站时点 ENTER 已经把站点音乐起播了。这一页的配乐只有呼吸，先把歌停掉。
-  if (musicPlaying.value) toggleMusic();
 
   stageEl.value?.addEventListener('pointermove', onPointerMove, { passive: true });
   stageEl.value?.addEventListener('pointerleave', onPointerLeave, { passive: true });
@@ -370,6 +379,11 @@ onMounted(() => {
 
 // keep-alive 失活：正片必须停，否则离开这一页还能听见呼吸；回来重新停在标题卡。
 onDeactivated(() => {
+  // 摘掉页面级主题类，并把只属于这一页的键盘监听收回 ——
+  // 否则在 HOME 上按 F 仍会去请求全屏、按 M 会去切这一页的音量。
+  applyProjectionPage(false);
+  document.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
   const v = videoEl.value;
   if (v) v.pause();
   state.value = 'poster';
@@ -379,8 +393,16 @@ onDeactivated(() => {
   pointerRaf = 0;
 });
 
+// keep-alive 回到这一页（onMounted 不会再跑）：把主题类与键盘监听补回来。
+onActivated(() => {
+  applyProjectionPage(true);
+  document.addEventListener('keydown', onKeydown);
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  if (musicPlaying.value) toggleMusic();
+});
+
 onBeforeUnmount(() => {
-  document.documentElement.classList.remove('projection-page');
+  applyProjectionPage(false);
   document.removeEventListener('keydown', onKeydown);
   document.removeEventListener('fullscreenchange', onFullscreenChange);
   stageEl.value?.removeEventListener('pointermove', onPointerMove);

@@ -46,7 +46,13 @@ export function useLightbox() {
     isLoading.value = true;
     isOpen.value = true;
     origin.value = from && from.rect
-      ? { rect: { ...from.rect }, src: from.src || '', aspect: from.aspect || 0 }
+      ? {
+        rect: { ...from.rect },
+        src: from.src || '',
+        aspect: from.aspect || 0,
+        // 点击的那扇窗（开/关都由 CoverFlight 从它量落点）
+        sourceEl: from.sourceEl || null,
+      }
       : null;
     document.body.style.overflow = 'hidden';
   }

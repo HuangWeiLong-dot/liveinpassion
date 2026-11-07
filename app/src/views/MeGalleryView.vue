@@ -315,9 +315,11 @@ onBeforeUnmount(() => {
 const lightboxOpen = ref(false);
 const lightboxSrc = ref('');
 const lightboxDate = ref('');
+const lightboxSourceEl = ref(null);
 // 灯箱主图用压缩图（原图太大，切换时容易停在上一张）
-function openPhoto(item) {
+function openPhoto(item, event = null) {
   hideTip();
+  lightboxSourceEl.value = event?.currentTarget || null;
   lightboxSrc.value = item.thumb;
   lightboxDate.value = item.date || '';
   lightboxOpen.value = true;
@@ -409,7 +411,7 @@ function scrollStrip(direction) {
               :style="{ '--win-i': index }"
               type="button"
               :aria-label="`ME: ${item.date || item.filename}`"
-              @click="openPhoto(item)"
+              @click="openPhoto(item, $event)"
               @pointerenter="enterWindow(item, $event)"
               @pointerleave="leaveWindow()"
             >
@@ -446,7 +448,7 @@ function scrollStrip(direction) {
               :class="{ 'is-active': item.thumb === stripActive }"
               type="button"
               :aria-label="`ME: ${item.date || item.filename}`"
-              @click="openPhoto(item)"
+              @click="openPhoto(item, $event)"
             >
               <!-- 缩略图是异步生成的：没拿到之前先铺一块中性占位，绝不挂空 src ——
                    空 src 的 <img> 会把 alt（文件名）和破图图标画在 66px 的格子里。 -->
@@ -498,6 +500,7 @@ function scrollStrip(direction) {
       :visible="lightboxOpen"
       :src="lightboxSrc"
       :date="lightboxDate"
+      :source-el="lightboxSourceEl"
       @close="lightboxOpen = false"
     />
   </main>
