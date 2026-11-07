@@ -1736,7 +1736,9 @@ watch(
       return;
     }
     const slug = getCoverFlightSlug();
-    const willLand = isCoverFlightActive() && getCoverFlightMode() === 'exit';
+    // 任何还活着的飞行层都要接回列表：中途按 Esc / 点空白退出时，
+    // 详情页接管的是 mode='enter' 的那一块，不能因为不是 'exit' 就把它丢在屏幕上。
+    const willLand = isCoverFlightActive();
 
     await nextTick(); // 等列表的 DOM 真的回到文档里，再去找元素
 

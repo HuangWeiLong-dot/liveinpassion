@@ -102,6 +102,13 @@ function revealCoverGlitch() {
 
 // 封面盒子的比例 = 图自身的比例（盒子的高度是 aspect-ratio 撑的）。
 // 解码前先给个 4/5 兜底，免得盒子塌成 0。
+// tags 来自 CMS 快照：只接受数组，统一大写；缺字段就是空。
+function safeTags(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map((t) => String(t).toUpperCase());
+  return [];
+}
+
 const ratio = ref('4 / 5');
 
 const post = computed(() => blogBySlug[route.params.slug] || null);
