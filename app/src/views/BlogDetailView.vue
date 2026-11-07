@@ -1144,6 +1144,10 @@ function scheduleEnter() {
     return;
   }
 
+  // 走到这里说明详情页不会接管飞行层（直接打开 / slug 对不上 / 被中断）。
+  // 如果 App 层还有一块飞行层在场上，必须立刻收掉，不能让它盖在文章上等到兜底超时。
+  if (isCoverFlightActive()) hideCoverFlight();
+
   // ── 没有飞行层（直接打开 / 窄屏 / 墙角 / 封面视图 / reduced-motion）─────
   // 直接打开时**不再读** sessionStorage 里的旧矩形：那份数据是上一次访问留下的，
   // 会让封面从一个过期位置起飞。这里让 handoff = null，下面的 FLIP 退化成
@@ -1473,10 +1477,29 @@ if (typeof window !== 'undefined') {
             <div class="blog-meta">
               <span class="blog-date">{{ post.date }}</span>
               <span class="bd-tag">{{ post.readTime }}</span>
+              <span
+                v-if="post.category && post.category !== 'UNFILED'"
+                class="bd-tag bd-category"
+              >{{ post.category }}</span>
             </div>
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
+            <!-- 分类/标签放在标题下面，书页模式下也始终可见；
+                 点击标签仍跳到 ECHOES 的 archive 并挂上筛选。 -->
+            <div v-if="safeTags(post.tags).length" class="blog-tags blog-tags--head">
+              <span class="blog-tags__label">TAGS</span>
+              <div class="blog-tags__list">
+                <button
+                  v-for="tag in safeTags(post.tags).slice(0, 12)"
+                  :key="tag"
+                  type="button"
+                  class="blog-tag"
+                  :aria-label="`查看带标签 ${tag} 的文章`"
+                  @click="openTag(tag)"
+                >{{ tag }}</button>
+              </div>
+            </div>
             <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
             <BlogBook v-else ref="bookRef" :pages="pages" />
           </div>
@@ -2111,6 +2134,55 @@ if (typeof window !== 'undefined') {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+/* 标题下的分类 / 标签：阅读器里常驻可见，不再藏在文末 */
+.bd-category {
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+}
+.blog-tags {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  justify-content: center;
+}
+.blog-tags--head { margin-top: 14px; }
+.bd-info.is-book > .blog-tags--head { margin-top: 12px; }
+.blog-tags__label {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.blog-tags__list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.blog-tag {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+.blog-tag:hover,
+.blog-tag:focus-visible {
+  border-color: var(--text-primary);
+  color: var(--bg);
+  background: var(--text-primary);
+  outline: none;
 }
 
 /* ── 标题：逐词揭幕 ─────────────────────────────────────────────────────

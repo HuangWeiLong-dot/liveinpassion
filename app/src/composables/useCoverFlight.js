@@ -130,7 +130,7 @@ export function beginCoverFlight({
   // 兜底：任何一步没接上（路由失败、页面被强切）也不让图永远浮在页面上
   safetyTimer = setTimeout(() => {
     if (coverFlightState.active) hideCoverFlight();
-  }, 6000);
+  }, 2500);
 
   return true;
 }

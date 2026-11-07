@@ -1729,7 +1729,12 @@ function flightTargetFor(slug) {
 watch(
   () => route.path,
   async (p) => {
-    if (p !== '/echoes' || !consumeReturningFromDetail()) return;
+    if (p !== '/echoes') return;
+    // 不是从详情返回的飞行：可能是上一次点击被中断留下的残影，直接收掉。
+    if (!consumeReturningFromDetail()) {
+      if (isCoverFlightActive()) hideCoverFlight();
+      return;
+    }
     const slug = getCoverFlightSlug();
     const willLand = isCoverFlightActive() && getCoverFlightMode() === 'exit';
 
