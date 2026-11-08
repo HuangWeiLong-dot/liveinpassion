@@ -50,6 +50,18 @@ export function getCoverFlightMode() {
   return coverFlightState.mode;
 }
 
+/**
+ * 改这一次飞行的方向 / 归属（不重启动画）。
+ * 入场飞到一半按 Esc 时，close() 会直接接管仍在飞的同一张图 —— 必须把 mode
+ * 从 enter 改成 exit，否则导航守则会把它当成"被打断的入场"当场收掉，
+ * 返回那一趟就没了。
+ */
+export function setCoverFlightMode(mode, slug = '') {
+  if (!coverFlightState.active) return;
+  if (mode) coverFlightState.mode = mode;
+  if (slug) coverFlightState.slug = slug;
+}
+
 /** 当前飞行矩形的快照（被打断时用来接着飞） */
 export function getCoverFlightRect() {
   return rect ? { ...rect } : null;
@@ -182,6 +194,28 @@ export function animateCoverFlightTo(targetRect, { duration = 0.8, ease = 'power
       timeline = null;
       onComplete?.();
     },
+  });
+}
+
+/**
+ * 挂到 router 上：在**导航确认之前**就判断这一次飞行还该不该继续。
+ *
+ * ⚠ 不能只靠组件里的 route watcher：转场守卫会把导航推迟 ~1.4s，等 route
+ *   更新时飞行层已经压在转场板子上面一整段了（浏览器后退 / 点导航时看起来
+ *   就是"飞行层死掉了"）。beforeEach 在守卫链最前面同步执行，能当场收掉。
+ */
+export function installCoverFlight(router) {
+  router.beforeEach((to) => {
+    if (!coverFlightState.active) return true;
+    const mode = coverFlightState.mode;
+    const slug = coverFlightState.slug;
+    // 入场只允许跨到同一篇的详情；退场只允许跨回列表
+    if (mode === 'enter'
+      && to.name === 'echo-detail'
+      && String(to.params?.slug || '') === slug) return true;
+    if (mode === 'exit' && to.path === '/echoes') return true;
+    hideCoverFlight();
+    return true;
   });
 }
 

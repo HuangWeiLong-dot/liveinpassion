@@ -117,23 +117,35 @@ const drawerOpen = ref(false);
 // 点完缩略图后强制收回：hover / focus 都不许把它留在展开态。
 const drawerClosing = ref(false);
 let drawerTimer = 0;
-// ARCHIVE 的两段退场动画：切换到别的视图（整页退场）。
+// ARCHIVE 的两段退场动画（保留给旧的 is-exiting 样式，当前走统一的柔化淡切）。
 const archiveExiting = ref(false);
 let archiveExitTimer = 0;
+// 视图切换的柔化层：先淡到本页底色 → 换视图 → 再淡回来。
+// 直接改 viewMode 会让 BlogWorld 的 v-if / ARCHIVE 的 v-if 硬切。
+const viewFade = ref(false);
+let viewFadeTimer = 0;
 
 function chooseView(key, e) {
-  // 从 ARCHIVE 切走时，先让整页做一次退场，再真正换视图。
-  if (viewMode.value === 'archive' && key !== 'archive') {
-    if (archiveExiting.value) return;
-    archiveExiting.value = true;
-    clearTimeout(archiveExitTimer);
-    archiveExitTimer = window.setTimeout(() => {
-      archiveExiting.value = false;
-      applyViewChoice(key, e);
-    }, 460);
+  // 点的是当前视图：只收抽屉
+  if (key === viewMode.value) {
+    closeDrawer(e);
     return;
   }
-  applyViewChoice(key, e);
+  // 减少动态效果：直接切
+  if (reduceMotion) {
+    applyViewChoice(key, e);
+    return;
+  }
+  closeDrawer(e);
+  viewFade.value = true;
+  clearTimeout(viewFadeTimer);
+  // 190ms：淡入（0.18s）刚好盖满，此时换视图，再等两帧让新视图画出来
+  viewFadeTimer = window.setTimeout(() => {
+    applyViewChoice(key, e);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      viewFade.value = false;
+    }));
+  }, 190);
 }
 
 function applyViewChoice(key, e) {
@@ -607,6 +619,12 @@ function openPost(post, el = null, query = null, instant = false) {
     // 详情覆盖层自己负责动画；这一跳不需要路由转场，否则两套动画会打架。
     clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {
+      // 这 240ms 里用户已经从别处离开了这页：别再把他拽回详情
+      if (route.path !== '/echoes') {
+        setCoverCurtain(false);
+        opening.value = false;
+        return;
+      }
       recordHandoff(); // 重新记一次（见上）
       skipNextPageTransition();
       router
@@ -621,10 +639,18 @@ function openPost(post, el = null, query = null, instant = false) {
   // 换页这一帧不碰它。
   clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
+    // 这 240ms 里用户已经从别处离开了这页：收掉飞行层，别再把他拽回详情
+    if (route.path !== '/echoes' || (flightStarted && !isCoverFlightActive())) {
+      hideCoverFlight();
+      setCoverCurtain(false);
+      opening.value = false;
+      return;
+    }
     skipNextPageTransition();
     router
       .push({ name: 'echo-detail', params: { slug: post.slug }, ...(query ? { query } : {}) })
-      .catch(() => {})
+      // 导航被守卫拦下 / 失败：飞行层不能留在列表上
+      .catch(() => { hideCoverFlight(); })
       .finally(() => { opening.value = false; });
   }, TAKEOVER_MS);
 }
@@ -1654,8 +1680,8 @@ function activate() {
   // 非返程的重新进入（比如从详情切到别的页面、再回 ECHOES）：把上一次飞行
   // 留在卡片上的标记清掉，否则那张图会一直是 opacity: 0。返程的目标标记由
   // route watcher 在下一拍挂上，这里先清不会误伤。
-  document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying, .is-flight-source')
-    .forEach((el) => el.classList.remove('is-flying', 'is-flight-source'));
+  document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying, .is-flight-source, .is-flight-target')
+    .forEach((el) => el.classList.remove('is-flying', 'is-flight-source', 'is-flight-target'));
   // 从详情返回这一趟：周围元素渐入（规则见上面的 html.bd-return-fade 那组）。
   //
   // 判据是详情在退出时置的**内存标记**；触发点见下面的 route watcher ——
@@ -1816,7 +1842,9 @@ watch(
 
     let target = null;
     if (willLand) target = flightTargetFor(slug);
-    if (target) target.classList.add('is-flying');
+    // 返程落点：整格保持可见（排除在渐入之外），但**图先藏起来** ——
+    // 照片还在飞行层上，原位置不能提前显示一张"已经回来"的图。
+    if (target) target.classList.add('is-flying', 'is-flight-target');
 
     // 周围元素渐入**和返程飞行并行**（不再是"飞完再淡"）。
     // 目标那一格被 .is-flying 排除在外：它要立刻亮着接住封面。
@@ -1855,13 +1883,14 @@ watch(
             // 飞行层跟着暗到同一档，落地再交还时亮度不变。
             opacity: Number(getComputedStyle(target).opacity) || 1,
             onComplete: () => {
+              // 同一帧：交还飞行层 + 交还落点格的图
               hideCoverFlight();
-              target.classList.remove('is-flying');
+              target.classList.remove('is-flying', 'is-flight-target');
             },
           });
         } else {
           hideCoverFlight();
-          target.classList.remove('is-flying');
+          target.classList.remove('is-flying', 'is-flight-target');
         }
       }
     }
@@ -1875,8 +1904,8 @@ watch(
     // 被点那张卡的标记等渐入演完再清（它给封面接手用）：清早了，落点那一格会在
     // 渐入半路被拉回 0（它也在 RETURN_FADE_SELECTOR 之外，靠的就是这个标记）。
     returnFadeTimer = window.setTimeout(() => {
-      document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying')
-        .forEach((c) => c.classList.remove('is-flying'));
+      document.querySelectorAll('.jb-card.is-flying, .ba-frame.is-flying, .is-flight-target')
+        .forEach((c) => c.classList.remove('is-flying', 'is-flight-target'));
     }, RETURN_FADE * 1000 + 150);
   }
 );
@@ -2322,8 +2351,14 @@ function onVisibility() {
           :aria-label="`切换到 ${opt.label} 视图`"
           @click="chooseView(opt.key, $event)"
         >
-          <img v-if="opt.image" :src="opt.image" alt="" loading="lazy" decoding="async" />
-          <span v-else class="jb-vthumb__blank" aria-hidden="true"></span>
+          <!-- 缩略图跟着当前文章变（ARCHIVE 滚轮/上下键、LOOKBACK 拖动）：
+               用交叉淡入代替直接换 src，避免硬切。 -->
+          <Transition name="jb-vthumb-fade">
+            <span v-if="opt.image" :key="opt.image" class="jb-vthumb__frame">
+              <img :src="opt.image" alt="" loading="lazy" decoding="async" />
+            </span>
+          </Transition>
+          <span v-if="!opt.image" class="jb-vthumb__blank" aria-hidden="true"></span>
           <span class="jb-vthumb__label">{{ opt.label }}</span>
         </button>
       </div>
@@ -2337,6 +2372,9 @@ function onVisibility() {
         <span class="jb-viewdrawer__handle-text">VIEW</span>
       </button>
     </aside>
+
+    <!-- 视图切换的柔化层：淡到本页底色再换视图，避免硬切 -->
+    <div class="jb-viewfade" :class="{ 'is-on': viewFade }" aria-hidden="true" />
   </main>
 </template>
 
@@ -3131,6 +3169,25 @@ function onVisibility() {
   }
 }
 
+/* ── 视图切换的柔化层 ───────────────────────────────────────────────────
+   点 VIEW 抽屉里的任意一张缩略图：先淡到本页底色（0.18s），换完视图再淡回
+   （0.34s）。直接切 v-if 会硬切；这层盖住切换那一帧。
+   z-index 42：压过 BlogWorld（40）和抽屉（41），低于固定头部（100）。 */
+.jb-viewfade {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  background: var(--jb-bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.34s ease;
+}
+.jb-viewfade.is-on {
+  opacity: 1;
+  pointer-events: auto;
+  transition-duration: 0.18s;
+}
+
 /* ── 视图切换：右侧抽屉 ─────────────────────────────────────────────────
    收起时只露右侧一条把手；悬停/聚焦/点击展开三张真实作品缩略图。
    颜色跟本页的 --jb-* 调色板走，暗/亮主题都一致。 */
@@ -3174,6 +3231,11 @@ function onVisibility() {
   cursor: pointer;
   display: block;
 }
+.jb-vthumb__frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
 .jb-vthumb img {
   width: 100%;
   height: 100%;
@@ -3181,6 +3243,15 @@ function onVisibility() {
   object-fit: cover;
   opacity: 0.55;
   transition: opacity 0.22s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 换图时两张图叠着交叉淡化（0.38s），不是直接换 src */
+.jb-vthumb-fade-enter-active,
+.jb-vthumb-fade-leave-active {
+  transition: opacity 0.38s ease;
+}
+.jb-vthumb-fade-enter-from,
+.jb-vthumb-fade-leave-to {
+  opacity: 0;
 }
 .jb-vthumb:hover img,
 .jb-vthumb:focus-visible img {
@@ -3493,10 +3564,11 @@ function onVisibility() {
   transition: opacity 0.24s ease;
 }
 
-/* 飞行期间，来源格 / 落点格自己的图先藏起来：
-   画面上只有 body 上那一张，不会出现"卡片里一张、飞行层一张"的双边。 */
-.jb-card.is-flying .jb-media img,
-.ba-frame.is-flying img {
+/* 返程落点：图先藏起来 —— 照片还在飞行层上，原位置不能提前出现一张"已经回来"的图。
+   只作用于 `.is-flight-target`，**不要**把入场来源格也藏掉：
+   飞行层是一个新的 <img>，即使 URL 命中缓存也要下一两帧才真正画出来；
+   先把来源图藏掉的话，点击后的前 30–60ms 会露出一条灰框（首次点击闪一下）。 */
+:global(.is-flight-target img) {
   opacity: 0;
 }
 

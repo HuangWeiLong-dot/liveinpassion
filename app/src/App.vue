@@ -21,7 +21,12 @@ import AppFooter from './components/AppFooter.vue';
 import { useBrandOverlay } from './composables/useBrandOverlay.js';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { hideCoverFlight } from './composables/useCoverFlight.js';
+import {
+  getCoverFlightMode,
+  getCoverFlightSlug,
+  hideCoverFlight,
+  isCoverFlightActive,
+} from './composables/useCoverFlight.js';
 
 // 品牌遮罩揭开之后：主体和四个人格先出来（它们在 Hero 里），
 // 头部／播放器／左下角那座 Ava 塔这批晚一步 —— 先把注意力留给画面。
@@ -95,12 +100,26 @@ watch(chromeHidden, (v) => {
   document.documentElement.classList.toggle('is-chrome-hidden', v);
 });
 
-// 飞行层只属于 ECHOES ⇄ 详情这一对路由。中途从别处离开（点导航、浏览器跳转）时
-// 立刻收掉，别让它浮在下一个页面上。
+// 飞行层只属于 ECHOES ⇄ 详情这一对路由。中途从别处离开（点导航、浏览器前进/后退）
+// 时立刻收掉，别让它浮在下一个页面上。
+//
+// ⚠ 不能只判断 `startsWith('/echoes')`：浏览器后退回列表时路径也是 /echoes，
+//   旧实现会把这个还没落地的飞行层留在屏幕上（一直挂到 6s 兜底），看起来就是
+//   "飞行层死掉了"。这里按**这一次飞行的模式 + slug**判断：
+//   · enter：只允许它跨到「同一篇」的详情路由；
+//   · exit ：只允许它跨回 /echoes（列表那边会接着量落点）。
+//   其它任何路由变化都是打断，直接收掉。
 watch(
   () => route.fullPath,
-  (path) => {
-    if (!path.startsWith('/echoes')) hideCoverFlight();
+  () => {
+    if (!isCoverFlightActive()) return;
+    const mode = getCoverFlightMode();
+    const slug = getCoverFlightSlug();
+    if (mode === 'enter'
+      && route.name === 'echo-detail'
+      && String(route.params.slug || '') === slug) return;
+    if (mode === 'exit' && route.path === '/echoes') return;
+    hideCoverFlight();
   }
 );
 

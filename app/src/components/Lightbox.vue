@@ -9,6 +9,7 @@
 // 两段用的是同一个 URL、同一个 CORS 模式（anonymous），所以整趟只有一次网络加载。
 // ←/→ 切图仍然走灯箱自己的交叉淡入；没有"第二个克隆元素飞回去"那套。
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useLightbox } from '../composables/useLightbox.js';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import { photoDate } from '../data/photoUtils.js';
@@ -285,6 +286,18 @@ function onResize() {
   vw.value = window.innerWidth;
   vh.value = window.innerHeight;
 }
+
+// 灯箱是全局单例：换路由时（比如从 GALLERY 直接点头部去 HOME）必须自己收起，
+// 否则大图会跟着站点一直挂着，飞行层也可能被遗留在新页面上。
+const route = useRoute();
+watch(() => route.fullPath, () => {
+  if (!isOpen.value) return;
+  closingFlight.value = false;
+  flightHidden.value = false;
+  flightPending.value = false;
+  if (isCoverFlightActive()) hideCoverFlight();
+  close();
+});
 
 // 关闭：整块灯箱（遮罩 + 大图）一起淡出。
 // 不再生成"飞回原来那扇窗"的克隆：大图先被瞬间藏掉、再让一个带描边的

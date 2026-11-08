@@ -17,16 +17,67 @@
 //
 // ⚠ 层级：面板 90、遮罩 94、抽屉 95 —— 都低于固定头部（100），
 //   高于 Hero 的舞台。转场板子（90000）和方块光标（100000）仍然盖在上面。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { hasShowcase, showcaseData } from '../data/showcase.js';
 
-const { entered } = useBrandOverlay();
+const { visible: brandVisible } = useBrandOverlay();
 const route = useRoute();
+const rootEl = ref(null);
 
 const collapsed = ref(false);
 const open = ref(false);
+// 首屏：等品牌遮罩完全退场 + **面板里真实的那几张 <img>** 都就绪，才从右侧滑出。
+// 用面板自己的 img 而不是另一批 Image 代理来判断：代理 load 完只代表字节到了，
+// 面板里的 img 还要挂载/解码；只看代理的话仍可能先露出空框。
+const assetsReady = ref(false);
+const ready = computed(() => !brandVisible.value && assetsReady.value);
+
+onMounted(async () => {
+  if (!hasShowcase()) {
+    assetsReady.value = true;
+    return;
+  }
+  await nextTick();
+  const imgs = Array.from(rootEl.value?.querySelectorAll('.hs-content .hs-card__media img') || []);
+  if (!imgs.length) {
+    assetsReady.value = true;
+    return;
+  }
+
+  let left = imgs.length;
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    // 再等两帧：load 只代表字节到了，解码完才真正画得出来
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      assetsReady.value = true;
+    }));
+  };
+  const one = () => {
+    left -= 1;
+    if (left <= 0) finish();
+  };
+  imgs.forEach((img) => {
+    if (img.complete) {
+      // complete 但还没有尺寸 = 已经失败，或刚好在解码；能 decode 就等它
+      if (img.naturalWidth) {
+        one();
+      } else if (typeof img.decode === 'function') {
+        img.decode().then(one).catch(one);
+      } else {
+        one();
+      }
+      return;
+    }
+    img.addEventListener('load', one, { once: true });
+    img.addEventListener('error', one, { once: true });
+  });
+  // 坏图 / 极慢网络：不能让它永远不出现（error 已经算完成，这条只兜超时）
+  window.setTimeout(finish, 8000);
+});
 
 try {
   const stored = localStorage.getItem('homeShowcaseCollapsed');
@@ -105,9 +156,10 @@ function cardKey(group, item) {
 <template>
   <aside
     v-if="total"
+    ref="rootEl"
     class="home-showcase"
     :class="{
-      'is-ready': entered,
+      'is-ready': ready,
       'is-collapsed': collapsed,
     }"
     aria-label="Curated showcase"
@@ -153,8 +205,9 @@ function cardKey(group, item) {
                     v-if="item.image"
                     :src="item.image"
                     alt=""
-                    loading="lazy"
+                    loading="eager"
                     decoding="async"
+                    crossorigin="anonymous"
                     draggable="false"
                   >
                   <span v-else class="hs-card__noimg">NO IMAGE</span>
@@ -224,6 +277,7 @@ function cardKey(group, item) {
                       alt=""
                       loading="lazy"
                       decoding="async"
+                      crossorigin="anonymous"
                       draggable="false"
                     >
                     <span v-else class="hs-card__noimg">NO IMAGE</span>
@@ -244,11 +298,14 @@ function cardKey(group, item) {
 
 <style scoped>
 .home-showcase {
+  /* 展开宽度单独抽成变量：内容层也要用它，展开/收起时文字不能跟着面板宽度
+     重新排版（否则动画中途标题会一行变两行，读起来很跳）。 */
+  --hs-w: clamp(264px, 20vw, 318px);
   position: fixed;
   top: 50%;
   right: clamp(14px, 2.4vw, 34px);
   z-index: 90;
-  width: clamp(264px, 20vw, 318px);
+  width: var(--hs-w);
   max-height: min(72vh, 760px);
   display: flex;
   flex-direction: column;
@@ -283,6 +340,11 @@ function cardKey(group, item) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* 宽度固定为展开态的宽度、右对齐：面板收窄时由 overflow 裁切，
+     内容本身不重排（标题不会在动画中途换行）。 */
+  width: var(--hs-w);
+  align-self: flex-end;
+  flex-shrink: 0;
   transition: opacity 0.26s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -542,11 +604,12 @@ function cardKey(group, item) {
    滑出一列完整卡片；不占底部，不会挡住页脚。 */
 @media (max-width: 1024px) {
   .home-showcase {
+    --hs-w: min(320px, 84vw);
     top: 50%;
     right: 0;
     left: auto;
     bottom: auto;
-    width: min(320px, 84vw);
+    width: var(--hs-w);
     max-height: 72vh;
     transform: translate(16px, -50%);
     /* 手机上不压太多模糊，性能优先 */

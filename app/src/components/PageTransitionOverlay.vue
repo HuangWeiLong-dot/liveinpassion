@@ -25,7 +25,7 @@
 //   而文字层面没有"按字符做延迟"这种能力（letter-spacing 也没法只染其中几个字）。
 //   拆字之后间距改成 flex gap —— 不能再靠 letter-spacing，否则每个 span 都各自
 //   多出一份字距，整行会被撑开。
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import gsap from 'gsap';
 import {
   GLYPH_MS,
@@ -53,6 +53,27 @@ const offsetOf = (dir) => {
 
 const panelRef = ref(null);
 const textRef = ref(null);
+
+// 把标题按**词**分组，词内再拆字。逐字动画保留，但折行只能发生在词与词之间 ——
+// 之前每个字符都是一个 flex 子项，长标题在窄屏上会在单词中间断开，而且
+// flex 子项默认 flex-shrink:1 会把字横向压扁（用户报的"排版被挤压"）。
+const labelWords = computed(() => {
+  const label = transitionLabel.value || '';
+  return label.split(/(\s+)/).filter(Boolean).map((token, index) => (
+    /^\s+$/.test(token)
+      ? { key: `s${index}`, space: true, chars: [] }
+      : { key: `w${index}`, space: false, chars: [...token] }
+  ));
+});
+
+// 标题越长，字号收一档：14 个字的板块名保持原来的气势，30 个字的文章标题
+// 不能还按 6.2vw 铺满屏幕。
+const labelSizeClass = computed(() => {
+  const n = (transitionLabel.value || '').length;
+  if (n > 28) return 'is-xlong';
+  if (n > 16) return 'is-long';
+  return '';
+});
 // 有没有在演。false 时整层不渲染 —— 平时它完全不在 DOM 里：
 // 既不挡灯箱 / 播放器 / 头部，也不参与命中测试。
 const active = ref(false);
@@ -71,7 +92,10 @@ async function play(runId) {
   if (!el) return;
 
   swapAtStart = swapVersion.value;
-  const glyphs = textRef.value ? Array.from(textRef.value.children) : [];
+  // 词容器是包裹层，真正要逐字亮的是里面所有 .transition-panel__glyph
+  const glyphs = textRef.value
+    ? Array.from(textRef.value.querySelectorAll('.transition-panel__glyph'))
+    : [];
   const { step } = labelTiming(transitionLabel.value);
   const from = offsetOf(transitionIn.value);
   const to = offsetOf(transitionOut.value);
@@ -138,13 +162,21 @@ watch(transitionRunId, (runId) => {
     class="transition-panel"
     aria-hidden="true"
   >
-    <div ref="textRef" class="transition-panel__text">
-      <span
-        v-for="(ch, i) in transitionLabel"
-        :key="i"
-        class="transition-panel__glyph"
-        :class="{ 'is-space': ch === ' ' }"
-      >{{ ch }}</span>
+    <div
+      ref="textRef"
+      class="transition-panel__text"
+      :class="labelSizeClass"
+    >
+      <template v-for="word in labelWords" :key="word.key">
+        <span v-if="word.space" class="transition-panel__glyph is-space" aria-hidden="true"></span>
+        <span v-else class="transition-panel__word">
+          <span
+            v-for="(ch, i) in word.chars"
+            :key="i"
+            class="transition-panel__glyph"
+          >{{ ch }}</span>
+        </span>
+      </template>
     </div>
   </div>
 </template>
@@ -205,12 +237,33 @@ watch(transitionRunId, (runId) => {
   user-select: none;
 }
 
+/* 标题越长，字号越收：文章标题（"PLEASE LISTEN TO ME CAREFULLY"）在手机上
+   不能还按板块名的字号铺，否则只能靠挤压/断词塞进屏幕。 */
+.transition-panel__text.is-long {
+  font-size: clamp(1.2rem, 4.6vw, 3.4rem);
+}
+.transition-panel__text.is-xlong {
+  font-size: clamp(1.05rem, 3.6vw, 2.5rem);
+}
+
+/* 词容器：词内逐字、词间才允许折行；flex-shrink:0 防止字被横向压扁 */
+.transition-panel__word {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0 0.06em;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* 每个字各是一个 span —— 逐字亮的 stagger 只能按元素给。
    ⚠ 基础 opacity 写 0：GSAP 那条时间线的第一个 tick 要等下一帧才跑，
    不写的话会先闪一帧整行字。 */
 .transition-panel__glyph {
   display: inline-block;
   white-space: pre;
+  /* ⚠ 不能让它跟着 flex 收缩：长标题一行放不下时，浏览器会先把每个字的盒子
+     压窄，整行字横向挤在一起（低分辨率屏上尤其难看）。折行交给外层。 */
+  flex-shrink: 0;
   opacity: 0;
   /* ⚠ 这里**故意不写** will-change：一行板块名拆出来二三十个 span，
      写上去就是二三十个独立合成层，显存和合成开销比省下来的还多。 */
@@ -223,6 +276,7 @@ watch(transitionRunId, (runId) => {
    办法是让空格自己撑出一份宽度：宽度写死，不能靠内容。 */
 .transition-panel__glyph.is-space {
   width: 0.42em;
+  flex-shrink: 0;
 }
 
 /* 减少动态效果：JS 那边已经整段跳过了（守卫里直接 return true），

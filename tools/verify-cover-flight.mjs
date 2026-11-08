@@ -165,6 +165,12 @@ const distance = (a, b) => (a && b
     await sleep(320);
     const exitMid = await evaluate(FLIGHT);
     check('返回换页期间飞行层仍在', exitMid.visible, JSON.stringify(exitMid.rect));
+    const targetHidden = await evaluate(`(() => {
+      const img = document.querySelector('.ba-frame[data-slug="${slug}"] img');
+      return img ? Number(getComputedStyle(img).opacity) : -1;
+    })()`);
+    check('返程途中落点格的图是藏着的（不能提前出现一张已回来的图）',
+      targetHidden >= 0 && targetHidden < 0.05, `img opacity=${targetHidden}`);
     await sleep(900);
     const exitEnd = await evaluate(FLIGHT);
     const targetImg = await evaluate(`(() => {
@@ -240,6 +246,92 @@ const distance = (a, b) => (a && b
     const h = JSON.parse(home);
     check('回 HOME 后 projection-page 已摘掉', !h.projectionPage);
     check('左下角 Avatar 回来', Number(h.towerOpacity) > 0.9, `opacity=${h.towerOpacity}`);
+
+    // ── 4. 打断：飞行层不允许"死"在页面上 ───────────────────────────
+    // ── 3.5 CURATED（首页）→ 详情 → ESC：必须等价于左上角 Back ─────────
+    console.log('\nCURATED → 详情 → ESC:');
+    await navigateAndEnter(`${baseUrl}/`);
+    const curatedHref = await evaluate(`document.querySelector('.hs-card[href^="/echoes/"]')?.getAttribute('href') || ''`);
+    check('CURATED 有 Echo 卡片', Boolean(curatedHref), curatedHref);
+    await evaluate(`document.querySelector('.hs-card[href^="/echoes/"]')?.click()`);
+    await sleep(2400);
+    check('点进详情成功', await evaluate(`Boolean(document.querySelector('.blog-detail'))`));
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
+    await sleep(2200);
+    const curatedState = JSON.parse(await evaluate(`JSON.stringify({
+      path: location.pathname,
+      home: !!document.querySelector('.hero-concept'),
+      curtainHtml: document.documentElement.classList.contains('bd-taking-cover'),
+      curtainShell: document.querySelector('.shell')?.classList.contains('bd-taking-cover'),
+      header: getComputedStyle(document.querySelector('#header') || document.body).opacity,
+      tower: getComputedStyle(document.querySelector('.author-tower') || document.body).opacity,
+      flight: document.querySelector('.cover-flight') ? getComputedStyle(document.querySelector('.cover-flight')).display : 'none',
+    })`));
+    check('ESC 回到首页', curatedState.path === '/' && curatedState.home, curatedState.path);
+    check('没有残留幕布 / 飞行层', !curatedState.curtainHtml && !curatedState.curtainShell && curatedState.flight === 'none');
+    check('首页 UI 没有消失（header / Avatar 可见）',
+      Number(curatedState.header) > 0.9 && Number(curatedState.tower) > 0.9,
+      `header=${curatedState.header} tower=${curatedState.tower}`);
+
+
+    console.log('\n打断 / 残留:');
+
+    // 入场途中浏览器后退：导航守卫要在转场守卫之前把层收掉
+    await navigateAndEnter(`${baseUrl}/echoes`);
+    await evaluate(`document.querySelector('.ba-frame.is-active')?.click()`);
+    await sleep(380);
+    await evaluate(`history.back()`);
+    await sleep(350);
+    const backLayer = await evaluate(FLIGHT);
+    check('入场中途后退：飞行层立即收起', !backLayer.visible, JSON.stringify(backLayer.rect));
+    await sleep(1700);
+    const backPath = await evaluate(`location.pathname`);
+    check('后退回到列表', backPath === '/echoes', backPath);
+
+    // 入场途中点 HOME
+    await navigateAndEnter(`${baseUrl}/echoes`);
+    await evaluate(`document.querySelector('.ba-frame.is-active')?.click()`);
+    await sleep(380);
+    await evaluate(`document.querySelector('a[href="/"]').click()`);
+    await sleep(1200);
+    const homeLayer = await evaluate(FLIGHT);
+    const homePath = await evaluate(`location.pathname`);
+    check('入场中途去 HOME：飞行层收起', !homeLayer.visible && homePath === '/', `${homePath} ${JSON.stringify(homeLayer.rect)}`);
+
+    // 灯箱飞行中点 HOME
+    await navigateAndEnter(`${baseUrl}/gallery`);
+    await evaluate(`(() => {
+      const el = [...document.querySelectorAll('.win--filled')].find((e) => {
+        const r = e.getBoundingClientRect();
+        return r.width > 40 && r.height > 40 && r.right > 0 && r.left < innerWidth
+          && r.bottom > 40 && r.top < innerHeight - 40;
+      });
+      el?.click();
+    })()`);
+    await sleep(120);
+    await evaluate(`document.querySelector('a[href="/"]').click()`);
+    await sleep(1200);
+    const lbHomeLayer = await evaluate(FLIGHT);
+    const lbOpen = await evaluate(`document.querySelector('.lightbox')?.classList.contains('active')`);
+    check('灯箱飞行中换页：飞行层收起、灯箱关闭',
+      !lbHomeLayer.visible && !lbOpen,
+      `open=${lbOpen}`);
+
+    // 点击后 80ms 就离开：240ms 的待跳转必须取消
+    await navigateAndEnter(`${baseUrl}/echoes`);
+    await evaluate(`document.querySelector('.ba-frame.is-active')?.click()`);
+    await sleep(80);
+    await evaluate(`document.querySelector('a[href="/"]').click()`);
+    await sleep(1200);
+    const pendingState = await evaluate(`JSON.stringify({
+      path: location.pathname,
+      detail: !!document.querySelector('.blog-detail'),
+      layer: getComputedStyle(document.querySelector('.cover-flight')).display,
+    })`);
+    const pd = JSON.parse(pendingState);
+    check('点击后立刻离开：待跳转取消、不回详情', pd.path === '/' && !pd.detail && pd.layer === 'none', pendingState);
+
 
     console.log('\n控制台:');
     const clean = consoleErrors.filter((e) => e && !/Failed to load resource/i.test(e));

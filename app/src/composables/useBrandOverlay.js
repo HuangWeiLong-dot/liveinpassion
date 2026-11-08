@@ -13,6 +13,7 @@
 // 于是全站只有一套转场，不再有第二份实现。
 import { ref } from 'vue';
 import { useTheme } from './useTheme.js';
+import { warmFirstScreenAssets } from './useFirstScreenWarmup.js';
 import { runPageTransition } from './usePageTransition.js';
 
 const LIFT_MS = 820;  // 字：中间 → 上方
@@ -28,6 +29,21 @@ const uiReady = ref(false);   // 最后浮出来的那批 UI（头部、页脚�
 const bg = ref('dark');       // 首屏遮罩的底色
 const runId = ref(0);         // 每次开演 +1，组件据此复位字的位移
 
+// 首屏那个小小的"LIVE IN PASSION / NOT LIVE IN PASSION"选择：
+// 前者点 ENTER 时预下接下来最可能看到的一小批图片，后者不预下。
+const PRELOAD_KEY = 'lip:first-screen-preload';
+const preloadOn = ref(true);
+try {
+  if (localStorage.getItem(PRELOAD_KEY) === '0') preloadOn.value = false;
+} catch { /* 隐私模式：默认预载 */ }
+
+function setPreload(on) {
+  preloadOn.value = Boolean(on);
+  try {
+    localStorage.setItem(PRELOAD_KEY, preloadOn.value ? '1' : '0');
+  } catch { /* ignore */ }
+}
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function useBrandOverlay() {
@@ -41,6 +57,9 @@ export function useBrandOverlay() {
     if (phase.value !== 'idle' || !showEnter.value) return;
     bg.value = useTheme().isDark.value ? 'dark' : 'light';
     runId.value++;
+    // 这一次点击也是"首次交互"：选了 LIVE IN PASSION 就趁首屏动画的时间窗
+    // 预下接下来最可能看到的一小批图片（首页 CURATED + 最近几篇封面等，≤14 张）。
+    if (preloadOn.value) warmFirstScreenAssets();
 
     // 1) 字滑到上方
     phase.value = 'lift';
@@ -82,5 +101,9 @@ export function useBrandOverlay() {
     await runPageTransition(() => toggle());
   }
 
-  return { visible, phase, showEnter, entered, wordmarkOn, uiReady, bg, runId, markReady, enter, switchTheme };
+  return {
+    visible, phase, showEnter, entered, wordmarkOn, uiReady, bg, runId,
+    preloadOn, setPreload,
+    markReady, enter, switchTheme,
+  };
 }

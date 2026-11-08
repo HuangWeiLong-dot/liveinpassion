@@ -38,6 +38,7 @@ import {
   hideCoverFlight,
   isCoverFlightActive,
   liftCoverFlightTo,
+  setCoverFlightMode,
 } from '../composables/useCoverFlight.js';
 import AppFooter from '../components/AppFooter.vue';
 import BlogBook from '../components/BlogBook.vue';
@@ -899,6 +900,26 @@ function close() {
   //
   // ⚠ "减少动态效果"下**不挂**：那时没有飞行，挂上去只会让 header 先淡没、
   //   换页后再淡回来 —— 白白多闪一下。回列表那条淡入本来也是跳过的。
+  // ── 后退的目标不是 ECHOES 列表时，走"左上角 Back"那条普通路 ──────────────
+  // 从首页 CURATED（或别处）点进详情，浏览器后退的目标是 `/`，不是列表。
+  // 这一趟没有"封面缩回列表某一格"可言；更重要的是幕布（bd-taking-cover）
+  // 只有 BlogsView.activate() 会摘 —— 回 HOME 时没人摘，header / 左下角 Ava
+  // 会整片消失（用户报的就是这个）。这里直接照 AppHeader.goBack 的行为：
+  // 不挂幕布、不起飞行层、不跳过通用转场，普通 router.back()。
+  const backPath = String(window.history.state?.back || '');
+  const goingToList = !backPath || /^\/echoes(?:[?#]|$)/.test(backPath);
+  if (!goingToList) {
+    stopTyping();
+    clearTimeout(typeSafety);
+    clearTimeout(infoSafety);
+    setCoverCurtain(false);
+    if (isCoverFlightActive()) hideCoverFlight();
+    // 和左上角 Back 完全一致（没有应用内历史时回首页）
+    if (window.history.state && window.history.state.back) router.back();
+    else router.push('/');
+    return;
+  }
+
   if (!reducedMotion) setCoverCurtain(true);
   // 窄屏：封面是整屏背景，没有"缩回列表那一格"这回事。
   // 只把正文淡掉再走，别的不动。
@@ -943,6 +964,9 @@ function close() {
       });
     }
     if (started) {
+      // 可能是入场飞到一半被 Esc 打断：把同一趟飞行的方向改成 exit，
+      // 否则导航守则会把它当成被打断的入场直接收掉。
+      setCoverFlightMode('exit', route.params.slug);
       if (innerEl) gsap.set(innerEl, { opacity: 0 });
       timeline?.kill();
       stopTyping();
@@ -1263,6 +1287,10 @@ onActivated(() => {
 });
 
 onDeactivated(() => {
+  // 这一页被"非 close()"的方式带走（浏览器后退、点导航）时，入场的飞行层
+  // 可能还没落地：不能把它留在下一张页面上。退场飞行（mode = exit）自己
+  // 拥有飞行层，别在这里收。
+  if (isCoverFlightActive() && getCoverFlightMode() === 'enter') hideCoverFlight();
   lockPageScroll(false);
   solidifyHeader(false);
   bgOn.value = true;  // 同上：留给下一次进来的是默认那一档，不是上次点过的状态

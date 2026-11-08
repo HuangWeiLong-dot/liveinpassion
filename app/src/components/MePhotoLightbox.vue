@@ -12,6 +12,7 @@
 //   关闭：灯箱大图 → **现场量**的那扇窗（墙面华容道移动过也准）。
 // 整趟只有一张图、一个 URL（anonymous CORS），不会多下一次。
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { attachCardTilt, playGlitchReveal } from '../composables/useCardFx.js';
 import {
   animateCoverFlightTo,
@@ -219,6 +220,17 @@ function onFullLoad(e) {
     show();
   }
 }
+
+// 换路由时灯箱必须自己收起（ME 页是 keep-alive，不收起的话回来还开着）
+const route = useRoute();
+watch(() => route.fullPath, () => {
+  if (!props.visible) return;
+  closingFlight.value = false;
+  flightHidden.value = false;
+  flightPending.value = false;
+  if (isCoverFlightActive()) hideCoverFlight();
+  emit('close');
+});
 
 onMounted(() => {
   detachTilt = attachCardTilt(rootEl.value, { card: '.me-photo-lightbox-full', maxX: 6, maxY: 9 });

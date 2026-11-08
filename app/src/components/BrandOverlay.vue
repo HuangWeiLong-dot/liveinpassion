@@ -18,7 +18,7 @@ import { useMusicPlayer } from '../composables/useMusicPlayer.js';
 const TEXT = 'LIVEINPASSION';
 const BG_ALPHA = 0.075; // 落到背景字时的浓度（和 .hero-wordmark 的 opacity 对齐）
 
-const { visible, phase, showEnter, bg, runId, markReady, enter } = useBrandOverlay();
+const { visible, phase, showEnter, bg, runId, preloadOn, setPreload, markReady, enter } = useBrandOverlay();
 const { isDark } = useTheme();
 const { cancelAutoPlay } = useMusicPlayer();
 
@@ -151,6 +151,30 @@ onBeforeUnmount(() => {
       >
         ENTER WITHOUT MUSIC
       </button>
+
+      <!-- 首屏的一个小选择：LIVE IN PASSION = 点 ENTER 时预下接下来最可能
+           看到的几张图；NOT LIVE IN PASSION = 不预下。记在 localStorage。 -->
+      <div class="brand__preload" role="radiogroup" aria-label="Preload next pages" data-no-music>
+        <button
+          class="brand__preload-opt"
+          :class="{ 'is-on': preloadOn }"
+          type="button"
+          :aria-pressed="preloadOn"
+          @click.stop="setPreload(true)"
+          @touchstart.stop
+          @keydown.stop
+        >LIVE IN PASSION</button>
+        <span class="brand__preload-sep" aria-hidden="true">/</span>
+        <button
+          class="brand__preload-opt"
+          :class="{ 'is-on': !preloadOn }"
+          type="button"
+          :aria-pressed="!preloadOn"
+          @click.stop="setPreload(false)"
+          @touchstart.stop
+          @keydown.stop
+        >NOT LIVE IN PASSION</button>
+      </div>
     </div>
   </div>
 </template>
@@ -256,6 +280,61 @@ onBeforeUnmount(() => {
   letter-spacing: 0.26em;
 }
 
+/* 首屏的 PRELOAD 小选择：等宽小字、斜杠分隔，选中的一条带实线下划线 */
+.brand__preload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  color: #111;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.brand.is-ready .brand__preload {
+  opacity: 1;
+}
+
+.brand.is-dark .brand__preload {
+  color: #fff;
+}
+
+.brand__preload-opt {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  opacity: 0.38;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: transparent;
+  transition: opacity 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+.brand__preload-opt:hover {
+  opacity: 0.72;
+}
+
+.brand__preload-opt.is-on {
+  opacity: 1;
+  text-decoration-color: currentColor;
+}
+
+.brand__preload-sep {
+  opacity: 0.24;
+}
+
 .brand.is-dark .brand__enter {
   color: #fff;
 }
@@ -287,6 +366,11 @@ onBeforeUnmount(() => {
   .brand__enter--quiet {
     padding: 6px 0;
     font-size: 8px;
+  }
+
+  .brand__preload {
+    font-size: 7px;
+    letter-spacing: 0.12em;
   }
 }
 </style>

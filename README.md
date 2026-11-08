@@ -48,6 +48,35 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 69 — 2026-11-08
+
+#### 首屏预载选择 + 飞行层打断收尾 + ECHOES 视图切换
+
+- **首屏预载选择**：品牌遮罩新增 `LIVE IN PASSION / NOT LIVE IN PASSION` 小选项
+  （存 `localStorage['lip:first-screen-preload']`）。选前者点 ENTER 时，借首屏动画的
+  时间窗预下 ≤14 张接下来最可能看到的图（首页 CURATED、ECHOES 最近封面、摄影/画廊
+  前几张）；与站内 `<img>` 用同一个 `anonymous` CORS 模式，避免缓存键分裂。选后者不预载。
+- **首页 Showcase 等图就绪再出场**：不再以 `entered` 为开关，改为「品牌遮罩退场 +
+  面板里真实 `<img>` 全部 load/decode」后才从右侧滑出（8s 超时兜底）；卡片图改
+  `eager` + `anonymous`。面板宽度抽成 `--hs-w`，收起动画中内容不重排，标题不会中途换行。
+- **转场板子长标题排版**：标题按词分组、词内逐字，折行只发生在词间；每个字形
+  `flex-shrink: 0`，不再被横向压扁；按长度分 `is-long` / `is-xlong` 两档收字号。
+- **飞行层打断收尾**：新增 router `beforeEach` 守卫（`installCoverFlight`，注册在转场
+  守卫之前），导航确认前按「模式 + slug」判断这趟飞行是否仍合法，浏览器后退 / 点导航
+  立刻收层；`App.vue` 的 route watcher 同步改成同一判据。详情入场飞到一半按 Esc 时用
+  `setCoverFlightMode('exit')` 接管同一趟飞行；从首页 CURATED 进入的详情按 Esc 走普通
+  返回（不挂幕布、不起飞行层），回 HOME 后 header / 左下角 Ava 不再消失。
+- **灯箱换页自动收起**：`Lightbox` / `MePhotoLightbox` 监听路由，离开当前页时关闭灯箱
+  并收掉飞行层（ME 页是 keep-alive，否则回来还开着）。
+- **ECHOES 视图切换柔化**：VIEW 抽屉切视图改为「淡到本页底色 → 换视图 → 淡回」
+  （190ms，reduced-motion 直接切），右侧缩略图换图用 0.38s 交叉淡入。返程落点改用
+  `.is-flight-target`，只藏落点图，入场来源格不再提前藏（修首次点击闪灰框）；
+  导航被拦 / 用户 240ms 内离开时取消待跳转。
+- **验收**：`tools/verify-cover-flight.mjs` 新增返程落点图隐藏、CURATED → 详情 → Esc、
+  入场中途后退 / 去 HOME、灯箱飞行中换页、点击后立刻离开等断言（43/43 通过）；
+  `verify-home-showcase` 19/19。
+- **内容快照**：CMS 精选列表同步（移除两条旧 Echo）。
+
 ### update: 68 — 2026-11-08
 
 #### Echoes 全文导出 + llms.txt
