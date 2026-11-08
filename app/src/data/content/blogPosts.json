@@ -7,11 +7,9 @@
       "title": "No It Is Not",
       "date": "November 8, 2026 · 2:06 PM",
       "readTime": "1 min read",
-      "category": "HER",
+      "category": "ROMANTIC",
       "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER"
+        "ABSTRACT"
       ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/02ed5973.jpg",
@@ -36,12 +34,8 @@
       "title": "Those Ineffable Feelings",
       "date": "November 7, 2026 · 11:25 PM",
       "readTime": "1 min read",
-      "category": "HER",
-      "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/32ce24e8.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/ca1f8c87.png"
@@ -65,12 +59,8 @@
       "title": "Please Listen to Me Carefully",
       "date": "November 6, 2026 · 11:17 PM",
       "readTime": "3 min read",
-      "category": "HER",
-      "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/c9a6dd59.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/8b5a3770.png"
@@ -94,12 +84,8 @@
       "title": "Echoes",
       "date": "November 5, 2026 · 10:50 PM",
       "readTime": "1 min read",
-      "category": "HER",
-      "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/714f13d2.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/16ac61aa.png"
@@ -123,12 +109,8 @@
       "title": "Head My Blow",
       "date": "November 4, 2026 · 9:30 PM",
       "readTime": "1 min read",
-      "category": "HER",
-      "tags": [
-        "HER",
-        "PHIL",
-        "PSYCH"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/7119fc8f.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/d47d5062.png"
@@ -152,13 +134,8 @@
       "title": "Disassociation",
       "date": "November 4, 2026 · 10:44 AM",
       "readTime": "1 min read",
-      "category": "HER",
-      "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER",
-        "MOSAIC"
-      ],
+      "category": "IDEALIST",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/0a0eef60.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/83c43e83.png"
@@ -182,12 +159,8 @@
       "title": "Next to Me",
       "date": "November 3, 2026 · 8:36 PM",
       "readTime": "1 min read",
-      "category": "HER",
-      "tags": [
-        "PHIL",
-        "PSYCH",
-        "HER"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/35e48c7b.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/5c98e781.png"
@@ -211,7 +184,7 @@
       "title": "Rain?",
       "date": "November 2, 2026 · 9:39 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ROMANTIC",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/31672a26.jpg",
@@ -236,7 +209,7 @@
       "title": "Upward",
       "date": "November 1, 2026 · 9:16 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/fd5ebb54.jpg",
@@ -261,7 +234,7 @@
       "title": "Contemplating",
       "date": "October 31, 2026 · 11:27 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/313dbf37.jpg",
@@ -286,7 +259,7 @@
       "title": "Wandering",
       "date": "October 30, 2026 · 8:21 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/9c29db43.jpg",
@@ -311,7 +284,7 @@
       "title": "Pedestrian",
       "date": "October 29, 2026 · 8:51 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/f49ab563.jpg",
@@ -336,7 +309,7 @@
       "title": "Afk",
       "date": "October 28, 2026 · 8:29 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3c5fd015.jpg",
@@ -361,7 +334,7 @@
       "title": "Digital Apathy",
       "date": "October 27, 2026 · 8:51 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/19680f33.jpg",
@@ -386,7 +359,7 @@
       "title": "Fuck the Air Fryer",
       "date": "October 26, 2026 · 8:56 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/d10e2131.jpg",
@@ -411,7 +384,7 @@
       "title": "If I Put My Heart Away, Will I Feel Anything?",
       "date": "October 25, 2026 · 10:07 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/a4f219d6.jpg",
@@ -436,7 +409,7 @@
       "title": "Transparent",
       "date": "October 24, 2026 · 10:31 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/107cbd14.jpg",
@@ -461,7 +434,7 @@
       "title": "Blood Flows From Sky, Forges My Body",
       "date": "October 23, 2026 · 11:02 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/88859b92.jpg",
@@ -486,7 +459,7 @@
       "title": "Sky Does Not Fall, Tears in My Eye",
       "date": "October 22, 2026 · 9:05 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/6c446fc2.jpg",
@@ -511,7 +484,7 @@
       "title": "No Surprises",
       "date": "October 21, 2026 · 5:38 PM",
       "readTime": "2 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/81b969ec.jpg",
@@ -536,7 +509,7 @@
       "title": "Cold Start",
       "date": "October 20, 2026 · 9:27 PM",
       "readTime": "2 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/bfaefe8c.jpg",
@@ -561,7 +534,7 @@
       "title": "Vibe, Temperament, Autonomy",
       "date": "October 19, 2026 · 8:14 PM",
       "readTime": "2 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/4c7341d3.jpg",
@@ -586,7 +559,7 @@
       "title": "Intrinsic Motivation",
       "date": "October 18, 2026 · 9:28 PM",
       "readTime": "4 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/fd90504c.jpg",
@@ -611,7 +584,7 @@
       "title": "Faint",
       "date": "October 17, 2026 · 8:49 PM",
       "readTime": "4 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/abff4bf1.jpg",
@@ -636,7 +609,7 @@
       "title": "Flight",
       "date": "October 16, 2026 · 7:30 PM",
       "readTime": "4 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/9b13b971.jpg",
@@ -661,7 +634,7 @@
       "title": "Life-logging System",
       "date": "October 15, 2026 · 8:44 PM",
       "readTime": "5 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/514c2d66.jpg",
@@ -686,7 +659,7 @@
       "title": "Freeze",
       "date": "October 14, 2026 · 8:00 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/98391bb6.jpg",
@@ -711,7 +684,7 @@
       "title": "Fawn",
       "date": "October 13, 2026 · 4:42 PM",
       "readTime": "4 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/861146e7.jpg",
@@ -736,7 +709,7 @@
       "title": "Fight",
       "date": "October 12, 2026 · 6:31 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/20ac209c.jpg",
@@ -761,7 +734,7 @@
       "title": "Shadow",
       "date": "October 11, 2026 · 7:24 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/b8d7b9cd.jpg",
@@ -786,7 +759,7 @@
       "title": "S & N",
       "date": "October 10, 2026 · 11:55 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/4a40b367.jpg",
@@ -811,7 +784,7 @@
       "title": "Mirage",
       "date": "October 9, 2026 · 9:46 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ROMANTIC",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3cf6521c.jpg",
@@ -836,7 +809,7 @@
       "title": "Individuation",
       "date": "October 8, 2026 · 10:23 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/197d30a6.jpg",
@@ -861,7 +834,7 @@
       "title": "Antithesis",
       "date": "October 7, 2026 · 9:19 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/b2d09cc3.jpg",
@@ -886,7 +859,7 @@
       "title": "Observer - Fragment IV",
       "date": "October 6, 2026 · 7:07 AM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/f8db08db.jpg",
@@ -911,7 +884,7 @@
       "title": "The Fire and The Trap",
       "date": "October 5, 2026 · 12:55 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/0901eb64.jpg",
@@ -936,7 +909,7 @@
       "title": "Romanticist - Fragment I",
       "date": "October 4, 2026 · 4:45 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ROMANTIC",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/787de818.jpg",
@@ -961,7 +934,7 @@
       "title": "Advocate - Fragment III",
       "date": "October 4, 2026 · 4:42 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "ADVOCATE",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/aa929ec9.jpg",
@@ -986,7 +959,7 @@
       "title": "Idealist - Fragment II",
       "date": "October 4, 2026 · 4:41 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/14f34ce5.jpg",
@@ -1011,7 +984,7 @@
       "title": "Urge",
       "date": "October 4, 2026 · 6:19 AM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/e8848759.jpg",
@@ -1036,7 +1009,7 @@
       "title": "Spinning",
       "date": "October 3, 2026 · 8:20 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/3c11054f.jpg",
@@ -1061,7 +1034,7 @@
       "title": "Contradiction",
       "date": "October 2, 2026 · 5:23 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/fdd052c4.jpg",
@@ -1086,7 +1059,7 @@
       "title": "Indecision",
       "date": "October 2, 2026 · 11:23 AM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/01aeb078.jpg",
@@ -1111,7 +1084,7 @@
       "title": "Tell Me, What Is the Voice Inside Me",
       "date": "October 1, 2026 · 6:16 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202610/_compressed/58205716.jpg",
@@ -1136,7 +1109,7 @@
       "title": "Small",
       "date": "September 30, 2026 · 5:16 PM",
       "readTime": "2 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/4393db92.jpg",
@@ -1161,7 +1134,7 @@
       "title": "Heavy",
       "date": "September 29, 2026 · 7:28 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "IDEALIST",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/0d0a99c2.jpg",
@@ -1186,7 +1159,7 @@
       "title": "Who I Am When No One Is Watching - I Can't Hold Someone's Trust And Not Give It Back",
       "date": "September 28, 2026 · 5:58 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/5ba4b5e9.jpg",
@@ -1211,7 +1184,7 @@
       "title": "I Sentenced Myself for Two Years",
       "date": "September 27, 2026 · 1:38 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/ff1663e0.jpg",
@@ -1236,7 +1209,7 @@
       "title": "In the Middle of the World",
       "date": "September 25, 2026 · 7:06 PM",
       "readTime": "2 min read",
-      "category": "UNFILED",
+      "category": "OBSERVER",
       "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/fbee9668.jpg",
@@ -1261,14 +1234,8 @@
       "title": "Before Heading Out",
       "date": "August 21, 2026 · 11:24 AM",
       "readTime": "3 min read",
-      "category": "DOCUMENT",
-      "tags": [
-        "LIFE",
-        "PHIL",
-        "PSYCH",
-        "PAST",
-        "B&W"
-      ],
+      "category": "OBSERVER",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/d33bf3a7.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/e45f3c3d.jpg"
@@ -1292,11 +1259,8 @@
       "title": "Don't Be a Dick",
       "date": "June 1, 2026 · 7:14 PM",
       "readTime": "3 min read",
-      "category": "INCIDENT",
-      "tags": [
-        "LIFE",
-        "INCIDENT"
-      ],
+      "category": "ADVOCATE",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/aec7f953.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/07fcd46a.jpg"
@@ -1320,12 +1284,8 @@
       "title": "May 25 – Just Another Timeline? No.",
       "date": "May 25, 2026 · 2:47 PM",
       "readTime": "1 min read",
-      "category": "BIRTHDAY",
-      "tags": [
-        "BIRTHDAY",
-        "MAY 25TH",
-        "COLOR"
-      ],
+      "category": "OBSERVER",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/585c93e6.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/68284824.jpg"
@@ -1349,10 +1309,8 @@
       "title": "The Two Halves of a Heart",
       "date": "May 23, 2026 · 5:21 AM",
       "readTime": "4 min read",
-      "category": "HER",
-      "tags": [
-        "DREAM"
-      ],
+      "category": "ROMANTIC",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/b0164814.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/4af9fe00.jpg"
@@ -1376,13 +1334,8 @@
       "title": "Life is a Fantasy",
       "date": "May 22, 2026 · 2:53 AM",
       "readTime": "2 min read",
-      "category": "ANNIVERSARY",
-      "tags": [
-        "LIFE",
-        "FILM",
-        "PSYCH",
-        "PHIL"
-      ],
+      "category": "OBSERVER",
+      "tags": [],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/f4788252.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/f8023233.jpg"

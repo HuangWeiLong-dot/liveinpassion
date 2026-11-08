@@ -118,7 +118,8 @@ watch(
     if (mode === 'enter'
       && route.name === 'echo-detail'
       && String(route.params.slug || '') === slug) return;
-    if (mode === 'exit' && route.path === '/echoes') return;
+    // 按 name 判断：Pages 的 /echoes/ 带尾斜杠，比 path 字符串会漏掉退场飞行。
+    if (mode === 'exit' && route.name === 'echoes') return;
     hideCoverFlight();
   }
 );

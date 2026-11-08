@@ -179,6 +179,27 @@ const distance = (a, b) => (a && b
     })()`);
     check('返回落地：飞行层收起、相框的图重新可见', !exitEnd.visible && targetImg > 0.9, `img opacity=${targetImg}`);
 
+    // ── 1b. 尾斜杠回归：Pages 会落在 /echoes/，分类后点封面仍须进详情 ──
+    // 旧实现硬比 route.path === '/echoes'，/echoes/ 被当成"已经离开列表"：
+    // 飞行层起来了、路由却不跳，封面停在屏幕上（线上实测）。
+    console.log('ECHOES 尾斜杠 + 分类:');
+    await navigateAndEnter(`${baseUrl}/echoes/`);
+    const slashCats = await evaluate(`[...document.querySelectorAll('.ba-cats__btn')].map((b) => b.textContent.trim())`);
+    const slashCat = slashCats.find((c) => c !== 'ALL');
+    if (slashCat) {
+      await evaluate(`[...document.querySelectorAll('.ba-cats__btn')].find((b) => b.textContent.trim() === ${JSON.stringify(slashCat)})?.click()`);
+      await sleep(400);
+    }
+    const slashSlug = await evaluate(`document.querySelector('.ba-frame.is-active')?.dataset.slug || ''`);
+    await evaluate(`document.querySelector('.ba-frame.is-active')?.click()`);
+    let slashDetail = false;
+    for (let i = 0; i < 24; i += 1) {
+      await sleep(120);
+      const st = await evaluate(`({ path: location.pathname, detail: Boolean(document.querySelector('.blog-detail')) })`);
+      if (st.path.startsWith('/echoes/') && st.path !== '/echoes/' && st.detail) { slashDetail = true; break; }
+    }
+    check('/echoes/ 下切换分类后点封面进入详情', Boolean(slashCat && slashSlug && slashDetail), `${slashCat} · ${slashSlug}`);
+
     // ── 2. 灯箱：PHOTOGRAPHY / GALLERY / ME GALLERY ────────────────────
     for (const [label, url, cardSel, closeScript] of [
       ['PHOTOGRAPHY', `${baseUrl}/photography/HanYong`, '.ph-window',

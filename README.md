@@ -48,6 +48,19 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 73.1 — 2026-11-08
+
+#### ECHOES 在 `/echoes/` 下点封面不跳转
+
+- 根因：GitHub Pages 会把 `/echoes` 落到 `/echoes/`，而列表页跳转守卫硬比
+  `route.path === '/echoes'`。点封面后 240ms 的判断误以为已经离开列表，直接取消跳转，
+  飞行层却留在屏幕上，封面看起来"停住不动"。
+- ECHOES 相关的路径判断统一改用路由名 `echoes`：`BlogsView` 的两处跳转守卫、返回落点
+  watcher，`App.vue` 的飞行层 watcher，`useCoverFlight` 的导航守卫。
+- 中断分支补 `hideCoverFlight()`，避免飞行层残留。
+- `tools/verify-cover-flight.mjs` 新增 `/echoes/` + 切换分类后点封面的回归断言。
+- 同步 CMS 内容快照（分类改为 ROMANTIC / IDEALIST / OBSERVER / ADVOCATE）。
+
 ### update: 73 — 2026-11-08
 
 #### Echoes 导出分页 + 分块清单

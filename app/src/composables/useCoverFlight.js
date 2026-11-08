@@ -213,7 +213,8 @@ export function installCoverFlight(router) {
     if (mode === 'enter'
       && to.name === 'echo-detail'
       && String(to.params?.slug || '') === slug) return true;
-    if (mode === 'exit' && to.path === '/echoes') return true;
+    // 用 route name 而不是 path：GitHub Pages 上是 /echoes/（带尾斜杠）。
+    if (mode === 'exit' && to.name === 'echoes') return true;
     hideCoverFlight();
     return true;
   });

@@ -620,8 +620,12 @@ function openPost(post, el = null, query = null, instant = false) {
     clearTimeout(holdTimer);
     holdTimer = window.setTimeout(() => {
       // 这 240ms 里用户已经从别处离开了这页：别再把他拽回详情
-      if (route.path !== '/echoes') {
+      // ⚠ 用 route.name 而不是 route.path：GitHub Pages 会把 /echoes 变成
+      //   /echoes/（目录尾斜杠），直接比字符串会让这里永远成立 —— 飞行层起来了、
+      //   路由却不跳，封面就停在屏幕上。
+      if (route.name !== 'echoes') {
         setCoverCurtain(false);
+        hideCoverFlight();
         opening.value = false;
         return;
       }
@@ -640,7 +644,8 @@ function openPost(post, el = null, query = null, instant = false) {
   clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
     // 这 240ms 里用户已经从别处离开了这页：收掉飞行层，别再把他拽回详情
-    if (route.path !== '/echoes' || (flightStarted && !isCoverFlightActive())) {
+    // 同样按 route.name 判断（/echoes/ 的尾斜杠见上面那条注释）。
+    if (route.name !== 'echoes' || (flightStarted && !isCoverFlightActive())) {
       hideCoverFlight();
       setCoverCurtain(false);
       opening.value = false;
@@ -1820,9 +1825,10 @@ function flightTargetFor(slug) {
 }
 
 watch(
-  () => route.path,
-  async (p) => {
-    if (p !== '/echoes') return;
+  () => route.name,
+  async () => {
+    // path 在 Pages 上可能是 /echoes/，用 name 判断更稳。
+    if (route.name !== 'echoes') return;
     // 不是从详情返回的飞行：可能是上一次点击被中断留下的残影，直接收掉。
     if (!consumeReturningFromDetail()) {
       if (isCoverFlightActive()) hideCoverFlight();
