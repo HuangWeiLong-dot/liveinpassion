@@ -38,6 +38,131 @@ app.get('/posts', async (c) => {
   return c.json({ posts });
 });
 
+// ---------- AI / LLM export ----------
+// 公开、只读、只含已发布文章。给 AI chat / agent 一份干净的 Markdown 全文，
+// 避免它们去啃 JSON + HTML。查询参数：
+//   category=LETTER  tag=LOVE  since=2026-01-01  limit=10
+const SITE = 'https://liveinpassion.me';
+const EXPORT_HEADERS = {
+  'Content-Type': 'text/markdown; charset=utf-8',
+  'Cache-Control': 'public, max-age=300',
+  // 浏览器里的 AI 工具也能直接拿；服务端抓取本来就不受 CORS 限制
+  'Access-Control-Allow-Origin': '*',
+};
+
+function decodeEntities(text) {
+  const map = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return String(text || '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&([a-z]+);/gi, (m, n) => map[n.toLowerCase()] ?? m);
+}
+
+// 只有极老的 HTML 行才走到这里；content_md 是首选。
+function htmlToText(html) {
+  const NL = String.fromCharCode(10);
+  return decodeEntities(String(html || '')
+    .replace(/<br\s*\/?>/gi, NL)
+    .replace(/<\/(p|div|h[1-6]|blockquote|li)>/gi, NL + NL)
+    .replace(/<[^>]+>/g, ''))
+    .replace(new RegExp(NL + '{3,}', 'g'), NL + NL)
+    .trim();
+}
+
+function bodyForExport(row) {
+  if (row.content_md) {
+    const NL = String.fromCharCode(10);
+    return String(row.content_md).replace(
+      /<div[^>]*class="[^"]*page-break[^"]*"[^>]*>\s*<\/div>/gi,
+      NL + NL + '---' + NL + NL
+    );
+  }
+  return htmlToText(row.content_html);
+}
+
+function filterRows(rows, c) {
+  const slug = String(c.req.query('slug') || '').trim();
+  const category = String(c.req.query('category') || '').trim().toUpperCase();
+  const tag = String(c.req.query('tag') || '').trim().toUpperCase();
+  const since = String(c.req.query('since') || '').trim().slice(0, 10);
+  const rawLimit = Number(c.req.query('limit') || 0);
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 200) : 0;
+  let list = rows;
+  if (slug) list = list.filter((r) => r.slug === slug);
+  if (category) list = list.filter((r) => String(r.category || 'UNFILED').toUpperCase() === category);
+  if (tag) list = list.filter((r) => parseTags(r.tags_json).map((t) => String(t).toUpperCase()).includes(tag));
+  if (since) list = list.filter((r) => String(r.published_at || '').slice(0, 10) >= since);
+  if (limit) list = list.slice(0, limit);
+  return list;
+}
+
+app.get('/posts/export.md', async (c) => {
+  const db = c.env.DB;
+  const rows = await db.prepare(
+    `SELECT slug, card_title, title, published_at, category, tags_json, content_md, content_html
+     FROM posts WHERE status='published' ORDER BY published_at DESC`
+  ).all();
+  const list = filterRows(rows.results, c);
+  const lines = [
+    '# LIVE IN PASSION — ECHOES',
+    '',
+    `> ${list.length} published piece${list.length === 1 ? '' : 's'} · exported ${new Date().toISOString()}`,
+    '> Only published posts. Drafts are excluded.',
+    '',
+    '---',
+    '',
+  ];
+  for (const row of list) {
+    const tags = parseTags(row.tags_json);
+    lines.push(
+      `## ${row.title || row.card_title || row.slug}`,
+      '',
+      `- Slug: \`${row.slug}\``,
+      `- Card title: ${row.card_title || row.title || row.slug}`,
+      `- Date: ${formatDate(row.published_at) || row.published_at || ''}`,
+      `- Category: ${row.category || 'UNFILED'}`,
+      `- Tags: ${tags.length ? tags.join(', ') : '—'}`,
+      `- URL: ${SITE}/echoes/${row.slug}`,
+      '',
+      bodyForExport(row) || '_(empty)_',
+      '',
+      '---',
+      '',
+    );
+  }
+  return new Response(lines.join(String.fromCharCode(10)), { headers: EXPORT_HEADERS });
+});
+
+app.get('/posts/index.json', async (c) => {
+  const db = c.env.DB;
+  const rows = await db.prepare(
+    `SELECT slug, card_title, title, published_at, category, tags_json, read_time_min
+     FROM posts WHERE status='published' ORDER BY published_at DESC`
+  ).all();
+  const list = filterRows(rows.results, c);
+  return new Response(JSON.stringify({
+    site: SITE,
+    count: list.length,
+    posts: list.map((row) => ({
+      slug: row.slug,
+      title: row.title,
+      cardTitle: row.card_title,
+      date: formatDate(row.published_at) || row.published_at || '',
+      category: row.category || 'UNFILED',
+      tags: parseTags(row.tags_json),
+      readTime: `${row.read_time_min} min read`,
+      url: `${SITE}/echoes/${row.slug}`,
+      markdown: `${new URL(c.req.url).origin}/api/posts/export.md?slug=${encodeURIComponent(row.slug)}`,
+    })),
+  }), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, max-age=300',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
+
 // 单篇博客（仅已发布）
 app.get('/posts/:slug', async (c) => {
   const db = c.env.DB;

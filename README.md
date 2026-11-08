@@ -48,6 +48,18 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 68 — 2026-11-08
+
+#### Echoes 全文导出 + llms.txt
+
+- Worker 新增公开只读 `GET /api/posts/export.md`：只含已发布文章，输出带
+  标题 / 日期 / 分类 / 标签 / slug / URL 和正文 Markdown 的单文件；支持
+  `category` / `tag` / `since` / `limit` / `slug` 查询参数，便于 AI 分批分析。
+- 新增 `GET /api/posts/index.json`：仅元数据索引，方便 agent 先选文章。
+- 站点构建生成 `llms.txt`：列出全文导出、索引、分类入口和用法，AI agent 可自动发现。
+- 导出与索引都带 `Access-Control-Allow-Origin: *`，只读取 `status='published'`，
+  不包含草稿。
+
 ### update: 67 — 2026-11-08
 
 #### HOME SHOWCASE 手机右侧抽屉 + ECHOES WORLD 说明栏

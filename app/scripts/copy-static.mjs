@@ -416,6 +416,43 @@ const rss = [
 ].join('\n');
 fs.writeFileSync(path.join(distDir, 'feed.xml'), rss);
 
+// ── llms.txt：给 AI chat / agent 的索引 ────────────────────────────────
+// 正文导出走 Worker 的 /api/posts/export.md（动态、只含已发布文章）；
+// 这里生成站点根目录的 llms.txt，方便 agent 自动发现。
+const exportUrl = 'https://cms.liveinpassion.me/api/posts/export.md';
+const indexUrl = 'https://cms.liveinpassion.me/api/posts/index.json';
+const categoryCounts = new Map();
+for (const p of posts) {
+  const c = String(p.category || 'UNFILED').toUpperCase();
+  categoryCounts.set(c, (categoryCounts.get(c) || 0) + 1);
+}
+const llms = [
+  '# LIVE IN PASSION',
+  '> Poems, essays and notes by Huang Wei Long. The Echoes archive is public.',
+  '',
+  '## Echoes',
+  `- [Full archive export](${exportUrl}) — all ${posts.length} published pieces as Markdown`,
+  `- [Archive index](${indexUrl}) — metadata only (title, date, category, tags, URL)`,
+  `- [ECHOES page](${SITE}/echoes)`,
+  '',
+  '## Export filters',
+  '- `?category=LETTER` — one category',
+  '- `?tag=LOVE` — one tag',
+  '- `?since=2026-01-01` — published on or after a date',
+  '- `?limit=10` — cap the number of pieces (max 200)',
+  '- `?slug=echoes` — a single piece',
+  '',
+  '## Categories',
+  ...[...categoryCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([c, n]) => `- ${c} (${n}) — ${exportUrl}?category=${encodeURIComponent(c)}`),
+  '',
+  '## Policy',
+  '- Only published posts are exported. Drafts are excluded.',
+  '- All content is public; do not treat this as private data.',
+  '',
+].join(String.fromCharCode(10));
+fs.writeFileSync(path.join(distDir, 'llms.txt'), llms);
+
 const robots = [
   'User-agent: *',
   'Allow: /',
