@@ -1492,9 +1492,11 @@ if (typeof window !== 'undefined') {
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
-            <!-- 分类/标签放在标题下面，书页模式下也始终可见；
-                 点击标签仍跳到 ECHOES 的 archive 并挂上筛选。 -->
-            <div v-if="safeTags(post.tags).length" class="blog-tags blog-tags--head">
+            <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
+            <BlogBook v-else ref="bookRef" :pages="pages" />
+            <!-- 标签放在正文最下方：书页模式下紧接书页，平铺模式下接在正文之后。
+                 点击标签仍跳到 ECHOES 的 ARCHIVE 并挂上筛选。 -->
+            <div v-if="safeTags(post.tags).length" class="blog-tags blog-tags--foot">
               <span class="blog-tags__label">TAGS</span>
               <div class="blog-tags__list">
                 <button
@@ -1507,8 +1509,6 @@ if (typeof window !== 'undefined') {
                 >{{ tag }}</button>
               </div>
             </div>
-            <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
-            <BlogBook v-else ref="bookRef" :pages="pages" />
           </div>
           <!-- 文章滚到底才看得到的页脚；书页模式下没有滚动，且底部要给翻页控件让位 -->
           <AppFooter v-if="!bookMode" compact />
@@ -2155,8 +2155,17 @@ if (typeof window !== 'undefined') {
   gap: 8px 16px;
   justify-content: center;
 }
-.blog-tags--head { margin-top: 14px; }
-.bd-info.is-book > .blog-tags--head { margin-top: 12px; }
+.blog-tags--foot {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  justify-content: center;
+}
+.bd-info.is-book > .blog-tags--foot {
+  flex-shrink: 0;
+  margin-top: 10px;
+  padding-top: 10px;
+}
 .blog-tags__label {
   font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 9px;

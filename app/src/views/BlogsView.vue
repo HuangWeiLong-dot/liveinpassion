@@ -138,11 +138,35 @@ function chooseView(key, e) {
 
 function applyViewChoice(key, e) {
   setViewMode(key);
+  closeDrawer(e);
+}
+
+/** 收起抽屉：`is-closing` 会压过 :hover / :focus-within，点 VIEW 才真的能收 */
+function closeDrawer(e) {
   drawerOpen.value = false;
   drawerClosing.value = true;
   try { e?.currentTarget?.blur?.(); } catch { /* ignore */ }
   clearTimeout(drawerTimer);
-  drawerTimer = window.setTimeout(() => { drawerClosing.value = false; }, 480);
+  // 鼠标一直停在把手上时不要 480ms 后又弹回来；等 pointerleave 再解禁。
+  // 触屏没有 pointerleave，用这条兜底把它真正收掉。
+  drawerTimer = window.setTimeout(() => { drawerClosing.value = false; }, 1600);
+}
+
+function onViewDrawerLeave() {
+  if (!drawerClosing.value) return;
+  clearTimeout(drawerTimer);
+  drawerTimer = window.setTimeout(() => { drawerClosing.value = false; }, 80);
+}
+
+/** VIEW 把手：抽屉只在点击时开关（hover / focus 不再自动展开，触屏才可控） */
+function toggleViewDrawer(e) {
+  if (drawerOpen.value) {
+    closeDrawer(e);
+    return;
+  }
+  clearTimeout(drawerTimer);
+  drawerClosing.value = false;
+  drawerOpen.value = true;
 }
 
 // ARCHIVE 里打开一篇：完全复用 LOOKBACK 的封面 FLIP —— 把被点的那张照片
@@ -198,14 +222,57 @@ const current = computed(() => blogPosts[activeIndex.value] || null);
 function normalizeArchiveEntry(p, globalIndex) {
   return {
     ...p,
+    category: String(p.category || 'UNFILED').toUpperCase(),
+    tags: Array.isArray(p.tags) ? p.tags.map((t) => String(t).toUpperCase()) : [],
     // 全站时间序号：最早发布 = 01，最新 = 最大。筛选/滚动都不能改变这个号。
     globalIndex,
     year: yearOf(p.cardDate || p.date),
   };
 }
 
-// 扁平作品列表，保留发布时间顺序（desc）
-const archiveWorks = computed(() => blogPosts.map((p, i) => normalizeArchiveEntry(p, i)));
+// 分类来自 CMS 的每篇文章，不写死白名单：新增/改名/删掉某分类的文章之后，
+// 重建一次，这一排 tab 会跟着变。
+const activeCategory = ref('ALL');
+const categoryTabs = computed(() => {
+  const set = new Set();
+  for (const p of blogPosts) {
+    const c = String(p.category || 'UNFILED').toUpperCase();
+    if (c) set.add(c);
+  }
+  return [...set].sort();
+});
+const categoryNav = computed(() => ['ALL', ...categoryTabs.value]);
+try {
+  const c = new URLSearchParams(window.location.search).get('cat');
+  if (c && (c.toUpperCase() === 'ALL' || categoryTabs.value.includes(c.toUpperCase()))) {
+    activeCategory.value = c.toUpperCase();
+  }
+} catch {
+  /* 隐私模式 */
+}
+
+function setCategory(c) {
+  const cat = String(c || 'ALL').toUpperCase();
+  if (cat === activeCategory.value) return;
+  activeCategory.value = cat;
+  archiveIndex.value = 0;
+  archiveDir.value = 1;
+  try {
+    const url = new URL(window.location.href);
+    if (cat === 'ALL') url.searchParams.delete('cat');
+    else url.searchParams.set('cat', cat);
+    window.history.replaceState(window.history.state, '', url);
+  } catch {
+    /* 隐私模式 */
+  }
+}
+
+// 扁平作品列表，保留发布时间顺序（desc）；按左上角分类筛选。
+const archiveWorks = computed(() => {
+  const list = blogPosts.map((p, i) => normalizeArchiveEntry(p, i));
+  if (activeCategory.value === 'ALL') return list;
+  return list.filter((p) => p.category === activeCategory.value);
+});
 
 const archiveIndex = ref(0);
 // 当前项上下的邻居：做成竖向预览框（参考站中图上下会露出前后作品）。
@@ -2131,6 +2198,19 @@ function onVisibility() {
       @touchend.passive="onArchiveTouchEnd"
     >
       <div class="ba-stage">
+        <nav class="ba-cats" aria-label="Categories">
+          <span class="ba-cats__label">CATEGORY</span>
+          <button
+            v-for="c in categoryNav"
+            :key="c"
+            type="button"
+            class="ba-cats__btn"
+            :class="{ 'is-active': activeCategory === c }"
+            :aria-pressed="activeCategory === c"
+            @click="setCategory(c)"
+          >{{ c }}</button>
+        </nav>
+
         <div v-if="activeWork" class="ba-slug">
           <!-- 左栏：序号 + 文章名，整列跟着中间的卷轴一起上下滚 -->
           <aside class="ba-idx" aria-label="Index">
@@ -2191,12 +2271,22 @@ function onVisibility() {
             <Transition :name="archiveDir < 0 ? 'ba-roll-up' : 'ba-roll-down'" mode="out-in">
               <div :key="activeWork.slug" class="ba-info__inner">
                 <div class="ba-info__col">
+                  <span class="ba-info__k">CATEGORY</span>
+                  <span class="ba-info__v">{{ activeWork.category }}</span>
+                </div>
+                <div class="ba-info__col">
                   <span class="ba-info__k">DATE</span>
                   <span class="ba-info__v">{{ monthOf(activeWork.cardDate) }}</span>
                 </div>
                 <div class="ba-info__col">
                   <span class="ba-info__k">READ</span>
                   <span class="ba-info__v">{{ activeWork.readTime || '—' }}</span>
+                </div>
+                <div v-if="activeWork.tags.length" class="ba-info__tags">
+                  <span class="ba-info__k">TAGS</span>
+                  <div class="ba-info__taglist">
+                    <span v-for="tag in activeWork.tags" :key="tag" class="ba-tag">{{ tag }}</span>
+                  </div>
                 </div>
               </div>
             </Transition>
@@ -2219,6 +2309,7 @@ function onVisibility() {
       class="jb-viewdrawer"
       :class="{ 'is-open': drawerOpen, 'is-closing': drawerClosing }"
       aria-label="Switch view"
+      @pointerleave="onViewDrawerLeave"
     >
       <div class="jb-viewdrawer__panel">
         <button
@@ -2241,7 +2332,7 @@ function onVisibility() {
         type="button"
         :aria-expanded="drawerOpen"
         aria-label="展开/收起视图切换"
-        @click="drawerOpen = !drawerOpen"
+        @click="toggleViewDrawer"
       >
         <span class="jb-viewdrawer__handle-text">VIEW</span>
       </button>
@@ -3044,26 +3135,15 @@ function onVisibility() {
    收起时只露右侧一条把手；悬停/聚焦/点击展开三张真实作品缩略图。
    颜色跟本页的 --jb-* 调色板走，暗/亮主题都一致。 */
 .jb-viewdrawer {
+  --jb-handle: 36px;
   position: fixed;
   top: max(104px, calc(var(--ba-nav-bottom, 84px) + 16px));
   right: 0;
   z-index: 41;
   display: flex;
   align-items: stretch;
-  transform: translateX(calc(100% - 36px));
-  transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.jb-viewdrawer:hover,
-.jb-viewdrawer:focus-within,
-.jb-viewdrawer.is-open {
-  transform: translateX(0);
-}
-/* 点完缩略图：不管鼠标还在不在上面、焦点还在不在里面，都强制收回去 */
-.jb-viewdrawer.is-closing,
-.jb-viewdrawer.is-closing:hover,
-.jb-viewdrawer.is-closing:focus-within {
-  transform: translateX(calc(100% - 36px));
-}
+/* 只滑面板，不滑整个抽屉：VIEW 把手永远留在右边缘，收起时也点得到 */
 .jb-viewdrawer__panel {
   display: flex;
   flex-direction: column;
@@ -3073,6 +3153,15 @@ function onVisibility() {
   backdrop-filter: blur(10px);
   border: 1px solid var(--jb-line);
   border-right: none;
+  transform: translateX(100%);
+  transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.jb-viewdrawer.is-open .jb-viewdrawer__panel {
+  transform: translateX(0);
+}
+/* 收起：面板滑回把手后面（把手是后一个 flex 子项，画在它上面） */
+.jb-viewdrawer:not(.is-open) .jb-viewdrawer__panel {
+  transform: translateX(100%);
 }
 .jb-vthumb {
   position: relative;
@@ -3148,14 +3237,14 @@ function onVisibility() {
 
 @media (max-width: 1024px) {
   .jb-viewdrawer {
+    --jb-handle: 30px;
     top: max(96px, calc(var(--ba-nav-bottom, 84px) + 14px));
-    transform: translateX(calc(100% - 30px));
   }
   .jb-vthumb {
     width: 104px;
     height: 66px;
   }
-  .jb-viewdrawer__handle { width: 30px; }
+  .jb-viewdrawer__handle { width: var(--jb-handle); }
 }
 
 /* ── ARCHIVE（east64films 式作品卷轴）──────────────────────────────────────
@@ -3169,6 +3258,47 @@ function onVisibility() {
   color: var(--jb-fg, #f5f5f5);
   overscroll-behavior: none;
 }
+.ba-cats {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 18px;
+}
+.ba-cats__label {
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--jb-faint);
+  margin-right: 4px;
+}
+.ba-cats__btn {
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--jb-dim);
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.ba-cats__btn:hover { color: var(--jb-fg); }
+.ba-cats__btn.is-active {
+  color: var(--jb-fg);
+  border-color: var(--jb-fg);
+}
+.ba-cats__btn:focus-visible {
+  outline: none;
+  color: var(--jb-fg);
+  border-color: var(--jb-fg);
+}
+
 .ba-stage {
   height: 100%;
   display: flex;
@@ -3425,6 +3555,27 @@ function onVisibility() {
   flex-direction: column;
   gap: 6px;
 }
+.ba-info__tags {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ba-info__taglist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ba-tag {
+  padding: 4px 8px;
+  border: 1px solid var(--jb-line);
+  color: var(--jb-dim);
+  font-family: 'Space Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
 .ba-info__k {
   font-family: 'Space Mono', ui-monospace, monospace;
   font-size: 8px;
@@ -3489,6 +3640,14 @@ function onVisibility() {
   .ba-info { display: none; }
 }
 @media (max-width: 720px) {
+  .ba-cats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .ba-cats::-webkit-scrollbar { display: none; }
+  .ba-cats__btn { flex: 0 0 auto; }
   .ba-stage { padding: max(108px, calc(var(--ba-nav-bottom, 84px) + 26px)) 20px 24px; }
   .ba-slug { grid-template-columns: 1fr; }
   .ba-idx { display: none; }
