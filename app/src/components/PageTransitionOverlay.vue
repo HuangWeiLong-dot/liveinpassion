@@ -38,6 +38,7 @@ import {
   transitionIn,
   transitionLabel,
   transitionOut,
+  transitionQuestion,
   transitionRunId,
   waitForSwap,
 } from '../composables/usePageTransition.js';
@@ -53,6 +54,7 @@ const offsetOf = (dir) => {
 
 const panelRef = ref(null);
 const textRef = ref(null);
+const questionRef = ref(null);
 
 // 把标题按**词**分组，词内再拆字。逐字动画保留，但折行只能发生在词与词之间 ——
 // 之前每个字符都是一个 flex 子项，长标题在窄屏上会在单词中间断开，而且
@@ -79,6 +81,7 @@ const labelSizeClass = computed(() => {
 const active = ref(false);
 
 let tl = null;
+let questionTween = null;
 let swapAtStart = 0;
 let cancelled = 0;
 
@@ -117,6 +120,26 @@ async function play(runId) {
       stagger: step / 1000,
       ease: 'power2.out',
     }, '>');
+
+  // 小字问题从下方飞入。⚠ 单独起一条 tween，不塞进主时间线：
+  // 这个元素在 v-if 里，nextTick 那一帧不保证已经挂上；挂不上就等下一帧。
+  questionTween?.kill();
+  const animateQuestion = () => {
+    const questionEl = questionRef.value;
+    if (!questionEl) {
+      requestAnimationFrame(animateQuestion);
+      return;
+    }
+    gsap.set(questionEl, { opacity: 0, y: 22 });
+    questionTween = gsap.to(questionEl, {
+      opacity: 1,
+      y: 0,
+      duration: 0.46,
+      ease: 'power2.out',
+      delay: IN_MS / 1000 + 0.08,
+    });
+  };
+  animateQuestion();
 
   await tl.then();
   if (!current(runId)) return;
@@ -177,6 +200,11 @@ watch(transitionRunId, (runId) => {
           >{{ ch }}</span>
         </span>
       </template>
+    </div>
+
+    <!-- 板子下方那行小字问题（每次转场随机） -->
+    <div v-if="transitionQuestion" ref="questionRef" class="transition-panel__question">
+      {{ transitionQuestion }}
     </div>
   </div>
 </template>
@@ -277,6 +305,36 @@ watch(transitionRunId, (runId) => {
 .transition-panel__glyph.is-space {
   width: 0.42em;
   flex-shrink: 0;
+}
+
+/* 板子下方的小字问题：等宽小字、压暗，安静地待在底部 */
+.transition-panel__question {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9vh;
+  max-width: min(84vw, 900px);
+  margin: 0 auto;
+  padding: 0 8vw;
+  box-sizing: border-box;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.56rem, 0.9vw, 0.78rem);
+  line-height: 1.5;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-primary) 55%, transparent);
+  user-select: none;
+  /* 定位不再用 translateX(-50%)：GSAP 的 y 会覆盖整条 transform。
+     居中交给 left/right:0 + text-align，飞入只动 y。 */
+}
+
+@media (max-width: 768px) {
+  .transition-panel__question {
+    bottom: 7vh;
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+  }
 }
 
 /* 减少动态效果：JS 那边已经整段跳过了（守卫里直接 return true），

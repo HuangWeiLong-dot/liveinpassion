@@ -24,6 +24,7 @@
 // 它们不需要板子盖住任何东西，上面两个问题都不存在。见 useViewTransition.js。
 import { nextTick, ref } from 'vue';
 import { sectionLabelFor } from './pageLabels.js';
+import { pickBrandQuestion } from '../data/brandQuestions.js';
 
 // ── 时长（唯一的出处；改这里就够了）───────────────────────────────────
 export const IN_MS = 420;            // ① 板子划进来
@@ -38,6 +39,8 @@ export const LABEL_CAP_MS = 900;
 // ── 覆盖层状态（组件读它渲染）─────────────────────────────────────────
 /** 屏幕正中要显示的那行字 */
 export const transitionLabel = ref('');
+/** 板子下方那行小字问题（每次转场随机一句） */
+export const transitionQuestion = ref('');
 /** 'left' | 'right' | 'up' | 'down' —— 板子从哪边**划进来** */
 export const transitionIn = ref('left');
 /** 'left' | 'right' | 'up' | 'down' —— 板子往哪边**滑走**（与进来那侧各自随机） */
@@ -187,6 +190,7 @@ export function installPageTransition(router) {
 
     // 字和方向都要在开演之前定下来 —— 组件的 watcher 是同步的，runId 一加它就开演。
     transitionLabel.value = sectionLabelFor(to);
+    transitionQuestion.value = pickBrandQuestion();
     transitionIn.value = pickDir();
     transitionOut.value = pickDir();
     const runId = transitionRunId.value + 1;

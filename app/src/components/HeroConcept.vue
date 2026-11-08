@@ -802,6 +802,14 @@ function morphSphereShape(target) {
 // 触屏不接拖拽（那是纵向滚动手势的地盘），只保留自转。
 const sphereDrag = { active: false, lastX: 0, lastY: 0, stepY: 0, stepX: 0, startX: 0, startY: 0, moved: false };
 
+// 球现在画在主体**上面**（z-index 5.5），但自己 pointer-events:none：
+// 指针事件穿透到下面的主体 / 人格；空白处由 Hero 根节点接住来拖球。
+// 从主体、人格、链接上起手时不拖 —— 那些是点击/跳转。
+function onHeroPointerDown(event) {
+  if (event.target?.closest?.('.hero-subject, .persona, a, button, input, textarea, select')) return;
+  onSphereDown(event);
+}
+
 function onSphereDown(event) {
   if (!finePointer.value || reducedMotion.value || wallHidden.value) return;
   if (event.button !== 0) return;
@@ -1927,6 +1935,7 @@ onBeforeUnmount(() => {
       'is-risen': brandEntered,
     }"
     @wheel="onSphereWheel"
+    @pointerdown="onHeroPointerDown"
   >
   <!-- 鼠标拖迹：一条跟着指针、朝尾部渐隐的折线（参照 oumahi.art 首页）。
          和方块光标一样 Teleport 到 body —— 留在 Hero 里的话，Hero 的 transform
@@ -1947,7 +1956,6 @@ onBeforeUnmount(() => {
       class="hero-sphere"
       :class="{ 'is-on': sphereOn, 'is-off': wallHidden, 'is-grabbing': sphereGrabbing }"
       aria-hidden="true"
-      @pointerdown="onSphereDown"
     >
       <div class="hero-sphere__viewport">
         <div ref="sphereWorldEl" class="hero-sphere__world">
@@ -2520,9 +2528,13 @@ onBeforeUnmount(() => {
 .hero-sphere {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  /* 3D 球包住主人格：球在主体（z5）上面、背景字（z6）下面。
+     ⚠ z-index 只能是整数，5.5 会被整条丢弃（computed 回到 auto）。
+     和背景字同为 6 时靠 DOM 顺序：球在字前面，所以字仍然在上面。
+     视觉在上、事件在下 —— 球自己不接收指针，拖拽改由 Hero 根节点接。 */
+  z-index: 6;
   opacity: 0;
-  pointer-events: auto;
+  pointer-events: none;
   /* 触屏上纵向手势留给页面滚动，横向拖动也不接（onSphereDown 只认精确指针） */
   touch-action: pan-y;
   cursor: grab;

@@ -13,8 +13,9 @@
 // 于是全站只有一套转场，不再有第二份实现。
 import { ref } from 'vue';
 import { useTheme } from './useTheme.js';
-import { warmFirstScreenAssets } from './useFirstScreenWarmup.js';
+import { preloadSiteImages } from './useSitePreload.js';
 import { runPageTransition } from './usePageTransition.js';
+import { pickBrandQuestion } from '../data/brandQuestions.js';
 
 const LIFT_MS = 820;  // 字：中间 → 上方
 const DROP_MS = 900;  // 字：上方 → 下方；主体与人格这时已经在播自己的动画
@@ -30,12 +31,49 @@ const bg = ref('dark');       // 首屏遮罩的底色
 const runId = ref(0);         // 每次开演 +1，组件据此复位字的位移
 
 // 首屏那个小小的"LIVE IN PASSION / NOT LIVE IN PASSION"选择：
-// 前者点 ENTER 时预下接下来最可能看到的一小批图片，后者不预下。
+// 前者点 ENTER 时预载**全站图片**（进度条画在首屏字上），后者不预载。
+// 默认 NOT：几百张图的全量下载不该强加给每个第一次来的访客；选过一次 LIVE
+// 会记在 localStorage，之后一直保留。
 const PRELOAD_KEY = 'lip:first-screen-preload';
-const preloadOn = ref(true);
+const preloadOn = ref(false);
 try {
-  if (localStorage.getItem(PRELOAD_KEY) === '0') preloadOn.value = false;
-} catch { /* 隐私模式：默认预载 */ }
+  if (localStorage.getItem(PRELOAD_KEY) === '1') preloadOn.value = true;
+} catch { /* 隐私模式：默认不预载 */ }
+
+// ── 首次访问 vs 刷新 ─────────────────────────────────────────────────────
+// 第一次进站：LIVEINPASSION + ENTER（现在的首屏）。
+// 之后每次刷新：不再要 ENTER，随机显示一个大写问题，走同一套字的上浮/回落
+// 动画后自动进站 —— 相当于把首屏变成一个会随机提问的过场。
+const VISITED_KEY = 'lip:visited';
+// 同名 cookie 作为兜底：某些浏览器/设置会在强刷（Ctrl+Shift+R）时清掉
+// localStorage 那一档，但 cookie 还在。两者任一为 1 都算"来过"。
+const VISITED_COOKIE = 'lip_visited';
+
+function readVisited() {
+  try {
+    if (localStorage.getItem(VISITED_KEY) === '1') return true;
+  } catch { /* ignore */ }
+  try {
+    return document.cookie.split('; ').some((c) => c.startsWith(`${VISITED_COOKIE}=1`));
+  } catch {
+    return false;
+  }
+}
+
+function markVisited() {
+  try {
+    localStorage.setItem(VISITED_KEY, '1');
+  } catch { /* ignore */ }
+  try {
+    document.cookie = `${VISITED_COOKIE}=1; Max-Age=31536000; Path=/; SameSite=Lax`;
+  } catch { /* ignore */ }
+}
+
+const wasVisited = readVisited();
+const refreshMode = ref(wasVisited);
+
+/** 首屏那行大字：首次是 LIVEINPASSION；刷新是一个随机问题 */
+const wordmarkText = ref(wasVisited ? pickBrandQuestion() : 'LIVEINPASSION');
 
 function setPreload(on) {
   preloadOn.value = Boolean(on);
@@ -57,9 +95,21 @@ export function useBrandOverlay() {
     if (phase.value !== 'idle' || !showEnter.value) return;
     bg.value = useTheme().isDark.value ? 'dark' : 'light';
     runId.value++;
-    // 这一次点击也是"首次交互"：选了 LIVE IN PASSION 就趁首屏动画的时间窗
-    // 预下接下来最可能看到的一小批图片（首页 CURATED + 最近几篇封面等，≤14 张）。
-    if (preloadOn.value) warmFirstScreenAssets();
+
+    // 首次进站完成之后，之后刷新都走"随机问题"的自动过场
+    if (!refreshMode.value) markVisited();
+
+    // 选了 LIVE IN PASSION：先把全站图片拉下来，进度条画在首屏那行字上。
+    // 这一步**挡在入场动画之前** —— 用户要的就是"下完再进"，避免浏览时逐张卡。
+    // 刷新过场是自动的、没有用户选择，不再预载（缓存通常也已经有了）。
+    if (!refreshMode.value && preloadOn.value) {
+      phase.value = 'loading';
+      try {
+        await preloadSiteImages();
+      } catch {
+        /* 预载失败也照常进站 */
+      }
+    }
 
     // 1) 字滑到上方
     phase.value = 'lift';
@@ -103,6 +153,7 @@ export function useBrandOverlay() {
 
   return {
     visible, phase, showEnter, entered, wordmarkOn, uiReady, bg, runId,
+    refreshMode, wordmarkText,
     preloadOn, setPreload,
     markReady, enter, switchTheme,
   };

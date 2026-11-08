@@ -48,6 +48,34 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 70 — 2026-11-08
+
+#### 刷新过场 + 全站预载进度 + Hero 球层级
+
+- **刷新过场**：首次进站仍是 `LIVEINPASSION + ENTER`；之后刷新不再出现 ENTER，
+  页面正中随机显示一句大写问题（`data/brandQuestions.js`，11 句，连续两次不重复），
+  约 900ms 后自动走同一套上浮 / 回落动画进站。`localStorage['lip:visited']`
+  与 cookie `lip_visited` 双写，强刷清掉 localStorage 也还能认出老访客。
+- **全站图片预载**：选 `LIVE IN PASSION` 点 ENTER 时先把全站图片拉完再进场
+  （`composables/useSitePreload.js`，替代原来 ≤14 张的 `useFirstScreenWarmup`）：
+  首页展示、全部博客封面、全部相册照片、好友照片、影片海报，并发 8、45s 上限；
+  超时先放行，剩余继续在后台下载。默认改为 **NOT**（不预载），选择记在
+  `lip:first-screen-preload`。
+- **字上进度条**：预载进度画在首屏大字上 —— `--brand-progress` 通过
+  `background-clip: text` 从左到右填实；loading 期间底板不淡出、操作区隐藏，
+  字下方滚动显示那组问题（reduced-motion 下静止）。
+- **页面转场小字问题**：转场板子底部新增一行随机问题，从下方 22px 淡入，
+  与标题逐字动画并行。
+- **Hero 球层级**：3D 球移到主体之上（`z-index: 6`，与背景字同层靠 DOM 顺序
+  压在下面），但自身 `pointer-events: none`；拖拽改由 Hero 根节点接，从主体 /
+  人格 / 链接 / 按钮上起手时不拖。
+- **ME 灯箱打开等待解码**：大图还没解码时盒子尺寸为 0，不再直接放弃飞行，
+  而是逐帧等它出现（最多 60 帧）；飞行层停在墙上那一格，不会出现「飞行没起来」。
+- **验收**：新增 `tools/verify-preload-progress.mjs`（默认 NOT 不预载、LIVE 进度
+  中间态、482 张全站请求、100% 后才入场、刷新过场自动进站，15/15）；
+  `verify-enter-no-music` 同步改为每次 load 前清 `lip:visited`，全部通过；
+  `verify-cover-flight` 43/43。
+
 ### update: 69 — 2026-11-08
 
 #### 首屏预载选择 + 飞行层打断收尾 + ECHOES 视图切换

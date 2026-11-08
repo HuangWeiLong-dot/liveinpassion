@@ -102,6 +102,12 @@ async function withPage(fn) {
     await send('Page.enable');
     await send('Runtime.enable');
     await send('Page.addScriptToEvaluateOnNewDocument', { source: INJECT });
+    // 每个场景都要模拟"第一次进站"：进场会写 lip:visited，第二次 load() 不清掉
+    // 就会走刷新过场（随机问题、自动进站），根本没有 quiet 按钮可点。
+    await send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `try { localStorage.removeItem('lip:visited'); } catch (e) {}
+try { document.cookie = 'lip_visited=; Max-Age=0; Path=/'; } catch (e) {}`,
+    });
     const result = await fn({ send, evalJs, load, state, sleep });
     ws.close();
     return result;

@@ -128,17 +128,29 @@ watch(() => props.visible, async (visible) => {
   }
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (!props.visible) return;
-    const box = rectOf(fullEl.value);
-    if (!box) {
-      flightHidden.value = false;
-      hideCoverFlight();
-      return;
-    }
-    animateCoverFlightTo(box, {
-      duration: 0.72,
-      ease: 'power2.inOut',
-      onComplete: landFlight,
-    });
+    // 大图还没解码时盒子的尺寸是 0：别急着放弃，等它出来再飞。
+    // （这时飞行层仍停在墙上那一格，灯箱大图是隐藏的。）
+    let tries = 0;
+    const fly = () => {
+      if (!props.visible) return;
+      const box = rectOf(fullEl.value);
+      if (box) {
+        animateCoverFlightTo(box, {
+          duration: 0.72,
+          ease: 'power2.inOut',
+          onComplete: landFlight,
+        });
+        return;
+      }
+      tries += 1;
+      if (tries > 60) {
+        flightHidden.value = false;
+        hideCoverFlight();
+        return;
+      }
+      requestAnimationFrame(fly);
+    };
+    fly();
   }));
 });
 

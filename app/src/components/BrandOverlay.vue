@@ -14,11 +14,20 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { useTheme } from '../composables/useTheme.js';
 import { useMusicPlayer } from '../composables/useMusicPlayer.js';
+import { sitePreload } from '../composables/useSitePreload.js';
+import { BRAND_QUESTIONS } from '../data/brandQuestions.js';
 
-const TEXT = 'LIVEINPASSION';
+// 预载进度条下方滚动的那些问题：复制一份，滚到一半时无缝接回开头
+const tickerQuestions = [...BRAND_QUESTIONS, ...BRAND_QUESTIONS];
+
 const BG_ALPHA = 0.075; // 落到背景字时的浓度（和 .hero-wordmark 的 opacity 对齐）
 
-const { visible, phase, showEnter, bg, runId, preloadOn, setPreload, markReady, enter } = useBrandOverlay();
+const {
+  visible, phase, showEnter, bg, runId,
+  refreshMode, wordmarkText,
+  preloadOn, setPreload,
+  markReady, enter,
+} = useBrandOverlay();
 const { isDark } = useTheme();
 const { cancelAutoPlay } = useMusicPlayer();
 
@@ -60,6 +69,17 @@ watch(runId, () => {
   ty.value = '0px';
   alpha.value = 1;
 });
+
+// 刷新过场：不出现 ENTER，问题字在正中停一下让人看清，再自动走同一套进场动画。
+let autoEnterTimer = 0;
+let autoEntered = false;
+watch([ready, showEnter, refreshMode], ([r, s, rm]) => {
+  if (!rm || !r || !s || autoEntered || phase.value !== 'idle') return;
+  autoEntered = true;
+  autoEnterTimer = window.setTimeout(() => {
+    if (phase.value === 'idle') enter();
+  }, 900);
+}, { immediate: true });
 
 // 无音乐进入：先摘掉首次交互自动起播的监听，再走同一条进入时序
 function enterNoMusic() {
@@ -104,6 +124,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   ready.value = false;
+  clearTimeout(autoEnterTimer);
 });
 </script>
 
@@ -115,7 +136,8 @@ onBeforeUnmount(() => {
       'is-gone': !visible,
       'is-ready': ready,
       'is-leaving': phase === 'leave',
-      'is-moving': phase !== 'idle',
+      // loading 期间底板要留着：进度条就画在这块实体底板上
+      'is-moving': phase !== 'idle' && phase !== 'loading',
     }"
   >
     <div class="brand__bg" aria-hidden="true" />
@@ -125,13 +147,18 @@ onBeforeUnmount(() => {
     <div
       ref="solidRef"
       class="brand__solid"
-      :style="{ transform: `translateY(${ty})`, opacity: ready ? alpha : 0 }"
+      :class="{ 'is-question': refreshMode }"
+      :style="{
+        transform: `translateY(${ty})`,
+        opacity: ready ? alpha : 0,
+        '--brand-progress': `${sitePreload.progress}%`,
+      }"
     >
-      {{ TEXT }}
+      {{ wordmarkText }}
     </div>
 
     <div
-      v-show="showEnter && phase === 'idle'"
+      v-show="!refreshMode && showEnter && phase === 'idle'"
       class="brand__actions"
     >
       <button
@@ -152,8 +179,8 @@ onBeforeUnmount(() => {
         ENTER WITHOUT MUSIC
       </button>
 
-      <!-- 首屏的一个小选择：LIVE IN PASSION = 点 ENTER 时预下接下来最可能
-           看到的几张图；NOT LIVE IN PASSION = 不预下。记在 localStorage。 -->
+      <!-- 首屏的一个小选择：LIVE IN PASSION = 点 ENTER 时预载全站图片；
+           NOT LIVE IN PASSION = 不预载。记在 localStorage。 -->
       <div class="brand__preload" role="radiogroup" aria-label="Preload next pages" data-no-music>
         <button
           class="brand__preload-opt"
@@ -174,6 +201,15 @@ onBeforeUnmount(() => {
           @touchstart.stop
           @keydown.stop
         >NOT LIVE IN PASSION</button>
+      </div>
+    </div>
+
+    <!-- 预载进度期间：字下方滚动显示那组问题 -->
+    <div v-if="sitePreload.active" class="brand__ticker" aria-hidden="true">
+      <div class="brand__ticker-track">
+        <span v-for="(question, i) in tickerQuestions" :key="i" class="brand__ticker-item">
+          {{ question }}
+        </span>
       </div>
     </div>
   </div>
@@ -219,20 +255,65 @@ onBeforeUnmount(() => {
 
 /* 首屏那行字。字号/字距必须和 Hero 的 .hero-wordmark **完全一致**，
    滑到底部时才是同一个东西的两段。 */
+/* 进度条就是这行字本身：已下载的部分用实色，没下完的部分压暗。
+   --brand-progress 由 sitePreload.progress 驱动，从左到右把字“填满”。 */
+@property --brand-progress {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 100%;
+}
+
 .brand__solid {
+  --brand-ink: #111;
   position: relative;
   font-family: 'Oswald', sans-serif;
   font-weight: 700;
   font-size: min(9.5vw, 10rem);
   letter-spacing: 0.1em;
   white-space: nowrap;
-  color: #111;
-  /* 两段滑动的节奏统一走这里 */
-  transition: transform 0.9s cubic-bezier(0.5, 0, 0.2, 1), opacity 0.7s ease;
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--brand-ink) 0 var(--brand-progress),
+    color-mix(in srgb, var(--brand-ink) 15%, transparent) var(--brand-progress) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* 两段滑动的节奏 + 进度填充都走这里 */
+  transition:
+    transform 0.9s cubic-bezier(0.5, 0, 0.2, 1),
+    opacity 0.7s ease,
+    --brand-progress 0.3s ease;
 }
 
 .brand.is-dark .brand__solid {
-  color: #ffffff;
+  --brand-ink: #ffffff;
+}
+
+/* 刷新过场的问题：句子比 LIVEINPASSION 长，允许按词折行、字号收一档 */
+.brand__solid.is-question {
+  width: min(88vw, 1120px);
+  font-size: clamp(1.6rem, 5.6vw, 6rem);
+  line-height: 1.06;
+  letter-spacing: 0.04em;
+  white-space: normal;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .brand__solid.is-question {
+    width: min(90vw, 560px);
+    font-size: clamp(1.4rem, 7.4vw, 2.7rem);
+    letter-spacing: 0.02em;
+  }
+}
+
+/* 不支持 background-clip:text 的浏览器：回到纯色字，别让字消失 */
+@supports not ((background-clip: text) or (-webkit-background-clip: text)) {
+  .brand__solid {
+    color: var(--brand-ink);
+    background-image: none;
+  }
 }
 
 .brand__actions {
@@ -333,6 +414,65 @@ onBeforeUnmount(() => {
 
 .brand__preload-sep {
   opacity: 0.24;
+}
+
+/* 预载期间：字下方滚动的那组问题 */
+.brand__ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9vh;
+  overflow: hidden;
+  color: #111;
+  opacity: 0.5;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.brand.is-dark .brand__ticker {
+  color: #fff;
+}
+
+.brand__ticker-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.6em;
+  width: max-content;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(0.5rem, 0.8vw, 0.64rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  animation: brand-ticker 38s linear infinite;
+}
+
+.brand__ticker-item::after {
+  content: '·';
+  margin-left: 1.4em;
+  opacity: 0.55;
+}
+
+@keyframes brand-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (max-width: 768px) {
+  .brand__ticker {
+    bottom: 8vh;
+  }
+
+  .brand__ticker-track {
+    font-size: 0.48rem;
+    letter-spacing: 0.12em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand__ticker-track {
+    animation: none;
+  }
 }
 
 .brand.is-dark .brand__enter {
