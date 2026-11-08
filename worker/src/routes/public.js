@@ -48,6 +48,7 @@ const EXPORT_HEADERS = {
   'Cache-Control': 'public, max-age=300',
   // 浏览器里的 AI 工具也能直接拿；服务端抓取本来就不受 CORS 限制
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Expose-Headers': 'X-Total-Count, X-Export-Start, X-Export-Count',
 };
 
 function decodeEntities(text) {
@@ -96,53 +97,188 @@ function filterRows(rows, c) {
   return list;
 }
 
+// 导出单篇的 Markdown 片段。分页 / 分块时按这个长度估算字节数，
+// 保证一块不会因为某篇特别长而超出 AI 的一次输入上限。
+function exportEntry(row) {
+  const NL = String.fromCharCode(10);
+  const tags = parseTags(row.tags_json);
+  const text = [
+    `## ${row.title || row.card_title || row.slug}`,
+    '',
+    `- Slug: \`${row.slug}\``,
+    `- Card title: ${row.card_title || row.title || row.slug}`,
+    `- Date: ${formatDate(row.published_at) || row.published_at || ''}`,
+    `- Category: ${row.category || 'UNFILED'}`,
+    `- Tags: ${tags.length ? tags.join(', ') : '—'}`,
+    `- URL: ${SITE}/echoes/${row.slug}`,
+    '',
+    bodyForExport(row) || '_(empty)_',
+    '',
+    '---',
+    '',
+  ].join(NL);
+  return { row, text, chars: text.length, tags };
+}
+
+// 只保留「筛选用」的参数，分页参数不往下传。
+function exportFilters(c) {
+  const params = new URLSearchParams();
+  for (const key of ['slug', 'category', 'tag', 'since', 'limit']) {
+    const value = String(c.req.query(key) || '').trim();
+    if (value) params.set(key, value);
+  }
+  return params;
+}
+
+function exportUrlWith(c, params) {
+  const origin = new URL(c.req.url).origin;
+  const qs = params.toString();
+  return `${origin}/api/posts/export.md${qs ? `?${qs}` : ''}`;
+}
+
 app.get('/posts/export.md', async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT slug, card_title, title, published_at, category, tags_json, content_md, content_html
-     FROM posts WHERE status='published' ORDER BY published_at DESC`
+     FROM posts WHERE status='published' ORDER BY published_at DESC, slug DESC`
   ).all();
   const list = filterRows(rows.results, c);
+  const entries = list.map(exportEntry);
+
+  // 分页：offset/per_page 直接切片；page/per_page 是给人手敲的等价写法。
+  const perPageRaw = Number(c.req.query('per_page') || 0);
+  const perPage = Number.isFinite(perPageRaw) && perPageRaw > 0
+    ? Math.min(Math.floor(perPageRaw), 200) : 0;
+  const offsetRaw = Number(c.req.query('offset') || 0);
+  const pageRaw = Number(c.req.query('page') || 1);
+  let offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? Math.floor(offsetRaw) : 0;
+  if (!offset && perPage && Number.isFinite(pageRaw) && pageRaw > 1) {
+    offset = (Math.floor(pageRaw) - 1) * perPage;
+  }
+
+  const total = entries.length;
+  const totalChars = entries.reduce((sum, entry) => sum + entry.chars, 0);
+  const start = Math.min(offset, total);
+  const slice = perPage ? entries.slice(start, start + perPage) : entries.slice(start);
+  const origin = new URL(c.req.url).origin;
+  const NL = String.fromCharCode(10);
   const lines = [
     '# LIVE IN PASSION — ECHOES',
     '',
-    `> ${list.length} published piece${list.length === 1 ? '' : 's'} · exported ${new Date().toISOString()}`,
+    `> ${total} published piece${total === 1 ? '' : 's'} · ${totalChars} chars · exported ${new Date().toISOString()}`,
     '> Only published posts. Drafts are excluded.',
+  ];
+  if (slice.length) {
+    lines.push(
+      `> Showing ${start + 1}–${start + slice.length} of ${total}${perPage ? ` · per_page=${perPage}` : ''}`,
+      `> Chunked export (recommended for AI): ${origin}/api/posts/export/manifest.json`,
+    );
+  } else {
+    lines.push(`> No pieces in this range (offset ${offset}, total ${total}).`);
+  }
+  lines.push(
+    `> Metadata index: ${origin}/api/posts/index.json`,
     '',
     '---',
     '',
-  ];
-  for (const row of list) {
-    const tags = parseTags(row.tags_json);
-    lines.push(
-      `## ${row.title || row.card_title || row.slug}`,
-      '',
-      `- Slug: \`${row.slug}\``,
-      `- Card title: ${row.card_title || row.title || row.slug}`,
-      `- Date: ${formatDate(row.published_at) || row.published_at || ''}`,
-      `- Category: ${row.category || 'UNFILED'}`,
-      `- Tags: ${tags.length ? tags.join(', ') : '—'}`,
-      `- URL: ${SITE}/echoes/${row.slug}`,
-      '',
-      bodyForExport(row) || '_(empty)_',
-      '',
-      '---',
-      '',
-    );
+  );
+  for (const entry of slice) lines.push(entry.text);
+  return new Response(lines.join(NL), {
+    headers: {
+      ...EXPORT_HEADERS,
+      'X-Total-Count': String(total),
+      'X-Export-Start': String(start),
+      'X-Export-Count': String(slice.length),
+    },
+  });
+});
+
+// 分块清单：给 AI 一次看清「一共多少篇、每块多大、下一块去哪拿」。
+// 按字符预算（默认 24k，约 6k tokens）切块，块边界永远落在文章之间。
+app.get('/posts/export/manifest.json', async (c) => {
+  const db = c.env.DB;
+  const rows = await db.prepare(
+    `SELECT slug, card_title, title, published_at, category, tags_json, content_md, content_html
+     FROM posts WHERE status='published' ORDER BY published_at DESC, slug DESC`
+  ).all();
+  const list = filterRows(rows.results, c);
+  const entries = list.map(exportEntry);
+  const totalChars = entries.reduce((sum, entry) => sum + entry.chars, 0);
+  const CHUNK_CHARS = 24000;
+  const chunks = [];
+  let start = 0;
+  while (start < entries.length) {
+    let end = start;
+    let chars = 0;
+    while (end < entries.length && (end === start || chars + entries[end].chars <= CHUNK_CHARS)) {
+      chars += entries[end].chars;
+      end += 1;
+    }
+    chunks.push({
+      index: chunks.length + 1,
+      from: start + 1,
+      to: end,
+      count: end - start,
+      chars,
+      approxTokens: Math.ceil(chars / 4),
+      titles: entries.slice(start, end).map((entry) => entry.row.title || entry.row.card_title || entry.row.slug),
+    });
+    start = end;
   }
-  return new Response(lines.join(String.fromCharCode(10)), { headers: EXPORT_HEADERS });
+
+  const origin = new URL(c.req.url).origin;
+  const filters = exportFilters(c);
+  for (const chunk of chunks) {
+    const params = new URLSearchParams(filters);
+    params.set('offset', String(chunk.from - 1));
+    params.set('per_page', String(chunk.count));
+    chunk.url = exportUrlWith(c, params);
+  }
+
+  return new Response(JSON.stringify({
+    site: SITE,
+    generatedAt: new Date().toISOString(),
+    count: entries.length,
+    totalChars,
+    chunkChars: CHUNK_CHARS,
+    chunkCount: chunks.length,
+    fullExport: exportUrlWith(c, filters),
+    index: `${origin}/api/posts/index.json`,
+    chunks,
+    posts: entries.map((entry) => ({
+      slug: entry.row.slug,
+      title: entry.row.title,
+      cardTitle: entry.row.card_title,
+      date: formatDate(entry.row.published_at) || entry.row.published_at || '',
+      category: entry.row.category || 'UNFILED',
+      tags: entry.tags,
+      chars: entry.chars,
+      approxTokens: Math.ceil(entry.chars / 4),
+      url: `${SITE}/echoes/${entry.row.slug}`,
+      markdown: exportUrlWith(c, new URLSearchParams({ slug: entry.row.slug })),
+    })),
+  }, null, 2), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'public, max-age=300',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
 });
 
 app.get('/posts/index.json', async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT slug, card_title, title, published_at, category, tags_json, read_time_min
-     FROM posts WHERE status='published' ORDER BY published_at DESC`
+     FROM posts WHERE status='published' ORDER BY published_at DESC, slug DESC`
   ).all();
   const list = filterRows(rows.results, c);
+  const origin = new URL(c.req.url).origin;
   return new Response(JSON.stringify({
     site: SITE,
     count: list.length,
+    fullExport: `${origin}/api/posts/export.md`,
+    manifest: `${origin}/api/posts/export/manifest.json`,
     posts: list.map((row) => ({
       slug: row.slug,
       title: row.title,
@@ -152,7 +288,7 @@ app.get('/posts/index.json', async (c) => {
       tags: parseTags(row.tags_json),
       readTime: `${row.read_time_min} min read`,
       url: `${SITE}/echoes/${row.slug}`,
-      markdown: `${new URL(c.req.url).origin}/api/posts/export.md?slug=${encodeURIComponent(row.slug)}`,
+      markdown: `${origin}/api/posts/export.md?slug=${encodeURIComponent(row.slug)}`,
     })),
   }), {
     headers: {

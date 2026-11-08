@@ -421,6 +421,7 @@ fs.writeFileSync(path.join(distDir, 'feed.xml'), rss);
 // 这里生成站点根目录的 llms.txt，方便 agent 自动发现。
 const exportUrl = 'https://cms.liveinpassion.me/api/posts/export.md';
 const indexUrl = 'https://cms.liveinpassion.me/api/posts/index.json';
+const manifestUrl = 'https://cms.liveinpassion.me/api/posts/export/manifest.json';
 const categoryCounts = new Map();
 for (const p of posts) {
   const c = String(p.category || 'UNFILED').toUpperCase();
@@ -432,8 +433,16 @@ const llms = [
   '',
   '## Echoes',
   `- [Full archive export](${exportUrl}) — all ${posts.length} published pieces as Markdown`,
+  `- [Chunk manifest](${manifestUrl}) — same archive split into ~24k-char chunks, with every title and per-chunk URLs`,
   `- [Archive index](${indexUrl}) — metadata only (title, date, category, tags, URL)`,
   `- [ECHOES page](${SITE}/echoes)`,
+  '',
+  '## Reading the archive in pieces',
+  'Use the manifest first. It lists every piece and paginated chunk URLs, so a long archive',
+  'never has to fit in one prompt.',
+  `- \`?per_page=10\` — 10 pieces per response`,
+  `- \`?page=2&per_page=10\` — second page (same as \`?offset=10&per_page=10\`)`,
+  `- \`?offset=20&per_page=10\` — explicit slice`,
   '',
   '## Export filters',
   '- `?category=LETTER` — one category',
@@ -441,6 +450,7 @@ const llms = [
   '- `?since=2026-01-01` — published on or after a date',
   '- `?limit=10` — cap the number of pieces (max 200)',
   '- `?slug=echoes` — a single piece',
+  '- `?per_page=10&page=2` — paginate the (filtered) result',
   '',
   '## Categories',
   ...[...categoryCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]))

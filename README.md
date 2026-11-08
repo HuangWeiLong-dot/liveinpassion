@@ -48,6 +48,21 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 73 — 2026-11-08
+
+#### Echoes 导出分页 + 分块清单
+
+- `GET /api/posts/export.md` 新增 `offset` / `per_page`（`page` / `per_page` 等价），
+  单页上限 200 篇；正文头部显示当前区间与总字符数，响应头带
+  `X-Total-Count` / `X-Export-Start` / `X-Export-Count`（并暴露给跨域调用）。
+- 新增 `GET /api/posts/export/manifest.json`：按约 24k 字符把已发布文章切成连续块，
+  每块给出 `url / from / to / count / chars / titles`，并附每篇的单篇导出地址。
+  AI 逐块抓取，不会再因为一次输入太大在中途被截断。
+- `GET /api/posts/index.json` 增加 `fullExport` 与 `manifest` 地址；`llms.txt` 增加
+  分块清单入口和 `page` / `per_page` / `offset` 用法。
+- 逻辑测试：分页、越界、筛选后分页、单篇导出、manifest 连续性 / 块大小 / 块 URL
+  可回读，共 24 项通过。
+
 ### update: 72 — 2026-11-08
 
 #### Admin 分类 / 标签：多选批量归类
