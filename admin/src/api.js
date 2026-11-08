@@ -66,6 +66,7 @@ export const taxonomyApi = {
   deleteCategory: (name) => request('/api/admin/taxonomy/category', { method: 'DELETE', body: JSON.stringify({ name }) }),
   renameTag: (from, to) => request('/api/admin/taxonomy/tag', { method: 'PUT', body: JSON.stringify({ from, to }) }),
   deleteTag: (name) => request('/api/admin/taxonomy/tag', { method: 'DELETE', body: JSON.stringify({ name }) }),
+  bulkUpdate: (payload) => request('/api/admin/taxonomy/posts', { method: 'PUT', body: JSON.stringify(payload) }),
 };
 
 // 上传

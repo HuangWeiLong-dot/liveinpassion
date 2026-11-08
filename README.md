@@ -48,6 +48,21 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 72 — 2026-11-08
+
+#### Admin 分类 / 标签：多选批量归类
+
+- Taxonomy 页下半部分新增文章列表：搜索、按分类 / 标签筛选、单篇勾选与「全选可见」。
+- 批量操作：统一设置 CATEGORY（可选已有分类，或「＋ New category…」现场新建）、
+  批量加标签（逗号 / 换行分隔，一次可多个）、批量移除某个标签。
+- Worker `PUT /api/admin/taxonomy/posts`：一次最多 500 篇；只改
+  `status='published'`，不存在的 id 静默跳过；没有实际变化不写库；有改动才触发
+  Pages 重建。
+- `GET /api/admin/taxonomy` 现在返回完整已发布文章列表（slug / 标题 / 分类 / 标签 /
+  发布时间，按时间倒序）+ `total`，页面据此筛选与多选。
+- 分类 / 标签没有独立实体，「新建」= 把它写给选中的文章。
+- 验收脚本 `tools/verify-admin-taxonomy.mjs` 同步批量路径。
+
 ### update: 71 — 2026-11-08
 
 #### Admin 分类 / 标签管理 + 首屏预载 v2

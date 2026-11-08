@@ -22,12 +22,16 @@ function parseTags(raw) {
 // 读出已发布文章的归类快照。normalize 一次，兼容早期没有归一化的旧数据。
 async function loadPublished(db) {
   const rows = await db.prepare(
-    `SELECT id, category, tags_json FROM posts WHERE status='published'`
+    `SELECT id, slug, card_title, title, category, tags_json, published_at
+     FROM posts WHERE status='published' ORDER BY published_at DESC`
   ).all();
   return rows.results.map((row) => ({
     id: row.id,
+    slug: row.slug,
+    title: row.card_title || row.title || row.slug,
     category: normalizeCategory(row.category),
     tags: normalizeTags(parseTags(row.tags_json)),
+    publishedAt: row.published_at,
   }));
 }
 
@@ -79,7 +83,48 @@ function renameTagInList(list, from, to) {
 app.get('/', requireAccessAuth, async (c) => {
   const posts = await loadPublished(c.env.DB);
   const { categories, tags } = aggregate(posts);
-  return c.json({ posts: posts.length, categories, tags });
+  return c.json({ total: posts.length, categories, tags, posts });
+});
+
+// 多选批量更新：设置分类 / 加标签 / 去标签。
+// 新分类、新标签都在这里"创建" —— 归类只在文章上存在，没有空的分类实体。
+app.put('/posts', requireAccessAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const ids = Array.isArray(body.ids)
+    ? [...new Set(body.ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))]
+    : [];
+  if (!ids.length) return c.json({ error: 'ids is required' }, 400);
+  if (ids.length > 500) return c.json({ error: 'too many posts in one request (max 500)' }, 400);
+
+  const hasCategory = body.category !== undefined && body.category !== null
+    && String(body.category).trim() !== '';
+  const category = hasCategory ? normalizeCategory(body.category) : '';
+  const addTags = normalizeTags(body.addTags || []);
+  const removeTags = new Set(normalizeTags(body.removeTags || []));
+  if (!hasCategory && !addTags.length && !removeTags.size) {
+    return c.json({ error: 'nothing to update' }, 400);
+  }
+
+  const posts = await loadPublished(c.env.DB);
+  const byId = new Map(posts.map((post) => [post.id, post]));
+  const changes = [];
+  for (const id of ids) {
+    const post = byId.get(id);
+    if (!post) continue; // 不存在或已取消发布：静默跳过
+
+    const nextCategory = hasCategory ? category : post.category;
+    let tags = post.tags;
+    if (addTags.length) tags = normalizeTags([...tags, ...addTags]);
+    if (removeTags.size) tags = tags.filter((tag) => !removeTags.has(tag));
+
+    const sameTags = JSON.stringify(tags) === JSON.stringify(post.tags);
+    if (nextCategory === post.category && sameTags) continue;
+    changes.push({ id, category: nextCategory, tags });
+  }
+
+  const affected = await saveChanges(c.env.DB, changes);
+  if (affected) rebuild(c, `bulk taxonomy update (${affected} posts)`);
+  return c.json({ ok: true, affected });
 });
 
 // ---------- 分类 ----------

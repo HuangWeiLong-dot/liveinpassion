@@ -12,36 +12,79 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const INJECT = `
 (function () {
   const state = {
-    posts: 9,
-    categories: [
-      { name: 'POEM', count: 5 },
-      { name: 'ESSAY', count: 3 },
-      { name: 'UNFILED', count: 1 },
+    posts: [
+      { id: 1, slug: 'first-light', title: 'First Light', category: 'POEM', tags: ['LOVE', 'NIGHT'], publishedAt: '2026-10-03 10:00:00' },
+      { id: 2, slug: 'second-light', title: 'Second Light', category: 'POEM', tags: ['LOVE'], publishedAt: '2026-10-02 10:00:00' },
+      { id: 3, slug: 'third-light', title: 'Third Light', category: 'ESSAY', tags: ['NIGHT', 'SOLITUDE'], publishedAt: '2026-10-01 10:00:00' },
+      { id: 4, slug: 'unfiled-note', title: 'Unfiled Note', category: 'UNFILED', tags: [], publishedAt: '2026-09-30 10:00:00' },
     ],
-    tags: [
-      { name: 'LOVE', count: 4 },
-      { name: 'NIGHT', count: 3 },
-      { name: 'SOLITUDE', count: 2 },
-    ],
+    categories: [],
+    tags: [],
   };
   window.__tx = state;
   const jsonResponse = (obj, status) => Promise.resolve(new Response(JSON.stringify(obj), {
     status: status || 200, headers: { 'Content-Type': 'application/json' },
   }));
-  function rename(list, from, to) {
-    const src = list.find((x) => x.name === from);
-    if (!src) return 0;
-    const dst = list.find((x) => x.name === to);
-    if (dst) dst.count += src.count;
-    else list.push({ name: to, count: src.count });
-    list.splice(list.indexOf(src), 1);
-    return src.count;
+  function summarize() {
+    const cats = new Map();
+    const tagMap = new Map();
+    for (const p of state.posts) {
+      cats.set(p.category, (cats.get(p.category) || 0) + 1);
+      for (const t of p.tags) tagMap.set(t, (tagMap.get(t) || 0) + 1);
+    }
+    const toList = (map) => [...map.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    state.categories = toList(cats);
+    state.tags = toList(tagMap);
   }
-  function drop(list, name) {
-    const src = list.find((x) => x.name === name);
-    if (!src) return 0;
-    list.splice(list.indexOf(src), 1);
-    return src.count;
+  summarize();
+  function renameCategory(from, to) {
+    let n = 0;
+    for (const p of state.posts) if (p.category === from) { p.category = to; n++; }
+    summarize();
+    return n;
+  }
+  function renameTag(from, to) {
+    let n = 0;
+    for (const p of state.posts) {
+      if (!p.tags.includes(from)) continue;
+      p.tags = p.tags.filter((t) => t !== from);
+      if (to && !p.tags.includes(to)) p.tags.push(to);
+      n++;
+    }
+    summarize();
+    return n;
+  }
+  function removeTag(name) {
+    let n = 0;
+    for (const p of state.posts) {
+      if (!p.tags.includes(name)) continue;
+      p.tags = p.tags.filter((t) => t !== name);
+      n++;
+    }
+    summarize();
+    return n;
+  }
+  function bulkUpdate(body) {
+    const ids = new Set(body.ids || []);
+    const add = body.addTags || [];
+    const remove = new Set(body.removeTags || []);
+    let n = 0;
+    for (const p of state.posts) {
+      if (!ids.has(p.id)) continue;
+      let changed = false;
+      if (body.category && p.category !== body.category) { p.category = body.category; changed = true; }
+      for (const t of add) if (!p.tags.includes(t)) { p.tags.push(t); changed = true; }
+      if (remove.size) {
+        const before = p.tags.length;
+        p.tags = p.tags.filter((t) => !remove.has(t));
+        if (p.tags.length !== before) changed = true;
+      }
+      if (changed) n++;
+    }
+    summarize();
+    return n;
   }
   const orig = window.fetch;
   window.fetch = function (input, init) {
@@ -49,21 +92,28 @@ const INJECT = `
     const method = (init && init.method) || 'GET';
     if (url.indexOf('/api/admin/taxonomy') === 0) {
       const body = init && init.body ? JSON.parse(init.body) : {};
-      if (method === 'GET') return jsonResponse(state);
+      if (method === 'GET') {
+        return jsonResponse({
+          total: state.posts.length,
+          categories: state.categories,
+          tags: state.tags,
+          posts: state.posts,
+        });
+      }
+      if (url === '/api/admin/taxonomy/posts' && method === 'PUT') {
+        return jsonResponse({ ok: true, affected: bulkUpdate(body) });
+      }
       if (url === '/api/admin/taxonomy/category' && method === 'PUT') {
-        const n = rename(state.categories, body.from, body.to);
-        return jsonResponse({ ok: true, affected: n });
+        return jsonResponse({ ok: true, affected: renameCategory(body.from, body.to) });
       }
       if (url === '/api/admin/taxonomy/tag' && method === 'PUT') {
-        const n = rename(state.tags, body.from, body.to);
-        return jsonResponse({ ok: true, affected: n });
+        return jsonResponse({ ok: true, affected: renameTag(body.from, body.to) });
       }
       if (url === '/api/admin/taxonomy/category' && method === 'DELETE') {
-        const n = rename(state.categories, body.name, 'UNFILED');
-        return jsonResponse({ ok: true, affected: n });
+        return jsonResponse({ ok: true, affected: renameCategory(body.name, 'UNFILED') });
       }
       if (url === '/api/admin/taxonomy/tag' && method === 'DELETE') {
-        return jsonResponse({ ok: true, affected: drop(state.tags, body.name) });
+        return jsonResponse({ ok: true, affected: removeTag(body.name) });
       }
       return jsonResponse({ error: 'not stubbed' }, 404);
     }
@@ -162,7 +212,7 @@ const section = (t) => console.log(`\n${t}`);
       cols: getComputedStyle(document.querySelector('.tx-layout')).gridTemplateColumns,
     })`);
     check('页面标题正确', head.h1 === 'Tags & Categories', head.h1);
-    check('Meta 统计 9 published / 3 categories / 3 tags', /9 Published/.test(head.meta) && /3 Categories/.test(head.meta) && /3 Tags/.test(head.meta), head.meta);
+    check('Meta 统计 4 published / 3 categories / 3 tags', /4 Published/.test(head.meta) && /3 Categories/.test(head.meta) && /3 Tags/.test(head.meta), head.meta);
     check('分类与标签各 3 行', head.cats === 3 && head.tags === 3, `${head.cats} / ${head.tags}`);
     check('桌面两栏布局', head.cols.split(' ').length === 2, head.cols);
     check('分类顺序按篇数', JSON.stringify(head.catNames) === JSON.stringify(['POEM', 'ESSAY', 'UNFILED']), JSON.stringify(head.catNames));
@@ -188,11 +238,11 @@ const section = (t) => console.log(`\n${t}`);
     const afterRename = await json(`({
       names: [...document.querySelectorAll('.tx-panel')[0].querySelectorAll('.tx-row__name')].map((e) => e.textContent.trim()),
       notice: document.querySelector('.notice-line')?.textContent.trim(),
-      stored: window.__tx.categories.map((c) => c.name),
+      stored: window.__tx.posts.map((p) => p.category),
     })`);
-    check('重命名后列表变成 VERSE 且保留 5 篇', afterRename.names.includes('VERSE') && !afterRename.names.includes('POEM'), JSON.stringify(afterRename.names));
+    check('重命名后列表变成 VERSE 且保留 2 篇', afterRename.names.includes('VERSE') && !afterRename.names.includes('POEM'), JSON.stringify(afterRename.names));
     check('重命名落到已发布文章（stub 收到 PUT）', afterRename.stored.includes('VERSE') && !afterRename.stored.includes('POEM'), JSON.stringify(afterRename.stored));
-    check('成功提示显示受影响篇数', /5 published posts/.test(afterRename.notice || ''), afterRename.notice);
+    check('成功提示显示受影响篇数', /2 published posts/.test(afterRename.notice || ''), afterRename.notice);
 
     section('合并标签');
     const mergeInfo = await json(`(function () {
@@ -212,7 +262,7 @@ const section = (t) => console.log(`\n${t}`);
       tags: window.__tx.tags,
       names: [...document.querySelectorAll('.tx-panel')[1].querySelectorAll('.tx-row__name')].map((e) => e.textContent.trim()),
     })`);
-    check('合并后 LOVE 消失、NIGHT 计数 7', afterMerge.names.includes('NIGHT') && !afterMerge.names.includes('LOVE') && afterMerge.tags.find((t) => t.name === 'NIGHT')?.count === 7, JSON.stringify(afterMerge.tags));
+    check('合并后 LOVE 消失、NIGHT 计数 3', afterMerge.names.includes('NIGHT') && !afterMerge.names.includes('LOVE') && afterMerge.tags.find((t) => t.name === 'NIGHT')?.count === 3, JSON.stringify(afterMerge.tags));
     check('合并前弹出确认', dialogs.some((d) => /Merge tag/.test(d)), JSON.stringify(dialogs));
 
     section('删除标签（生日防误删）');
@@ -238,8 +288,120 @@ const section = (t) => console.log(`\n${t}`);
     const afterDelete = await json(`({
       names: [...document.querySelectorAll('.tx-panel')[1].querySelectorAll('.tx-row__name')].map((e) => e.textContent.trim()),
       tags: window.__tx.tags.map((t) => t.name),
+      postTags: window.__tx.posts.map((p) => p.tags),
     })`);
-    check('标签从全部已发布文章移除', !afterDelete.names.includes('SOLITUDE') && !afterDelete.tags.includes('SOLITUDE'), JSON.stringify(afterDelete));
+    check('标签从全部已发布文章移除', !afterDelete.names.includes('SOLITUDE') && !afterDelete.tags.includes('SOLITUDE')
+      && afterDelete.postTags.every((tags) => !tags.includes('SOLITUDE')), JSON.stringify(afterDelete));
+
+    section('多选批量归类');
+    const postRows = await json(`({
+      rows: document.querySelectorAll('.tx-post').length,
+      selected: document.querySelector('.tx-bulk__count')?.textContent.trim(),
+      firstTitle: document.querySelector('.tx-post__title')?.textContent.trim(),
+      firstTags: [...document.querySelectorAll('.tx-post')[0].querySelectorAll('.tx-post__tag')].map((e) => e.textContent.trim()),
+    })`);
+    check('已发布文章列表渲染 4 行', postRows.rows === 4, JSON.stringify(postRows));
+    check('文章行显示标题与标签', postRows.firstTitle === 'First Light' && postRows.firstTags.includes('NIGHT'), JSON.stringify(postRows));
+
+    // 搜索过滤
+    await evaluate(`(function () {
+      const i = document.querySelector('.tx-search');
+      i.value = 'third-light';
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(200);
+    const searchRows = await json(`document.querySelectorAll('.tx-post').length`);
+    check('搜索按 slug 过滤到 1 行', searchRows === 1, String(searchRows));
+    await evaluate(`(function () {
+      const i = document.querySelector('.tx-search');
+      i.value = '';
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(200);
+
+    // 全选
+    await evaluate(`(function () {
+      const cb = document.querySelector('.tx-check input');
+      cb.checked = true;
+      cb.dispatchEvent(new Event('change', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(200);
+    const selectedAll = await json(`({
+      count: document.querySelector('.tx-bulk__count')?.textContent.trim(),
+      checks: [...document.querySelectorAll('.tx-post input')].filter((c) => c.checked).length,
+      applied: document.querySelectorAll('.tx-post.is-selected').length,
+    })`);
+    check('Select all shown 选中全部 4 篇', /4 selected/.test(selectedAll.count) && selectedAll.checks === 4 && selectedAll.applied === 4, JSON.stringify(selectedAll));
+
+    // 批量新建分类并应用
+    await evaluate(`(function () {
+      const sel = document.querySelectorAll('.tx-bulk__row')[1].querySelector('select');
+      sel.value = '__new__';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(150);
+    await evaluate(`(function () {
+      const i = document.querySelector('.tx-bulk__row:nth-child(2) .tx-newinput');
+      i.value = 'hymn';
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(100);
+    await evaluate(`document.querySelectorAll('.tx-bulk__row')[1].querySelector('.btn-primary').click()`);
+    await sleep(900);
+    const bulkCategory = await json(`({
+      categories: window.__tx.posts.map((p) => p.category),
+      summary: window.__tx.categories,
+      notice: document.querySelector('.notice-line')?.textContent.trim(),
+      selected: document.querySelector('.tx-bulk__count')?.textContent.trim(),
+    })`);
+    check('批量新建 HYMN 并应用到全部选中文章', bulkCategory.categories.every((c) => c === 'HYMN'), JSON.stringify(bulkCategory.categories));
+    check('分类计数合并为 HYMN 4', bulkCategory.summary.length === 1 && bulkCategory.summary[0].name === 'HYMN' && bulkCategory.summary[0].count === 4, JSON.stringify(bulkCategory.summary));
+    check('提示说明是新建并应用', /Created and applied/.test(bulkCategory.notice || ''), bulkCategory.notice);
+    check('批量操作后仍保持 4 篇选中', /4 selected/.test(bulkCategory.selected || ''), bulkCategory.selected);
+
+    // 批量加标签（新的 + 大的写）
+    await evaluate(`(function () {
+      const i = document.querySelector('.tx-newinput--tags');
+      i.value = 'hope, calm';
+      i.dispatchEvent(new Event('input', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(100);
+    await evaluate(`document.querySelectorAll('.tx-bulk__row')[2].querySelector('.btn-primary').click()`);
+    await sleep(900);
+    const bulkTags = await json(`({
+      tags: window.__tx.posts.map((p) => p.tags),
+      notice: document.querySelector('.notice-line')?.textContent.trim(),
+    })`);
+    check('批量给每篇加 HOPE / CALM', bulkTags.tags.every((tags) => tags.includes('HOPE') && tags.includes('CALM')), JSON.stringify(bulkTags.tags));
+    check('提示列出新加的标签', /HOPE/.test(bulkTags.notice || '') && /CALM/.test(bulkTags.notice || ''), bulkTags.notice);
+
+    // 批量移除标签
+    await evaluate(`(function () {
+      const sel = document.querySelectorAll('.tx-bulk__row')[2].querySelector('select');
+      sel.value = 'CALM';
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return 1;
+    })()`);
+    await sleep(100);
+    await evaluate(`document.querySelectorAll('.tx-bulk__row')[2].querySelector('.btn-danger').click()`);
+    await sleep(900);
+    const removeTags = await json(`({
+      tags: window.__tx.posts.map((p) => p.tags),
+      available: window.__tx.tags.map((t) => t.name),
+    })`);
+    check('批量移除 CALM 但保留 HOPE', removeTags.tags.every((tags) => !tags.includes('CALM') && tags.includes('HOPE')), JSON.stringify(removeTags));
+
+    // 清空选择
+    await evaluate(`[...document.querySelectorAll('.tx-bulk__row .btn-secondary')].find((b) => /Clear/.test(b.textContent)).click()`);
+    await sleep(200);
+    const cleared = await json(`document.querySelector('.tx-bulk__count')?.textContent.trim()`);
+    check('Clear 清空选择', /0 selected/.test(cleared || ''), cleared);
 
     section('手机 390px');
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] });
@@ -250,7 +412,7 @@ const section = (t) => console.log(`\n${t}`);
       const de = document.documentElement;
       const cols = getComputedStyle(document.querySelector('.tx-layout')).gridTemplateColumns;
       const small = [];
-      for (const el of document.querySelectorAll('.tx-panel .btn, .tx-merge, .tx-rename__input')) {
+      for (const el of document.querySelectorAll('.tx-panel .btn, .tx-merge, .tx-rename__input, .tx-posts .btn, .tx-filter, .tx-search, .tx-newinput, .tx-check')) {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) continue;
         if (r.height < 44 || r.width < 44) small.push({ cls: el.className, w: Math.round(r.width), h: Math.round(r.height) });
