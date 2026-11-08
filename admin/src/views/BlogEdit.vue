@@ -76,6 +76,7 @@ const TAG_LIMIT = 12;
 const TAG_MAX_LEN = 24;
 const CATEGORY_MAX_LEN = 24;
 const categorySuggestions = ref([]);
+const tagSuggestions = ref([]);
 const saving = ref(false);
 // 当前文章在服务端的状态：已发布的文章只显示 Update，编辑后重建前台但不改发布日期。
 const postStatus = ref('draft');
@@ -229,6 +230,17 @@ function removeTag(tag) {
   form.value.tags = form.value.tags.filter((t) => t !== tag);
 }
 
+function toggleSuggestedTag(tag) {
+  const t = String(tag || '').trim().toUpperCase().slice(0, TAG_MAX_LEN);
+  if (!t) return;
+  if (form.value.tags.includes(t)) {
+    removeTag(t);
+    return;
+  }
+  if (form.value.tags.length >= TAG_LIMIT) return;
+  form.value.tags.push(t);
+}
+
 function onTagKeydown(e) {
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
@@ -242,11 +254,17 @@ function loadCategorySuggestions() {
   blogApi.list()
     .then((data) => {
       const seen = new Set();
+      const tagSeen = new Set();
       for (const p of data.posts || []) {
         const c = normalizeCategoryInput(p.category);
         if (c !== 'UNFILED') seen.add(c);
+        for (const t of (Array.isArray(p.tags) ? p.tags : [])) {
+          const tag = String(t || '').trim().toUpperCase().slice(0, TAG_MAX_LEN);
+          if (tag) tagSeen.add(tag);
+        }
       }
       categorySuggestions.value = [...seen].sort();
+      tagSuggestions.value = [...tagSeen].sort();
     })
     .catch(() => { /* suggestions are optional */ });
 }
@@ -1123,7 +1141,18 @@ onUnmounted(() => {
               {{ tag }} <span class="tag-chip__x"><AdminIcon name="x" :size="10" /></span>
             </button>
           </div>
-          <div class="field-hint">Enter or comma adds a tag · click to remove · up to 12</div>
+          <div v-if="tagSuggestions.length" class="suggest-row tag-suggest">
+            <button
+              v-for="tag in tagSuggestions"
+              :key="tag"
+              type="button"
+              class="suggest-chip"
+              :class="{ active: form.tags.includes(tag) }"
+              :aria-pressed="form.tags.includes(tag)"
+              @click="toggleSuggestedTag(tag)"
+            >{{ tag }}</button>
+          </div>
+          <div class="field-hint">Enter or comma adds a tag · click an existing tag to add / remove · up to 12</div>
         </div>
 
         <div class="field field--wide">
