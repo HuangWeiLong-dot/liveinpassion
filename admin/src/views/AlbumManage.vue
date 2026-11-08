@@ -181,6 +181,8 @@ const dragOverIndex = ref(null);
 
 function onCellPointerDown(idx, e) {
   if (dragIndex.value !== null) return;
+  // 删除钮等控件不启动拖拽：下面 mouse 的 preventDefault() 会把随后的 click 一起吞掉
+  if (e.target.closest?.('button, a, input, label')) return;
   if (e.pointerType === 'mouse') e.preventDefault(); // 挡掉选中与原生图片拖拽
   startPressDrag(e, {
     onEngage: () => {

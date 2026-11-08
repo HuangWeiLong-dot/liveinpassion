@@ -14,18 +14,20 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useBrandOverlay } from '../composables/useBrandOverlay.js';
 import { useTheme } from '../composables/useTheme.js';
 import { useMusicPlayer } from '../composables/useMusicPlayer.js';
-import { sitePreload } from '../composables/useSitePreload.js';
+import { sitePreload, skipSitePreload } from '../composables/useSitePreload.js';
 import { BRAND_QUESTIONS } from '../data/brandQuestions.js';
 
 // 预载进度条下方滚动的那些问题：复制一份，滚到一半时无缝接回开头
 const tickerQuestions = [...BRAND_QUESTIONS, ...BRAND_QUESTIONS];
+// 点问题可以暂停滚轮，停下来读；再点继续
+const tickerPaused = ref(false);
 
 const BG_ALPHA = 0.075; // 落到背景字时的浓度（和 .hero-wordmark 的 opacity 对齐）
 
 const {
   visible, phase, showEnter, bg, runId,
   refreshMode, wordmarkText,
-  preloadOn, setPreload,
+  preloadOn, setPreload, preloadScope, setPreloadScope,
   markReady, enter,
 } = useBrandOverlay();
 const { isDark } = useTheme();
@@ -141,6 +143,22 @@ onBeforeUnmount(() => {
     }"
   >
     <div class="brand__bg" aria-hidden="true" />
+
+    <!-- 预载期间：已下载的封面在字背后慢慢拼成一颗圆形球（越下越多、越显） -->
+    <div
+      v-if="sitePreload.active"
+      class="brand__collage"
+      aria-hidden="true"
+      :style="{ '--collage-progress': sitePreload.progress }"
+    >
+      <span
+        v-for="(url, i) in sitePreload.loadedUrls"
+        :key="`c${i}`"
+        class="brand__collage__tile"
+      >
+        <img :src="url" alt="" decoding="async" crossorigin="anonymous" draggable="false">
+      </span>
+    </div>
     <!-- ⚠ 这行大字也要挂在 ready 上。它原来是"一直就画"，于是首屏必然先用
          兜底字体画一遍、等 Oswald 到了再换一次 —— 整屏只有这一个字，那一下很跳。
          is-ready 以前只管 ENTER 按钮，所以那套"等字体"其实没管到字。 -->
@@ -202,14 +220,71 @@ onBeforeUnmount(() => {
           @keydown.stop
         >NOT LIVE IN PASSION</button>
       </div>
+
+      <!-- LIVE 的范围：QUICK 只等首屏那一批，FULL 等全站 -->
+      <div
+        v-if="preloadOn"
+        class="brand__scope"
+        role="radiogroup"
+        aria-label="Preload scope"
+        data-no-music
+      >
+        <button
+          class="brand__preload-opt"
+          :class="{ 'is-on': preloadScope === 'full' }"
+          type="button"
+          :aria-pressed="preloadScope === 'full'"
+          @click.stop="setPreloadScope('full')"
+          @touchstart.stop
+          @keydown.stop
+        >PATIENT</button>
+        <span class="brand__preload-sep" aria-hidden="true">/</span>
+        <button
+          class="brand__preload-opt"
+          :class="{ 'is-on': preloadScope === 'quick' }"
+          type="button"
+          :aria-pressed="preloadScope === 'quick'"
+          @click.stop="setPreloadScope('quick')"
+          @touchstart.stop
+          @keydown.stop
+        >NOT PATIENT</button>
+      </div>
+    </div>
+
+    <!-- 预载进度期间：百分比 / 数量 / 剩余秒数 + SKIP；下面是纵向滚动的问题 -->
+    <div v-if="sitePreload.active" class="brand__loadmeta" aria-live="polite">
+      <span class="brand__loadmeta-line">
+        {{ sitePreload.progress }}% · {{ sitePreload.done }}/{{ sitePreload.total }}<template v-if="sitePreload.etaSec"> · ~{{ sitePreload.etaSec }}s</template>
+      </span>
+      <button
+        class="brand__skip"
+        type="button"
+        data-no-music
+        @click.stop="skipSitePreload"
+        @touchstart.stop
+        @keydown.stop
+      >SKIP — ENTER NOW</button>
     </div>
 
     <!-- 预载进度期间：字下方滚动显示那组问题 -->
-    <div v-if="sitePreload.active" class="brand__ticker" aria-hidden="true">
-      <div class="brand__ticker-track">
-        <span v-for="(question, i) in tickerQuestions" :key="i" class="brand__ticker-item">
-          {{ question }}
-        </span>
+    <div
+      v-if="sitePreload.active"
+      class="brand__ticker"
+      :class="{ 'is-paused': tickerPaused }"
+      role="group"
+      aria-label="Questions — click to pause"
+    >
+      <div class="brand__ticker-track" :class="{ 'is-paused': tickerPaused }">
+        <button
+          v-for="(question, i) in tickerQuestions"
+          :key="i"
+          class="brand__ticker-item"
+          type="button"
+          data-no-music
+          @click.stop="tickerPaused = !tickerPaused"
+          @touchstart.stop
+          @keydown.stop
+        >{{ question }}</button>
       </div>
     </div>
   </div>
@@ -416,18 +491,142 @@ onBeforeUnmount(() => {
   opacity: 0.24;
 }
 
+/* LIVE 的范围行：QUICK / FULL，沿用上面那排小字的皮肤 */
+.brand__scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-top: -2px;
+  color: #111;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.brand.is-dark .brand__scope {
+  color: #fff;
+}
+
+/* 字背后的图片拼贴：已下载的封面拼成一颗圆形球，越下越多、越显。 */
+.brand__collage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 1px;
+  opacity: calc(0.05 + var(--collage-progress, 0) * 0.0017);
+  transform: scale(calc(0.92 + var(--collage-progress, 0) * 0.0008));
+  -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%, #000 8%, rgba(0, 0, 0, 0.6) 42%, transparent 70%);
+  mask-image: radial-gradient(circle closest-side at 50% 50%, #000 8%, rgba(0, 0, 0, 0.6) 42%, transparent 70%);
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.brand__collage__tile {
+  overflow: hidden;
+}
+
+.brand__collage__tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: grayscale(1) contrast(1.15);
+  opacity: 0.7;
+}
+
+/* 加载读数：百分比 · 数量 · 预计剩余 + SKIP */
+.brand__loadmeta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #111;
+  opacity: 0.62;
+  pointer-events: none;
+  text-align: center;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  font-size: clamp(0.5rem, 0.8vw, 0.62rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.brand.is-dark .brand__loadmeta {
+  color: #fff;
+}
+
+.brand__loadmeta-line {
+  white-space: nowrap;
+}
+
+.brand__skip {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  opacity: 0.72;
+  transition: opacity 0.2s ease;
+}
+
+.brand__skip:hover {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .brand__scope {
+    font-size: 7px;
+    letter-spacing: 0.12em;
+  }
+
+  .brand__loadmeta {
+    bottom: 6vh;
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+  }
+}
+
 /* 预载期间：字下方滚动的那组问题 */
+/* 预载期间：问题在字下方、数据上方，**较大的字号**纵向逐句滚动。
+   点一下可暂停阅读，再点继续。 */
 .brand__ticker {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 9vh;
+  bottom: 15vh;
+  height: 2.4em;
   overflow: hidden;
   color: #111;
-  opacity: 0.5;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  opacity: 0.68;
+  pointer-events: auto;
+  cursor: pointer;
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(1rem, 1.8vw, 1.6rem);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+}
+
+.brand__ticker.is-paused {
+  opacity: 0.82;
 }
 
 .brand.is-dark .brand__ticker {
@@ -435,37 +634,53 @@ onBeforeUnmount(() => {
 }
 
 .brand__ticker-track {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2.6em;
-  width: max-content;
-  white-space: nowrap;
-  font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
-  font-size: clamp(0.5rem, 0.8vw, 0.64rem);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  animation: brand-ticker 38s linear infinite;
+  width: 100%;
+  /* 两份首尾相接；滚掉一整份的高度就是无缝回卷 */
+  animation: brand-ticker 24s linear infinite;
 }
 
-.brand__ticker-item::after {
-  content: '·';
-  margin-left: 1.4em;
-  opacity: 0.55;
+.brand__ticker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 2.4em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: 1.15;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 暂停时在问题前点一个制动符号，告诉用户现在是"停住"的 */
+.brand__ticker.is-paused .brand__ticker-item::before {
+  content: '❚❚';
+  margin-right: 1em;
+  opacity: 0.6;
+}
+
+.brand__ticker-track.is-paused {
+  animation-play-state: paused;
 }
 
 @keyframes brand-ticker {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
 }
 
 @media (max-width: 768px) {
   .brand__ticker {
-    bottom: 8vh;
-  }
-
-  .brand__ticker-track {
-    font-size: 0.48rem;
-    letter-spacing: 0.12em;
+    bottom: 13vh;
+    font-size: clamp(0.9rem, 4.2vw, 1.3rem);
+    letter-spacing: 0.04em;
   }
 }
 

@@ -34,11 +34,15 @@ const runId = ref(0);         // 每次开演 +1，组件据此复位字的位�
 // 前者点 ENTER 时预载**全站图片**（进度条画在首屏字上），后者不预载。
 // 默认 NOT：几百张图的全量下载不该强加给每个第一次来的访客；选过一次 LIVE
 // 会记在 localStorage，之后一直保留。
-const PRELOAD_KEY = 'lip:first-screen-preload';
-const preloadOn = ref(false);
+// v2：默认 LIVE；LIVE 下再分 QUICK（首屏优先，默认）/ FULL（全站）。
+const PRELOAD_KEY = 'lip:first-screen-preload-v2';
+const PRELOAD_SCOPE_KEY = 'lip:first-screen-preload-mode-v2';
+const preloadOn = ref(true);
+const preloadScope = ref('quick');
 try {
-  if (localStorage.getItem(PRELOAD_KEY) === '1') preloadOn.value = true;
-} catch { /* 隐私模式：默认不预载 */ }
+  if (localStorage.getItem(PRELOAD_KEY) === 'none') preloadOn.value = false;
+  if (localStorage.getItem(PRELOAD_SCOPE_KEY) === 'full') preloadScope.value = 'full';
+} catch { /* 隐私模式：默认 LIVE + QUICK */ }
 
 // ── 首次访问 vs 刷新 ─────────────────────────────────────────────────────
 // 第一次进站：LIVEINPASSION + ENTER（现在的首屏）。
@@ -78,7 +82,14 @@ const wordmarkText = ref(wasVisited ? pickBrandQuestion() : 'LIVEINPASSION');
 function setPreload(on) {
   preloadOn.value = Boolean(on);
   try {
-    localStorage.setItem(PRELOAD_KEY, preloadOn.value ? '1' : '0');
+    localStorage.setItem(PRELOAD_KEY, preloadOn.value ? 'live' : 'none');
+  } catch { /* ignore */ }
+}
+
+function setPreloadScope(scope) {
+  preloadScope.value = scope === 'full' ? 'full' : 'quick';
+  try {
+    localStorage.setItem(PRELOAD_SCOPE_KEY, preloadScope.value);
   } catch { /* ignore */ }
 }
 
@@ -105,7 +116,7 @@ export function useBrandOverlay() {
     if (!refreshMode.value && preloadOn.value) {
       phase.value = 'loading';
       try {
-        await preloadSiteImages();
+        await preloadSiteImages(preloadScope.value);
       } catch {
         /* 预载失败也照常进站 */
       }
@@ -154,7 +165,7 @@ export function useBrandOverlay() {
   return {
     visible, phase, showEnter, entered, wordmarkOn, uiReady, bg, runId,
     refreshMode, wordmarkText,
-    preloadOn, setPreload,
+    preloadOn, setPreload, preloadScope, setPreloadScope,
     markReady, enter, switchTheme,
   };
 }

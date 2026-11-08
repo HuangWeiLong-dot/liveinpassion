@@ -59,6 +59,15 @@ export const filmApi = {
   remove: (id) => request(`/api/admin/films/${id}`, { method: 'DELETE' }),
 };
 
+// 分类 / 标签总览（只作用于已发布文章）
+export const taxonomyApi = {
+  get: () => request('/api/admin/taxonomy'),
+  renameCategory: (from, to) => request('/api/admin/taxonomy/category', { method: 'PUT', body: JSON.stringify({ from, to }) }),
+  deleteCategory: (name) => request('/api/admin/taxonomy/category', { method: 'DELETE', body: JSON.stringify({ name }) }),
+  renameTag: (from, to) => request('/api/admin/taxonomy/tag', { method: 'PUT', body: JSON.stringify({ from, to }) }),
+  deleteTag: (name) => request('/api/admin/taxonomy/tag', { method: 'DELETE', body: JSON.stringify({ name }) }),
+};
+
 // 上传
 export const uploadApi = {
   upload: async (file, compressedFile, type) => {

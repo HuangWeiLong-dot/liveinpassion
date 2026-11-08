@@ -417,11 +417,14 @@ select { cursor: pointer; }
   .nav-links::-webkit-scrollbar { display: none; }
   .nav-item { flex-shrink: 0; }
 
-  .nav-item { height: var(--nav-h); padding: 0 8px; font-size: 0.68rem; letter-spacing: 0.08em; }
-  .nav-en { display: none; }
+  .nav-item { height: var(--nav-h); padding: 0 6px; font-size: 0.68rem; letter-spacing: 0.08em; }
+  /* 必须带上 .nav-item 前缀：基础规则 .nav-item .nav-en 的特异性更高，
+     只写 .nav-en 会被它压住，手机导航就会多出一截编号。 */
+  .nav-item .nav-en { display: none; }
   .nav-item--ghost { display: none; }
-  .nav-item.router-link-exact-active::after { left: 8px; right: 8px; }
-  .theme-toggle { margin-left: 4px; }
+  .nav-item.router-link-exact-active::after { left: 6px; right: 6px; }
+  /* 导航项多了以后 nav-links 会横向滚动，主题按钮不能被 flex 压窄 */
+  .theme-toggle { margin-left: 4px; flex-shrink: 0; }
 
   .admin-main { padding: calc(var(--nav-h) + 26px) 0 52px; }
   .admin-main__inner { padding: 0 14px; }

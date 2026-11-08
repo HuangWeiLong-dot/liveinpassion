@@ -7,6 +7,7 @@ const routes = [
   { path: '/albums', name: 'albums', component: () => import('../views/AlbumManage.vue') },
   { path: '/showcase', name: 'showcase', component: () => import('../views/ShowcaseManage.vue') },
   { path: '/films', name: 'films', component: () => import('../views/FilmManage.vue') },
+  { path: '/taxonomy', name: 'taxonomy', component: () => import('../views/TaxonomyManage.vue') },
 ];
 
 export default createRouter({

@@ -1,17 +1,18 @@
-// 验收：首屏 LIVE IN PASSION 的全站预载 + 字上的进度填充。
+// 验收：首屏 LIVE IN PASSION 预载 + 字上进度 + 拼贴 + 读数/SKIP + 问题暂停。
 //
 //   cd app && npm run build
 //   npx vite preview --port 4174 --strictPort
 //   node tools/verify-preload-progress.mjs http://localhost:4174
 //
-// 图片在 CDP 里统一伪造（1×1 PNG，20ms 延迟），否则真下约 500 张会把验收拖到
-// 分钟级。断言的是**机制**：
-//   1. 默认 NOT LIVE IN PASSION，ENTER 直接进场（进度保持 100%，没有全量请求）
-//   2. 选 LIVE 后 --brand-progress 从 0 涨到 100（中间态存在），loading 期间
-//      操作区隐藏、底板不淡
-//   3. 预载范围是全站（唯一图片请求数 > 300），不是原来那十几张
-//   4. 100% 之后入场动画才继续，最终 brand 收起、hero 出现
-//   5. 零 console 报错
+// 图片在 CDP 里统一伪造（1×1 PNG，60ms 延迟），否则真下约 500 张会把验收拖到
+// 分钟级。断言的是机制：
+//   1. 默认 LIVE + NOT PATIENT（首屏优先，30 张）
+//   2. loading 期间：字上进度有中间态、读数（百分比/数量）、SKIP、纵向问题、
+//      字后面的拼贴；操作区隐藏
+//   3. PATIENT（全站）：图片请求 > 300；点问题暂停/继续；SKIP 立即进站
+//   4. NOT LIVE IN PASSION：ENTER 不预载
+//   5. 首次进站后刷新：字换成随机问题，不再出现 ENTER
+//   6. 零 console 报错
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -57,19 +58,54 @@ const STATE = `(() => {
   const solid = document.querySelector('.brand__solid');
   const brand = document.querySelector('.brand');
   const actions = document.querySelector('.brand__actions');
+  const meta = document.querySelector('.brand__loadmeta');
+  const ticker = document.querySelector('.brand__ticker');
+  const track = ticker?.querySelector('.brand__ticker-track');
+  const collage = document.querySelector('.brand__collage');
   return {
     progress: solid ? solid.style.getPropertyValue('--brand-progress') : null,
     brandClass: brand ? brand.className : '',
     actions: actions ? getComputedStyle(actions).display : null,
+    meta: meta ? meta.textContent.replace(/\\s+/g, ' ').trim() : null,
+    skip: Boolean(document.querySelector('.brand__skip')),
+    ticker: Boolean(ticker),
+    tickerText: ticker ? ticker.textContent.replace(/\\s+/g, ' ').trim() : '',
+    tickerState: track ? getComputedStyle(track).animationPlayState : null,
+    collage: collage ? collage.querySelectorAll('.brand__collage__tile').length : 0,
     hero: Boolean(document.querySelector('.hero-concept')),
+    questionMode: solid ? solid.classList.contains('is-question') : false,
+    text: solid ? solid.textContent.trim() : '',
   };
 })()`;
 
 async function waitBrandReady() {
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 45; i += 1) {
     if (await evaluate(`Boolean(document.querySelector('.brand.is-ready .brand__preload'))`)) return;
     await sleep(200);
   }
+}
+
+async function freshFirstVisit({ scope, preload } = {}) {
+  // 清掉 visited / cookie 与本次预载选择，回到"第一次进站"
+  await evaluate(`(() => {
+    try { localStorage.removeItem('lip:visited'); } catch {}
+    try { document.cookie = 'lip_visited=; Max-Age=0; Path=/'; } catch {}
+    try {
+      localStorage.removeItem('lip:first-screen-preload-v2');
+      localStorage.removeItem('lip:first-screen-preload-mode-v2');
+    } catch {}
+  })()`);
+  await send('Page.navigate', { url: baseUrl + '/' });
+  await sleep(3500);
+  await waitBrandReady();
+  if (preload === 'none') {
+    await evaluate(`[...document.querySelectorAll('.brand__preload-opt')]
+      .find((b) => b.textContent.trim() === 'NOT LIVE IN PASSION')?.click()`);
+  } else if (scope === 'full') {
+    await evaluate(`[...document.querySelectorAll('.brand__preload-opt')]
+      .find((b) => b.textContent.trim() === 'PATIENT')?.click()`);
+  }
+  await sleep(200);
 }
 
 (async () => {
@@ -131,103 +167,88 @@ async function waitBrandReady() {
           ],
           body: PNG,
         }).catch(() => {});
-      }, 20);
+      }, 60);
     });
 
-    // ── 1. 默认 NOT：ENTER 直接进场，没有全量请求 ───────────────────────
-    console.log('默认 NOT LIVE IN PASSION:');
-    const loaded = new Promise((res) => on('Page.loadEventFired', res));
-    await send('Page.navigate', { url: baseUrl + '/' });
-    await Promise.race([loaded, sleep(10000)]);
-    await sleep(3500);
-    await waitBrandReady();
-
-    const initial = await evaluate(`JSON.stringify({
-      options: [...document.querySelectorAll('.brand__preload-opt')].map((b) => ({
+    // ── 1. 默认 LIVE + NOT PATIENT：首屏优先 ────────────────────────────
+    console.log('默认 LIVE + NOT PATIENT:');
+    await freshFirstVisit();
+    const initial = await evaluate(`JSON.stringify(
+      [...document.querySelectorAll('.brand__preload-opt')].map((b) => ({
         text: b.textContent.trim(),
         on: b.classList.contains('is-on'),
-      })),
-      stored: localStorage.getItem('lip:first-screen-preload'),
-    })`);
-    const init = JSON.parse(initial);
-    const notBtn = init.options.find((o) => o.text === 'NOT LIVE IN PASSION');
-    check('默认选中 NOT LIVE IN PASSION', Boolean(notBtn?.on), initial);
+      }))
+    )`);
+    const opts = JSON.parse(initial);
+    const onOf = (text) => Boolean(opts.find((o) => o.text === text)?.on);
+    check('默认 LIVE IN PASSION', onOf('LIVE IN PASSION'), initial);
+    check('默认 NOT PATIENT（首屏优先）', onOf('NOT PATIENT'), initial);
 
-    imageUrls.clear();
-    await evaluate(`document.querySelector('.brand__enter')?.click()`);
-    await sleep(250);
-    const notState = await evaluate(STATE);
-    check('默认路径 ENTER 不触发进度（保持 100%）', notState.progress === '100%', notState.progress);
-    await sleep(2600);
-    const notDone = await evaluate(STATE);
-    check('默认路径很快完成入场', notDone.brandClass.includes('is-gone') && notDone.hero);
-    check('默认路径没有全量预载', imageUrls.size < 100, `${imageUrls.size} 张图片请求`);
-
-    // ── 2. LIVE：全站预载 + 字上进度 ────────────────────────────────────
-    // 上一轮进场已经写下 `lip:visited`（还有同名 cookie），不清掉的话这一轮
-    // 会走"刷新过场"：随机问题 + 自动进站，既没有 ENTER 也不会预载。
-    await evaluate(`(() => {
-      localStorage.removeItem('lip:visited');
-      localStorage.removeItem('lip:first-screen-preload');
-      document.cookie = 'lip_visited=; Max-Age=0; Path=/';
-    })()`);
-    console.log('\nLIVE IN PASSION:');
-    await send('Page.navigate', { url: baseUrl + '/' });
-    await sleep(3500);
-    await waitBrandReady();
-    await evaluate(`[...document.querySelectorAll('.brand__preload-opt')]
-      .find((b) => b.textContent.trim() === 'LIVE IN PASSION')?.click()`);
-    await sleep(250);
-    const chosen = await evaluate(`JSON.stringify({
-      stored: localStorage.getItem('lip:first-screen-preload'),
-      liveOn: [...document.querySelectorAll('.brand__preload-opt')]
-        .find((b) => b.textContent.trim() === 'LIVE IN PASSION')?.classList.contains('is-on'),
-    })`);
-    const chosenState = JSON.parse(chosen);
-    check('选 LIVE 后写入 localStorage 并高亮', chosenState.stored === '1' && chosenState.liveOn, chosen);
-
-    imageUrls.clear();
     await evaluate(`document.querySelector('.brand__enter')?.click()`);
     const seq = [];
-    for (let i = 0; i < 36; i += 1) {
-      await sleep(150);
+    for (let i = 0; i < 10; i += 1) {
+      await sleep(90);
       seq.push(await evaluate(STATE));
     }
-    const values = seq
-      .map((s) => Number(String(s.progress || '').replace('%', '')))
-      .filter((n) => Number.isFinite(n));
-    const sawMid = values.some((v) => v > 0 && v < 100);
-    const reached = values.some((v) => v >= 100);
-    check('字上进度经过中间态', sawMid, seq.map((s) => s.progress).slice(0, 8).join(' → '));
-    check('字上进度到达 100%', reached);
-    check('loading 期间操作区隐藏', seq.some((s) => s.actions === 'none' && s.progress !== '100%'));
-    check('预载的是全站资源（>300 张）', imageUrls.size > 300, `${imageUrls.size} 张图片请求`);
-    check('进度完成前不收起品牌遮罩',
-      seq.filter((s) => s.progress !== '100%').every((s) => !s.brandClass.includes('is-gone')));
-    await sleep(2600);
-    const finalState = await evaluate(STATE);
-    check('100% 之后才完成入场', finalState.brandClass.includes('is-gone') && finalState.hero);
+    const values = seq.map((s) => Number(String(s.progress || '').replace('%', ''))).filter(Number.isFinite);
+    check('字上进度经过中间态', values.some((v) => v > 0 && v < 100), seq.map((s) => s.progress).slice(0, 6).join(' → '));
+    check('loading 期间操作区隐藏', seq.some((s) => s.actions === 'none'));
+    check('有百分比 / 数量读数', seq.some((s) => s.meta && /\d+%/.test(s.meta) && /\/\s*\d+/.test(s.meta)), seq[0]?.meta);
+    check('有 SKIP', seq.some((s) => s.skip));
+    check('字后面有图片拼贴', seq.some((s) => s.collage > 0), `${Math.max(...seq.map((s) => s.collage))} 格`);
+    check('有问题纵向滚动带', seq.some((s) => s.ticker && s.tickerText.includes('WHO ARE YOU?')));
+    await sleep(2800);
+    const afterQuick = await evaluate(STATE);
+    check('首屏批次完成后进站', afterQuick.brandClass.includes('is-gone') && afterQuick.hero);
 
-    // ── 3. 刷新过场：上一轮已经写下 lip:visited，这次不再出现 ENTER ──────
+    // ── 2. PATIENT：全站 + 问题暂停/继续 + SKIP ────────────────────────
+    console.log('\nPATIENT（全站）:');
+    await freshFirstVisit({ scope: 'full' });
+    imageUrls.clear();
+    await evaluate(`document.querySelector('.brand__enter')?.click()`);
+    await sleep(420);
+    const fullState = await evaluate(STATE);
+    check('PATIENT 使用全站总量（>300）', Number(String(fullState.meta || '').match(/\/(\d+)/)?.[1] || 0) > 300,
+      fullState.meta);
+    check('全站加载期间有问题带', fullState.ticker);
+    await evaluate(`document.querySelector('.brand__ticker-item')?.click()`);
+    await sleep(120);
+    const paused = await evaluate(STATE);
+    check('点问题暂停滚动', paused.tickerState === 'paused', paused.tickerState);
+    await evaluate(`document.querySelector('.brand__ticker-item')?.click()`);
+    await sleep(120);
+    const resumed = await evaluate(STATE);
+    check('再点继续滚动', resumed.tickerState === 'running', resumed.tickerState);
+    await evaluate(`document.querySelector('.brand__skip')?.click()`);
+    await sleep(2800);
+    const skipped = await evaluate(STATE);
+    check('SKIP 立即进站', skipped.brandClass.includes('is-gone') && skipped.hero);
+    check('全站请求确实发生（>300）', imageUrls.size > 300, `${imageUrls.size} 张`);
+
+    // ── 3. NOT LIVE：不预载 ─────────────────────────────────────────────
+    console.log('\nNOT LIVE IN PASSION:');
+    await freshFirstVisit({ preload: 'none' });
+    imageUrls.clear();
+    await evaluate(`document.querySelector('.brand__enter')?.click()`);
+    await sleep(300);
+    const notState = await evaluate(STATE);
+    check('NOT 路径没有 loading 读数/问题带', !notState.meta && !notState.ticker);
+    await sleep(2600);
+    const notDone = await evaluate(STATE);
+    check('NOT 路径直接进站', notDone.brandClass.includes('is-gone') && notDone.hero);
+    check('NOT 路径没有全量请求', imageUrls.size < 100, `${imageUrls.size} 张`);
+
+    // ── 4. 刷新：随机问题，不再要 ENTER ───────────────────────────────
     console.log('\n刷新过场:');
     await send('Page.navigate', { url: baseUrl + '/' });
+    await sleep(3000);
+    await waitBrandReady();
+    const refresh = await evaluate(STATE);
+    check('刷新后字是问题', refresh.questionMode && refresh.text !== 'LIVEINPASSION', refresh.text);
+    check('刷新过场不显示 ENTER / 预载选择', refresh.actions === 'none');
     await sleep(2600);
-    // 自动进站的时序是「字体就绪 → 900ms → 上浮/回落/撤场」，等它走完
-    for (let i = 0; i < 30; i += 1) {
-      const gone = await evaluate(`document.querySelector('.brand')?.classList.contains('is-gone') ?? true`);
-      if (gone) break;
-      await sleep(250);
-    }
-    const refreshState = JSON.parse(await evaluate(`JSON.stringify({
-      text: document.querySelector('.brand__solid')?.textContent.trim() || '',
-      enterShown: [...document.querySelectorAll('.brand__enter')].some((b) => b.offsetParent !== null),
-      gone: document.querySelector('.brand')?.classList.contains('is-gone') ?? true,
-      hero: Boolean(document.querySelector('.hero-concept')),
-    })`));
-    check('刷新后字换成一个问题（不再是 LIVEINPASSION）',
-      Boolean(refreshState.text) && refreshState.text !== 'LIVEINPASSION', refreshState.text);
-    check('刷新过场没有 ENTER 按钮', !refreshState.enterShown);
-    check('刷新过场自动进站', refreshState.gone && refreshState.hero);
+    const refreshDone = await evaluate(STATE);
+    check('问题过场自动进站', refreshDone.brandClass.includes('is-gone') && refreshDone.hero);
 
     console.log('\n控制台:');
     const clean = consoleErrors.filter((e) => e && !/Failed to load resource/i.test(e));

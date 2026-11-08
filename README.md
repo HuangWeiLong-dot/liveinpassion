@@ -48,6 +48,30 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 71 — 2026-11-08
+
+#### Admin 分类 / 标签管理 + 首屏预载 v2
+
+- **Admin Taxonomy 页**（`/taxonomy`，导航 05）：列出已发布文章的 CATEGORY / TAG 计数，
+  支持 Rename、Merge（合并到已有名字）、Delete；分类删除后文章退回 `UNFILED`，
+  标签删除则从每篇里移除。只统计、只修改 `status='published'` 的文章，草稿不受影响；
+  每次改动后触发 Pages 重建。
+- **Worker** `routes/taxonomy.js`：`GET /api/admin/taxonomy` + 分类 / 标签的
+  `PUT`（重命名 / 合并）与 `DELETE`；名字走 body（分类 / 标签是自由文本，可能含 `/`）；
+  UPDATE 时再校验一次 `status='published'`，避免读写之间文章被取消发布时误改草稿。
+- **首屏预载 v2**：默认改为 LIVE + QUICK —— 只等前 30 张（展示 + 最近封面）就放行，
+  剩余后台继续下；LIVE 下新增 `PATIENT / NOT PATIENT`（FULL / QUICK）范围选择，
+  FULL 等全站或 45s 上限。新增 `SKIP — ENTER NOW`，任何时候都能先进站。
+  存储键升到 v2（`lip:first-screen-preload-v2` / `...-mode-v2`），旧选择不迁移。
+- **预载视觉**：已下载的封面在字背后拼成一颗圆形球（越下越多、越显）；底部读数显示
+  `百分比 · 完成/总数 · 预计剩余秒数`；滚动的问题改为按钮，点一下暂停、再点继续。
+- **Admin 移动端导航**：手机隐藏编号的规则补上 `.nav-item` 前缀（原来被更高特异性的
+  基础规则压住，多出一截编号）；导航项变多后主题按钮不再被 flex 压窄。
+- **相册管理**：从删除按钮 / 输入框起手不启动长按拖拽（`preventDefault` 会吞掉 click）。
+- **内容快照**：CMS 分类整理落地（UNFILED → HER，PHIL / PSYCH / HER 标签）。
+- **验收脚本**：新增 `tools/verify-admin-taxonomy.mjs`；`verify-admin-mobile` /
+  `verify-cover-flight` / `verify-preload-progress` 同步新行为。
+
 ### update: 70 — 2026-11-08
 
 #### 刷新过场 + 全站预载进度 + Hero 球层级

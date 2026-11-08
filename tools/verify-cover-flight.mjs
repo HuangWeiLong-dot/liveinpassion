@@ -211,7 +211,7 @@ const distance = (a, b) => (a && b
       const openFlight = await evaluate(FLIGHT);
       check('打开：飞行层从窗口起飞', openFlight.visible, JSON.stringify(openFlight.rect));
       check('打开：起点对着窗口', distance(openFlight.rect, cardRect) < 24, `${distance(openFlight.rect, cardRect).toFixed(0)}px`);
-      await sleep(1400);
+      await sleep(2200);
       const lbImg = await evaluate(`(() => {
         // 两个灯箱都常驻 DOM：必须取**打开着的那个**，否则会读到全局灯箱里
         // opacity: 0 的那张（ME 测的就是这个坑）

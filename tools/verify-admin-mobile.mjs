@@ -305,13 +305,23 @@ async function tap(sel) {
     const lo = await json('window.__overflow()');
     check('页面不横向溢出', lo.scrollWidth <= lo.clientWidth,
       `${lo.scrollWidth} / ${lo.clientWidth}` + (lo.over.length ? '  溢出: ' + JSON.stringify(lo.over) : ''));
+    // 窄屏下导航条本身就设计成横向滚动（admin.css 的 .nav-links），
+    // 断言重点从"一次全塞进视口"改成"每个按钮都能滚进视口"。
     const navBox = await json(`(function () {
-      var n = document.querySelector('.admin-nav'); var r = n.getBoundingClientRect();
-      return { h: Math.round(r.height),
-               linksRight: [...document.querySelectorAll('.nav-item')].map(function (e) { return Math.round(e.getBoundingClientRect().right); }),
-               innerW: window.innerWidth };
+      var links = document.querySelector('.nav-links');
+      var items = [...document.querySelectorAll('.nav-item')].filter(function (e) {
+        return e.offsetParent !== null && e.getBoundingClientRect().width > 0;
+      });
+      var reachable = items.every(function (e) {
+        e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        var r = e.getBoundingClientRect();
+        return r.left >= -1 && r.right <= window.innerWidth + 1;
+      });
+      links.scrollLeft = 0;
+      return { scrollW: links.scrollWidth, clientW: links.clientWidth,
+               scrollable: getComputedStyle(links).overflowX === 'auto', reachable };
     })()`);
-    check('导航按钮都在视口内', navBox.linksRight.every((r) => r <= navBox.innerW + 0.5), JSON.stringify(navBox));
+    check('导航可横向滚动，每个按钮都能滚进视口', navBox.reachable && navBox.scrollable, JSON.stringify(navBox));
     const listSmall = await json('window.__tapTargets()');
     check('列表页无 <44px 的点按目标', listSmall.length === 0, listSmall.length ? JSON.stringify(listSmall.slice(0, 6)) : '');
 
@@ -484,11 +494,26 @@ async function tap(sel) {
 
     // 每个拖拽面都压在可点控件上，而 pointerdown 里调了 preventDefault()。
     // 有的引擎会因此吞掉随后的 click —— 必须确认删除钮仍然点得动。
-    dialogs.length = 0;
-    await evaluate(`document.querySelector('.photo-cell[data-idx="0"] .photo-remove').click(); 1`);
+    // 用真实鼠标按下/抬起（而不是 .click()），才测得到 pointerdown 的副作用。
+    const rmPoint = await json(`(function () {
+      var e = document.querySelector('.photo-cell[data-idx="0"] .photo-remove');
+      var r = e.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rmPoint.x, y: rmPoint.y });
+    await sleep(120);
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rmPoint.x, y: rmPoint.y, button: 'left', buttons: 1, clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rmPoint.x, y: rmPoint.y, button: 'left', buttons: 0, clickCount: 1 });
     await sleep(400);
-    check('照片删除钮在 pointerdown 之后仍能收到 click',
-      dialogs.some((m) => /Remove .* from this album/.test(m)), JSON.stringify(dialogs));
+    const rmGuard = await json(`!!document.querySelector('#delete-guard-password')`);
+    check('照片删除钮在 pointerdown 之后仍能收到 click', rmGuard === true, String(rmGuard));
+    // 关闭防误删弹窗，别挡后面的步骤
+    await evaluate(`(function () {
+      var b = document.querySelector('.delete-guard__actions .btn-secondary');
+      if (b) b.click();
+      return 1;
+    })()`);
+    await sleep(250);
 
     await goto('/blogs/1');
     const barDesk = await json('window.__probe(".gallery-editbar")');

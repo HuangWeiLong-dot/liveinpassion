@@ -7,8 +7,12 @@
       "title": "No It Is Not",
       "date": "November 8, 2026 · 2:06 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/02ed5973.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/24ee507b.jpg"
@@ -32,8 +36,12 @@
       "title": "Those Ineffable Feelings",
       "date": "November 7, 2026 · 11:25 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/32ce24e8.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/ca1f8c87.png"
@@ -57,8 +65,12 @@
       "title": "Please Listen to Me Carefully",
       "date": "November 6, 2026 · 11:17 PM",
       "readTime": "3 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/c9a6dd59.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/8b5a3770.png"
@@ -82,8 +94,12 @@
       "title": "Echoes",
       "date": "November 5, 2026 · 10:50 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/714f13d2.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/16ac61aa.png"
@@ -107,8 +123,12 @@
       "title": "Head My Blow",
       "date": "November 4, 2026 · 9:30 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "HER",
+        "PHIL",
+        "PSYCH"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/7119fc8f.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/d47d5062.png"
@@ -132,8 +152,13 @@
       "title": "Disassociation",
       "date": "November 4, 2026 · 10:44 AM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER",
+        "MOSAIC"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/0a0eef60.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/83c43e83.png"
@@ -157,8 +182,12 @@
       "title": "Next to Me",
       "date": "November 3, 2026 · 8:36 PM",
       "readTime": "1 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "HER",
+      "tags": [
+        "PHIL",
+        "PSYCH",
+        "HER"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202611/_compressed/35e48c7b.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202611/5c98e781.png"
@@ -1232,8 +1261,14 @@
       "title": "Before Heading Out",
       "date": "August 21, 2026 · 11:24 AM",
       "readTime": "3 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "category": "DOCUMENT",
+      "tags": [
+        "LIFE",
+        "PHIL",
+        "PSYCH",
+        "PAST",
+        "B&W"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/d33bf3a7.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/e45f3c3d.jpg"
@@ -1256,9 +1291,12 @@
       "cardDate": "JUNE 1, 2026 · 7:14 PM",
       "title": "Don't Be a Dick",
       "date": "June 1, 2026 · 7:14 PM",
-      "readTime": "4 min read",
-      "category": "UNFILED",
-      "tags": [],
+      "readTime": "3 min read",
+      "category": "INCIDENT",
+      "tags": [
+        "LIFE",
+        "INCIDENT"
+      ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/aec7f953.jpg",
         "fullSrc": "https://cms.liveinpassion.me/img/blog/202609/07fcd46a.jpg"
@@ -1285,7 +1323,8 @@
       "category": "BIRTHDAY",
       "tags": [
         "BIRTHDAY",
-        "MAY 25TH"
+        "MAY 25TH",
+        "COLOR"
       ],
       "image": {
         "src": "https://cms.liveinpassion.me/img/blog/202609/_compressed/585c93e6.jpg",

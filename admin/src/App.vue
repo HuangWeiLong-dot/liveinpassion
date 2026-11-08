@@ -39,6 +39,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll));
         <RouterLink to="/albums" class="nav-item">Albums <span class="nav-en">02</span></RouterLink>
         <RouterLink to="/showcase" class="nav-item">Showcase <span class="nav-en">03</span></RouterLink>
         <RouterLink to="/films" class="nav-item">Films <span class="nav-en">04</span></RouterLink>
+        <RouterLink to="/taxonomy" class="nav-item">Taxonomy <span class="nav-en">05</span></RouterLink>
         <a href="https://liveinpassion.me" target="_blank" rel="noopener" class="nav-item nav-item--ghost">
           Site <span class="nav-en">↗</span>
         </a>
