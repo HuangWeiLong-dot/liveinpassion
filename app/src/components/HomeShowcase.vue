@@ -10,10 +10,10 @@
 // 交互与动画：
 //   · 桌面端固定在右侧。收起时面板宽度/高度收成右边缘一枚竖标签，
 //     不是瞬间换 DOM —— 内容淡出、面板收窄、标签随后淡入；展开走反方向。
-//   · 手机上底部横条始终在；INDEX 从底部升起一张抽屉（transform + 背景遮罩），
-//     CLOSE / 点遮罩 / Esc 滑回去。抽屉 Teleport 到 body —— 面板自己有 transform，
-//     fixed 子元素会被关进面板里。
-//   · 收起状态记在 localStorage，刷新后保持（手机上不参与，横条一直在）。
+//   · 手机 / 平板也是**右侧抽屉**（不是底部横条：那条会压住全局页脚、和左下角
+//     的 Ava/说明挤在一起）。默认只露右边缘的竖标签，点开后滑出完整列表；
+//     头部的「–」收起，点标签展开。
+//   · 收起状态记在 localStorage，刷新后保持；手机上首次进入默认收起。
 //
 // ⚠ 层级：面板 90、遮罩 94、抽屉 95 —— 都低于固定头部（100），
 //   高于 Hero 的舞台。转场板子（90000）和方块光标（100000）仍然盖在上面。
@@ -29,7 +29,12 @@ const collapsed = ref(false);
 const open = ref(false);
 
 try {
-  collapsed.value = localStorage.getItem('homeShowcaseCollapsed') === '1';
+  const stored = localStorage.getItem('homeShowcaseCollapsed');
+  // 手机上默认只露右边缘那条竖标签（抽屉），不把首屏占掉；
+  // 桌面默认展开。用户手动收/开过就尊重存储值。
+  collapsed.value = stored !== null
+    ? stored === '1'
+    : window.matchMedia('(max-width: 1024px)').matches;
 } catch {
   // 隐私模式下 localStorage 可能不可用：当作默认展开
 }
@@ -531,179 +536,77 @@ function cardKey(group, item) {
   display: none;
 }
 
+/* ── 手机 / 平板：右侧抽屉（不是底部横条）──────────────────────────────
+   底部横条会压住全局页脚，也会和左下角的 Ava/说明文字挤在一起。
+   这里和桌面共用同一块面板：收起时只留右边缘一条竖标签，点开后从右侧
+   滑出一列完整卡片；不占底部，不会挡住页脚。 */
 @media (max-width: 1024px) {
   .home-showcase {
-    top: auto;
-    left: 12px;
-    right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    width: auto;
-    max-height: 46vh;
-    transform: translateY(14px);
+    top: 50%;
+    right: 0;
+    left: auto;
+    bottom: auto;
+    width: min(320px, 84vw);
+    max-height: 72vh;
+    transform: translate(16px, -50%);
     /* 手机上不压太多模糊，性能优先 */
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
+    border-right: 0;
   }
 
   .home-showcase.is-ready {
-    transform: translateY(0);
+    transform: translate(0, -50%);
   }
 
-  /* 手机上不参与"收起"：横条一直在，展开交给抽屉 */
   .home-showcase.is-collapsed {
-    width: auto;
-    max-height: 46vh;
+    width: 40px;
+    max-height: 152px;
   }
 
   .home-showcase.is-collapsed .hs-content {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
+    opacity: 0;
+    transform: translateX(18px);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
   }
 
-  .hs-tab,
+  /* 收起态仍然留一条竖标签；用头部那颗「–」收起，不再有 INDEX 底部抽屉 */
+  .hs-tab {
+    display: flex;
+    writing-mode: vertical-rl;
+  }
+
   .hs-btn--collapse {
-    display: none;
-  }
-
-  /* 横条态：只露一行缩略图，不展开文字 */
-  .hs-body {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 8px 12px 10px;
-    scroll-snap-type: x proximity;
-  }
-
-  .hs-group {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding-top: 0;
-    flex-shrink: 0;
-  }
-
-  .hs-group + .hs-group {
-    margin-top: 0;
-  }
-
-  /* 横条里不放分组标题：竖排字会溢出到头部 */
-  .hs-group__title {
-    display: none;
-  }
-
-  .hs-group__count {
-    display: none;
-  }
-
-  .hs-list {
-    display: flex;
-    gap: 8px;
-  }
-
-  .hs-card {
-    grid-template-columns: 1fr;
-    width: 74px;
-    padding: 0;
-    border-bottom: 0;
-    gap: 0;
-    scroll-snap-align: start;
-  }
-
-  .hs-card:hover {
-    padding-left: 0;
-  }
-
-  .hs-card__media {
-    width: 74px;
-    aspect-ratio: 1 / 1;
-  }
-
-  .hs-card__text {
-    display: none;
+    display: inline-flex;
   }
 
   .hs-btn--index {
-    display: inline-block;
+    display: none;
   }
 
-  /* 抽屉：从底部升起 */
-  .hs-backdrop {
+  /* 展开态：完整竖排列表（和桌面同一套排版） */
+  .hs-body {
     display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 94;
-    background: color-mix(in srgb, #000 46%, transparent);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.38s ease;
-  }
-
-  .hs-backdrop.is-open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-
-  .hs-sheet {
-    display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 95;
-    transform: translateY(calc(100% + 20px));
-    transition: transform 0.46s cubic-bezier(0.22, 0.61, 0.36, 1);
-    pointer-events: none;
-    will-change: transform;
-  }
-
-  .hs-sheet.is-open {
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-
-  .hs-sheet__inner {
-    width: 100%;
-    max-width: 640px;
-    margin: 0 auto;
-    max-height: min(78dvh, 760px);
-    display: flex;
-    flex-direction: column;
-    background: color-mix(in srgb, var(--bg) 96%, transparent);
-    -webkit-backdrop-filter: blur(18px);
-    backdrop-filter: blur(18px);
-    border-top: 1px solid color-mix(in srgb, var(--text-primary) 35%, transparent);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.35);
-  }
-
-  .hs-sheet__head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 14px 16px;
-    border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
-    flex-shrink: 0;
-  }
-
-  .hs-sheet__body {
-    flex: 1 1 auto;
-    min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 2px 16px 16px;
+    padding: 4px 14px 12px;
   }
 
-  /* 抽屉里的卡片恢复完整排版（外面横条的 .hs-card 覆盖只作用于横条） */
-  .hs-sheet .hs-group {
+  .hs-group {
     display: block;
+    width: auto;
     padding-top: 12px;
+    flex-shrink: 1;
   }
 
-  .hs-sheet .hs-group__title {
+  .hs-group + .hs-group {
+    margin-top: 4px;
+  }
+
+  .hs-group__title {
     display: flex;
+    writing-mode: horizontal-tb;
     font-size: 0.52rem;
     letter-spacing: 0.22em;
     padding-bottom: 6px;
@@ -712,15 +615,15 @@ function cardKey(group, item) {
     justify-content: space-between;
   }
 
-  .hs-sheet .hs-group__count {
+  .hs-group__count {
     display: inline;
   }
 
-  .hs-sheet .hs-list {
+  .hs-list {
     display: block;
   }
 
-  .hs-sheet .hs-card {
+  .hs-card {
     grid-template-columns: 62px minmax(0, 1fr);
     width: auto;
     padding: 8px 6px 8px 0;
@@ -728,13 +631,23 @@ function cardKey(group, item) {
     gap: 11px;
   }
 
-  .hs-sheet .hs-card__media {
+  .hs-card:hover {
+    padding-left: 6px;
+  }
+
+  .hs-card__media {
     width: 62px;
     aspect-ratio: 4 / 3;
   }
 
-  .hs-sheet .hs-card__text {
+  .hs-card__text {
     display: flex;
+  }
+
+  /* 底部抽屉在手机上退役：只保留右侧抽屉 */
+  .hs-sheet,
+  .hs-backdrop {
+    display: none;
   }
 }
 

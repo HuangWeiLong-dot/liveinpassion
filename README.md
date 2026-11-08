@@ -48,6 +48,21 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 67 — 2026-11-08
+
+#### HOME SHOWCASE 手机右侧抽屉 + ECHOES WORLD 说明栏
+
+- **手机 / 平板 HOME SHOWCASE 改为右侧抽屉**：≤1024px 不再用底部横条 + INDEX 底部抽屉
+  （会压住全局页脚、和左下角 Ava/说明挤在一起）。与桌面共用同一块面板：默认收起成右边缘
+  竖标签，点标签展开、头部「–」收起；手机上首次进入默认收起，收发状态仍记在
+  `localStorage.homeShowcaseCollapsed`。底部横条与 `.hs-sheet` / `.hs-backdrop` 退役。
+- **ECHOES WORLD 说明栏移到左下角**：`ECHOES — WORLD VIEW / ENTRIES / DRAG...` 从右上角
+  VIEW 按钮下方改到左下角（桌面在胶片条上方，手机在列表底部留白里），不再和展开的
+  缩略图叠在一起；同时去掉 `CLASS B` / `TYPE` 这类占位假元数据。
+- **内容快照**：同步 CMS 新文章《NO IT IS NOT》（`no-it-is-not`）与首页 LATEST ECHO。
+- **验收脚本**：`tools/verify-home-showcase.mjs` 同步新行为（右侧贴边、不贴底、
+  竖标签收起 / 展开、手机无横向溢出）。
+
 ### update: 66 — 2026-11-08
 
 #### ECHOES 分类导航 + 归档信息 + 正文尾标签

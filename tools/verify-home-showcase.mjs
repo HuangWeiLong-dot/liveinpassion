@@ -10,7 +10,7 @@
 //   3. 每张卡片的标题 / 跳转地址取对（文章、摄影作者、影片）
 //   4. 收起 / 展开可用
 //   5. 亮暗主题下面板颜色跟着变
-//   6. 手机上变成底部横条：贴底、三张缩略图同排、INDEX 展开、页面无横向溢出
+//   6. 手机上也是右侧抽屉：默认/收起不贴底、不挡页脚、展开有完整标题、无横向溢出
 //   7. 零 console 报错 / 未捕获异常
 //
 // 图片用 CDP 伪造（1×1 PNG），不依赖 CDN，也不会因为图片慢而抖动。
@@ -84,7 +84,7 @@ const SNAPSHOT_JS = `(() => {
     opacity: Number(getComputedStyle(panel).opacity),
     contentOpacity: content ? Number(getComputedStyle(content).opacity) : 0,
     tabOpacity: tab ? Number(getComputedStyle(tab).opacity) : 0,
-    rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height), bottom: Math.round(rect.bottom) },
+    rect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height), right: Math.round(rect.right), bottom: Math.round(rect.bottom) },
     groups: [...panel.querySelectorAll('.hs-content .hs-group__title > span:first-child')].map((n) => n.textContent.trim()),
     cards: cardsOf(panel.querySelector('.hs-content') || panel),
     collapsed: panel.classList.contains('is-collapsed'),
@@ -267,49 +267,35 @@ const consoleErrors = [];
     });
     await sleep(700);
     const mobile = await evaluate(SNAPSHOT_JS);
-    check('面板贴底（bottom ≈ 视口底部）',
-      Math.abs(mobile.rect.bottom - 844) <= 24,
+    check('面板在右侧（右边缘贴视口）',
+      Math.abs(mobile.rect.right - 390) <= 2,
+      `right=${mobile.rect.right}`);
+    check('不再贴底：给页脚和左下角留出空间',
+      mobile.rect.bottom < 844 - 60,
       `bottom=${mobile.rect.bottom}`);
-    check('三张缩略图在同一排（x 递增）',
-      mobile.cards.length >= 3
-      && mobile.cards.every((card, i) => i === 0 || card.rect.x > mobile.cards[i - 1].rect.x),
-      mobile.cards.map((c) => c.rect.x).join(' / '));
     check('手机页面没有横向溢出',
       mobile.docScroll[0] <= mobile.docScroll[1] + 1,
       `${mobile.docScroll[0]} / ${mobile.docScroll[1]}`);
-    check('抽屉默认停在屏幕外',
-      mobile.sheet && !mobile.sheet.open && mobile.sheet.ty > 20,
-      `ty=${mobile.sheet?.ty}`);
+    check('展开态卡片带完整标题',
+      mobile.cards.length >= 3 && mobile.cards.every((card) => card.title.length > 0),
+      `${mobile.cards.length} 张`);
 
-    await evaluate(`window.__tys = []; (function rec(){
-      const s = document.querySelector('.hs-sheet');
-      if (s) {
-        const m = /matrix\\(([^)]+)\\)/.exec(getComputedStyle(s).transform);
-        window.__tys.push(m ? Math.round(Number(m[1].split(',')[5])) : -1);
-      }
-      if (window.__tys.length < 50) requestAnimationFrame(rec);
-    })()`);
-    await evaluate(`document.querySelector('.hs-btn--index')?.click()`);
-    await sleep(800);
-    const tys = JSON.parse(await evaluate('JSON.stringify(window.__tys)'));
-    const sawSlide = tys.some((ty) => ty > 8 && ty < mobile.sheet.ty - 8);
-    check('INDEX 展开是上滑动画（位移经过中间值）', sawSlide,
-      tys.filter((_, i) => i % 6 === 0).join(' → '));
-
-    const open = await evaluate(SNAPSHOT_JS);
-    check('抽屉到位、遮罩淡入',
-      open.sheet.open && Math.abs(open.sheet.ty) <= 2 && open.backdropOpacity > 0.5,
-      `ty=${open.sheet.ty} / backdrop=${open.backdropOpacity}`);
-    check('展开后能看到完整标题',
-      open.sheet.cards.length >= 3 && open.sheet.cards.every((card) => card.title.length > 0),
-      `${open.sheet.cards.length} 张`);
-
-    await evaluate(`document.querySelector('.hs-backdrop').click()`);
+    await evaluate(`document.querySelector('.hs-btn--collapse')?.click()`);
     await sleep(700);
-    const closed = await evaluate(SNAPSHOT_JS);
-    check('点遮罩收起：抽屉滑回屏幕外、遮罩淡出',
-      !closed.sheet.open && closed.sheet.ty > 20 && closed.backdropOpacity < 0.2,
-      `ty=${closed.sheet.ty} / backdrop=${closed.backdropOpacity}`);
+    const collapsedMobile = await evaluate(SNAPSHOT_JS);
+    check('「–」收起成右边缘竖标签',
+      collapsedMobile.rect.w <= 44 && collapsedMobile.tabOpacity > 0.9,
+      `w=${collapsedMobile.rect.w} / tab=${collapsedMobile.tabOpacity}`);
+    check('收起后不覆盖页脚区域',
+      collapsedMobile.rect.bottom < 844 - 60,
+      `bottom=${collapsedMobile.rect.bottom}`);
+
+    await evaluate(`document.querySelector('.hs-tab')?.click()`);
+    await sleep(700);
+    const reopened = await evaluate(SNAPSHOT_JS);
+    check('点竖标签重新展开', reopened.rect.w > 100 && reopened.contentOpacity > 0.9,
+      `w=${reopened.rect.w} / content=${reopened.contentOpacity}`);
+
 
     console.log('\n控制台:');
     const clean = consoleErrors.filter((e) => e && !/Failed to load resource/i.test(e));

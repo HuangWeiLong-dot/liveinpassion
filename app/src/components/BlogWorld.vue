@@ -448,7 +448,7 @@ onBeforeUnmount(() => {
 
           <div class="bw-expand__text">
             <div class="bw-expand__eyebrow">
-              <span class="bw-eyebrow">ENTRY — CLASS B</span>
+              <span class="bw-eyebrow">ENTRY</span>
               <span class="bw-eyebrow">{{ padNo(expanded) }} / {{ padNo(N - 1) }}</span>
             </div>
             <h2 class="bw-expand__title">{{ current.cardTitle }}</h2>
@@ -458,7 +458,6 @@ onBeforeUnmount(() => {
               <span class="bw-expand__rule" aria-hidden="true"></span>
               <div class="bw-expand__row"><span>DATE</span><span>{{ current.date }}</span></div>
               <div class="bw-expand__row"><span>READ</span><span>{{ current.readTime }}</span></div>
-              <div class="bw-expand__row"><span>TYPE</span><span>WRITTEN NOTE</span></div>
               <button class="bw-expand__read" type="button" @click="readEntry">
                 READ ENTRY <span aria-hidden="true">→</span>
               </button>
@@ -713,14 +712,14 @@ onBeforeUnmount(() => {
 /* ── 顶部信息 ────────────────────────────────────────────────────────── */
 .bw-head {
   position: absolute;
-  /* 落在右上角 VIEW 按钮（top:92 / 高约 34px）的正下方，
-     右边缘与按钮对齐，三行说明右对齐成一列 */
-  top: 140px;
-  right: 64px;
+  /* 放在**左下角**、胶片条上方：右上角是 VIEW 抽屉，说明栏再放那里
+     会和展开的缩略图叠在一起。 */
+  left: 48px;
+  bottom: 136px;
   display: grid;
-  justify-items: end;
+  justify-items: start;
   gap: 6px;
-  text-align: right;
+  text-align: left;
   pointer-events: none;
 }
 .bw-eyebrow {
@@ -1070,11 +1069,16 @@ onBeforeUnmount(() => {
   .bw-strip {
     display: none;
   }
-  /* 小屏同样收在 VIEW 按钮下方（按钮在 78 / 高约 28），三行右对齐成一列 */
+  /* 小屏也放左下角；列表底部留出它的位置，避免盖住最后几行 */
   .bw-head {
-    top: 118px;
-    right: 20px;
+    left: 20px;
+    right: auto;
+    top: auto;
+    bottom: 16px;
     gap: 4px;
+  }
+  .bw-mobile {
+    padding-bottom: 76px;
   }
   .bw-head__hint {
     font-size: 8px;
