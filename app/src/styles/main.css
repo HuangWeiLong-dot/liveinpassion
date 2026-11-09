@@ -4779,8 +4779,12 @@
         /* ≤1024px：左下角那座 Ava 塔让位；原来底部"空格键"里的全部控件
            统一收进右上角的汉堡。 */
         @media (max-width: 1024px) {
-            .author-tower {
-                display: none;
+            /* ⚠ 必须 !important：上面 html.echoes-locked / html.blog-detail-open
+               的 display:block 是桌面端用来抵消 blogs-lookback 的，权重 (0,2,1)
+               比这里的 .author-tower 高 —— 不加的话 ARCHIVE 和详情页会在
+               手机 / 平板上把左下角头像重新点亮。 */
+            html .author-tower {
+                display: none !important;
             }
 
             nav {

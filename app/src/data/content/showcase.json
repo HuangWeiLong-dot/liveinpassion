@@ -1,11 +1,11 @@
 {
   "latestEcho": {
     "kind": "echo",
-    "refId": 55,
-    "title": "NO IT IS NOT",
+    "refId": 56,
+    "title": "THEN I HEARD A VOICE LIKE THUNDER, ''COME AND SEE, THE FINAL WONDER\"",
     "meta": "ROMANTIC · 2026.11",
-    "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/02ed5973.jpg",
-    "href": "/echoes/no-it-is-not"
+    "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/11bd53b8.jpg",
+    "href": "/echoes/then-i-heard-a-voice-like-thunder-come-and-see-the-final-wonder"
   },
   "latestPhotography": {
     "kind": "photography",
@@ -16,9 +16,9 @@
     "href": "/photography/HanYong"
   },
   "limits": {
-    "echo": 5,
-    "photography": 3,
-    "film": 2
+    "echo": 4,
+    "photography": 4,
+    "film": 4
   },
   "selected": [
     {
@@ -28,6 +28,14 @@
       "meta": "FILM",
       "image": "https://cms.liveinpassion.me/img/films/the-projection-poster.jpg",
       "href": "/projection"
+    },
+    {
+      "kind": "echo",
+      "refId": 55,
+      "title": "NO IT IS NOT",
+      "meta": "ROMANTIC · 2026.11",
+      "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/02ed5973.jpg",
+      "href": "/echoes/no-it-is-not"
     },
     {
       "kind": "echo",
@@ -44,14 +52,6 @@
       "meta": "IDEALIST · 2026.11",
       "image": "https://cms.liveinpassion.me/img/blog/202611/_compressed/0a0eef60.jpg",
       "href": "/echoes/disassociation"
-    },
-    {
-      "kind": "echo",
-      "refId": 12,
-      "title": "INDECISION",
-      "meta": "OBSERVER · 2026.10",
-      "image": "https://cms.liveinpassion.me/img/blog/202610/_compressed/01aeb078.jpg",
-      "href": "/echoes/indecision"
     }
   ]
 }

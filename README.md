@@ -48,6 +48,19 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 73.2 — 2026-11-09
+
+#### 响应式设备上隐藏左下角头像
+
+- ≤1024px 一律隐藏 `.author-tower`，头像只保留在右上角汉堡菜单的
+  `.nav-tools__avatar` 里（菜单展开时可见，44×44）。
+- 旧规则 `.author-tower { display: none }` 权重不够，被桌面端兜底用的
+  `html.echoes-locked .author-tower` / `html.blog-detail-open .author-tower`
+  的 `display: block` 反压，导致 ECHOES ARCHIVE 与详情页在手机 / 平板上
+  仍会露出左下角头像；改为 `html .author-tower { display: none !important }`。
+- 桌面端（>1024px）行为不变：首页、ECHOES、详情页仍显示左下角 Ava 塔。
+- 同步 CMS 内容快照（新增第 55 篇）。
+
 ### fix: 73.1 — 2026-11-08
 
 #### ECHOES 在 `/echoes/` 下点封面不跳转
