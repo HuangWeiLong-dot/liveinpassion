@@ -9,14 +9,18 @@
 //   · 手表：Gadgetbridge 汇总（可能滞后，看 synced 字段）
 //
 // 这个组件自己轮询，不依赖 LIFE 的 /api/life；60 秒的页面轮询和它是两条线。
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
+// watch as vueWatch：组件里已经有一个名为 watch 的 computed（手表数据）
+import {
+  computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch as vueWatch,
+} from 'vue';
 import LifeIcon from './LifeIcon.vue';
 
 const emit = defineEmits(['snapshot']);
 
 const CMS_BASE = import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
 const POLL_MS = 30000;
-const TICK_MS = 5000;
+// 歌词高亮靠本地时钟推进，2 秒一刷足够跟得上
+const TICK_MS = 2000;
 
 const snap = ref(null);
 const loading = ref(true);
@@ -59,6 +63,57 @@ const networkLabel = computed(() => {
 });
 
 const networkIcon = computed(() => (phone.value?.network?.mode === 'wifi' ? 'wifi' : 'signal'));
+
+// ── 歌词 ──────────────────────────────────────────────────────
+// LRC 形如 [00:19.16] 歌词；只保留有文字的带时间戳行。
+const lyricLines = computed(() => {
+  const raw = phone.value?.music?.lyrics;
+  if (!raw) return [];
+  return String(raw)
+    .split('\n')
+    .map((line) => {
+      const m = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)$/);
+      if (!m) return null;
+      const text = m[3].trim();
+      return text ? { t: Number(m[1]) * 60 + Number(m[2]), text } : null;
+    })
+    .filter(Boolean);
+});
+
+// 当前位置 = 最近一次打点的位置 + 之后流逝的时间（只在播放时累加）
+const lyricTime = computed(() => {
+  const m = phone.value?.music;
+  if (!m) return 0;
+  const anchor = parseDate(m.positionAt || m.at);
+  const basePos = Number(m.position || 0);
+  if (!anchor) return basePos;
+  const elapsed = Math.max(0, (nowMs.value - anchor.getTime()) / 1000);
+  // playing 为 null = 没有位置心跳（旧版 App），退回按「30 分钟内」当成在播
+  const playing = m.playing == null ? musicLive.value : m.playing;
+  return basePos + (playing ? elapsed : 0);
+});
+
+const lyricIndex = computed(() => {
+  const lines = lyricLines.value;
+  if (!lines.length) return -1;
+  const t = lyricTime.value;
+  let idx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].t <= t + 0.2) idx = i;
+    else break;
+  }
+  return idx;
+});
+
+const lyricBox = ref(null);
+vueWatch(lyricIndex, (i) => {
+  const el = lyricBox.value;
+  if (!el || i < 0) return;
+  const line = el.children[i];
+  if (line) {
+    el.scrollTop = line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2;
+  }
+});
 
 function mmss(value) {
   const s = Math.max(0, Math.round(Number(value) || 0));
@@ -372,24 +427,34 @@ onBeforeUnmount(() => {
           >{{ musicLive ? 'PLAYING' : 'LAST TRACK' }}</span>
         </div>
         <template v-if="phone?.music && phone.music.title">
-          <div class="life-now-track-row">
-            <img
-              v-if="phone.music.cover"
-              class="life-now-cover"
-              :src="`data:image/jpeg;base64,${phone.music.cover}`"
-              alt=""
-            />
-            <div class="life-now-track-body">
-              <strong class="life-now-track">{{ track.artist || track.title }}</strong>
-              <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
-              <p v-if="phone.music.album" class="life-now-track-album">{{ phone.music.album }}</p>
-              <div class="life-now-meta">
-                <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
-                <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
-                <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
-                <span v-else>LAST TRACK TODAY</span>
+          <div class="life-now-music-body">
+            <div class="life-now-track-row">
+              <img
+                v-if="phone.music.cover"
+                class="life-now-cover"
+                :src="`data:image/jpeg;base64,${phone.music.cover}`"
+                alt=""
+              />
+              <div class="life-now-track-body">
+                <strong class="life-now-track">{{ track.artist || track.title }}</strong>
+                <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
+                <p v-if="phone.music.album" class="life-now-track-album">{{ phone.music.album }}</p>
+                <div class="life-now-meta">
+                  <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
+                  <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
+                  <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
+                  <span v-else>LAST TRACK TODAY</span>
+                </div>
               </div>
             </div>
+
+            <ol v-if="lyricLines.length" ref="lyricBox" class="life-now-lyrics">
+              <li
+                v-for="(line, i) in lyricLines"
+                :key="i"
+                :class="{ 'is-current': i === lyricIndex }"
+              >{{ line.text }}</li>
+            </ol>
           </div>
         </template>
         <span v-else class="life-now-empty">NOTHING PLAYING</span>
@@ -573,11 +638,42 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
+.life-now-music-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
 .life-now-track-row {
   display: flex;
   align-items: flex-start;
   gap: 14px;
   margin-top: 12px;
+  flex: none;
+}
+
+.life-now-lyrics {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0 8px 0 0;
+  flex: 1;
+  min-width: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.66rem;
+  line-height: 2;
+  color: var(--text-secondary);
+}
+
+.life-now-lyrics li {
+  transition: color 0.2s;
+}
+
+.life-now-lyrics li.is-current {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .life-now-cover {
@@ -886,6 +982,16 @@ onBeforeUnmount(() => {
 
   .life-now-track {
     font-size: 1.6rem;
+  }
+
+  .life-now-music-body {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .life-now-lyrics {
+    max-height: 120px;
+    margin-top: 14px;
   }
 }
 
