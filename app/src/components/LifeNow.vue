@@ -357,14 +357,24 @@ onBeforeUnmount(() => {
           >{{ musicLive ? 'PLAYING' : 'LAST TRACK' }}</span>
         </div>
         <template v-if="phone?.music && phone.music.title">
-          <strong class="life-now-track">{{ track.artist || track.title }}</strong>
-          <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
-          <div class="life-now-meta">
-            <span v-if="phone.music.album">{{ phone.music.album }}</span>
-            <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
-            <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
-            <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
-            <span v-else>LAST TRACK TODAY</span>
+          <div class="life-now-track-row">
+            <img
+              v-if="phone.music.cover"
+              class="life-now-cover"
+              :src="`data:image/jpeg;base64,${phone.music.cover}`"
+              alt=""
+            />
+            <div class="life-now-track-body">
+              <strong class="life-now-track">{{ track.artist || track.title }}</strong>
+              <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
+              <div class="life-now-meta">
+                <span v-if="phone.music.album">{{ phone.music.album }}</span>
+                <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
+                <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
+                <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
+                <span v-else>LAST TRACK TODAY</span>
+              </div>
+            </div>
           </div>
         </template>
         <span v-else class="life-now-empty">NOTHING PLAYING</span>
@@ -520,9 +530,28 @@ onBeforeUnmount(() => {
   grid-column: span 2;
 }
 
+.life-now-track-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.life-now-cover {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.life-now-track-body {
+  min-width: 0;
+}
+
 .life-now-track {
   display: block;
-  margin-top: 12px;
+  margin-top: 0;
   font-family: 'Oswald', sans-serif;
   font-size: 1.6rem;
   font-weight: 500;
