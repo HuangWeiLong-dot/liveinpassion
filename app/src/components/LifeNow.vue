@@ -429,17 +429,17 @@ onBeforeUnmount(() => {
               <b>{{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small></b>
               <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
             </div>
-            <div class="life-now-stat">
+            <div class="life-now-stat is-network">
               <span class="life-now-stat-icon"><LifeIcon :name="networkIcon" :size="16" /></span>
               <b>{{ networkLabel }}</b>
               <em>NETWORK</em>
             </div>
-            <div class="life-now-stat">
+            <div class="life-now-stat is-notifications">
               <span class="life-now-stat-icon"><LifeIcon name="bell" :size="16" /></span>
               <b>{{ num(phone.notifications) }}</b>
               <em>NOTIFICATIONS TODAY</em>
             </div>
-            <div class="life-now-stat">
+            <div class="life-now-stat is-unlocks">
               <span class="life-now-stat-icon"><LifeIcon name="screen" :size="16" /></span>
               <b>{{ num(phone.unlocks) }}</b>
               <em>UNLOCKS TODAY</em>
@@ -652,6 +652,41 @@ onBeforeUnmount(() => {
 
 .life-now-stat-icon {
   color: var(--text-secondary);
+}
+
+/* 信号：像 wifi 在找网，缓慢呼吸 */
+.life-now-stat.is-network .life-now-stat-icon {
+  animation: life-signal 3.2s ease-in-out infinite;
+}
+
+@keyframes life-signal {
+  0%, 100% { opacity: 0.5; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+/* 通知：隔一阵晃一下铃铛 */
+.life-now-stat.is-notifications .life-now-stat-icon {
+  transform-origin: 50% 18%;
+  animation: life-bell 6.5s ease-in-out infinite;
+}
+
+@keyframes life-bell {
+  0%, 86%, 100% { transform: rotate(0deg); }
+  89% { transform: rotate(-12deg); }
+  92% { transform: rotate(9deg); }
+  95% { transform: rotate(-5deg); }
+  98% { transform: rotate(2deg); }
+}
+
+/* 解锁：锁形图标偶尔亮一下，像刚点开屏幕 */
+.life-now-stat.is-unlocks .life-now-stat-icon {
+  animation: life-unlock 7s ease-in-out infinite;
+}
+
+@keyframes life-unlock {
+  0%, 84%, 100% { opacity: 0.5; transform: scale(0.96); }
+  88% { opacity: 1; transform: scale(1.12); }
+  92% { opacity: 0.75; transform: scale(1); }
 }
 
 .life-now-stat b {
@@ -1151,8 +1186,13 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .life-now-dot {
+  .life-now-dot,
+  .life-now-stat-icon,
+  .life-battery-edge,
+  .life-battery-water,
+  .life-now-lyric-list {
     animation: none;
+    transition: none;
   }
 }
 </style>
