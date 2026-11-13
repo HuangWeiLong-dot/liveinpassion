@@ -121,24 +121,23 @@ function lyricStyle(i) {
 }
 
 const lyricBox = ref(null);
+const lyricOffset = ref(0);
 
 async function scrollToCurrentLine() {
   await nextTick();
-  const el = lyricBox.value;
+  const box = lyricBox.value;
   const i = lyricIndex.value;
-  if (!el || i < 0) return;
-  const line = el.children[i];
+  if (!box) return;
+  if (i < 0) {
+    lyricOffset.value = 0;
+    return;
+  }
+  const list = box.querySelector('.life-now-lyric-list');
+  const line = list?.children[i];
   if (!line) return;
-
-  // 用 getBoundingClientRect 而不是 offsetTop：offsetTop 依赖 offsetParent，
-  // 之前算出来的位置不对，当前行会贴在顶部而不是中间。
-  const lineRect = line.getBoundingClientRect();
-  const boxRect = el.getBoundingClientRect();
-  const delta = lineRect.top - boxRect.top;
-  el.scrollTo({
-    top: el.scrollTop + delta - (el.clientHeight - line.clientHeight) / 2,
-    behavior: 'smooth',
-  });
+  // 用 transform 位移而不是 scrollTop：scrollTop 会被 0 夹住，
+  // 前几行永远贴顶；位移没有这个限制，焦点行始终在容器正中。
+  lyricOffset.value = box.clientHeight / 2 - (line.offsetTop + line.clientHeight / 2);
 }
 
 // immediate：首屏歌词一到就滚到当前行，否则列表停在最上面，
@@ -420,9 +419,10 @@ onBeforeUnmount(() => {
                 :style="{ width: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
                 aria-hidden="true"
               >
+                <!-- 主体铺到 `宽度 - 12px`，最后 12px 是波浪；两者同色、无缝、不越界 -->
+                <span class="life-battery-body"></span>
                 <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
-                  <!-- 左边缘贴住水块，右边缘是波浪；整条是水块的一部分，不是第二块 -->
-                  <path d="M0 0 L0 120 L6 120 Q 12 105 6 90 T 6 60 T 6 30 T 6 0 Z" />
+                  <path d="M0 0 L0 120 L8 120 Q 12 105 8 90 T 8 60 T 8 30 T 8 0 Z" />
                 </svg>
               </div>
               <div class="life-battery-content">
@@ -492,14 +492,19 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <ol v-if="lyricLines.length" ref="lyricBox" class="life-now-lyrics">
-              <li
-                v-for="(line, i) in lyricLines"
-                :key="i"
-                :class="{ 'is-current': i === lyricIndex }"
-                :style="lyricStyle(i)"
-              >{{ line.text }}</li>
-            </ol>
+            <div v-if="lyricLines.length" ref="lyricBox" class="life-now-lyrics">
+              <ul
+                class="life-now-lyric-list"
+                :style="{ transform: `translateY(${lyricOffset}px)` }"
+              >
+                <li
+                  v-for="(line, i) in lyricLines"
+                  :key="i"
+                  :class="{ 'is-current': i === lyricIndex }"
+                  :style="lyricStyle(i)"
+                >{{ line.text }}</li>
+              </ul>
+            </div>
           </div>
         </template>
         <span v-else class="life-now-empty">NOTHING PLAYING</span>
@@ -680,17 +685,25 @@ onBeforeUnmount(() => {
   top: 0;
   bottom: 0;
   /* 颜色跟随主题：深色主题是白，浅色主题是黑，不再固定蓝色 */
-  background: var(--text-primary);
   opacity: 0.18;
   transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   animation: life-battery-float 6s ease-in-out infinite;
 }
 
+/* 主体：宽度里预留最后 12px 给波浪 */
+.life-battery-body {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  right: 12px;
+  background: var(--text-primary);
+}
+
 /* 右边缘的竖浪：整条上下移动，看起来像水在流动 */
 .life-battery-edge {
   position: absolute;
-  /* 左边缘压在水块右边缘上 1px，避免抗锯齿缝；波浪向右鼓出 */
-  left: calc(100% - 1px);
+  right: 0;
   top: 0;
   width: 12px;
   height: 200%;
@@ -788,20 +801,13 @@ onBeforeUnmount(() => {
 }
 
 .life-now-lyrics {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0 8px 0 0;
+  position: relative;
   flex: 1;
   min-width: 0;
   max-height: 180px;
-  overflow: hidden auto;
-  /* 上下留白：首行和末行也能滚到中间，焦点行始终居中 */
-  padding: 72px 0;
-  /* poem 排版：整块歌词居中，不再靠左 */
+  overflow: hidden;
+  /* poem 排版：整块歌词居中 */
   text-align: center;
-  /* 隐藏滚动条但保留滚动：默认滚动条在这块窄区域里很难看 */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
   /* 上下边缘渐隐，像音乐软件那样 */
   mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 82%, transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 82%, transparent 100%);
@@ -811,17 +817,22 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-.life-now-lyrics::-webkit-scrollbar {
-  display: none;
+/* 整条列表用 transform 上下移动：焦点行永远在容器正中 */
+.life-now-lyric-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
 }
 
-.life-now-lyrics li {
+.life-now-lyric-list li {
   transition: opacity 0.45s ease, transform 0.45s ease, color 0.45s ease;
   transform-origin: center center;
   will-change: opacity, transform;
 }
 
-.life-now-lyrics li.is-current {
+.life-now-lyric-list li.is-current {
   color: var(--text-primary);
   font-weight: 600;
   letter-spacing: 0.02em;
