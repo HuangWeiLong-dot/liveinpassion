@@ -381,9 +381,38 @@ onBeforeUnmount(() => {
         </div>
         <template v-if="phone">
           <div class="life-now-stats">
-            <div class="life-now-stat">
-              <span class="life-now-stat-icon"><LifeIcon name="battery" :size="16" /></span>
-              <b>{{ phone.battery ? Math.round(phone.battery.level) + '%' : '—' }}</b>
+            <div class="life-now-stat is-battery">
+              <div
+                class="life-battery"
+                :class="{ 'is-charging': phone.battery && phone.battery.charging }"
+                aria-hidden="true"
+              >
+                <svg viewBox="0 0 60 100" class="life-battery-svg">
+                  <defs>
+                    <clipPath id="lifeBatteryClip">
+                      <rect x="3" y="3" width="54" height="94" rx="11" />
+                    </clipPath>
+                  </defs>
+                  <g clip-path="url(#lifeBatteryClip)">
+                    <g
+                      class="life-battery-fill"
+                      :style="{ transform: `translateY(${100 - (phone.battery ? Math.round(phone.battery.level) : 0)}px)` }"
+                    >
+                      <g class="life-battery-wave w1">
+                        <path d="M0 8 Q 15 0 30 8 T 60 8 T 90 8 T 120 8 V 130 H 0 Z" />
+                      </g>
+                      <g class="life-battery-wave w2">
+                        <path d="M0 8 Q 15 16 30 8 T 60 8 T 90 8 T 120 8 V 130 H 0 Z" />
+                      </g>
+                    </g>
+                  </g>
+                  <rect class="life-battery-shell" x="3" y="3" width="54" height="94" rx="11" />
+                  <rect class="life-battery-cap" x="23" y="0" width="14" height="4" rx="2" />
+                </svg>
+                <span class="life-battery-pct">
+                  {{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small>
+                </span>
+              </div>
               <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
             </div>
             <div class="life-now-stat">
@@ -620,6 +649,99 @@ onBeforeUnmount(() => {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-secondary);
+}
+
+/* ── 电池液面 ─────────────────────────────────────────────── */
+.life-now-stat.is-battery {
+  align-items: flex-start;
+}
+
+.life-battery {
+  position: relative;
+  width: 54px;
+  height: 92px;
+}
+
+.life-battery-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.life-battery-shell {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 2;
+}
+
+.life-battery-cap {
+  fill: var(--border);
+}
+
+.life-battery-fill {
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.life-battery-wave path {
+  fill: rgba(96, 165, 250, 0.85);
+}
+
+.life-battery-wave.w2 path {
+  fill: rgba(96, 165, 250, 0.45);
+}
+
+.life-battery-wave.w1 {
+  animation: life-battery-wave 5s linear infinite;
+}
+
+.life-battery-wave.w2 {
+  animation: life-battery-wave 8s linear infinite reverse;
+}
+
+/* 充电：波浪加速 + 发光脉冲 */
+.life-battery.is-charging .life-battery-wave.w1 {
+  animation-duration: 2.2s;
+}
+
+.life-battery.is-charging .life-battery-wave.w2 {
+  animation-duration: 3.4s;
+}
+
+.life-battery.is-charging .life-battery-fill {
+  animation: life-battery-glow 1.6s ease-in-out infinite;
+}
+
+.life-battery-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+.life-battery.is-charging .life-battery-pct {
+  color: #60a5fa;
+}
+
+.life-battery-pct small {
+  font-size: 0.6em;
+  margin-left: 1px;
+}
+
+@keyframes life-battery-wave {
+  from { transform: translateX(0); }
+  to { transform: translateX(-60px); }
+}
+
+@keyframes life-battery-glow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(96, 165, 250, 0.45)); }
+  50% { filter: drop-shadow(0 0 9px rgba(96, 165, 250, 0.95)); }
 }
 
 .life-now-toplist {
