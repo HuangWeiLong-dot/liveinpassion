@@ -354,6 +354,7 @@ onBeforeUnmount(() => {
           <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
           <div class="life-now-meta">
             <span v-if="phone.music.app">{{ phone.music.app }}</span>
+            <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
             <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
             <span v-else>LAST TRACK TODAY</span>
           </div>
@@ -536,6 +537,10 @@ onBeforeUnmount(() => {
   padding: 0;
   display: grid;
   gap: 6px;
+  /* 应用多时不让卡片无限长：内部滚动，最长 190px */
+  max-height: 190px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .life-now-top li {

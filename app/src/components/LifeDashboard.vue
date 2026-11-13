@@ -1014,7 +1014,8 @@ function openDay(day) {
 
 .dash-now-row {
   display: grid;
-  grid-template-columns: 66px 84px minmax(0, 1fr);
+  /* 名字（图标+标签）· 状态（可伸缩，长歌名换行）· 备注（固定窄列） */
+  grid-template-columns: 82px minmax(0, 1fr) 78px;
   align-items: baseline;
   gap: 10px;
   padding: 7px 0;
@@ -1029,12 +1030,17 @@ function openDay(day) {
   font-style: normal;
   color: var(--text-secondary);
   opacity: 0.7;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dash-now-row b {
   font-weight: 500;
   color: var(--text-primary);
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .dash-now-row b.is-off {
