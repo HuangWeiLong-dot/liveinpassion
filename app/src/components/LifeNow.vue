@@ -35,6 +35,12 @@ const phone = computed(() => snap.value?.phone || null);
 const watch = computed(() => snap.value?.watch || null);
 const qa = computed(() => snap.value?.qa || null);
 
+// 「正在播放」只认 30 分钟内的最后一条 music；更早的是「今天最后放的一首」
+const musicLive = computed(() => {
+  const d = parseDate(phone.value?.music?.at);
+  return !!d && nowMs.value - d.getTime() < 30 * 60 * 1000;
+});
+
 function parseDate(value) {
   if (!value) return null;
   const d = new Date(value);
@@ -324,13 +330,18 @@ onBeforeUnmount(() => {
       <article class="life-now-card is-row-start is-wide-3">
         <div class="life-now-label">
           <span>06</span> NOW PLAYING
-          <span v-if="phone?.music && phone.music.title" class="life-now-flag is-on">PLAYING</span>
+          <span
+            v-if="phone?.music && phone.music.title"
+            class="life-now-flag"
+            :class="{ 'is-on': musicLive }"
+          >{{ musicLive ? 'PLAYING' : 'LAST TRACK' }}</span>
         </div>
         <template v-if="phone?.music && phone.music.title">
           <strong class="life-now-track">{{ phone.music.title }}</strong>
           <div class="life-now-meta">
             <span v-if="phone.music.app">{{ phone.music.app }}</span>
-            <span>LAST TRACK TODAY</span>
+            <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
+            <span v-else>LAST TRACK TODAY</span>
           </div>
         </template>
         <span v-else class="life-now-empty">NOTHING PLAYING</span>

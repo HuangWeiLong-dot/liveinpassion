@@ -160,12 +160,15 @@ const nowRows = computed(() => {
   // 手机的状态类数据各占一行，不再塞进 PHONE 那一行的 note 里
   const ph = props.nowSnap?.phone || {};
   if (ph.music && ph.music.title) {
+    // 只认 30 分钟内的最后一条；更早的是「今天最后放的一首」，不能说正在播放
+    const at = ph.music.at ? new Date(ph.music.at).getTime() : 0;
+    const live = at > 0 && Date.now() - at < 30 * 60 * 1000;
     rows.push({
       key: 'music',
       name: 'MUSIC',
       status: ph.music.title,
-      note: 'NOW PLAYING',
-      tone: 'on',
+      note: live ? 'NOW PLAYING' : 'LAST TRACK',
+      tone: live ? 'on' : 'off',
     });
   }
   if (ph.network && ph.network.mode) {
