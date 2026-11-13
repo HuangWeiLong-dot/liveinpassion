@@ -421,7 +421,8 @@ onBeforeUnmount(() => {
                 aria-hidden="true"
               >
                 <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
-                  <path d="M6 0 Q 0 15 6 30 T 6 60 T 6 90 T 6 120 L 12 120 L 12 0 Z" />
+                  <!-- 左边缘贴住水块，右边缘是波浪；整条是水块的一部分，不是第二块 -->
+                  <path d="M0 0 L0 120 L6 120 Q 12 105 6 90 T 6 60 T 6 30 T 6 0 Z" />
                 </svg>
               </div>
               <div class="life-battery-content">
@@ -688,7 +689,8 @@ onBeforeUnmount(() => {
 /* 右边缘的竖浪：整条上下移动，看起来像水在流动 */
 .life-battery-edge {
   position: absolute;
-  right: -11px;
+  /* 左边缘压在水块右边缘上 1px，避免抗锯齿缝；波浪向右鼓出 */
+  left: calc(100% - 1px);
   top: 0;
   width: 12px;
   height: 200%;
