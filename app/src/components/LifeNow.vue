@@ -654,39 +654,79 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-/* 信号：像 wifi 在找网，缓慢呼吸 */
-.life-now-stat.is-network .life-now-stat-icon {
-  animation: life-signal 3.2s ease-in-out infinite;
+/* 动效做在格子里，不动图标 */
+
+.life-now-stat.is-network,
+.life-now-stat.is-notifications,
+.life-now-stat.is-unlocks {
+  position: relative;
+  overflow: hidden;
 }
 
-@keyframes life-signal {
-  0%, 100% { opacity: 0.5; transform: scale(0.96); }
-  50% { opacity: 1; transform: scale(1.06); }
+.life-now-stat.is-network > b,
+.life-now-stat.is-network > em,
+.life-now-stat.is-notifications > b,
+.life-now-stat.is-notifications > em,
+.life-now-stat.is-unlocks > b,
+.life-now-stat.is-unlocks > em {
+  position: relative;
+  z-index: 1;
 }
 
-/* 通知：隔一阵晃一下铃铛 */
-.life-now-stat.is-notifications .life-now-stat-icon {
-  transform-origin: 50% 18%;
-  animation: life-bell 6.5s ease-in-out infinite;
+/* 网络：一道很淡的光横向扫过，像数据在流动 */
+.life-now-stat.is-network::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--text-primary), transparent);
+  opacity: 0.06;
+  transform: translateX(-100%);
+  animation: life-sweep 4.5s ease-in-out infinite;
 }
 
-@keyframes life-bell {
-  0%, 86%, 100% { transform: rotate(0deg); }
-  89% { transform: rotate(-12deg); }
-  92% { transform: rotate(9deg); }
-  95% { transform: rotate(-5deg); }
-  98% { transform: rotate(2deg); }
+@keyframes life-sweep {
+  0% { transform: translateX(-100%); }
+  55%, 100% { transform: translateX(100%); }
 }
 
-/* 解锁：锁形图标偶尔亮一下，像刚点开屏幕 */
-.life-now-stat.is-unlocks .life-now-stat-icon {
-  animation: life-unlock 7s ease-in-out infinite;
+/* 通知：三颗光点从底部浮起再消失 */
+.life-now-stat.is-notifications::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  box-shadow: -16px 0 0 var(--text-primary), 16px 0 0 var(--text-primary);
+  opacity: 0;
+  animation: life-dots 5s linear infinite;
 }
 
-@keyframes life-unlock {
-  0%, 84%, 100% { opacity: 0.5; transform: scale(0.96); }
-  88% { opacity: 1; transform: scale(1.12); }
-  92% { opacity: 0.75; transform: scale(1); }
+@keyframes life-dots {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 0.3; }
+  75% { opacity: 0.12; }
+  100% { transform: translateY(-80px); opacity: 0; }
+}
+
+/* 解锁：一条扫描线从上往下走 */
+.life-now-stat.is-unlocks::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--text-primary);
+  opacity: 0.16;
+  top: -2px;
+  animation: life-scan 6s linear infinite;
+}
+
+@keyframes life-scan {
+  from { top: -2px; }
+  to { top: 100%; }
 }
 
 .life-now-stat b {
@@ -1187,7 +1227,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .life-now-dot,
-  .life-now-stat-icon,
+  .life-now-stat::after,
   .life-battery-edge,
   .life-battery-water,
   .life-now-lyric-list {
