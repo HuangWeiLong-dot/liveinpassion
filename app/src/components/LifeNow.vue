@@ -414,24 +414,20 @@ onBeforeUnmount(() => {
               class="life-now-stat is-battery"
               :class="{ 'is-charging': phone.battery && phone.battery.charging }"
             >
+              <!-- 整个格子就是电池：水从左往右涨，右端是滚动的竖浪 -->
+              <div
+                class="life-battery-water"
+                :style="{ width: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
+                aria-hidden="true"
+              >
+                <span class="life-battery-body"></span>
+                <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
+                  <path d="M0 0 L0 120 L8 120 Q 12 105 8 90 T 8 60 T 8 30 T 8 0 Z" />
+                </svg>
+              </div>
+
               <b>{{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small></b>
               <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
-
-              <!-- 横放的电池：正极在右，水从左往右涨，右端是滚动的波纹 -->
-              <div class="life-battery" aria-hidden="true">
-                <div class="life-battery-cell">
-                  <div
-                    class="life-battery-water"
-                    :style="{ width: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
-                  >
-                    <span class="life-battery-body"></span>
-                    <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
-                      <path d="M0 0 L0 120 L8 120 Q 12 105 8 90 T 8 60 T 8 30 T 8 0 Z" />
-                    </svg>
-                  </div>
-                </div>
-                <span class="life-battery-cap"></span>
-              </div>
             </div>
             <div class="life-now-stat">
               <span class="life-now-stat-icon"><LifeIcon :name="networkIcon" :size="16" /></span>
@@ -678,7 +674,15 @@ onBeforeUnmount(() => {
 /* ── 电池液面 ─────────────────────────────────────────────── */
 .life-now-stat.is-battery {
   position: relative;
+  overflow: hidden;
   min-height: 104px;
+}
+
+/* 文字压在水面之上 */
+.life-now-stat.is-battery > b,
+.life-now-stat.is-battery > em {
+  position: relative;
+  z-index: 1;
 }
 
 .life-now-stat.is-battery b {
@@ -703,33 +707,6 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-/* 横放的电池：格子里一条电池，正极（cap）在右 */
-.life-battery {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  width: 100%;
-  margin-top: auto;
-  padding-top: 12px;
-}
-
-.life-battery-cell {
-  position: relative;
-  flex: 1;
-  height: 38px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.life-battery-cap {
-  flex: none;
-  width: 5px;
-  height: 16px;
-  background: var(--border);
-  border-radius: 0 2px 2px 0;
-}
-
 .life-battery-water {
   position: absolute;
   left: 0;
@@ -738,7 +715,7 @@ onBeforeUnmount(() => {
   /* 颜色跟随主题：深色主题是白，浅色主题是黑 */
   opacity: 0.18;
   transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: life-battery-float 6s ease-in-out infinite;
+  /* 不做整块上下浮动：会露出底边 2px 空白，看起来像裂开 */
 }
 
 /* 主体：宽度里预留最后 12px 给波浪 */
@@ -769,25 +746,15 @@ onBeforeUnmount(() => {
   animation-duration: 2.4s;
 }
 
-.life-now-stat.is-charging .life-battery-cap {
-  background: var(--text-primary);
-}
 
 .life-now-stat.is-charging .life-battery-water {
-  animation:
-    life-battery-float 3.2s ease-in-out infinite,
-    life-battery-glow 1.8s ease-in-out infinite;
+  animation: life-battery-glow 1.8s ease-in-out infinite;
 }
 
 @keyframes life-battery-flow {
   /* 方向反过来：波峰向下走 */
   from { transform: translateY(-50%); }
   to { transform: translateY(0); }
-}
-
-@keyframes life-battery-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
 }
 
 @keyframes life-battery-glow {
