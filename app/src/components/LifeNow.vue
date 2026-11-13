@@ -116,7 +116,7 @@ function lyricStyle(i) {
   return {
     opacity,
     transform: `scale(${d === 0 ? 1.06 : 0.95})`,
-    transformOrigin: 'left center',
+    transformOrigin: 'center center',
   };
 }
 
@@ -129,8 +129,14 @@ async function scrollToCurrentLine() {
   if (!el || i < 0) return;
   const line = el.children[i];
   if (!line) return;
+
+  // 用 getBoundingClientRect 而不是 offsetTop：offsetTop 依赖 offsetParent，
+  // 之前算出来的位置不对，当前行会贴在顶部而不是中间。
+  const lineRect = line.getBoundingClientRect();
+  const boxRect = el.getBoundingClientRect();
+  const delta = lineRect.top - boxRect.top;
   el.scrollTo({
-    top: line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2,
+    top: el.scrollTop + delta - (el.clientHeight - line.clientHeight) / 2,
     behavior: 'smooth',
   });
 }
@@ -674,7 +680,7 @@ onBeforeUnmount(() => {
   bottom: 0;
   /* 颜色跟随主题：深色主题是白，浅色主题是黑，不再固定蓝色 */
   background: var(--text-primary);
-  opacity: 0.12;
+  opacity: 0.18;
   transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   animation: life-battery-float 6s ease-in-out infinite;
 }
@@ -733,8 +739,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes life-battery-flow {
-  from { transform: translateY(0); }
-  to { transform: translateY(-50%); }
+  /* 方向反过来：波峰向下走 */
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
 }
 
 @keyframes life-battery-float {
@@ -743,8 +750,8 @@ onBeforeUnmount(() => {
 }
 
 @keyframes life-battery-glow {
-  0%, 100% { opacity: 0.12; }
-  50% { opacity: 0.22; }
+  0%, 100% { opacity: 0.18; }
+  50% { opacity: 0.28; }
 }
 
 .life-now-toplist {
@@ -786,6 +793,10 @@ onBeforeUnmount(() => {
   min-width: 0;
   max-height: 180px;
   overflow: hidden auto;
+  /* 上下留白：首行和末行也能滚到中间，焦点行始终居中 */
+  padding: 72px 0;
+  /* poem 排版：整块歌词居中，不再靠左 */
+  text-align: center;
   /* 隐藏滚动条但保留滚动：默认滚动条在这块窄区域里很难看 */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -804,7 +815,7 @@ onBeforeUnmount(() => {
 
 .life-now-lyrics li {
   transition: opacity 0.45s ease, transform 0.45s ease, color 0.45s ease;
-  transform-origin: left center;
+  transform-origin: center center;
   will-change: opacity, transform;
 }
 
