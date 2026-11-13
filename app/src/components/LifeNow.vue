@@ -264,15 +264,26 @@ onBeforeUnmount(() => {
         </div>
         <template v-if="phone">
           <strong class="life-now-app">{{ phone.app || '—' }}</strong>
+          <div class="life-now-chips">
+            <span
+              v-if="phone.network && phone.network.mode"
+              class="life-now-chip"
+              :class="{ 'is-on': phone.network.mode === 'wifi' }"
+            >{{ phone.network.mode === 'wifi' ? 'WI-FI'
+                : phone.network.mode === 'mobile' ? 'MOBILE'
+                : String(phone.network.mode).toUpperCase() }}</span>
+            <span
+              v-if="phone.battery"
+              class="life-now-chip"
+              :class="{ 'is-on': phone.battery.charging }"
+            >{{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHG' : '' }}</span>
+            <span v-if="phone.notifications != null" class="life-now-chip">
+              {{ num(phone.notifications) }} NOTIF
+            </span>
+          </div>
           <div class="life-now-meta">
             <span>{{ num(phone.unlocks) }} UNLOCKS TODAY</span>
-            <span v-if="phone.battery">
-              {{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHARGING' : '' }}
-            </span>
             <span>SEEN {{ hhmm(phone.lastSeen) }} · {{ phoneAge }}</span>
-          </div>
-          <div v-if="phone.music && phone.music.title" class="life-now-meta">
-            <span>PLAYING · {{ phone.music.title }}</span>
           </div>
         </template>
         <span v-else class="life-now-empty">NO PHONE DATA</span>
@@ -308,6 +319,37 @@ onBeforeUnmount(() => {
           </div>
         </template>
         <span v-else class="life-now-empty">NO WATCH DATA</span>
+      </article>
+
+      <article class="life-now-card is-row-start is-wide-3">
+        <div class="life-now-label">
+          <span>06</span> NOW PLAYING
+          <span v-if="phone?.music && phone.music.title" class="life-now-flag is-on">PLAYING</span>
+        </div>
+        <template v-if="phone?.music && phone.music.title">
+          <strong class="life-now-track">{{ phone.music.title }}</strong>
+          <div class="life-now-meta">
+            <span v-if="phone.music.app">{{ phone.music.app }}</span>
+            <span>LAST TRACK TODAY</span>
+          </div>
+        </template>
+        <span v-else class="life-now-empty">NOTHING PLAYING</span>
+      </article>
+
+      <article class="life-now-card is-row-start is-wide-2">
+        <div class="life-now-label">
+          <span>07</span> NOTIFICATIONS
+          <span v-if="phone && phone.notifications > 0" class="life-now-flag">TODAY</span>
+        </div>
+        <template v-if="phone">
+          <strong class="life-now-app">
+            {{ num(phone.notifications) }}<em>today</em>
+          </strong>
+          <div class="life-now-meta">
+            <span>PUSHED TO THIS PHONE</span>
+          </div>
+        </template>
+        <span v-else class="life-now-empty">NO PHONE DATA</span>
       </article>
     </div>
   </section>
@@ -397,6 +439,53 @@ onBeforeUnmount(() => {
   border-color: var(--text-primary);
   background: var(--text-primary);
   color: var(--bg);
+}
+
+/* 状态 chips：电量 / 网络 / 通知条数，和 SCREEN ON 一样是「状态」而不是正文 */
+.life-now-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.life-now-chip {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.46rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.life-now-chip.is-on {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+/* 第二行：NOW PLAYING / NOTIFICATIONS 各占一整块 */
+.life-now-card.is-row-start {
+  border-top: 1px solid var(--border);
+}
+
+.life-now-card.is-wide-3 {
+  grid-column: span 3;
+}
+
+.life-now-card.is-wide-2 {
+  grid-column: span 2;
+}
+
+.life-now-track {
+  display: block;
+  margin-top: 12px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 500;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .life-now-place,
@@ -583,6 +672,11 @@ onBeforeUnmount(() => {
   .life-now-qa {
     border-right: 0;
   }
+
+  .life-now-card.is-wide-3,
+  .life-now-card.is-wide-2 {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -606,6 +700,11 @@ onBeforeUnmount(() => {
 
   .life-now-card:last-child {
     border-bottom: 0;
+  }
+
+  .life-now-card.is-wide-3,
+  .life-now-card.is-wide-2 {
+    grid-column: 1 / -1;
   }
 }
 

@@ -156,6 +156,45 @@ const nowRows = computed(() => {
       tone: w.synced ? 'on' : 'off',
     });
   }
+
+  // 手机的状态类数据各占一行，不再塞进 PHONE 那一行的 note 里
+  const ph = props.nowSnap?.phone || {};
+  if (ph.music && ph.music.title) {
+    rows.push({
+      key: 'music',
+      name: 'MUSIC',
+      status: ph.music.title,
+      note: 'NOW PLAYING',
+      tone: 'on',
+    });
+  }
+  if (ph.network && ph.network.mode) {
+    rows.push({
+      key: 'network',
+      name: 'NETWORK',
+      status: String(ph.network.mode).toUpperCase(),
+      note: ph.network.mode === 'wifi' ? 'WI-FI' : 'CELLULAR',
+      tone: ph.network.mode === 'wifi' ? 'on' : 'off',
+    });
+  }
+  if (ph.battery) {
+    rows.push({
+      key: 'battery',
+      name: 'BATTERY',
+      status: `${Math.round(ph.battery.level)}%`,
+      note: ph.battery.charging ? 'CHARGING' : 'ON BATTERY',
+      tone: ph.battery.charging ? 'on' : 'off',
+    });
+  }
+  if (ph.notifications != null) {
+    rows.push({
+      key: 'notifications',
+      name: 'ALERTS',
+      status: fmt(ph.notifications),
+      note: 'TODAY',
+      tone: 'off',
+    });
+  }
   return rows;
 });
 
