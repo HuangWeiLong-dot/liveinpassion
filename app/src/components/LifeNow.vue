@@ -10,6 +10,7 @@
 //
 // 这个组件自己轮询，不依赖 LIFE 的 /api/life；60 秒的页面轮询和它是两条线。
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue';
+import LifeIcon from './LifeIcon.vue';
 
 const emit = defineEmits(['snapshot']);
 
@@ -39,6 +40,15 @@ const qa = computed(() => snap.value?.qa || null);
 const musicLive = computed(() => {
   const d = parseDate(phone.value?.music?.at);
   return !!d && nowMs.value - d.getTime() < 30 * 60 * 1000;
+});
+
+// Tasker 传的是「Artist - Title」一行；拆开展示，拆不开就整行当曲名。
+const track = computed(() => {
+  const raw = phone.value?.music?.title || '';
+  const i = raw.indexOf(' - ');
+  return i > 0
+    ? { artist: raw.slice(0, i).trim(), title: raw.slice(i + 3).trim() }
+    : { artist: '', title: raw };
 });
 
 function parseDate(value) {
@@ -188,7 +198,7 @@ onBeforeUnmount(() => {
     <div class="life-now-grid">
       <article class="life-now-card life-now-location">
         <div class="life-now-label">
-          <span>01</span> LOCATION
+          <span>01</span><LifeIcon name="location" /> LOCATION
           <span
             v-if="loc?.mode"
             class="life-now-flag"
@@ -219,7 +229,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card life-now-qa">
         <div class="life-now-label">
-          <span>02</span> LIVE Q&amp;A
+          <span>02</span><LifeIcon name="qa" /> LIVE Q&amp;A
           <span v-if="qaOld" class="life-now-flag">LAST ANSWER</span>
         </div>
         <template v-if="qa">
@@ -235,7 +245,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card">
         <div class="life-now-label">
-          <span>03</span> DESKTOP
+          <span>03</span><LifeIcon name="desktop" /> DESKTOP
           <span v-if="desk?.running" class="life-now-flag is-on">RUNNING</span>
           <span v-else-if="desk?.afk" class="life-now-flag">AFK</span>
           <span v-else-if="desk" class="life-now-flag">IDLE</span>
@@ -263,7 +273,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card">
         <div class="life-now-label">
-          <span>04</span> PHONE
+          <span>04</span><LifeIcon name="phone" /> PHONE
           <span v-if="phone?.screenOn === true" class="life-now-flag is-on">SCREEN ON</span>
           <span v-else-if="phone?.screenOn === false" class="life-now-flag">SCREEN OFF</span>
           <span v-else-if="phone" class="life-now-flag">SCREEN —</span>
@@ -275,16 +285,19 @@ onBeforeUnmount(() => {
               v-if="phone.network && phone.network.mode"
               class="life-now-chip"
               :class="{ 'is-on': phone.network.mode === 'wifi' }"
-            >{{ phone.network.mode === 'wifi' ? 'WI-FI'
+            ><LifeIcon
+              :name="phone.network.mode === 'wifi' ? 'wifi' : 'signal'"
+              :size="10"
+            />{{ phone.network.mode === 'wifi' ? 'WI-FI'
                 : phone.network.mode === 'mobile' ? 'MOBILE'
                 : String(phone.network.mode).toUpperCase() }}</span>
             <span
               v-if="phone.battery"
               class="life-now-chip"
               :class="{ 'is-on': phone.battery.charging }"
-            >{{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHG' : '' }}</span>
+            ><LifeIcon name="battery" :size="10" />{{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHG' : '' }}</span>
             <span v-if="phone.notifications != null" class="life-now-chip">
-              {{ num(phone.notifications) }} NOTIF
+              <LifeIcon name="bell" :size="10" />{{ num(phone.notifications) }} NOTIF
             </span>
           </div>
           <div class="life-now-meta">
@@ -297,7 +310,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card">
         <div class="life-now-label">
-          <span>05</span> WATCH
+          <span>05</span><LifeIcon name="watch" /> WATCH
           <span v-if="watch && !watch.synced" class="life-now-flag">NOT TODAY</span>
         </div>
         <template v-if="watch">
@@ -329,7 +342,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card is-row-start is-wide-3">
         <div class="life-now-label">
-          <span>06</span> NOW PLAYING
+          <span>06</span><LifeIcon name="music" /> NOW PLAYING
           <span
             v-if="phone?.music && phone.music.title"
             class="life-now-flag"
@@ -337,7 +350,8 @@ onBeforeUnmount(() => {
           >{{ musicLive ? 'PLAYING' : 'LAST TRACK' }}</span>
         </div>
         <template v-if="phone?.music && phone.music.title">
-          <strong class="life-now-track">{{ phone.music.title }}</strong>
+          <strong class="life-now-track">{{ track.artist || track.title }}</strong>
+          <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
           <div class="life-now-meta">
             <span v-if="phone.music.app">{{ phone.music.app }}</span>
             <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
@@ -349,14 +363,19 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card is-row-start is-wide-2">
         <div class="life-now-label">
-          <span>07</span> NOTIFICATIONS
+          <span>07</span><LifeIcon name="bell" /> NOTIFICATIONS
           <span v-if="phone && phone.notifications > 0" class="life-now-flag">TODAY</span>
         </div>
         <template v-if="phone">
           <strong class="life-now-app">
             {{ num(phone.notifications) }}<em>today</em>
           </strong>
-          <div class="life-now-meta">
+          <ul v-if="phone.notificationsTop && phone.notificationsTop.length" class="life-now-top">
+            <li v-for="[app, n] in phone.notificationsTop" :key="app">
+              <span>{{ app }}</span><b>{{ n }}</b>
+            </li>
+          </ul>
+          <div v-else class="life-now-meta">
             <span>PUSHED TO THIS PHONE</span>
           </div>
         </template>
@@ -461,6 +480,9 @@ onBeforeUnmount(() => {
 }
 
 .life-now-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 6px;
   border: 1px solid var(--border);
   color: var(--text-secondary);
@@ -497,6 +519,45 @@ onBeforeUnmount(() => {
   font-weight: 500;
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.life-now-track-title {
+  margin: 4px 0 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.life-now-top {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.life-now-top li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+}
+
+.life-now-top li span {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.life-now-top li b {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .life-now-place,

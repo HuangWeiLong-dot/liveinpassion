@@ -7,6 +7,7 @@
 //
 // 数据仍然来自 /api/life 的今日聚合，不额外发请求。
 import { computed, nextTick, ref, watch } from 'vue';
+import LifeIcon from './LifeIcon.vue';
 
 const props = defineProps({
   kind: { type: String, default: '' },
@@ -90,7 +91,13 @@ const battery = computed(() => phone.value?.battery || null);
 const network = computed(() => phone.value?.network || null);
 const music = computed(() => phone.value?.music || null);
 const notifications = computed(() => phone.value?.notifications || null);
-const musicTracks = computed(() => rows(music.value?.tracks));
+// Tasker 的 %MTRACK 是「Artist - Title」一行；拆开展示，拆不开就整行当曲名
+const musicTracks = computed(() => rows(music.value?.tracks).map((t) => {
+  const i = t.name.indexOf(' - ');
+  return i > 0
+    ? { ...t, artist: t.name.slice(0, i).trim(), title: t.name.slice(i + 3).trim() }
+    : { ...t, artist: '', title: t.name };
+}));
 const notifApps = computed(() => rows(notifications.value?.byApp));
 
 function batteryRange(b) {
@@ -220,35 +227,35 @@ watch(
             <template v-else-if="kind === 'phone'">
               <div v-if="phone" class="life-day-stats life-detail-stats">
                 <span>
-                  <em>SCREEN TIME</em>
+                  <em><LifeIcon name="screen" :size="11" />SCREEN TIME</em>
                   <b>{{ phone.screenMinutes == null ? '—' : minutesLabel(phone.screenMinutes) }}</b>
                 </span>
                 <span>
-                  <em>UNLOCKS</em>
+                  <em><LifeIcon name="phone" :size="11" />UNLOCKS</em>
                   <b>{{ num(phone.unlocks) }}</b>
                 </span>
                 <span>
-                  <em>APP SWITCHES</em>
+                  <em><LifeIcon name="signal" :size="11" />APP SWITCHES</em>
                   <b>{{ num(phone.appSwitches) }}</b>
                 </span>
                 <span>
-                  <em>SCREEN ON / OFF</em>
+                  <em><LifeIcon name="screen" :size="11" />SCREEN ON / OFF</em>
                   <b>{{ num(phone.screenOn) }} / {{ num(phone.screenOff) }}</b>
                 </span>
                 <span>
-                  <em>BATTERY</em>
+                  <em><LifeIcon name="battery" :size="11" />BATTERY</em>
                   <b>{{ batteryRange(battery) }}</b>
                 </span>
                 <span>
-                  <em>CHARGING</em>
+                  <em><LifeIcon name="battery" :size="11" />CHARGING</em>
                   <b>{{ battery && battery.chargingMinutes != null ? minutesLabel(battery.chargingMinutes) : '—' }}</b>
                 </span>
                 <span>
-                  <em>WI-FI / MOBILE</em>
+                  <em><LifeIcon name="wifi" :size="11" />WI-FI / MOBILE</em>
                   <b>{{ network ? `${minutesLabel(network.wifiMinutes)} / ${minutesLabel(network.mobileMinutes)}` : '—' }}</b>
                 </span>
                 <span>
-                  <em>NOTIFICATIONS</em>
+                  <em><LifeIcon name="bell" :size="11" />NOTIFICATIONS</em>
                   <b>{{ notifications ? num(notifications.total) : '—' }}</b>
                 </span>
               </div>
@@ -272,10 +279,13 @@ watch(
               </section>
 
               <section v-if="musicTracks.length" class="life-day-block">
-                <h4>MUSIC · {{ music.plays }} PLAY{{ music.plays === 1 ? '' : 'S' }}</h4>
+                <h4><LifeIcon name="music" :size="11" />MUSIC · {{ music.plays }} PLAY{{ music.plays === 1 ? '' : 'S' }}</h4>
                 <div v-for="t in musicTracks" :key="t.name" class="life-day-row">
                   <span class="life-rank">{{ t.rank }}</span>
-                  <span class="life-name">{{ t.name }}</span>
+                  <span class="life-name">
+                    {{ t.artist || t.title }}
+                    <em v-if="t.artist" class="life-name-sub">{{ t.title }}</em>
+                  </span>
                   <span class="life-num">{{ t.value }}×</span>
                   <span class="life-track">
                     <span
@@ -290,7 +300,7 @@ watch(
               </section>
 
               <section v-if="notifApps.length" class="life-day-block">
-                <h4>NOTIFICATIONS · {{ num(notifications.total) }}</h4>
+                <h4><LifeIcon name="bell" :size="11" />NOTIFICATIONS · {{ num(notifications.total) }}</h4>
                 <div v-for="a in notifApps" :key="a.name" class="life-day-row">
                   <span class="life-rank">{{ a.rank }}</span>
                   <span class="life-name">{{ a.name }}</span>
@@ -450,6 +460,28 @@ watch(
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 10px;
   border-top: 1px solid var(--border);
+}
+
+/* 统计项标签前的小图标 */
+.life-detail-stats em {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 音乐行：歌手为主，曲名作第二行 */
+.life-name-sub {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 0.86em;
+  color: var(--text-secondary);
+}
+
+.life-day-block h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* 屏幕时间的逐日表：日期 + 三列时长，等宽数字对齐 */

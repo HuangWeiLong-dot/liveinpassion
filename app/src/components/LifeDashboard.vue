@@ -12,6 +12,7 @@
 // 和 KPI 的 bento 是同一套做法。
 import { computed, ref } from 'vue';
 import OdometerNumber from './OdometerNumber.vue';
+import LifeIcon from './LifeIcon.vue';
 import GithubActivity from './GithubActivity.vue';
 import LifeRadar from './LifeRadar.vue';
 import LifeSleep from './LifeSleep.vue';
@@ -141,8 +142,8 @@ const nowRows = computed(() => {
   const d = props.live?.desktop || {};
   const p = props.live?.phone || {};
   const rows = [
-    { key: 'desktop', name: 'DESKTOP', status: d.label || '—', note: d.note || 'NO DESKTOP DATA', tone: d.tone || 'unknown' },
-    { key: 'phone', name: 'PHONE', status: p.label || '—', note: p.note || 'NO PHONE DATA', tone: p.tone || 'unknown' },
+    { key: 'desktop', name: 'DESKTOP', icon: 'desktop', status: d.label || '—', note: d.note || 'NO DESKTOP DATA', tone: d.tone || 'unknown' },
+    { key: 'phone', name: 'PHONE', icon: 'phone', status: p.label || '—', note: p.note || 'NO PHONE DATA', tone: p.tone || 'unknown' },
   ];
   // 手表可能比其它来源滞后；同步状态放在第三行，没有就不占位。
   const w = props.nowSnap?.watch;
@@ -150,6 +151,7 @@ const nowRows = computed(() => {
     rows.push({
       key: 'watch',
       name: 'WATCH',
+      icon: 'watch',
       status: w.hrAvg != null ? `${Math.round(w.hrAvg)} BPM` : (w.steps != null ? `${fmt(w.steps)} STEPS` : 'SYNCED'),
       note: [w.steps != null ? `${fmt(w.steps)} STEPS` : '', w.synced ? '' : 'NOT TODAY']
         .filter(Boolean).join(' · ') || 'NO STEP DATA',
@@ -166,6 +168,7 @@ const nowRows = computed(() => {
     rows.push({
       key: 'music',
       name: 'MUSIC',
+      icon: 'music',
       status: ph.music.title,
       note: live ? 'NOW PLAYING' : 'LAST TRACK',
       tone: live ? 'on' : 'off',
@@ -175,6 +178,7 @@ const nowRows = computed(() => {
     rows.push({
       key: 'network',
       name: 'NETWORK',
+      icon: ph.network.mode === 'wifi' ? 'wifi' : 'signal',
       status: String(ph.network.mode).toUpperCase(),
       note: ph.network.mode === 'wifi' ? 'WI-FI' : 'CELLULAR',
       tone: ph.network.mode === 'wifi' ? 'on' : 'off',
@@ -184,6 +188,7 @@ const nowRows = computed(() => {
     rows.push({
       key: 'battery',
       name: 'BATTERY',
+      icon: 'battery',
       status: `${Math.round(ph.battery.level)}%`,
       note: ph.battery.charging ? 'CHARGING' : 'ON BATTERY',
       tone: ph.battery.charging ? 'on' : 'off',
@@ -193,6 +198,7 @@ const nowRows = computed(() => {
     rows.push({
       key: 'notifications',
       name: 'ALERTS',
+      icon: 'bell',
       status: fmt(ph.notifications),
       note: 'TODAY',
       tone: 'off',
@@ -345,7 +351,7 @@ function openDay(day) {
               :key="row.key"
               class="dash-now-row"
             >
-              <em>{{ row.name }}</em>
+              <em><LifeIcon v-if="row.icon" :name="row.icon" :size="11" />{{ row.name }}</em>
               <b :class="`is-${row.tone}`">{{ row.status }}</b>
               <span>{{ row.note }}</span>
             </div>
@@ -863,6 +869,13 @@ function openDay(day) {
 </template>
 
 <style scoped>
+/* NOW 栏每行前面的小图标 */
+.dash-now-row em {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* 12 列板子：1px 的 gap 露出背景色 = 发丝线，和 KPI bento 同一套做法 */
 .life-dash {
   display: grid;
