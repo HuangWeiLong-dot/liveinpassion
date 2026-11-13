@@ -53,6 +53,13 @@ const track = computed(() => {
     : { artist: '', title: raw };
 });
 
+const networkLabel = computed(() => {
+  const mode = phone.value?.network?.mode;
+  return mode ? String(mode).toUpperCase() : '—';
+});
+
+const networkIcon = computed(() => (phone.value?.network?.mode === 'wifi' ? 'wifi' : 'signal'));
+
 function mmss(value) {
   const s = Math.max(0, Math.round(Number(value) || 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -280,44 +287,7 @@ onBeforeUnmount(() => {
 
       <article class="life-now-card">
         <div class="life-now-label">
-          <span>04</span><LifeIcon name="phone" /> PHONE
-          <span v-if="phone?.screenOn === true" class="life-now-flag is-on">SCREEN ON</span>
-          <span v-else-if="phone?.screenOn === false" class="life-now-flag">SCREEN OFF</span>
-          <span v-else-if="phone" class="life-now-flag">SCREEN —</span>
-        </div>
-        <template v-if="phone">
-          <strong class="life-now-app">{{ phone.app || '—' }}</strong>
-          <div class="life-now-chips">
-            <span
-              v-if="phone.network && phone.network.mode"
-              class="life-now-chip"
-              :class="{ 'is-on': phone.network.mode === 'wifi' }"
-            ><LifeIcon
-              :name="phone.network.mode === 'wifi' ? 'wifi' : 'signal'"
-              :size="10"
-            />{{ phone.network.mode === 'wifi' ? 'WI-FI'
-                : phone.network.mode === 'mobile' ? 'MOBILE'
-                : String(phone.network.mode).toUpperCase() }}</span>
-            <span
-              v-if="phone.battery"
-              class="life-now-chip"
-              :class="{ 'is-on': phone.battery.charging }"
-            ><LifeIcon name="battery" :size="10" />{{ Math.round(phone.battery.level) }}% · {{ phone.battery.charging ? 'CHARGING' : 'ON BATTERY' }}</span>
-            <span v-if="phone.notifications != null" class="life-now-chip">
-              <LifeIcon name="bell" :size="10" />{{ num(phone.notifications) }} NOTIF
-            </span>
-          </div>
-          <div class="life-now-meta">
-            <span>{{ num(phone.unlocks) }} UNLOCKS TODAY</span>
-            <span>SEEN {{ hhmm(phone.lastSeen) }} · {{ phoneAge }}</span>
-          </div>
-        </template>
-        <span v-else class="life-now-empty">NO PHONE DATA</span>
-      </article>
-
-      <article class="life-now-card">
-        <div class="life-now-label">
-          <span>05</span><LifeIcon name="watch" /> WATCH
+          <span>04</span><LifeIcon name="watch" /> WATCH
           <span v-if="watch && !watch.synced" class="life-now-flag">NOT TODAY</span>
         </div>
         <template v-if="watch">
@@ -347,7 +317,52 @@ onBeforeUnmount(() => {
         <span v-else class="life-now-empty">NO WATCH DATA</span>
       </article>
 
-      <article class="life-now-card is-row-start is-wide-3">
+      <article class="life-now-card is-full life-now-phone">
+        <div class="life-now-label">
+          <span>05</span><LifeIcon name="phone" /> PHONE
+          <span v-if="phone?.screenOn === true" class="life-now-flag is-on">SCREEN ON</span>
+          <span v-else-if="phone?.screenOn === false" class="life-now-flag">SCREEN OFF</span>
+          <span v-else-if="phone" class="life-now-flag">SCREEN —</span>
+        </div>
+        <template v-if="phone">
+          <div class="life-now-stats">
+            <div class="life-now-stat">
+              <span class="life-now-stat-icon"><LifeIcon name="battery" :size="16" /></span>
+              <b>{{ phone.battery ? Math.round(phone.battery.level) + '%' : '—' }}</b>
+              <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
+            </div>
+            <div class="life-now-stat">
+              <span class="life-now-stat-icon"><LifeIcon :name="networkIcon" :size="16" /></span>
+              <b>{{ networkLabel }}</b>
+              <em>NETWORK</em>
+            </div>
+            <div class="life-now-stat">
+              <span class="life-now-stat-icon"><LifeIcon name="bell" :size="16" /></span>
+              <b>{{ num(phone.notifications) }}</b>
+              <em>NOTIFICATIONS TODAY</em>
+            </div>
+            <div class="life-now-stat">
+              <span class="life-now-stat-icon"><LifeIcon name="screen" :size="16" /></span>
+              <b>{{ num(phone.unlocks) }}</b>
+              <em>UNLOCKS TODAY</em>
+            </div>
+          </div>
+
+          <div v-if="phone.notificationsTop && phone.notificationsTop.length" class="life-now-toplist">
+            <span v-for="[app, n] in phone.notificationsTop" :key="app">
+              {{ app }} <b>{{ n }}</b>
+            </span>
+          </div>
+
+          <div class="life-now-meta">
+            <span v-if="phone.app">USING {{ phone.app }}</span>
+            <span>SEEN {{ hhmm(phone.lastSeen) }} · {{ phoneAge }}</span>
+          </div>
+        </template>
+        <span v-else class="life-now-empty">NO PHONE DATA</span>
+      </article>
+
+      <article class="life-now-card is-full life-now-music">
         <div class="life-now-label">
           <span>06</span><LifeIcon name="music" /> NOW PLAYING
           <span
@@ -367,8 +382,8 @@ onBeforeUnmount(() => {
             <div class="life-now-track-body">
               <strong class="life-now-track">{{ track.artist || track.title }}</strong>
               <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
+              <p v-if="phone.music.album" class="life-now-track-album">{{ phone.music.album }}</p>
               <div class="life-now-meta">
-                <span v-if="phone.music.album">{{ phone.music.album }}</span>
                 <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
                 <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
                 <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
@@ -378,27 +393,6 @@ onBeforeUnmount(() => {
           </div>
         </template>
         <span v-else class="life-now-empty">NOTHING PLAYING</span>
-      </article>
-
-      <article class="life-now-card is-row-start is-wide-2">
-        <div class="life-now-label">
-          <span>07</span><LifeIcon name="bell" /> NOTIFICATIONS
-          <span v-if="phone && phone.notifications > 0" class="life-now-flag">TODAY</span>
-        </div>
-        <template v-if="phone">
-          <strong class="life-now-app">
-            {{ num(phone.notifications) }}<em>today</em>
-          </strong>
-          <ul v-if="phone.notificationsTop && phone.notificationsTop.length" class="life-now-top">
-            <li v-for="[app, n] in phone.notificationsTop" :key="app">
-              <span>{{ app }}</span><b>{{ n }}</b>
-            </li>
-          </ul>
-          <div v-else class="life-now-meta">
-            <span>PUSHED TO THIS PHONE</span>
-          </div>
-        </template>
-        <span v-else class="life-now-empty">NO PHONE DATA</span>
       </article>
     </div>
   </section>
@@ -445,8 +439,15 @@ onBeforeUnmount(() => {
 }
 
 .life-now-grid {
+  /* 一行四块：位置 / 问答 / 桌面 / 手表；手机和正在播放各自占满整行 */
   display: grid;
-  grid-template-columns: 1.25fr 1.55fr 1fr 1fr 1fr;
+  grid-template-columns: 1.25fr 1.55fr 1fr 1fr;
+}
+
+.life-now-card.is-full {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border);
+  border-right: 0;
 }
 
 .life-now-card {
@@ -517,17 +518,59 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
-/* 第二行：NOW PLAYING / NOTIFICATIONS 各占一整块 */
-.life-now-card.is-row-start {
-  border-top: 1px solid var(--border);
+/* 手机整块：四个状态瓦片，用 1px 缝隙画分隔线 */
+.life-now-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  background: var(--border);
 }
 
-.life-now-card.is-wide-3 {
-  grid-column: span 3;
+.life-now-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--bg);
 }
 
-.life-now-card.is-wide-2 {
-  grid-column: span 2;
+.life-now-stat-icon {
+  color: var(--text-secondary);
+}
+
+.life-now-stat b {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 500;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.life-now-stat em {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.44rem;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.life-now-toplist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.life-now-toplist b {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 .life-now-track-row {
@@ -538,8 +581,8 @@ onBeforeUnmount(() => {
 }
 
 .life-now-cover {
-  width: 64px;
-  height: 64px;
+  width: 132px;
+  height: 132px;
   flex: none;
   object-fit: cover;
   border: 1px solid var(--border);
@@ -553,13 +596,22 @@ onBeforeUnmount(() => {
   display: block;
   margin-top: 0;
   font-family: 'Oswald', sans-serif;
-  font-size: 1.6rem;
+  font-size: 2.1rem;
   font-weight: 500;
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
 .life-now-track-title {
+  margin: 6px 0 0;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.life-now-track-album {
   margin: 4px 0 0;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.58rem;
@@ -787,9 +839,12 @@ onBeforeUnmount(() => {
     border-right: 0;
   }
 
-  .life-now-card.is-wide-3,
-  .life-now-card.is-wide-2 {
+  .life-now-card.is-full {
     grid-column: 1 / -1;
+  }
+
+  .life-now-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -816,9 +871,21 @@ onBeforeUnmount(() => {
     border-bottom: 0;
   }
 
-  .life-now-card.is-wide-3,
-  .life-now-card.is-wide-2 {
+  .life-now-card.is-full {
     grid-column: 1 / -1;
+  }
+
+  .life-now-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .life-now-cover {
+    width: 96px;
+    height: 96px;
+  }
+
+  .life-now-track {
+    font-size: 1.6rem;
   }
 }
 
