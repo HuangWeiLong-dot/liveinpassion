@@ -432,6 +432,8 @@ onBeforeUnmount(() => {
                 </svg>
               </div>
 
+              <!-- 和另外三格保持同一结构：图标 → 数值 → 标签 -->
+              <span class="life-now-stat-icon"><LifeIcon name="battery" :size="16" /></span>
               <b>{{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small></b>
               <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
             </div>
@@ -780,36 +782,19 @@ onBeforeUnmount(() => {
 .life-now-stat.is-battery {
   position: relative;
   overflow: hidden;
-  min-height: 104px;
 }
 
-/* 文字压在水面之上 */
+/* 图标和文字压在水面之上 */
+.life-now-stat.is-battery > .life-now-stat-icon,
 .life-now-stat.is-battery > b,
 .life-now-stat.is-battery > em {
   position: relative;
   z-index: 1;
 }
 
-.life-now-stat.is-battery b {
-  font-family: 'Oswald', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 500;
-  line-height: 1;
-  color: var(--text-primary);
-}
-
 .life-now-stat.is-battery b small {
-  font-size: 0.55em;
+  font-size: 0.6em;
   margin-left: 1px;
-}
-
-.life-now-stat.is-battery em {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 0.44rem;
-  font-style: normal;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
 }
 
 .life-battery-water {
