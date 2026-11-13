@@ -169,7 +169,7 @@ const nowRows = computed(() => {
       key: 'music',
       name: 'MUSIC',
       icon: 'music',
-      status: ph.music.title,
+      status: ph.music.artist ? `${ph.music.artist} — ${ph.music.title}` : ph.music.title,
       note: live ? 'NOW PLAYING' : 'LAST TRACK',
       tone: live ? 'on' : 'off',
     });

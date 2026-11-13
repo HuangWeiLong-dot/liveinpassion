@@ -42,14 +42,21 @@ const musicLive = computed(() => {
   return !!d && nowMs.value - d.getTime() < 30 * 60 * 1000;
 });
 
-// Tasker 传的是「Artist - Title」一行；拆开展示，拆不开就整行当曲名。
+// 手机 App 会单独给 artist/title；Tasker 只有「Artist - Title」一行，拆开展示。
 const track = computed(() => {
-  const raw = phone.value?.music?.title || '';
+  const m = phone.value?.music || {};
+  if (m.artist) return { artist: m.artist, title: m.title || '' };
+  const raw = m.raw || m.title || '';
   const i = raw.indexOf(' - ');
   return i > 0
     ? { artist: raw.slice(0, i).trim(), title: raw.slice(i + 3).trim() }
     : { artist: '', title: raw };
 });
+
+function mmss(value) {
+  const s = Math.max(0, Math.round(Number(value) || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 function parseDate(value) {
   if (!value) return null;
@@ -353,7 +360,8 @@ onBeforeUnmount(() => {
           <strong class="life-now-track">{{ track.artist || track.title }}</strong>
           <p v-if="track.artist" class="life-now-track-title">{{ track.title }}</p>
           <div class="life-now-meta">
-            <span v-if="phone.music.app">{{ phone.music.app }}</span>
+            <span v-if="phone.music.album">{{ phone.music.album }}</span>
+            <span v-if="phone.music.duration">{{ mmss(phone.music.duration) }}</span>
             <span v-if="phone.music.plays">{{ phone.music.plays }} PLAYS TODAY</span>
             <span v-if="phone.music.at">{{ hhmm(phone.music.at) }} · {{ age(phone.music.at) }}</span>
             <span v-else>LAST TRACK TODAY</span>
