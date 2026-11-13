@@ -402,11 +402,11 @@ onBeforeUnmount(() => {
             >
               <div
                 class="life-battery-water"
-                :style="{ height: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
+                :style="{ width: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
                 aria-hidden="true"
               >
-                <svg class="life-battery-surface" viewBox="0 0 120 12" preserveAspectRatio="none">
-                  <path d="M0 6 Q 15 0 30 6 T 60 6 T 90 6 T 120 6 V 12 H 0 Z" />
+                <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
+                  <path d="M6 0 Q 0 15 6 30 T 6 60 T 6 90 T 6 120 L 12 120 L 12 0 Z" />
                 </svg>
               </div>
               <div class="life-battery-content">
@@ -661,23 +661,27 @@ onBeforeUnmount(() => {
 .life-battery-water {
   position: absolute;
   left: 0;
-  right: 0;
+  top: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.30), rgba(96, 165, 250, 0.16));
-  transition: height 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  /* 颜色跟随主题：深色主题是白，浅色主题是黑，不再固定蓝色 */
+  background: var(--text-primary);
+  opacity: 0.12;
+  transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: life-battery-float 6s ease-in-out infinite;
 }
 
-.life-battery-surface {
+/* 右边缘的竖浪：整条上下移动，看起来像水在流动 */
+.life-battery-edge {
   position: absolute;
-  left: 0;
-  top: -9px;
-  width: 200%;
-  height: 12px;
-  animation: life-battery-slide 7s linear infinite;
+  right: -11px;
+  top: 0;
+  width: 12px;
+  height: 200%;
+  animation: life-battery-flow 5s linear infinite;
 }
 
-.life-battery-surface path {
-  fill: rgba(96, 165, 250, 0.30);
+.life-battery-edge path {
+  fill: var(--text-primary);
 }
 
 .life-battery-content {
@@ -709,27 +713,29 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
 }
 
-.life-now-stat.is-charging {
-  box-shadow: inset 0 0 26px rgba(96, 165, 250, 0.18);
-}
-
-.life-now-stat.is-charging .life-battery-surface {
-  animation-duration: 2.6s;
+.life-now-stat.is-charging .life-battery-edge {
+  animation-duration: 2.4s;
 }
 
 .life-now-stat.is-charging .life-battery-water {
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.46), rgba(96, 165, 250, 0.22));
-  animation: life-battery-glow 1.8s ease-in-out infinite;
+  animation:
+    life-battery-float 3.2s ease-in-out infinite,
+    life-battery-glow 1.8s ease-in-out infinite;
 }
 
-@keyframes life-battery-slide {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
+@keyframes life-battery-flow {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+@keyframes life-battery-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 @keyframes life-battery-glow {
-  0%, 100% { opacity: 0.82; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.22; }
 }
 
 .life-now-toplist {
