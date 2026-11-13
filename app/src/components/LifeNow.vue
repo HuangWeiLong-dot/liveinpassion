@@ -105,13 +105,27 @@ const lyricIndex = computed(() => {
   return idx;
 });
 
+// 音乐软件那种聚焦：当前行最亮最大，上下行按距离淡出
+function lyricStyle(i) {
+  const idx = lyricIndex.value;
+  if (idx < 0) return { opacity: 0.5 };
+  const d = Math.abs(i - idx);
+  const opacity = d === 0 ? 1 : d === 1 ? 0.42 : d === 2 ? 0.22 : 0.1;
+  return {
+    opacity,
+    transform: `scale(${d === 0 ? 1.06 : 0.95})`,
+    transformOrigin: 'left center',
+  };
+}
+
 const lyricBox = ref(null);
 vueWatch(lyricIndex, (i) => {
   const el = lyricBox.value;
   if (!el || i < 0) return;
   const line = el.children[i];
   if (line) {
-    el.scrollTop = line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2;
+    const top = line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2;
+    el.scrollTo({ top, behavior: 'smooth' });
   }
 });
 
@@ -466,6 +480,7 @@ onBeforeUnmount(() => {
                 v-for="(line, i) in lyricLines"
                 :key="i"
                 :class="{ 'is-current': i === lyricIndex }"
+                :style="lyricStyle(i)"
               >{{ line.text }}</li>
             </ol>
           </div>
@@ -753,10 +768,13 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   max-height: 150px;
-  overflow-y: auto;
+  overflow: hidden auto;
   /* 隐藏滚动条但保留滚动：默认滚动条在这块窄区域里很难看 */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* 上下边缘渐隐，像音乐软件那样 */
+  mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 82%, transparent 100%);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.66rem;
   line-height: 2;
@@ -768,12 +786,15 @@ onBeforeUnmount(() => {
 }
 
 .life-now-lyrics li {
-  transition: color 0.2s;
+  transition: opacity 0.45s ease, transform 0.45s ease, color 0.45s ease;
+  transform-origin: left center;
+  will-change: opacity, transform;
 }
 
 .life-now-lyrics li.is-current {
   color: var(--text-primary);
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .life-now-cover {
