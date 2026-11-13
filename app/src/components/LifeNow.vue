@@ -18,7 +18,8 @@ import LifeIcon from './LifeIcon.vue';
 const emit = defineEmits(['snapshot']);
 
 const CMS_BASE = import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
-const POLL_MS = 30000;
+// 手机 App 播放中每 10 秒推一次位置；这里 15 秒拉一次，暂停/切歌基本即时可见
+const POLL_MS = 15000;
 // 歌词高亮靠本地时钟推进，2 秒一刷足够跟得上
 const TICK_MS = 2000;
 
