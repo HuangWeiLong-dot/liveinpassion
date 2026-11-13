@@ -266,7 +266,13 @@ onBeforeUnmount(() => {
           <strong class="life-now-app">{{ phone.app || '—' }}</strong>
           <div class="life-now-meta">
             <span>{{ num(phone.unlocks) }} UNLOCKS TODAY</span>
+            <span v-if="phone.battery">
+              {{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHARGING' : '' }}
+            </span>
             <span>SEEN {{ hhmm(phone.lastSeen) }} · {{ phoneAge }}</span>
+          </div>
+          <div v-if="phone.music && phone.music.title" class="life-now-meta">
+            <span>PLAYING · {{ phone.music.title }}</span>
           </div>
         </template>
         <span v-else class="life-now-empty">NO PHONE DATA</span>

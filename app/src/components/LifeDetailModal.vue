@@ -85,6 +85,18 @@ const apps = computed(() => rows(props.payload?.topApps));
 const sites = computed(() => rows(props.payload?.topSites));
 const phone = computed(() => props.payload?.phone || null);
 const phoneApps = computed(() => rows(phone.value?.topApps));
+// 2026-11 新增：电量 / 网络 / 音乐 / 通知
+const battery = computed(() => phone.value?.battery || null);
+const network = computed(() => phone.value?.network || null);
+const music = computed(() => phone.value?.music || null);
+const notifications = computed(() => phone.value?.notifications || null);
+const musicTracks = computed(() => rows(music.value?.tracks));
+const notifApps = computed(() => rows(notifications.value?.byApp));
+
+function batteryRange(b) {
+  if (!b || b.start == null || b.end == null) return '—';
+  return `${Math.round(b.start)}% → ${Math.round(b.end)}%`;
+}
 const ai = computed(() => props.payload?.ai || null);
 const aiModels = computed(() => rows(ai.value?.models));
 const aiProjects = computed(() => rows(ai.value?.projects));
@@ -223,6 +235,22 @@ watch(
                   <em>SCREEN ON / OFF</em>
                   <b>{{ num(phone.screenOn) }} / {{ num(phone.screenOff) }}</b>
                 </span>
+                <span>
+                  <em>BATTERY</em>
+                  <b>{{ batteryRange(battery) }}</b>
+                </span>
+                <span>
+                  <em>CHARGING</em>
+                  <b>{{ battery && battery.chargingMinutes != null ? minutesLabel(battery.chargingMinutes) : '—' }}</b>
+                </span>
+                <span>
+                  <em>WI-FI / MOBILE</em>
+                  <b>{{ network ? `${minutesLabel(network.wifiMinutes)} / ${minutesLabel(network.mobileMinutes)}` : '—' }}</b>
+                </span>
+                <span>
+                  <em>NOTIFICATIONS</em>
+                  <b>{{ notifications ? num(notifications.total) : '—' }}</b>
+                </span>
               </div>
 
               <section v-if="phoneApps.length" class="life-day-block">
@@ -231,6 +259,42 @@ watch(
                   <span class="life-rank">{{ a.rank }}</span>
                   <span class="life-name">{{ a.name }}</span>
                   <span class="life-num">{{ minutesLabel(a.value) }}</span>
+                  <span class="life-track">
+                    <span
+                      class="life-fill"
+                      :style="{
+                        width: a.pct + '%',
+                        background: colorMode ? `var(--cat-${fillCat})` : null,
+                      }"
+                    ></span>
+                  </span>
+                </div>
+              </section>
+
+              <section v-if="musicTracks.length" class="life-day-block">
+                <h4>MUSIC · {{ music.plays }} PLAY{{ music.plays === 1 ? '' : 'S' }}</h4>
+                <div v-for="t in musicTracks" :key="t.name" class="life-day-row">
+                  <span class="life-rank">{{ t.rank }}</span>
+                  <span class="life-name">{{ t.name }}</span>
+                  <span class="life-num">{{ t.value }}×</span>
+                  <span class="life-track">
+                    <span
+                      class="life-fill"
+                      :style="{
+                        width: t.pct + '%',
+                        background: colorMode ? `var(--cat-${fillCat})` : null,
+                      }"
+                    ></span>
+                  </span>
+                </div>
+              </section>
+
+              <section v-if="notifApps.length" class="life-day-block">
+                <h4>NOTIFICATIONS · {{ num(notifications.total) }}</h4>
+                <div v-for="a in notifApps" :key="a.name" class="life-day-row">
+                  <span class="life-rank">{{ a.rank }}</span>
+                  <span class="life-name">{{ a.name }}</span>
+                  <span class="life-num">{{ a.value }}</span>
                   <span class="life-track">
                     <span
                       class="life-fill"

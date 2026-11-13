@@ -71,7 +71,15 @@ const LOCATION_KEYS = new Set([
 ]);
 const PHONE_KEYS = new Set([
   'unlocks', 'screenOn', 'screenOff', 'screenMinutes', 'appSwitches', 'topApps',
+  // 2026-11 新增：电量 / 网络 / 音乐 / 通知。全部是聚合值，不含正文。
+  'battery', 'network', 'music', 'notifications',
 ]);
+const PHONE_BATTERY_KEYS = new Set([
+  'start', 'end', 'min', 'max', 'drop', 'chargingMinutes', 'samples',
+]);
+const PHONE_NETWORK_KEYS = new Set(['wifiMinutes', 'mobileMinutes', 'last', 'changes']);
+const PHONE_MUSIC_KEYS = new Set(['plays', 'last', 'tracks']);
+const PHONE_NOTIF_KEYS = new Set(['total', 'byApp']);
 const AI_KEYS = new Set([
   'cost', 'costSource', 'dailyCost', 'spend', 'estimatedCost',
   'calls', 'callsSource', 'models', 'projects',
@@ -272,6 +280,40 @@ function validateDay(d) {
     if (!isOptNum(p.screenMinutes, 0, 1440)) return 'phone.screenMinutes';
     if (!isOptNum(p.appSwitches, 0, 1000000)) return 'phone.appSwitches';
     if (p.topApps !== null && !isAppPairs(p.topApps, 40, 1440)) return 'phone.topApps';
+
+    if (p.battery != null) {
+      const b = p.battery;
+      if (!isObj(b) || !onlyKeys(b, PHONE_BATTERY_KEYS)) return 'phone.battery';
+      if (!isOptNum(b.start, 0, 100) || !isOptNum(b.end, 0, 100)
+        || !isOptNum(b.min, 0, 100) || !isOptNum(b.max, 0, 100)) return 'phone.battery.level';
+      if (!isOptNum(b.drop, -100, 100)) return 'phone.battery.drop';
+      if (!isOptNum(b.chargingMinutes, 0, 1440)) return 'phone.battery.chargingMinutes';
+      if (!isOptNum(b.samples, 0, 10000)) return 'phone.battery.samples';
+    }
+
+    if (p.network != null) {
+      const n = p.network;
+      if (!isObj(n) || !onlyKeys(n, PHONE_NETWORK_KEYS)) return 'phone.network';
+      if (!isOptNum(n.wifiMinutes, 0, 1440)) return 'phone.network.wifiMinutes';
+      if (!isOptNum(n.mobileMinutes, 0, 1440)) return 'phone.network.mobileMinutes';
+      if (n.last !== null && !isName(n.last, 24)) return 'phone.network.last';
+      if (!isOptNum(n.changes, 0, 10000)) return 'phone.network.changes';
+    }
+
+    if (p.music != null) {
+      const m = p.music;
+      if (!isObj(m) || !onlyKeys(m, PHONE_MUSIC_KEYS)) return 'phone.music';
+      if (!isOptNum(m.plays, 0, 100000)) return 'phone.music.plays';
+      if (m.last !== null && !isName(m.last, 200)) return 'phone.music.last';
+      if (m.tracks !== null && !isPairs(m.tracks, 40, 100000)) return 'phone.music.tracks';
+    }
+
+    if (p.notifications != null) {
+      const nf = p.notifications;
+      if (!isObj(nf) || !onlyKeys(nf, PHONE_NOTIF_KEYS)) return 'phone.notifications';
+      if (!isOptNum(nf.total, 0, 100000)) return 'phone.notifications.total';
+      if (nf.byApp !== null && !isPairs(nf.byApp, 40, 100000)) return 'phone.notifications.byApp';
+    }
   }
 
   if (d.ai !== null) {
