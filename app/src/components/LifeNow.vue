@@ -381,39 +381,23 @@ onBeforeUnmount(() => {
         </div>
         <template v-if="phone">
           <div class="life-now-stats">
-            <div class="life-now-stat is-battery">
+            <div
+              class="life-now-stat is-battery"
+              :class="{ 'is-charging': phone.battery && phone.battery.charging }"
+            >
               <div
-                class="life-battery"
-                :class="{ 'is-charging': phone.battery && phone.battery.charging }"
+                class="life-battery-water"
+                :style="{ height: (phone.battery ? Math.round(phone.battery.level) : 0) + '%' }"
                 aria-hidden="true"
               >
-                <svg viewBox="0 0 60 100" class="life-battery-svg">
-                  <defs>
-                    <clipPath id="lifeBatteryClip">
-                      <rect x="3" y="3" width="54" height="94" rx="11" />
-                    </clipPath>
-                  </defs>
-                  <g clip-path="url(#lifeBatteryClip)">
-                    <g
-                      class="life-battery-fill"
-                      :style="{ transform: `translateY(${100 - (phone.battery ? Math.round(phone.battery.level) : 0)}px)` }"
-                    >
-                      <g class="life-battery-wave w1">
-                        <path d="M0 8 Q 15 0 30 8 T 60 8 T 90 8 T 120 8 V 130 H 0 Z" />
-                      </g>
-                      <g class="life-battery-wave w2">
-                        <path d="M0 8 Q 15 16 30 8 T 60 8 T 90 8 T 120 8 V 130 H 0 Z" />
-                      </g>
-                    </g>
-                  </g>
-                  <rect class="life-battery-shell" x="3" y="3" width="54" height="94" rx="11" />
-                  <rect class="life-battery-cap" x="23" y="0" width="14" height="4" rx="2" />
+                <svg class="life-battery-surface" viewBox="0 0 120 12" preserveAspectRatio="none">
+                  <path d="M0 6 Q 15 0 30 6 T 60 6 T 90 6 T 120 6 V 12 H 0 Z" />
                 </svg>
-                <span class="life-battery-pct">
-                  {{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small>
-                </span>
               </div>
-              <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
+              <div class="life-battery-content">
+                <b>{{ phone.battery ? Math.round(phone.battery.level) : '—' }}<small>%</small></b>
+                <em>{{ phone.battery ? (phone.battery.charging ? 'CHARGING' : 'ON BATTERY') : 'NO BATTERY DATA' }}</em>
+              </div>
             </div>
             <div class="life-now-stat">
               <span class="life-now-stat-icon"><LifeIcon :name="networkIcon" :size="16" /></span>
@@ -653,95 +637,83 @@ onBeforeUnmount(() => {
 
 /* ── 电池液面 ─────────────────────────────────────────────── */
 .life-now-stat.is-battery {
-  align-items: flex-start;
-}
-
-.life-battery {
   position: relative;
-  width: 54px;
-  height: 92px;
+  overflow: hidden;
+  min-height: 104px;
 }
 
-.life-battery-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.life-battery-shell {
-  fill: none;
-  stroke: var(--border);
-  stroke-width: 2;
-}
-
-.life-battery-cap {
-  fill: var(--border);
-}
-
-.life-battery-fill {
-  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.life-battery-wave path {
-  fill: rgba(96, 165, 250, 0.85);
-}
-
-.life-battery-wave.w2 path {
-  fill: rgba(96, 165, 250, 0.45);
-}
-
-.life-battery-wave.w1 {
-  animation: life-battery-wave 5s linear infinite;
-}
-
-.life-battery-wave.w2 {
-  animation: life-battery-wave 8s linear infinite reverse;
-}
-
-/* 充电：波浪加速 + 发光脉冲 */
-.life-battery.is-charging .life-battery-wave.w1 {
-  animation-duration: 2.2s;
-}
-
-.life-battery.is-charging .life-battery-wave.w2 {
-  animation-duration: 3.4s;
-}
-
-.life-battery.is-charging .life-battery-fill {
-  animation: life-battery-glow 1.6s ease-in-out infinite;
-}
-
-.life-battery-pct {
+.life-battery-water {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.30), rgba(96, 165, 250, 0.16));
+  transition: height 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.life-battery-surface {
+  position: absolute;
+  left: 0;
+  top: -9px;
+  width: 200%;
+  height: 12px;
+  animation: life-battery-slide 7s linear infinite;
+}
+
+.life-battery-surface path {
+  fill: rgba(96, 165, 250, 0.30);
+}
+
+.life-battery-content {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.life-battery-content b {
   font-family: 'Oswald', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   font-weight: 500;
+  line-height: 1;
   color: var(--text-primary);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
-  pointer-events: none;
 }
 
-.life-battery.is-charging .life-battery-pct {
-  color: #60a5fa;
-}
-
-.life-battery-pct small {
-  font-size: 0.6em;
+.life-battery-content b small {
+  font-size: 0.55em;
   margin-left: 1px;
 }
 
-@keyframes life-battery-wave {
+.life-battery-content em {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.44rem;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.life-now-stat.is-charging {
+  box-shadow: inset 0 0 26px rgba(96, 165, 250, 0.18);
+}
+
+.life-now-stat.is-charging .life-battery-surface {
+  animation-duration: 2.6s;
+}
+
+.life-now-stat.is-charging .life-battery-water {
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.46), rgba(96, 165, 250, 0.22));
+  animation: life-battery-glow 1.8s ease-in-out infinite;
+}
+
+@keyframes life-battery-slide {
   from { transform: translateX(0); }
-  to { transform: translateX(-60px); }
+  to { transform: translateX(-50%); }
 }
 
 @keyframes life-battery-glow {
-  0%, 100% { filter: drop-shadow(0 0 3px rgba(96, 165, 250, 0.45)); }
-  50% { filter: drop-shadow(0 0 9px rgba(96, 165, 250, 0.95)); }
+  0%, 100% { opacity: 0.82; }
+  50% { opacity: 1; }
 }
 
 .life-now-toplist {
@@ -782,11 +754,17 @@ onBeforeUnmount(() => {
   min-width: 0;
   max-height: 150px;
   overflow-y: auto;
-  scrollbar-width: thin;
+  /* 隐藏滚动条但保留滚动：默认滚动条在这块窄区域里很难看 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 0.66rem;
   line-height: 2;
   color: var(--text-secondary);
+}
+
+.life-now-lyrics::-webkit-scrollbar {
+  display: none;
 }
 
 .life-now-lyrics li {
