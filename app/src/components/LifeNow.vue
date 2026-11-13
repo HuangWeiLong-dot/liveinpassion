@@ -66,6 +66,12 @@ const networkLabel = computed(() => {
 
 const networkIcon = computed(() => (phone.value?.network?.mode === 'wifi' ? 'wifi' : 'signal'));
 
+// 通知滚动条：重复一遍列表，translateY(-50%) 才能无缝循环
+const notifFeed = computed(() => {
+  const list = phone.value?.notificationsRecent || [];
+  return [...list, ...list];
+});
+
 // ── 歌词 ──────────────────────────────────────────────────────
 // LRC 形如 [00:19.16] 歌词；只保留有文字的带时间戳行。
 const lyricLines = computed(() => {
@@ -438,6 +444,18 @@ onBeforeUnmount(() => {
               <span class="life-now-stat-icon"><LifeIcon name="bell" :size="16" /></span>
               <b>{{ num(phone.notifications) }}</b>
               <em>NOTIFICATIONS TODAY</em>
+              <div
+                v-if="phone.notificationsRecent && phone.notificationsRecent.length"
+                class="life-notif-feed"
+              >
+                <div class="life-notif-track">
+                  <div
+                    v-for="(n, i) in notifFeed"
+                    :key="i"
+                    class="life-notif-item"
+                  ><span class="life-notif-app">{{ n.app }}</span> {{ n.text || n.title }}</div>
+                </div>
+              </div>
             </div>
             <div class="life-now-stat is-unlocks">
               <span class="life-now-stat-icon"><LifeIcon name="screen" :size="16" /></span>
@@ -689,26 +707,38 @@ onBeforeUnmount(() => {
   55%, 100% { transform: translateX(100%); }
 }
 
-/* 通知：三颗光点从底部浮起再消失 */
-.life-now-stat.is-notifications::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: var(--text-primary);
-  box-shadow: -16px 0 0 var(--text-primary), 16px 0 0 var(--text-primary);
-  opacity: 0;
-  animation: life-dots 5s linear infinite;
+/* 通知：真实消息在格子里向上滚动 */
+.life-notif-feed {
+  position: relative;
+  overflow: hidden;
+  margin-top: 6px;
+  max-height: 44px;
+  mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
 }
 
-@keyframes life-dots {
-  0% { transform: translateY(0); opacity: 0; }
-  15% { opacity: 0.3; }
-  75% { opacity: 0.12; }
-  100% { transform: translateY(-80px); opacity: 0; }
+.life-notif-track {
+  animation: life-notif-scroll 20s linear infinite;
+}
+
+@keyframes life-notif-scroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+.life-notif-item {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.44rem;
+  line-height: 2;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.life-notif-app {
+  color: var(--text-primary);
 }
 
 /* 解锁：一条扫描线从上往下走 */
