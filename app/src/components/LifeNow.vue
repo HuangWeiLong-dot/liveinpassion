@@ -11,15 +11,16 @@
 // 这个组件自己轮询，不依赖 LIFE 的 /api/life；60 秒的页面轮询和它是两条线。
 // watch as vueWatch：组件里已经有一个名为 watch 的 computed（手表数据）
 import {
-  computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch as vueWatch,
+  computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref,
+  watch as vueWatch,
 } from 'vue';
 import LifeIcon from './LifeIcon.vue';
 
 const emit = defineEmits(['snapshot']);
 
 const CMS_BASE = import.meta.env.VITE_CMS_BASE || 'https://cms.liveinpassion.me';
-// 手机 App 播放中每 10 秒推一次位置；这里 15 秒拉一次，暂停/切歌基本即时可见
-const POLL_MS = 15000;
+// 手机 App 播放中每 10 秒推一次位置；这里 5 秒拉一次，切歌/暂停基本即时可见
+const POLL_MS = 5000;
 // 歌词高亮靠本地时钟推进，2 秒一刷足够跟得上
 const TICK_MS = 2000;
 
@@ -120,15 +121,23 @@ function lyricStyle(i) {
 }
 
 const lyricBox = ref(null);
-vueWatch(lyricIndex, (i) => {
+
+async function scrollToCurrentLine() {
+  await nextTick();
   const el = lyricBox.value;
+  const i = lyricIndex.value;
   if (!el || i < 0) return;
   const line = el.children[i];
-  if (line) {
-    const top = line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2;
-    el.scrollTo({ top, behavior: 'smooth' });
-  }
-});
+  if (!line) return;
+  el.scrollTo({
+    top: line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2,
+    behavior: 'smooth',
+  });
+}
+
+// immediate：首屏歌词一到就滚到当前行，否则列表停在最上面，
+// 看起来像「焦点错了」——其实是焦点行在可视区之外。
+vueWatch([lyricIndex, lyricLines], scrollToCurrentLine, { immediate: true });
 
 function mmss(value) {
   const s = Math.max(0, Math.round(Number(value) || 0));
@@ -756,7 +765,8 @@ onBeforeUnmount(() => {
 
 .life-now-music-body {
   display: flex;
-  align-items: flex-start;
+  /* 歌词在右侧垂直居中，避免右下角一片空白 */
+  align-items: center;
   gap: 28px;
 }
 
@@ -774,7 +784,7 @@ onBeforeUnmount(() => {
   padding: 0 8px 0 0;
   flex: 1;
   min-width: 0;
-  max-height: 150px;
+  max-height: 180px;
   overflow: hidden auto;
   /* 隐藏滚动条但保留滚动：默认滚动条在这块窄区域里很难看 */
   scrollbar-width: none;
