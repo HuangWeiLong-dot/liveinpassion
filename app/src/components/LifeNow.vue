@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
               v-if="phone.battery"
               class="life-now-chip"
               :class="{ 'is-on': phone.battery.charging }"
-            ><LifeIcon name="battery" :size="10" />{{ Math.round(phone.battery.level) }}%{{ phone.battery.charging ? ' · CHG' : '' }}</span>
+            ><LifeIcon name="battery" :size="10" />{{ Math.round(phone.battery.level) }}% · {{ phone.battery.charging ? 'CHARGING' : 'ON BATTERY' }}</span>
             <span v-if="phone.notifications != null" class="life-now-chip">
               <LifeIcon name="bell" :size="10" />{{ num(phone.notifications) }} NOTIF
             </span>
