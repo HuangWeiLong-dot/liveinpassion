@@ -430,6 +430,12 @@ onBeforeUnmount(() => {
                 <svg class="life-battery-edge" viewBox="0 0 12 120" preserveAspectRatio="none">
                   <path d="M0 0 L0 120 L8 120 Q 12 105 8 90 T 8 60 T 8 30 T 8 0 Z" />
                 </svg>
+                <!-- 充电专属：水里升起气泡 -->
+                <template v-if="phone.battery && phone.battery.charging">
+                  <i class="life-bubble b1"></i>
+                  <i class="life-bubble b2"></i>
+                  <i class="life-bubble b3"></i>
+                </template>
               </div>
 
               <!-- 和另外三格保持同一结构：图标 → 数值 → 标签 -->
@@ -825,19 +831,48 @@ onBeforeUnmount(() => {
   top: 0;
   width: 12px;
   height: 200%;
-  animation: life-battery-flow 5s linear infinite;
+  /* 不充电：很慢、很平静的水面 */
+  animation: life-battery-flow 7s linear infinite;
 }
 
 .life-battery-edge path {
   fill: var(--text-primary);
 }
 
-.life-now-stat.is-charging .life-battery-edge {
-  animation-duration: 2.4s;
+/* 充电时的气泡：只在 .is-charging 时渲染，从水底升到水面 */
+.life-bubble {
+  position: absolute;
+  bottom: 4px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  opacity: 0;
+  animation: life-bubble 2.4s ease-in infinite;
 }
 
+.life-bubble.b1 { left: 12%; }
+.life-bubble.b2 { left: 38%; width: 2px; height: 2px; animation-delay: 0.8s; }
+.life-bubble.b3 { left: 64%; animation-delay: 1.5s; }
+
+@keyframes life-bubble {
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  20% { opacity: 0.65; }
+  100% { transform: translateY(-58px) scale(1.1); opacity: 0; }
+}
+
+/* 充电：水面明显加快，状态标签也变亮 */
+.life-now-stat.is-charging .life-battery-edge {
+  animation-duration: 2.2s;
+}
+
+.life-now-stat.is-charging em {
+  color: var(--text-primary);
+  font-weight: 600;
+}
 
 .life-now-stat.is-charging .life-battery-water {
+  /* 更亮 + 明暗脉冲（keyframes 里会在 0.2–0.3 之间起伏） */
   animation: life-battery-glow 1.8s ease-in-out infinite;
 }
 
@@ -1245,6 +1280,7 @@ onBeforeUnmount(() => {
   .life-now-stat::after,
   .life-battery-edge,
   .life-battery-water,
+  .life-bubble,
   .life-now-lyric-list {
     animation: none;
     transition: none;
