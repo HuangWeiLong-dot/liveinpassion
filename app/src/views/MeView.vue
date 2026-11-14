@@ -1,8 +1,10 @@
 <script setup>
-// ME 页：一台方角复古 CRT 电视机，屏幕里三个频道（ME / GALLERY / FRIENDS）。
-// 原来的「EXPLORE 无限回廊」（30 张照片在 3D 隧道里飞、滚动推进整页）已整体移除：
-// 这一页现在只有电视一屏，不再有纵向叙事、滚动锁和自动推进。
-// 屏幕里保留雪花花屏 + 横向撕裂的换台故障；画面之上叠 RGB 荧光栅格与色散。
+// ME 页：一台方角复古 CRT 电视机。
+// 原来的 ME / GALLERY / FRIENDS 三个频道保留，新增 CH 04「THE CORRIDOR」：
+// 屏幕里一条竖向滚动回廊（MeCorridor）—— 一屏一站，
+// 照片从幕布中揭开、标题逐字升起、说明行左右交错；
+// 六个展位把 ECHOES 的正文和 ME 相册 / 博文封面的照片并排。
+// 换台时留一下雪花花屏 + 横向撕裂，画面之上叠 RGB 荧光栅格与色散。
 import { onActivated, onBeforeUnmount, onDeactivated, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useVirtue } from '../composables/useVirtue.js';
@@ -10,6 +12,7 @@ import { meQuotes } from '../data/quotes.js';
 import { blogPosts } from '../data/blogPosts.js';
 import SteamGameModal from '../components/SteamGameModal.vue';
 import MeModals from '../components/MeModals.vue';
+import MeCorridor from '../components/MeCorridor.vue';
 
 const router = useRouter();
 const { virtue } = useVirtue();
@@ -18,25 +21,29 @@ const reduceMotion = () => (
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 );
 
-// 电视里的三个频道：首屏只放 ME，下面的频道按钮负责切换
+// 电视里的频道：原来的 ME / GALLERY / FRIENDS 保留，回廊是新增的第 4 个
 const CHANNELS = [
   { id: 'me', label: 'ME' },
   { id: 'gallery', label: 'GALLERY' },
   { id: 'friends', label: 'FRIENDS' },
+  { id: 'corridor', label: 'CORRIDOR' },
 ];
 const activeChannel = ref(0);
 const switching = ref(false);
-// 换台雪花用的画布（模板里的 <canvas ref="noiseRef">）
+// 进站 / 换台雪花用的画布（模板里的 <canvas ref="noiseRef">）
 const noiseRef = ref(null);
 
-// ── 频道切换：雪花花屏 + 横向撕裂的故障效果 ─────────────────────────────
+// ── 雪花花屏 + 横向撕裂：进站与换台时闪一下 ────────────────────────────
 let noiseRAF = 0;
+let noiseTimer = 0;
 let switchTimerA = 0;
 let switchTimerB = 0;
 
 function stopNoise() {
   if (noiseRAF) cancelAnimationFrame(noiseRAF);
   noiseRAF = 0;
+  clearTimeout(noiseTimer);
+  noiseTimer = 0;
 }
 
 function playNoise(duration = 460) {
@@ -88,6 +95,12 @@ function playNoise(duration = 460) {
   noiseRAF = requestAnimationFrame(step);
 }
 
+function bootGlitch() {
+  if (reduceMotion()) return;
+  clearTimeout(noiseTimer);
+  noiseTimer = setTimeout(() => playNoise(420), 240);
+}
+
 function cancelChannelSwitch() {
   stopNoise();
   clearTimeout(switchTimerA);
@@ -124,9 +137,10 @@ function switchChannel(index) {
 onDeactivated(cancelChannelSwitch);
 onBeforeUnmount(cancelChannelSwitch);
 
-// 每次回到这一页换一句引言（原来的行为，和回廊无关）
+// 每次回到这一页换一句引言，并让屏幕闪一下雪花
 onActivated(() => {
   quote.value = meQuotes[Math.floor(Math.random() * meQuotes.length)];
+  bootGlitch();
 });
 
 // ── 内容 ────────────────────────────────────────────────────────────────
@@ -146,8 +160,8 @@ function copyWeChat() {
 
 <template>
   <main class="page active me-intro-page">
-    <!-- ── 一台电视里的三个频道：ME / GALLERY / FRIENDS ─────────────────── -->
-    <section class="me-tv-stage" aria-label="ME, Gallery and Friends">
+    <!-- ── 整页内容都在这台电视机里：屏幕内是一屏一站的竖向回廊 ───────── -->
+    <section class="me-tv-stage" aria-label="ME — The Corridor">
       <div class="me-tv">
         <!-- 机身上沿：品牌 / 型号 / 信号灯 -->
         <div class="me-tv__bezel">
@@ -162,7 +176,7 @@ function copyWeChat() {
           </span>
         </div>
 
-        <!-- 屏幕：一次只播一个频道，底部按钮负责切换 -->
+        <!-- 屏幕：原来的三个频道原样保留，回廊是新增的 CH 04 -->
         <div class="me-tv__screen" :class="{ 'is-switching': switching }">
           <div class="me-tv__screen-inner">
             <div class="me-tv__osd">
@@ -170,7 +184,7 @@ function copyWeChat() {
               <span class="me-tv__osd-meta">CH {{ String(activeChannel + 1).padStart(2, '0') }} · BE {{ virtue }}</span>
             </div>
 
-            <div class="me-tv__channel-stage">
+            <div class="me-tv__channel-stage" :class="{ 'is-walk': activeChannel === 3 }">
               <!-- 01 ME -->
               <div v-if="activeChannel === 0" class="me-channel me-channel--me">
                 <div class="me-channel__main">
@@ -212,7 +226,7 @@ function copyWeChat() {
               </div>
 
               <!-- 03 FRIENDS -->
-              <div v-else class="me-channel">
+              <div v-else-if="activeChannel === 2" class="me-channel">
                 <div class="me-channel__main">
                   <div class="me-channel__wordbox">
                     <span class="me-channel__ghost" aria-hidden="true">FRIENDS</span>
@@ -230,6 +244,14 @@ function copyWeChat() {
                   </router-link>
                 </div>
               </div>
+
+              <!-- 04 THE CORRIDOR：新增的竖向滚动回廊 -->
+              <MeCorridor
+                v-else
+                :virtue="virtue"
+                :quote="quote"
+                :last-update="lastUpdate"
+              />
             </div>
 
             <div class="me-tv__osd me-tv__osd--bottom">
@@ -328,9 +350,12 @@ function copyWeChat() {
 <style scoped>
 .me-intro-page {
   position: relative;
+  height: 100vh;
+  height: 100svh;
   background: var(--bg);
   color: var(--text-primary);
-  overflow: visible;
+  /* 整页只有电视一屏；内容的滚动发生在电视屏幕内部 */
+  overflow: hidden;
 }
 
 /* ── 复古电视机：整台机器就是三个板块的容器 ──────────────────────────── */
@@ -445,8 +470,9 @@ function copyWeChat() {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 0;
-  /* 屏幕自身作为容器：巨字用 cqw 计算，避免被列宽截断 */
-  container-type: inline-size;
+  /* 屏幕自身作为尺寸容器：回廊用 cqw / cqh 排版，
+     它的一屏是屏幕高度，不是浏览器视口高度。 */
+  container-type: size;
   background: var(--tv-ink);
   color: var(--tv-paper);
   box-shadow:
@@ -464,7 +490,7 @@ function copyWeChat() {
   grid-template-rows: auto minmax(0, 1fr) auto;
   padding: clamp(10px, 1.4vw, 18px) clamp(12px, 1.8vw, 24px) clamp(8px, 1.2vw, 14px);
   /* 屏幕里所有文字带一点红/蓝分离：CRT 三枪对不齐的那点色散 */
-  text-shadow: 0.5px 0 rgba(255, 70, 70, 0.3), -0.5px 0 rgba(70, 130, 255, 0.3);
+  text-shadow: 0.4px 0 rgba(255, 70, 70, 0.2), -0.4px 0 rgba(70, 130, 255, 0.2);
 }
 
 .me-tv__osd {
@@ -691,6 +717,24 @@ function copyWeChat() {
   display: flex;
   min-height: 0;
   overflow: visible;
+}
+
+/* CH 04：屏幕中间这一格变成回廊自己的滚动容器。
+   它同时也是尺寸容器，回廊的 100cqh 才是“电视里的一屏”，不是浏览器一屏。 */
+.me-tv__channel-stage.is-walk {
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  container-type: size;
+}
+
+.me-tv__channel-stage.is-walk::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* 频道内容：左边巨字，右边信息 */
@@ -959,11 +1003,12 @@ function copyWeChat() {
     font-size: 7px;
   }
 
-  /* 手机上不要在 aspect-ratio + min-height 同时使用：
-     两者会把宽度撑出电视机身。这里用高度下限，宽度始终 100%。 */
+  /* 手机上屏幕竖着拉高：一屏仍然要装得下一个展位，
+     整台电视（机身 + 屏幕 + 下沿）必须落在 100svh 里。 */
   .me-tv__screen {
     aspect-ratio: auto;
-    min-height: clamp(280px, 52vw, 468px);
+    height: calc(100svh - 240px);
+    min-height: 280px;
     border-radius: 0;
   }
 
@@ -1092,7 +1137,7 @@ function copyWeChat() {
   }
 
   .me-tv__screen {
-    min-height: 280px;
+    min-height: 260px;
   }
 
   .me-tv__screen-inner {

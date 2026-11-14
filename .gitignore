@@ -45,3 +45,7 @@ music/
 # 验收工具的截图输出，不入库
 .screenshots/
 
+
+# Trae HTML 分享包
+.trae-html-share-packages/
+

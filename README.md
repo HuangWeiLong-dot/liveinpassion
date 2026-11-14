@@ -48,6 +48,21 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 100 — 2026-11-14
+
+#### ME 电视新增 CH 04「THE CORRIDOR」+ 品牌 logo 入库
+
+- **MeCorridor**：ME 页电视机的第四个频道。版面参照 inherited.band——六栏细线、
+  超大字、卡片从幕布中揭开、非当前展位缩到 0.4 并淡出、说明行左右交错；
+  每个展位是一块本站配色的色块（电视 RGB 的蓝 / 红，配纸白 / 近黑），不用任何
+  自拍或博文照片。滚动竖向发生在电视屏幕内部，整屏背景用 clip-path 从底部推上来
+  换场；底片池循环取 ECHOES 的环境封面。
+- **品牌 logo 入库**：`logo/` 收下横版 / 竖排 / 纯 mark 三种形态、黑白两色共 6 个
+  SVG，以及 logo-motion / time-mark 两个动效预览 HTML。
+- **sketches/**：设计草图台（Sketch Desk）入库，集中放未采用的版面试验。
+- **快照**：新文章入库（blogPosts +108 行），showcase 同步刷新。
+- **杂项**：`.gitignore` 排除 `.trae-html-share-packages/`。
+
 ### update: 99 — 2026-11-14
 
 #### 充电 / 不充电两套动效

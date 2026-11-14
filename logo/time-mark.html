@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIVEINPASSION — TIME MARK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Space+Mono:wght@400;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #111111;
+    --paper: #FAFAFA;
+    --muted: #8A8A8A;
+    --line: #2E2E2E;
+    --bg: #0E0E0E;
+    --red: #C8102E;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--paper); }
+  body {
+    font-family: 'Space Mono', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  ::selection { background: var(--paper); color: var(--ink); }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    padding: 18px 28px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand svg { width: 20px; height: 20px; flex: 0 0 auto; }
+  .brand b { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 13px; letter-spacing: .24em; white-space: nowrap; }
+  .brand span { font-size: 9px; letter-spacing: .2em; color: var(--muted); white-space: nowrap; }
+  .head-actions { display: flex; gap: 8px; }
+  .btn {
+    border: 1px solid #3A3A3A; padding: 8px 12px; font-size: 9px; letter-spacing: .12em;
+    transition: border-color .2s, color .2s, background .2s;
+  }
+  .btn:hover { border-color: var(--paper); }
+  .btn.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+  .hero { max-width: 1440px; margin: 0 auto; padding: 22px 28px 0; }
+  .stage-wrap {
+    position: relative; width: min(100%, calc((100vh - 252px) * 1200 / 820));
+    aspect-ratio: 1200 / 820; margin: 0 auto;
+    border: 1px solid var(--line); background: #101010; overflow: hidden;
+  }
+  .stage-wrap::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.055) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; color: var(--paper); }
+
+  .meta { position: absolute; font-size: 8px; letter-spacing: .18em; color: #7C7C7C; line-height: 1.9; pointer-events: none; }
+  .meta b { display: block; color: var(--paper); font-weight: 400; }
+  .meta.tl { left: 18px; top: 16px; }
+  .meta.tr { right: 18px; top: 16px; text-align: right; }
+  .meta.bl { left: 18px; bottom: 16px; }
+  .meta.br { right: 18px; bottom: 16px; text-align: right; }
+
+  .ask {
+    position: absolute; left: 0; right: 0; bottom: 13%; text-align: center;
+    opacity: 0; transform: translateY(14px); pointer-events: none;
+  }
+  .ask-cn {
+    font-family: 'Noto Serif SC', 'Songti SC', serif; font-weight: 500;
+    font-size: clamp(22px, 4.2vw, 56px); line-height: 1.5; letter-spacing: .1em;
+  }
+  .ask-en { margin-top: 14px; font-size: 9px; letter-spacing: .26em; color: var(--muted); }
+
+  .phases {
+    display: flex; flex-wrap: wrap; gap: 0; margin-top: 14px;
+    border: 1px solid var(--line);
+  }
+  .phase {
+    flex: 1 1 0; min-width: 130px; padding: 10px 12px 12px;
+    border-right: 1px solid var(--line); transition: background .25s, color .25s;
+  }
+  .phase:last-child { border-right: 0; }
+  .phase i { display: block; font-style: normal; font-size: 8px; letter-spacing: .18em; color: #5E5E5E; }
+  .phase b { display: block; margin-top: 6px; font-weight: 400; font-size: 9px; letter-spacing: .14em; color: #8E8E8E; }
+  .phase.on { background: #191919; }
+  .phase.on i { color: var(--red); }
+  .phase.on b { color: var(--paper); }
+
+  .timeline { position: absolute; left: 18px; right: 18px; bottom: 42px; display: flex; align-items: center; gap: 12px; }
+  .timeline input[type=range] {
+    flex: 1; appearance: none; height: 1px; background: #3A3A3A; outline: none; cursor: pointer;
+  }
+  .timeline input[type=range]::-webkit-slider-thumb {
+    appearance: none; width: 9px; height: 9px; background: var(--paper); border-radius: 0;
+  }
+  .timeline .tc { font-size: 8px; letter-spacing: .14em; color: var(--muted); white-space: nowrap; }
+
+  section.block { max-width: 1440px; margin: 0 auto; padding: 64px 28px 0; }
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .sec-no { font-size: 9px; letter-spacing: .2em; color: var(--muted); }
+  .sec-title { font-family: 'Oswald', sans-serif; font-weight: 500; font-size: 17px; letter-spacing: .18em; text-transform: uppercase; }
+  .sec-note { max-width: 460px; font-size: 10px; line-height: 2; color: var(--muted); letter-spacing: .04em; }
+  .body-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 48px; padding-top: 28px; }
+  .lede { font-size: 13px; line-height: 2.3; color: #C9C9C9; letter-spacing: .04em; }
+  .lede em { font-style: normal; color: var(--paper); }
+  .facts { border-top: 1px solid var(--line); }
+  .fact { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid #222; font-size: 9px; letter-spacing: .12em; color: var(--muted); }
+  .fact b { font-weight: 400; color: var(--paper); text-align: right; }
+
+  .states { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-top: 28px; }
+  .panel { border: 1px solid var(--line); padding: 26px; position: relative; background: #121212; }
+  .panel .tag { position: absolute; left: 14px; top: 12px; font-size: 8px; letter-spacing: .18em; color: var(--muted); }
+  .panel .cap { margin-top: 10px; font-size: 9px; letter-spacing: .12em; color: var(--muted); text-align: center; }
+  .mark-svg { display: block; width: 100%; height: 340px; color: var(--paper); }
+
+  .scale-row { display: flex; align-items: flex-end; gap: 44px; padding: 34px 0 8px; flex-wrap: wrap; }
+  .scale-item { text-align: center; color: var(--paper); }
+  .scale-item .box { display: flex; align-items: flex-end; justify-content: center; }
+  .scale-item svg { display: block; }
+  .scale-item label { display: block; margin-top: 10px; font-size: 8px; letter-spacing: .16em; color: var(--muted); }
+
+  footer {
+    max-width: 1440px; margin: 72px auto 0; padding: 18px 28px 26px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; gap: 18px;
+    font-size: 8px; letter-spacing: .16em; color: #6E6E6E;
+  }
+
+  @media (max-width: 900px) {
+    header { padding: 14px 16px; }
+    .brand span { display: none; }
+    .hero { padding: 14px 12px 0; }
+    .stage-wrap { width: 100%; aspect-ratio: 1200 / 900; }
+    .meta.tr { display: none; }
+    .meta.bl, .meta.br { display: none; }
+    .ask { bottom: 12%; }
+    .timeline { bottom: 10px; }
+    section.block { padding: 44px 16px 0; }
+    .body-grid { grid-template-columns: 1fr; gap: 28px; }
+    .states { grid-template-columns: 1fr; }
+    .mark-svg { height: 240px; }
+    .phases .phase { min-width: 33%; }
+    .phase b { font-size: 8px; }
+  }
+  @media (max-width: 600px) {
+    .head-actions .btn.opt { display: none; }
+    .ask-en { letter-spacing: .18em; }
+    footer { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg viewBox="-58 -58 116 116" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="square">
+        <path d="M-38 -38L0 0L38 -38"/>
+        <path d="M-38 38L0 0L38 38"/>
+        <path d="M-38 -38H38" stroke-linecap="butt"/>
+        <path d="M-38 38H38" stroke-linecap="butt"/>
+      </g>
+    </svg>
+    <b>LIVEINPASSION</b>
+    <span>/ TIME MARK</span>
+  </div>
+  <div class="head-actions">
+    <button class="btn opt" id="speedBtn">1×</button>
+    <button class="btn opt" id="loopBtn">LOOP OFF</button>
+    <button class="btn" id="replayBtn">REPLAY</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="stage-wrap" id="stageWrap">
+    <svg id="stage" viewBox="0 0 1200 820" role="img" aria-label="LIVEINPASSION logo animation">
+      <g id="wordmark" opacity="0">
+        <g transform="translate(46.6 330) scale(1.25)">
+          <g transform="translate(116.62 0)" fill="currentColor">
+            <path id="wmL" d="M41.60 0L6.10 0L6.10-81L22.60-81L22.60-11.20L41.60-11.20L41.60 0Z"/>
+            <path d="M68 0L51.60 0L51.60-81L68-81L68 0Z"/>
+            <path d="M110.90 0L93.90 0L78.50-81L92.80-81L102.40-25L111.40-81L126.30-81L110.90 0Z"/>
+            <path d="M172.10 0L136.60 0L136.60-81L171.90-81L171.90-69.60L153.10-69.60L153.10-48.10L167.60-48.10L167.60-36.60L153.10-36.60L153.10-11.20L172.10-11.20L172.10 0Z"/>
+            <path d="M199 0L182.60 0L182.60-81L199-81L199 0Z"/>
+            <path d="M227.50 0L213.40 0L213.40-81L224.90-81L242.90-38.80L242.90-81L256.50-81L256.50 0L245.50 0L227.50-44.80L227.50 0Z"/>
+            <path d="M287.30 0L270.80 0L270.80-81L296.50-81Q303.80-81 308.40-78.25Q313.00-75.50 315.25-70.30Q317.50-65.10 317.50-57.70L317.50-57.70Q317.50-49 314.55-44.10Q311.60-39.20 306.50-37.15Q301.40-35.10 294.80-35.10L294.80-35.10L287.30-35.10L287.30 0ZM287.30-69.40L287.30-46.70L293.10-46.70Q296.70-46.70 298.65-47.85Q300.60-49 301.30-51.50Q302.00-54 302.00-57.90L302.00-57.90Q302.00-61.60 301.45-64.10Q300.90-66.60 299.00-68Q297.10-69.40 293.00-69.40L293.00-69.40L287.30-69.40Z"/>
+            <path d="M339.50 0L324.00 0L339.70-81L358.00-81L373.60 0L358.30 0L355.40-17.80L342.60-17.80L339.50 0ZM348.90-60.60L344.10-27.90L353.80-27.90L348.90-60.60Z"/>
+            <path d="M404.80 1.10L404.80 1.10Q397.30 1.10 392.30-1.65Q387.30-4.40 384.75-9.95Q382.20-15.50 381.80-24.10L381.80-24.10L396.00-26.50Q396.20-21.50 397.05-18.15Q397.90-14.80 399.65-13.15Q401.40-11.50 404.00-11.50L404.00-11.50Q407.20-11.50 408.35-13.50Q409.50-15.50 409.50-18.10L409.50-18.10Q409.50-23.20 407.05-26.65Q404.60-30.10 400.60-33.60L400.60-33.60L392.20-40.90Q387.70-44.70 384.85-49.50Q382.00-54.30 382.00-61.30L382.00-61.30Q382.00-71.30 387.85-76.65Q393.70-82 403.90-82L403.90-82Q410.00-82 413.90-80Q417.80-78 419.95-74.65Q422.10-71.30 422.95-67.35Q423.80-63.40 424.00-59.50L424.00-59.50L409.90-57.40Q409.70-61.10 409.25-63.90Q408.80-66.70 407.45-68.30Q406.10-69.90 403.40-69.90L403.40-69.90Q400.50-69.90 399.10-67.75Q397.70-65.60 397.70-63L397.70-63Q397.70-58.70 399.65-55.95Q401.60-53.20 405.00-50.20L405.00-50.20L413.20-43Q418.30-38.60 421.95-32.95Q425.60-27.30 425.60-19L425.60-19Q425.60-13.30 423.00-8.70Q420.40-4.10 415.75-1.50Q411.10 1.10 404.80 1.10Z"/>
+            <path d="M457.30 1.10L457.30 1.10Q449.80 1.10 444.80-1.65Q439.80-4.40 437.25-9.95Q434.70-15.50 434.30-24.10L434.30-24.10L448.50-26.50Q448.70-21.50 449.55-18.15Q450.40-14.80 452.15-13.15Q453.90-11.50 456.50-11.50L456.50-11.50Q459.70-11.50 460.85-13.50Q462.00-15.50 462.00-18.10L462.00-18.10Q462.00-23.20 459.55-26.65Q457.10-30.10 453.10-33.60L453.10-33.60L444.70-40.90Q440.20-44.70 437.35-49.50Q434.50-54.30 434.50-61.30L434.50-61.30Q434.50-71.30 440.35-76.65Q446.20-82 456.40-82L456.40-82Q462.50-82 466.40-80Q470.30-78 472.45-74.65Q474.60-71.30 475.45-67.35Q476.30-63.40 476.50-59.50L476.50-59.50L462.40-57.40Q462.20-61.10 461.75-63.90Q461.30-66.70 459.95-68.30Q458.60-69.90 455.90-69.90L455.90-69.90Q453.00-69.90 451.60-67.75Q450.20-65.60 450.20-63L450.20-63Q450.20-58.70 452.15-55.95Q454.10-53.20 457.50-50.20L457.50-50.20L465.70-43Q470.80-38.60 474.45-32.95Q478.10-27.30 478.10-19L478.10-19Q478.10-13.30 475.50-8.70Q472.90-4.10 468.25-1.50Q463.60 1.10 457.30 1.10Z"/>
+            <path d="M505.40 0L489.00 0L489.00-81L505.40-81L505.40 0Z"/>
+            <path d="M542.40 1.10L542.40 1.10Q533.50 1.10 528.30-2.10Q523.10-5.30 520.85-11.25Q518.60-17.20 518.60-25.50L518.60-25.50L518.60-55.70Q518.60-64 520.85-69.90Q523.10-75.80 528.30-78.90Q533.50-82 542.40-82L542.40-82Q551.40-82 556.65-78.85Q561.90-75.70 564.15-69.85Q566.40-64 566.40-55.70L566.40-55.70L566.40-25.50Q566.40-17.20 564.15-11.25Q561.90-5.30 556.65-2.10Q551.40 1.10 542.40 1.10ZM542.40-10.80L542.40-10.80Q545.60-10.80 547.10-12.25Q548.60-13.70 549.10-16.15Q549.60-18.60 549.60-21.40L549.60-21.40L549.60-59.70Q549.60-62.50 549.10-64.90Q548.60-67.30 547.10-68.75Q545.60-70.20 542.40-70.20L542.40-70.20Q539.40-70.20 537.90-68.75Q536.40-67.30 535.90-64.90Q535.40-62.50 535.40-59.70L535.40-59.70L535.40-21.40Q535.40-18.60 535.85-16.15Q536.30-13.70 537.80-12.25Q539.30-10.80 542.40-10.80Z"/>
+            <path d="M593.50 0L579.40 0L579.40-81L590.90-81L608.90-38.80L608.90-81L622.50-81L622.50 0L611.50 0L593.50-44.80L593.50 0Z"/>
+          </g>
+        </g>
+      </g>
+
+      <g id="mark" transform="translate(210.3 323) scale(1.5)">
+        <g id="ink" fill="none" stroke="currentColor" stroke-width="13.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2">
+          <path id="l1" pathLength="200" stroke-dasharray="0 400"/>
+          <path id="l2" pathLength="200" stroke-dasharray="0 400"/>
+        </g>
+      </g>
+    </svg>
+
+    <div class="meta tl"><b>LP–03 / TIME MARK</b>HOURGLASS · INFINITY</div>
+    <div class="meta tr"><b>SEQUENCE 01–07</b>L → TILT → HOURGLASS → ∞</div>
+    <div class="meta bl"><b>BLACK / WHITE</b>NO GRADIENT · NO ROUNDED CORNER</div>
+    <div class="meta br"><b>©05</b>LIVEINPASSION.ME</div>
+
+    <div class="ask" id="ask">
+      <p class="ask-cn">在这仅剩时光中<br>你想做什么？</p>
+      <p class="ask-en">WHAT WILL YOU DO WITH THE TIME THAT REMAINS?</p>
+    </div>
+
+    <div class="timeline">
+      <span class="tc" id="tc">00.00 / 09.40</span>
+      <input type="range" id="scrub" min="0" max="9.4" step="0.01" value="0">
+    </div>
+  </div>
+
+  <div class="phases" id="phases">
+    <div class="phase"><i>01</i><b>抽取 L</b></div>
+    <div class="phase"><i>02</i><b>倾斜</b></div>
+    <div class="phase"><i>03</i><b>反向 L</b></div>
+    <div class="phase"><i>04</i><b>沙漏</b></div>
+    <div class="phase"><i>05</i><b>横转</b></div>
+    <div class="phase"><i>06</i><b>无限</b></div>
+    <div class="phase"><i>07</i><b>回转 · 发问</b></div>
+  </div>
+</div>
+
+<section class="block">
+  <div class="sec-head">
+    <div>
+      <div class="sec-no">01 / LANGUAGE</div>
+      <div class="sec-title">One Letter, Two Times</div>
+    </div>
+    <p class="sec-note">一个字标里的 L，离开句子，倾斜，反向生长，围成沙漏；横向翻转成为无限；再竖回去，时间继续。</p>
+  </div>
+  <div class="body-grid">
+    <p class="lede">
+      L 是 LIVEINPASSION 的第一个字母，也是取景框的角。<em>它被从字标里抽出来，倾斜，与反向的自己相接</em>，围成一个沙漏。沙漏横过来，是无限的符号；竖回去，又是沙漏。整枚标记没有一笔是装饰：两条 L、两条横线，在 90° 的旋转里同时意味着<em>时间</em>与<em>无限</em>。
+    </p>
+    <div class="facts">
+      <div class="fact"><span>构造</span><b>2 × L + 2 × 横线</b></div>
+      <div class="fact"><span>网格</span><b>100 × 100</b></div>
+      <div class="fact"><span>笔画</span><b>8 / 100</b></div>
+      <div class="fact"><span>角度</span><b>45° / 90°</b></div>
+      <div class="fact"><span>最小尺寸</span><b>16 PX</b></div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="sec-head">
+    <div>
+      <div class="sec-no">02 / STATES</div>
+      <div class="sec-title">Hourglass / Infinity</div>
+    </div>
+    <p class="sec-note">竖为沙漏，横为无限。两者是同一组线在不同角度下的读法。</p>
+  </div>
+  <div class="states">
+    <div class="panel">
+      <span class="tag">VERTICAL · TIME</span>
+      <div id="markHour"></div>
+      <div class="cap">沙漏 · 时光流逝</div>
+    </div>
+    <div class="panel">
+      <span class="tag">HORIZONTAL · INFINITY</span>
+      <div id="markInf"></div>
+      <div class="cap">无限 · 回转之后</div>
+    </div>
+  </div>
+  <div class="scale-row" id="scaleRow"></div>
+</section>
+
+<footer>
+  <span>LIVEINPASSION · TIME MARK · ©05</span>
+  <span>A FRAME, AND ONE POINT OF LIGHT</span>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const mark = $('mark'), l1 = $('l1'), l2 = $('l2'), ink = $('ink');
+  const wordmark = $('wordmark'), wmL = $('wmL');
+  const ask = $('ask'), scrub = $('scrub'), tc = $('tc');
+  const phasesEl = [...document.querySelectorAll('.phase')];
+
+  const DUR = 9.4;
+  const PH = {
+    wmIn:   [0.05, 0.62],
+    draw:   [0.40, 1.02],
+    fadeL:  [0.55, 1.00],
+    fadeWm: [1.05, 1.58],
+    lift:   [1.20, 2.00],
+    open:   [2.00, 2.62],
+    grow:   [2.16, 2.78],
+    bars:   [2.38, 2.84],
+    holdH:  [2.84, 3.26],
+    turn:   [3.26, 4.42],
+    holdI:  [4.42, 5.36],
+    back:   [5.36, 6.46],
+    settle: [6.46, 7.18],
+    ask:    [6.86, 7.66]
+  };
+
+  const clamp01 = (x) => Math.min(1, Math.max(0, x));
+  const ease = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const lp = (t, r) => clamp01((t - r[0]) / (r[1] - r[0]));
+
+  const A0 = [0, -64], B0 = [22, 0];
+  const A1 = [-28, -42], B1 = [28, -42];
+  const D1 = [-28, 42], E1 = [28, 42];
+
+  function render(t) {
+    // wordmark
+    const wmIn = ease(lp(t, PH.wmIn));
+    const wmOut = ease(lp(t, PH.fadeWm));
+    wordmark.setAttribute('opacity', (wmIn * (1 - wmOut)).toFixed(3));
+    wmL.setAttribute('opacity', (1 - ease(lp(t, PH.fadeL))).toFixed(3));
+
+    // extract stroke
+    const draw = ease(lp(t, PH.draw));
+
+    // lift + scale
+    const lift = ease(lp(t, PH.lift));
+    const x = lerp(210.3, 600, lift);
+    const y = lerp(323, 470, lift);
+    ink.setAttribute('stroke-width', lerp(13.6, 8, lift).toFixed(2));
+
+    // arms open into hourglass
+    const open = ease(lp(t, PH.open));
+    const A = [lerp(A0[0], A1[0], open), lerp(A0[1], A1[1], open)];
+    const B = [lerp(B0[0], B1[0], open), lerp(B0[1], B1[1], open)];
+
+    // reverse L
+    const grow = ease(lp(t, PH.grow));
+    const D = [D1[0] * grow, D1[1] * grow];
+    const E = [E1[0] * grow, E1[1] * grow];
+    const bars = ease(lp(t, PH.bars));
+
+    // turn to infinity
+    let turnP = 0;
+    if (t >= PH.turn[0] && t <= PH.turn[1]) turnP = ease(lp(t, PH.turn));
+    else if (t > PH.turn[1] && t < PH.back[0]) turnP = 1;
+    else if (t >= PH.back[0] && t <= PH.back[1]) turnP = 1 - ease(lp(t, PH.back));
+    const rot = 90 * turnP;
+
+    // settle: shrink and rise for the question
+    const settle = ease(lp(t, PH.settle));
+    const scale = lerp(lerp(1.5, 5.2, lift), 3.0, settle);
+    const sy = y - 190 * settle;
+
+    mark.setAttribute('transform', `translate(${x.toFixed(2)} ${sy.toFixed(2)}) scale(${scale.toFixed(4)}) rotate(${rot.toFixed(2)})`);
+
+    l1.setAttribute('d', `M${A[0].toFixed(2)} ${A[1].toFixed(2)}L0 0L${B[0].toFixed(2)} ${B[1].toFixed(2)}Z`);
+    l2.setAttribute('d', `M${D[0].toFixed(2)} ${D[1].toFixed(2)}L0 0L${E[0].toFixed(2)} ${E[1].toFixed(2)}Z`);
+    l1.setAttribute('stroke-dasharray', `${(100 * draw + 100 * bars).toFixed(2)} 400`);
+    l2.setAttribute('stroke-dasharray', `${(100 * grow + 100 * bars).toFixed(2)} 400`);
+
+    // question
+    const askP = ease(lp(t, PH.ask));
+    ask.style.opacity = askP.toFixed(3);
+    ask.style.transform = `translateY(${(14 * (1 - askP)).toFixed(2)}px)`;
+
+    // ui
+    const active = [
+      PH.draw[0], PH.lift[0], PH.grow[0], PH.holdH[0], PH.turn[0], PH.holdI[0], PH.ask[0]
+    ].reduce((acc, start, i) => (t >= start ? i : acc), 0);
+    phasesEl.forEach((el, i) => el.classList.toggle('on', i === active));
+    tc.textContent = t.toFixed(2).padStart(5, '0') + ' / ' + DUR.toFixed(2);
+    scrub.value = t;
+  }
+
+  // playback
+  let t = 0, playing = true, speed = 1, loop = false, last = performance.now();
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { playing = false; t = DUR; render(t); }
+
+  function frame(now) {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)) * speed;
+    last = now;
+    if (playing) {
+      t += dt;
+      if (t >= DUR) {
+        if (loop) t = 0; else { t = DUR; playing = false; }
+      }
+      render(t);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  const replay = () => { t = 0; playing = true; last = performance.now(); };
+  $('replayBtn').addEventListener('click', replay);
+  $('speedBtn').addEventListener('click', (e) => {
+    speed = speed === 1 ? 0.5 : 1;
+    e.currentTarget.textContent = speed === 1 ? '1×' : '0.5×';
+  });
+  $('loopBtn').addEventListener('click', (e) => {
+    loop = !loop;
+    e.currentTarget.classList.toggle('on', loop);
+    e.currentTarget.textContent = loop ? 'LOOP ON' : 'LOOP OFF';
+    if (loop && t >= DUR) replay();
+  });
+  scrub.addEventListener('input', () => {
+    playing = false;
+    t = Number(scrub.value);
+    render(t);
+  });
+
+  // static marks
+  function markSVG(rot, vb) {
+    const A = [-28, -42], B = [28, -42], D = [-28, 42], E = [28, 42];
+    return `<svg class="mark-svg" viewBox="${vb || '-58 -48 116 96'}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <g transform="rotate(${rot})" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="2">
+        <path d="M${A[0]} ${A[1]}L0 0L${B[0]} ${B[1]}Z"/>
+        <path d="M${D[0]} ${D[1]}L0 0L${E[0]} ${E[1]}Z"/>
+      </g>
+    </svg>`;
+  }
+  $('markHour').innerHTML = markSVG(0);
+  $('markInf').innerHTML = markSVG(90);
+
+  const row = $('scaleRow');
+  [96, 48, 24, 16].forEach((size) => {
+    const item = document.createElement('div');
+    item.className = 'scale-item';
+    item.innerHTML = `<div class="box">${markSVG(0).replace('class="mark-svg"', `style="width:${size}px;height:${size}px"`)}</div><label>${size} PX</label>`;
+    row.appendChild(item);
+  });
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

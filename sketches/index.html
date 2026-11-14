@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIVEINPASSION — Sketch Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1A1A1A;
+    --paper: #FAFAFA;
+    --bg: #141414;
+    --panel: #1A1A1A;
+    --line: #333333;
+    --dim: #8A8A8A;
+    --red: #C8102E;
+    --blue: #1F4FD8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--paper);
+    font-family: 'Space Mono', ui-monospace, 'PingFang SC', 'Microsoft YaHei', monospace;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  ::selection { background: var(--paper); color: var(--ink); }
+
+  header {
+    flex: 0 0 56px; height: 56px;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px;
+    padding: 0 22px; border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand svg { width: 19px; height: 19px; flex: 0 0 auto; }
+  .brand b {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 600;
+    font-size: 13px; letter-spacing: .24em; white-space: nowrap;
+  }
+  .brand span { font-size: 9px; letter-spacing: .2em; color: var(--dim); white-space: nowrap; }
+  .actions { display: flex; gap: 8px; }
+  .btn {
+    border: 1px solid #3a3a3a; padding: 9px 13px; font-size: 10px;
+    letter-spacing: .08em; white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s;
+  }
+  .btn:hover { border-color: var(--paper); }
+  .btn.primary { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  .btn.primary:hover { background: #d8d8d8; border-color: #d8d8d8; }
+
+  main { flex: 1 1 auto; display: grid; grid-template-columns: 78px 1fr; min-height: 0; }
+
+  .tools {
+    border-right: 1px solid var(--line); background: var(--panel);
+    display: flex; flex-direction: column; align-items: center;
+    gap: 14px; padding: 14px 8px; overflow-y: auto;
+  }
+  .tool {
+    width: 58px; padding: 10px 0; font-size: 11px; letter-spacing: .1em;
+    border: 1px solid transparent; color: var(--dim);
+  }
+  .tool:hover { color: var(--paper); }
+  .tool.active { border-color: var(--line); background: #242424; color: var(--paper); }
+  .lbl { font-size: 8px; letter-spacing: .14em; color: #6f6f6f; }
+  .group { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; padding-top: 12px; border-top: 1px solid #2a2a2a; }
+  .sizes { display: flex; flex-direction: column; gap: 5px; align-items: center; width: 100%; }
+  .size {
+    width: 44px; height: 30px; display: flex; align-items: center; justify-content: center;
+    border: 1px solid transparent;
+  }
+  .size i { display: block; background: var(--paper); border-radius: 50%; }
+  .size.active { border-color: var(--line); background: #242424; }
+  .colors { display: flex; gap: 7px; }
+  .color { width: 22px; height: 22px; border: 1px solid #555; }
+  .color.active { outline: 1px solid var(--paper); outline-offset: 2px; }
+  .action { width: 58px; padding: 9px 0; font-size: 10px; letter-spacing: .06em; border: 1px solid #3a3a3a; }
+  .action:hover { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+  .stage { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px 24px 12px; gap: 10px; }
+  .stage-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .head-left { display: flex; align-items: center; gap: 16px; }
+  .add-frame { border: 1px solid #3a3a3a; padding: 6px 11px; font-size: 9px; letter-spacing: .1em; color: var(--dim); transition: color .2s, border-color .2s; }
+  .add-frame:hover { border-color: var(--paper); color: var(--paper); }
+  .frame-label { font-size: 9px; letter-spacing: .2em; color: var(--dim); }
+  .frame-label b { color: var(--paper); font-weight: 700; font-size: 11px; }
+  .hint { font-size: 9px; letter-spacing: .06em; color: #7a7a7a; text-align: right; line-height: 1.6; }
+  .hint em { color: var(--red); font-style: normal; }
+  .board-wrap {
+    flex: 1 1 auto; min-height: 0; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #board {
+    display: block;
+    background: #fff;
+    width: 0; height: 0;
+    box-shadow: 0 0 0 1px #3a3a3a;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .note {
+    flex: 0 0 auto; width: 100%; background: var(--panel); border: 1px solid var(--line);
+    color: var(--paper); font-size: 12px; letter-spacing: .04em;
+    padding: 11px 13px; outline: none;
+  }
+  .note:focus { border-color: #6a6a6a; }
+  .note::placeholder { color: #6a6a6a; }
+
+  .strip {
+    flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--panel);
+    padding: 10px 24px 12px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+  }
+  .frames { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
+  .thumb { flex: 0 0 auto; width: clamp(96px, 9vw, 132px); cursor: pointer; }
+  .thumb canvas { display: block; width: 100%; height: auto; background: #fff; border: 1px solid #4a4a4a; }
+  .thumb span { display: block; margin-top: 5px; font-size: 9px; letter-spacing: .16em; color: #7a7a7a; }
+  .thumb.active canvas { border-color: var(--paper); }
+  .thumb.active span { color: var(--paper); }
+  .strip-meta { flex: 0 0 auto; text-align: right; font-size: 8px; letter-spacing: .1em; color: #6f6f6f; line-height: 1.9; }
+  .strip-meta b { display: block; color: var(--dim); font-weight: 400; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%);
+    background: var(--paper); color: var(--ink); padding: 12px 18px;
+    font-size: 11px; letter-spacing: .04em; line-height: 1.6; max-width: 80vw;
+    opacity: 0; pointer-events: none; transition: opacity .25s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 760px) {
+    header { padding: 0 12px; gap: 10px; }
+    .brand span { display: none; }
+    .btn { padding: 8px 9px; font-size: 9px; }
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .tools { flex-direction: row; align-items: center; gap: 8px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+    .group { flex-direction: row; border-top: 0; padding-top: 0; width: auto; gap: 6px; }
+    .lbl { display: none; }
+    .sizes { flex-direction: row; width: auto; }
+    .stage { padding: 10px 12px 8px; }
+    .hint { display: none; }
+    .strip { padding: 8px 12px 10px; }
+    .thumb { width: 104px; }
+    .strip-meta { display: none; }
+    .toast { bottom: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <g fill="currentColor">
+        <rect x="0" y="0" width="12" height="100"/>
+        <rect x="0" y="88" width="100" height="12"/>
+        <circle cx="57" cy="44" r="23"/>
+      </g>
+    </svg>
+    <b>LIVEINPASSION</b>
+    <span>/ SKETCH DESK</span>
+  </div>
+  <div class="actions">
+    <button class="btn" id="importBtn">导入工程</button>
+    <button class="btn" id="jsonBtn">导出工程</button>
+    <button class="btn primary" id="pngBtn">导出 PNG</button>
+  </div>
+  <input id="fileInput" type="file" accept=".json,application/json" hidden>
+</header>
+
+<main>
+  <aside class="tools">
+    <button class="tool active" data-tool="pen">画笔</button>
+    <button class="tool" data-tool="eraser">橡皮</button>
+
+    <div class="group">
+      <span class="lbl">粗细</span>
+      <div class="sizes">
+        <button class="size" data-size="4" title="细"><i style="width:4px;height:4px"></i></button>
+        <button class="size active" data-size="8" title="中"><i style="width:8px;height:8px"></i></button>
+        <button class="size" data-size="16" title="粗"><i style="width:16px;height:16px"></i></button>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="lbl">颜色</span>
+      <div class="colors">
+        <button class="color active" data-color="#111111" style="background:#111111" title="黑 · 图形"></button>
+        <button class="color" data-color="#C8102E" style="background:#C8102E" title="红 · 运动 / 注释"></button>
+        <button class="color" data-color="#1F4FD8" style="background:#1F4FD8" title="蓝 · 备注"></button>
+      </div>
+    </div>
+
+    <div class="group">
+      <button class="action" id="undoBtn">撤销</button>
+      <button class="action" id="clearBtn">清空帧</button>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="stage-head">
+      <div class="head-left">
+        <span class="frame-label">FRAME <b id="frameNum">01</b> / <b id="frameTotal">06</b></span>
+        <button class="add-frame" id="addFrameBtn">＋ 新帧</button>
+      </div>
+      <span class="hint">黑 = 图形 · <em>红 = 运动方向</em> · 蓝 = 备注 &nbsp;|&nbsp; 切换帧 1–9，撤销 ⌘/Ctrl+Z</span>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="board" width="1600" height="900"></canvas>
+    </div>
+
+    <input class="note" id="note" maxlength="160" placeholder="本帧备注：时间 / 动作 / 声音 —— 例如 0.0–0.4s 取景框从左上角描出，圆点在 0.5s 亮起">
+  </section>
+</main>
+
+<footer class="strip">
+  <div class="frames" id="frames"></div>
+  <div class="strip-meta">
+    <b>完成后：导出 PNG</b>
+    保存到 liveinpassion\sketches\<br>然后告诉我文件名
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const W = 1600, H = 900, MIN = 6, MAX = 24;
+  const board = document.getElementById('board');
+  const ctx = board.getContext('2d');
+  const noteInput = document.getElementById('note');
+  const frameNum = document.getElementById('frameNum');
+  const frameTotal = document.getElementById('frameTotal');
+  const thumbWrap = document.getElementById('frames');
+  const toastEl = document.getElementById('toast');
+
+  let frames = Array.from({ length: MIN }, () => ({ strokes: [] }));
+  let notes = Array(MIN).fill('');
+  let active = 0;
+  let tool = 'pen';
+  let color = '#111111';
+  let size = 8;
+  let drawing = false;
+  let stroke = null;
+  let last = null;
+  let saveTimer = null;
+
+  // ---------- storage ----------
+  const KEY = 'lip_sketch_v1';
+  function save(now) {
+    clearTimeout(saveTimer);
+    const run = () => {
+      try {
+        localStorage.setItem(KEY, JSON.stringify({ frames, notes }));
+      } catch (e) {}
+    };
+    if (now) run(); else saveTimer = setTimeout(run, 400);
+  }
+  function restore() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.frames)) return;
+      frames = data.frames.slice(0, MAX).map((f) => ({ strokes: Array.isArray(f.strokes) ? f.strokes : [] }));
+      while (frames.length < MIN) frames.push({ strokes: [] });
+      notes = (data.notes || []).slice(0, Math.max(frames.length, MIN));
+      while (notes.length < frames.length) notes.push('');
+    } catch (e) {}
+  }
+
+  // ---------- render ----------
+  function paint(target, frame, scale) {
+    target.save();
+    target.fillStyle = '#FFFFFF';
+    target.fillRect(0, 0, target.canvas.width, target.canvas.height);
+    target.scale(scale, scale);
+    target.lineCap = 'round';
+    target.lineJoin = 'round';
+    for (const s of frame.strokes) {
+      target.strokeStyle = s.color;
+      target.fillStyle = s.color;
+      target.lineWidth = s.size;
+      const pts = s.points;
+      if (!pts.length) continue;
+      if (pts.length === 1) {
+        target.beginPath();
+        target.arc(pts[0][0], pts[0][1], s.size / 2, 0, Math.PI * 2);
+        target.fill();
+        continue;
+      }
+      target.beginPath();
+      target.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) target.lineTo(pts[i][0], pts[i][1]);
+      target.stroke();
+    }
+    target.restore();
+  }
+
+  function redrawBoard() {
+    paint(ctx, frames[active], 1);
+  }
+
+  function drawSegment(from, to) {
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.size;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(from[0], from[1]);
+    ctx.lineTo(to[0], to[1]);
+    ctx.stroke();
+  }
+
+  // ---------- thumbnails ----------
+  function buildThumbs() {
+    thumbWrap.innerHTML = '';
+    frames.forEach((frame, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb' + (i === active ? ' active' : '');
+      const c = document.createElement('canvas');
+      c.width = 284; c.height = 160;
+      wrap.appendChild(c);
+      const label = document.createElement('span');
+      label.textContent = 'FRAME ' + String(i + 1).padStart(2, '0');
+      wrap.appendChild(label);
+      wrap.addEventListener('click', () => switchFrame(i));
+      thumbWrap.appendChild(wrap);
+      paint(c.getContext('2d'), frame, c.width / W);
+    });
+
+    frameTotal.textContent = String(frames.length).padStart(2, '0');
+  }
+  function paintThumb(i) {
+    const thumb = thumbWrap.children[i];
+    if (!thumb) return;
+    const c = thumb.querySelector('canvas');
+    paint(c.getContext('2d'), frames[i], c.width / W);
+  }
+  function syncThumbState() {
+    Array.from(thumbWrap.children).forEach((el, i) => {
+      el.classList.toggle('active', i === active);
+    });
+  }
+
+  // ---------- frame control ----------
+  function switchFrame(i) {
+    if (i === active || i < 0 || i >= frames.length) return;
+    active = i;
+    frameNum.textContent = String(i + 1).padStart(2, '0');
+    noteInput.value = notes[i];
+    redrawBoard();
+    syncThumbState();
+    const cur = thumbWrap.children[i];
+    if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  function updateFrameLabel() {
+    frameNum.textContent = String(active + 1).padStart(2, '0');
+    frameTotal.textContent = String(frames.length).padStart(2, '0');
+    noteInput.value = notes[active];
+    syncThumbState();
+  }
+  function addFrame() {
+    if (frames.length >= MAX) {
+      toast('最多 ' + MAX + ' 帧。');
+      return;
+    }
+    frames.push({ strokes: [] });
+    notes.push('');
+    const i = frames.length - 1;
+    buildThumbs();
+    active = i;
+    updateFrameLabel();
+    redrawBoard();
+    save(true);
+    const cur = thumbWrap.children[i];
+    if (cur) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    toast('已添加 FRAME ' + String(i + 1).padStart(2, '0') + '。');
+  }
+
+  // ---------- pointer ----------
+  function toCanvas(e) {
+    const r = board.getBoundingClientRect();
+    return [
+      Math.round(((e.clientX - r.left) * W / r.width) * 10) / 10,
+      Math.round(((e.clientY - r.top) * H / r.height) * 10) / 10
+    ];
+  }
+
+  board.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    drawing = true;
+    board.setPointerCapture(e.pointerId);
+    const p = toCanvas(e);
+    stroke = {
+      color: tool === 'eraser' ? '#FFFFFF' : color,
+      size: tool === 'eraser' ? size * 3 : size,
+      points: [p]
+    };
+    frames[active].strokes.push(stroke);
+    last = p;
+    // dot
+    ctx.fillStyle = stroke.color;
+    ctx.beginPath();
+    ctx.arc(p[0], p[1], stroke.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  board.addEventListener('pointermove', (e) => {
+    if (!drawing || !stroke) return;
+    const p = toCanvas(e);
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.2) return;
+    stroke.points.push(p);
+    drawSegment(last, p);
+    last = p;
+  });
+
+  function endStroke(e) {
+    if (!drawing) return;
+    drawing = false;
+    stroke = null;
+    last = null;
+    if (e && board.hasPointerCapture(e.pointerId)) board.releasePointerCapture(e.pointerId);
+    paintThumb(active);
+    save();
+  }
+  board.addEventListener('pointerup', endStroke);
+  board.addEventListener('pointercancel', endStroke);
+
+  // ---------- toolbar ----------
+  document.querySelectorAll('.tool').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tool = btn.dataset.tool;
+      document.querySelectorAll('.tool').forEach((b) => b.classList.toggle('active', b === btn));
+      board.style.cursor = tool === 'eraser' ? 'cell' : 'crosshair';
+    });
+  });
+  document.querySelectorAll('.size').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      size = Number(btn.dataset.size);
+      document.querySelectorAll('.size').forEach((b) => b.classList.toggle('active', b === btn));
+    });
+  });
+  document.querySelectorAll('.color').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      color = btn.dataset.color;
+      tool = 'pen';
+      document.querySelectorAll('.tool').forEach((b) => b.classList.toggle('active', b.dataset.tool === 'pen'));
+      document.querySelectorAll('.color').forEach((b) => b.classList.toggle('active', b === btn));
+      board.style.cursor = 'crosshair';
+    });
+  });
+
+  document.getElementById('addFrameBtn').addEventListener('click', addFrame);
+
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if (!frames[active].strokes.length) return;
+    frames[active].strokes.pop();
+    redrawBoard();
+    paintThumb(active);
+    save();
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!frames[active].strokes.length) return;
+    if (!confirm('清空当前帧？')) return;
+    frames[active].strokes = [];
+    redrawBoard();
+    paintThumb(active);
+    save();
+  });
+
+  noteInput.addEventListener('input', () => {
+    notes[active] = noteInput.value;
+    save();
+  });
+
+  // ---------- keyboard ----------
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (e.key >= '1' && e.key <= '9') switchFrame(Number(e.key) - 1);
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      document.getElementById('undoBtn').click();
+    }
+    if (e.key === '[ ' || e.key === '[') document.querySelector('.size[data-size="4"]').click();
+    if (e.key === ']') document.querySelector('.size[data-size="16"]').click();
+    if (e.key.toLowerCase() === 'e') document.querySelector('.tool[data-tool="eraser"]').click();
+    if (e.key.toLowerCase() === 'b') document.querySelector('.tool[data-tool="pen"]').click();
+  });
+
+  // ---------- toast ----------
+  let toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 4200);
+  }
+
+  // ---------- export sheet ----------
+  function buildSheet() {
+    const pad = 80, gap = 40, cols = 2, rows = Math.ceil(frames.length / cols);
+    const panelW = (2400 - pad * 2 - gap) / cols;
+    const frameH = panelW * 9 / 16;
+    const labelH = 44, noteH = 140;
+    const panelH = labelH + frameH + noteH;
+    const headerH = 196;
+    const footerH = 96;
+    const sheetH = headerH + rows * panelH + (rows - 1) * gap + footerH;
+
+    const c = document.createElement('canvas');
+    c.width = 2400; c.height = Math.round(sheetH);
+    const g = c.getContext('2d');
+    g.fillStyle = '#FAFAFA';
+    g.fillRect(0, 0, c.width, c.height);
+    g.textBaseline = 'alphabetic';
+
+    // header
+    const mx = pad, my = 62, ms = 52;
+    g.fillStyle = '#1A1A1A';
+    g.fillRect(mx, my, ms * 0.12, ms);
+    g.fillRect(mx, my + ms * 0.88, ms, ms * 0.12);
+    g.beginPath();
+    g.arc(mx + ms * 0.57, my + ms * 0.44, ms * 0.23, 0, Math.PI * 2);
+    g.fill();
+
+    g.fillStyle = '#1A1A1A';
+    g.font = '600 46px Oswald, "Arial Narrow", Impact, sans-serif';
+    try { g.letterSpacing = '5px'; } catch (e) {}
+    g.fillText('LIVEINPASSION', mx + 76, my + 32);
+    try { g.letterSpacing = '1px'; } catch (e) {}
+    g.fillStyle = '#777777';
+    g.font = '400 17px "Space Mono", monospace';
+    g.fillText('SKETCH SHEET / OPENING ANIMATION', mx + 78, my + 58);
+
+    const d = new Date();
+    const date = String(d.getFullYear()) + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+    g.textAlign = 'right';
+    g.fillText(date, c.width - pad, my + 26);
+    g.fillText('LP–01 / ' + String(frames.length).padStart(2, '0') + ' FRAMES', c.width - pad, my + 50);
+    g.textAlign = 'left';
+
+    g.strokeStyle = '#D8D6D2';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(pad, headerH - 30);
+    g.lineTo(c.width - pad, headerH - 30);
+    g.stroke();
+
+    // panels
+    frames.forEach((frame, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = pad + col * (panelW + gap);
+      const y = headerH + row * (panelH + gap);
+
+      g.fillStyle = '#1A1A1A';
+      g.font = '700 24px "Space Mono", monospace';
+      try { g.letterSpacing = '2px'; } catch (e) {}
+      g.fillText('FRAME ' + String(i + 1).padStart(2, '0'), x, y + 26);
+      try { g.letterSpacing = '0px'; } catch (e) {}
+
+      g.fillStyle = '#FFFFFF';
+      g.fillRect(x, y + labelH, panelW, frameH);
+      g.strokeStyle = '#1A1A1A';
+      g.lineWidth = 2;
+      g.strokeRect(x + 1, y + labelH + 1, panelW - 2, frameH - 2);
+
+      g.save();
+      g.beginPath();
+      g.rect(x, y + labelH, panelW, frameH);
+      g.clip();
+      g.translate(x, y + labelH);
+      g.scale(panelW / W, panelW / W);
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (const s of frame.strokes) {
+        g.strokeStyle = s.color;
+        g.fillStyle = s.color;
+        g.lineWidth = s.size;
+        const pts = s.points;
+        if (!pts.length) continue;
+        if (pts.length === 1) {
+          g.beginPath();
+          g.arc(pts[0][0], pts[0][1], s.size / 2, 0, Math.PI * 2);
+          g.fill();
+          continue;
+        }
+        g.beginPath();
+        g.moveTo(pts[0][0], pts[0][1]);
+        for (let k = 1; k < pts.length; k++) g.lineTo(pts[k][0], pts[k][1]);
+        g.stroke();
+      }
+      g.restore();
+
+      // note
+      const note = (notes[i] || '').trim();
+      g.font = '400 22px "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif';
+      g.fillStyle = note ? '#333333' : '#AAAAAA';
+      const text = note || '—';
+      wrapText(g, text, x, y + labelH + frameH + 40, panelW, 34, 3);
+    });
+
+    // footer
+    g.fillStyle = '#777777';
+    g.font = '400 15px "Space Mono", monospace';
+    try { g.letterSpacing = '1px'; } catch (e) {}
+    g.fillText('LIVEINPASSION.ME', pad, c.height - 46);
+    g.textAlign = 'right';
+    g.fillText('A FRAME, AND ONE POINT OF LIGHT', c.width - pad, c.height - 46);
+    g.textAlign = 'left';
+
+    return c;
+  }
+
+  function wrapText(g, text, x, y, maxW, lineH, maxLines) {
+    const chars = Array.from(text);
+    let line = '';
+    let lines = 0;
+    for (let i = 0; i < chars.length; i++) {
+      const test = line + chars[i];
+      if (g.measureText(test).width > maxW && line) {
+        g.fillText(line, x, y + lines * lineH);
+        lines++;
+        line = chars[i];
+        if (lines >= maxLines - 1) break;
+      } else {
+        line = test;
+      }
+    }
+    if (lines < maxLines && line) g.fillText(line, x, y + lines * lineH);
+  }
+
+  // ---------- save helpers ----------
+  async function saveBlob(blob, name, mime, ext) {
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: name,
+          types: [{ description: ext.toUpperCase(), accept: { [mime]: ['.' + ext] } }]
+        });
+        const w = await handle.createWritable();
+        await w.write(blob);
+        await w.close();
+        toast('已保存：' + name + '。把它放进 liveinpassion\\sketches\\ 后告诉我文件名。');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    toast('已下载：' + name + '。请把它放进 liveinpassion\\sketches\\ 后告诉我文件名。');
+  }
+
+  function stamp() {
+    const d = new Date();
+    return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '-' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  document.getElementById('pngBtn').addEventListener('click', () => {
+    const c = buildSheet();
+    c.toBlob((blob) => saveBlob(blob, 'liveinpassion-sketch-' + stamp() + '.png', 'image/png', 'png'), 'image/png');
+  });
+
+  document.getElementById('jsonBtn').addEventListener('click', () => {
+    const data = { app: 'LIVEINPASSION Sketch Desk', version: 1, saved: new Date().toISOString(), frames, notes };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    saveBlob(blob, 'liveinpassion-sketch-' + stamp() + '.json', 'application/json', 'json');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.frames)) throw new Error('bad file');
+        frames = data.frames.slice(0, MAX).map((f) => ({ strokes: Array.isArray(f.strokes) ? f.strokes : [] }));
+        while (frames.length < MIN) frames.push({ strokes: [] });
+        notes = (data.notes || []).slice(0, Math.max(frames.length, MIN));
+        while (notes.length < frames.length) notes.push('');
+        active = 0;
+        redrawBoard();
+        updateFrameLabel();
+        buildThumbs();
+        save(true);
+        toast('工程已导入。');
+      } catch (err) {
+        toast('导入失败：不是有效的工程文件。');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- fit canvas to stage ----------
+  function fitBoard() {
+    const wrap = board.parentElement;
+    const aw = wrap.clientWidth;
+    const ah = wrap.clientHeight;
+    if (!aw || !ah) return;
+    const s = Math.min(aw / W, ah / H, 1);
+    board.style.width = Math.floor(W * s) + 'px';
+    board.style.height = Math.floor(H * s) + 'px';
+  }
+  new ResizeObserver(fitBoard).observe(board.parentElement);
+  window.addEventListener('load', fitBoard);
+
+  // ---------- init ----------
+  restore();
+  redrawBoard();
+  updateFrameLabel();
+  buildThumbs();
+  fitBoard();
+})();
+</script>
+</body>
+</html>
