@@ -3,9 +3,11 @@ import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed, wa
 import { useRoute, useRouter } from 'vue-router';
 import { MdEditor, config } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
+import { EditorView } from '@codemirror/view';
 import { blogApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
+import { lintMarkdown } from '../utils/mdLint.js';
 import { isDark } from '../theme.js';
 import AdminIcon from '../components/AdminIcon.vue';
 
@@ -46,6 +48,13 @@ config({
       };
     }
     return plugins;
+  },
+  // 浏览器原生拼写检查：CodeMirror 6 默认给内容区设了 spellcheck="false"，
+  // 这里用 facet 覆盖成 true 并指定英文，打字时错词会直接出现红下划线。
+  // 面板里的「常见错拼 / 重复词」规则见 utils/mdLint.js，两者互补。
+  codeMirrorExtensions(theme, extensions) {
+    extensions.push(EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'en' }));
+    return extensions;
   },
 });
 
@@ -160,12 +169,70 @@ function insertPageBreak() {
   nextTick(() => view.dispatch({ scrollIntoView: true }));
 }
 
+// ===== 静态检查：Markdown 语法 + 拼写 =====
+// 输入停下 400ms 后跑一遍 utils/mdLint.js 的纯文本规则，结果列在编辑器上方的 Lint 面板。
+// 面板里只列「能指出行号」的问题；错字的大头交给编辑器里的浏览器原生拼写检查（红下划线）。
+const lintIssues = ref([]);
+const lintStats = ref({ words: 0, pages: 1, readTime: 1 });
+const lintOpen = ref(false);
+const SEV_LABEL = { error: 'ERR', warn: 'WARN', info: 'NOTE' };
+const LINT_VISIBLE_MAX = 80;
+let lintTimer = 0;
+
+function runLint() {
+  const { issues, stats } = lintMarkdown(form.value.contentMd);
+  lintIssues.value = issues;
+  lintStats.value = stats;
+}
+
+watch(
+  () => form.value.contentMd,
+  () => {
+    window.clearTimeout(lintTimer);
+    lintTimer = window.setTimeout(runLint, 400);
+  },
+  { immediate: true }
+);
+
+onUnmounted(() => window.clearTimeout(lintTimer));
+
+const lintErrors = computed(() => lintIssues.value.filter((i) => i.severity === 'error').length);
+const lintWarns = computed(() => lintIssues.value.filter((i) => i.severity === 'warn').length);
+const lintSummary = computed(() => {
+  const total = lintIssues.value.length;
+  if (!total) return 'clean';
+  return `${total} issue${total > 1 ? 's' : ''}`;
+});
+const lintTone = computed(() => {
+  if (lintErrors.value) return 'is-error';
+  if (lintWarns.value) return 'is-warn';
+  if (lintIssues.value.length) return 'is-info';
+  return 'is-clean';
+});
+const lintVisible = computed(() => lintIssues.value.slice(0, LINT_VISIBLE_MAX));
+
+function toggleLint() {
+  lintOpen.value = !lintOpen.value;
+  if (lintOpen.value) runLint();
+}
+
+// 点一条问题 → 光标选中对应那一段并滚到可视区
+function gotoLintIssue(issue) {
+  const view = editorView();
+  if (!view) return;
+  const doc = view.state.doc;
+  const line = doc.line(Math.min(doc.lines, Math.max(1, issue.line)));
+  const from = Math.min(line.to, line.from + Math.max(0, issue.col || 0));
+  const to = Math.min(line.to, from + Math.max(1, issue.length || 1));
+  view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+  view.focus();
+}
+
 // 编辑器扩展按内容按需加载：照片博客里通常没有代码/公式/流程图，
 // 不写这些内容时就不要从 unpkg 拉 highlight.js / katex / mermaid
 const hasCodeBlock = computed(() => /```/.test(form.value.contentMd));
 const hasMath = computed(() => /\$\$|\\\(|\\\[|\$[^$\n]+\$/.test(form.value.contentMd));
 const hasMermaid = computed(() => /```mermaid/.test(form.value.contentMd));
-
 // Title / Slug 是否已被手动编辑过；手动改过的不再自动填充
 const titleDirty = ref(false);
 const slugDirty = ref(false);
@@ -1184,14 +1251,47 @@ onUnmounted(() => {
     <div class="editor-panel">
       <div class="editor-head">
         <span>Markdown — Editor</span>
-        <span class="editor-tip">
-          <template v-if="imgProgress">{{ imgProgress }}</template>
-          <template v-else-if="pendingImages.size">{{ pendingImages.size }} image(s) pending · upload on save</template>
-          <template v-else>
-            <span class="tip-fine">Ctrl+S save draft · paste / drop image to insert</span>
-            <span class="tip-coarse">Tap the save icon to draft · tap a photo to edit it</span>
-          </template>
+        <span class="editor-head__right">
+          <button
+            type="button"
+            class="lint-toggle"
+            :class="lintTone"
+            :aria-expanded="lintOpen"
+            @click="toggleLint"
+          >
+            <span class="lint-toggle__dot"></span>
+            <span>Lint — {{ lintSummary }}</span>
+          </button>
+          <span class="editor-tip">
+            <template v-if="imgProgress">{{ imgProgress }}</template>
+            <template v-else-if="pendingImages.size">{{ pendingImages.size }} image(s) pending · upload on save</template>
+            <template v-else>
+              <span class="tip-fine">Ctrl+S save draft · paste / drop image to insert</span>
+              <span class="tip-coarse">Tap the save icon to draft · tap a photo to edit it</span>
+            </template>
+          </span>
         </span>
+      </div>
+
+      <div v-if="lintOpen" class="lint-panel">
+        <div v-if="!lintIssues.length" class="lint-empty">
+          Nothing to fix — syntax and spelling look clean.
+        </div>
+        <ul v-else class="lint-list">
+          <li v-for="(issue, idx) in lintVisible" :key="`${issue.rule}-${issue.line}-${issue.col}-${idx}`">
+            <button type="button" class="lint-item" :class="`is-${issue.severity}`" @click="gotoLintIssue(issue)">
+              <span class="lint-item__sev">{{ SEV_LABEL[issue.severity] }}</span>
+              <span class="lint-item__line">L{{ String(issue.line).padStart(3, '0') }}</span>
+              <span class="lint-item__msg">{{ issue.message }}</span>
+              <span class="lint-item__rule">{{ issue.rule }}</span>
+            </button>
+          </li>
+        </ul>
+        <div class="lint-foot">
+          <span>{{ lintStats.words }} words · {{ lintStats.pages }} page{{ lintStats.pages > 1 ? 's' : '' }} · {{ lintStats.readTime }} min read</span>
+          <span v-if="lintIssues.length > lintVisible.length">First {{ lintVisible.length }} of {{ lintIssues.length }} shown</span>
+          <span>Spelling: known typos + browser spellcheck underlines</span>
+        </div>
       </div>
       <MdEditor
         ref="editorRef"
@@ -1468,6 +1568,111 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
+/* ===== Lint：语法 / 拼写检查 ===== */
+.editor-head__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.lint-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.lint-toggle:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.lint-toggle__dot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  background: currentColor;
+  opacity: 0.5;
+}
+.lint-toggle.is-error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+.lint-toggle.is-warn { color: var(--text-primary); }
+.lint-toggle.is-info { color: var(--text-secondary); }
+.lint-toggle.is-clean .lint-toggle__dot { opacity: 0.25; }
+
+.lint-panel {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.lint-empty {
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+.lint-list { list-style: none; margin: 0; padding: 0; }
+.lint-item {
+  display: grid;
+  grid-template-columns: 38px 44px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.lint-item:hover { background: var(--bg); }
+.lint-item__sev {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+}
+.lint-item.is-error .lint-item__sev { color: var(--danger); }
+.lint-item__line {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.lint-item__msg { min-width: 0; }
+.lint-item__rule {
+  color: var(--text-secondary);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+.lint-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 9px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* 触摸设备上这两类按钮按 44px 最小点按区处理（与站内其它按钮一致） */
+@media (pointer: coarse) {
+  .lint-toggle { min-height: 44px; min-width: 44px; }
+  .lint-item { min-height: 44px; align-items: center; }
+}
+
 .action-bar {
   position: sticky;
   bottom: 0;
@@ -1540,6 +1745,10 @@ onUnmounted(() => {
 @media (max-width: 700px) {
   .form-grid { grid-template-columns: 1fr; gap: 20px; }
   .field--wide { grid-column: auto; }
+  .editor-head { flex-wrap: wrap; row-gap: 8px; }
+  .editor-head__right { width: 100%; justify-content: space-between; gap: 10px; }
+  .lint-item { grid-template-columns: 34px 40px minmax(0, 1fr); }
+  .lint-item__rule { display: none; }
   .action-bar { flex-wrap: wrap; row-gap: 10px; }
   .action-bar__hint { display: none; }
   .action-bar__pages { width: 100%; }

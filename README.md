@@ -48,6 +48,20 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 101 — 2026-11-14
+
+#### 后台编辑器加 Markdown Lint 面板与拼写检查
+
+- 新增 `admin/src/utils/mdLint.js`：纯文本静态分析，不依赖编辑器实例，可以直接在
+  Node 里跑。输入停下 400ms 后对正文跑一遍，结果列在 Lint 面板。
+  语法规则只覆盖这套站点真正会写的结构：围栏代码、标题、链接/图片、HTML 块、
+  表格、分页符。
+- 拼写分两层：mdLint 查常见错拼（accomodate / definately / seperate…）与重复词
+  （`that that`、`had had` 这类英文正常写法不报）；其余错字交给浏览器原生拼写检查
+  —— BlogEdit 通过 `codeMirrorExtensions` 放开 CodeMirror 的 `spellcheck`，
+  编辑器里直接画红下划线。
+- 新增依赖 `@codemirror/view`（拿到 EditorView 以挂上拼写检查所需的 DOM 属性）。
+
 ### update: 100 — 2026-11-14
 
 #### ME 电视新增 CH 04「THE CORRIDOR」+ 品牌 logo 入库
