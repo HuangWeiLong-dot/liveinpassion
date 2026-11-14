@@ -29,6 +29,7 @@ import LifeWeather from '../components/LifeWeather.vue';
 import LifeNutrition from '../components/LifeNutrition.vue';
 import LifeCoverage from '../components/LifeCoverage.vue';
 import LifeHeart from '../components/LifeHeart.vue';
+import LifePatterns from '../components/LifePatterns.vue';
 import LifeNow from '../components/LifeNow.vue';
 import LifeToday from '../components/LifeToday.vue';
 import LifeDetailModal from '../components/LifeDetailModal.vue';
@@ -2559,6 +2560,7 @@ onBeforeUnmount(() => {
           :last-updated="lastUpdated"
           :latest-is-today="latestIsToday"
           :cms-base="CMS_BASE"
+          :patterns="data?.patterns || null"
           :reduced="REDUCED"
           @open-day="openDay"
           @open-today="openTodayDetail"
@@ -3928,16 +3930,30 @@ onBeforeUnmount(() => {
           <LifeHeart :rows="rows" />
         </div>
 
-        <!-- 13 GitHub：公开事件流（和 LIFE 数据同属「公开生命档案」的一部分） -->
-        <div class="stats-panel life-panel" data-reveal>
-          <GithubActivity variant="panel" index="13" />
+        <!-- 13 相关性结论：跨天的，不是某一天的。 -->
+        <div class="stats-panel life-panel" data-reveal data-chart="patterns">
+          <div class="stats-panel-head">
+            <div class="stats-panel-title">
+              <span class="stats-panel-index">13</span>
+              <h2>PATTERNS</h2>
+            </div>
+            <span class="stats-panel-sub">CROSS-SOURCE · FDR-CORRECTED · CORRELATION ONLY</span>
+          </div>
+          <div class="life-chart">
+            <LifePatterns :patterns="data?.patterns || null" />
+          </div>
         </div>
 
-        <!-- 14 归档：全量原始数据 -->
+        <!-- 14 GitHub：公开事件流（和 LIFE 数据同属「公开生命档案」的一部分） -->
+        <div class="stats-panel life-panel" data-reveal>
+          <GithubActivity variant="panel" index="14" />
+        </div>
+
+        <!-- 15 归档：全量原始数据 -->
         <div class="stats-panel life-panel life-archive-panel" data-reveal>
           <div class="stats-panel-head">
             <div class="stats-panel-title">
-              <span class="stats-panel-index">14</span>
+              <span class="stats-panel-index">15</span>
               <h2>THE ARCHIVE</h2>
             </div>
             <span class="stats-panel-sub">Unfiltered · {{ archiveTotal }} entries</span>

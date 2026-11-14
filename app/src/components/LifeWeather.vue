@@ -107,7 +107,7 @@
         <div class="life-rail-head">AVERAGE HIGH BY WEEK</div>
         <div class="lc-sub-row">
           <div v-for="w in byWeek" :key="w.label" class="lc-sub-col">
-            <span class="lc-sub-bar" :style="{ height: w.pct + '%' }"></span>
+            <span class="lc-sub-bar" :style="{ height: w.px + 'px' }"></span>
             <em>{{ w.label }}</em>
             <b>{{ w.value }}</b>
           </div>
@@ -251,7 +251,8 @@ const byWeek = computed(() => {
   return entries.map(([key, xs], i) => ({
     label: `W${key.slice(5)}`,
     value: `${Math.round(avgs[i])}°`,
-    pct: 18 + ((avgs[i] - min) / Math.max(0.1, max - min)) * 82,
+    // 像素高度，理由同 LifeSleep：flex 列里的百分比高度会塌成方块。
+    px: Math.round(8 + ((avgs[i] - min) / Math.max(0.1, max - min)) * 54),
   }));
 });
 

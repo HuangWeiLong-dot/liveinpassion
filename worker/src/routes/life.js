@@ -50,6 +50,9 @@ const WEATHER_KEYS = new Set([
 const NUTRITION_KEYS = new Set([
   'calories', 'proteinG', 'carbsG', 'fatG', 'meals', 'confidence',
 ]);
+// 相关性结论是跨天的，单独存在 life_meta 里（见 migrations/0011）。
+const PATTERN_KEYS = new Set(['generatedAt', 'window', 'days', 'tests', 'findings']);
+const FINDING_KEYS = new Set(['a', 'b', 'lag', 'n', 'r', 'ci', 'q']);
 const ALL_TIME_KEYS = new Set([
   'runs', 'km', 'bestPaceS', 'bestPaceKm', 'bestPaceName', 'bestPaceDay',
   'bestPaceStart', 'longestKm', 'longestName', 'longestDay', 'longestStart',
@@ -111,12 +114,12 @@ function isName(v, max = 64) {
 }
 
 // [[name, value], ...]
-function isPairs(v, maxLen, maxValue) {
+function isPairs(v, maxLen, maxValue, nameLen = 64) {
   return Array.isArray(v)
     && v.length <= maxLen
     && v.every((p) => Array.isArray(p)
       && p.length === 2
-      && isName(p[0])
+      && isName(p[0], nameLen)
       && isNum(p[1], 0, maxValue));
 }
 
@@ -128,6 +131,27 @@ function isAppPairs(v, maxLen, maxValue) {
 function isRealDate(day) {
   const d = new Date(`${day}T00:00:00Z`);
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === day;
+}
+
+// 相关性结论的校验。范围按「相关系数就是 -1..1」卡死 ——
+// 上游算错时（比如把百分比当相关系数），这里要挡住，不要让它上页面。
+function validatePatterns(p) {
+  if (!isObj(p) || !onlyKeys(p, PATTERN_KEYS)) return 'patterns';
+  if (!Array.isArray(p.findings) || p.findings.length > 50) return 'patterns.findings';
+  for (const f of p.findings) {
+    if (!isObj(f) || !onlyKeys(f, FINDING_KEYS)) return 'patterns.findings';
+    if (!isName(f.a, 40) || !isName(f.b, 40)) return 'patterns.findings.name';
+    if (!isOptNum(f.n, 0, 100000)) return 'patterns.findings.n';
+    if (!isNum(f.r, -1, 1)) return 'patterns.findings.r';
+    if (!isOptNum(f.q, 0, 1)) return 'patterns.findings.q';
+    if (f.ci !== null) {
+      if (!Array.isArray(f.ci) || f.ci.length !== 2) return 'patterns.findings.ci';
+      if (!f.ci.every((x) => typeof x === 'number' && x >= -1 && x <= 1)) {
+        return 'patterns.findings.ci';
+      }
+    }
+  }
+  return null;
 }
 
 // 返回出错的字段名；null 表示通过。
@@ -305,7 +329,8 @@ function validateDay(d) {
       if (!isObj(m) || !onlyKeys(m, PHONE_MUSIC_KEYS)) return 'phone.music';
       if (!isOptNum(m.plays, 0, 100000)) return 'phone.music.plays';
       if (m.last !== null && !isName(m.last, 200)) return 'phone.music.last';
-      if (m.tracks !== null && !isPairs(m.tracks, 40, 100000)) return 'phone.music.tracks';
+      // 歌名天然比应用名长（实测 83 字符），单独放宽到 120
+      if (m.tracks !== null && !isPairs(m.tracks, 40, 100000, 120)) return 'phone.music.tracks';
     }
 
     if (p.notifications != null) {
@@ -392,6 +417,12 @@ lifeRoutes.post('/life/ingest', async (c) => {
     }
   }
 
+  // patterns 是可选的：老版本笔记本不发它，站点显示「暂无」而不是报错。
+  if (body.patterns !== undefined && body.patterns !== null) {
+    const bad = validatePatterns(body.patterns);
+    if (bad) return c.json({ error: 'invalid patterns', field: bad }, 400);
+  }
+
   const stmts = body.days.map((d) => c.env.DB.prepare(
     `INSERT INTO life_days (day, payload, updated_at)
      VALUES (?, ?, datetime('now'))
@@ -403,6 +434,15 @@ lifeRoutes.post('/life/ingest', async (c) => {
   try {
     for (let i = 0; i < stmts.length; i += BATCH_SIZE) {
       await c.env.DB.batch(stmts.slice(i, i + BATCH_SIZE));
+    }
+    if (isObj(body.patterns)) {
+      await c.env.DB.prepare(
+        `INSERT INTO life_meta (key, payload, updated_at)
+         VALUES ('patterns', ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET
+           payload = excluded.payload,
+           updated_at = excluded.updated_at`,
+      ).bind(JSON.stringify(body.patterns)).run();
     }
   } catch (err) {
     console.error('life ingest failed:', err?.message || err);
@@ -460,9 +500,21 @@ lifeRoutes.get('/life', async (c) => {
   }
   days.reverse();
 
+  // 相关性结论。表还没迁移时安静地当没有 —— 不能因为一个可选面板让整页 500。
+  let patterns = null;
+  try {
+    const row = await c.env.DB.prepare(
+      "SELECT payload FROM life_meta WHERE key = 'patterns'",
+    ).first();
+    if (row && row.payload) patterns = JSON.parse(row.payload);
+  } catch {
+    patterns = null;
+  }
+
   c.header('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
   return c.json({
     v: 1,
+    patterns,
     days,
     count: days.length,
     skipped,

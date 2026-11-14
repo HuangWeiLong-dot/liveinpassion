@@ -159,7 +159,20 @@ function buildFull() {
       ai,
     });
   }
-  return { v: 1, days, count: days.length, skipped: 0, range: { from: days[0].day, to: days[days.length - 1].day }, generatedAt: '2026-10-18T12:00:00Z', updatedAt: '2026-10-18 04:00:00' };
+  // 跨天的相关性结论（/api/life 顶层字段，不是某一天的）
+  const patterns = {
+    generatedAt: '2026-10-18T12:00:00Z',
+    window: [days[0].day, days[days.length - 1].day],
+    days: days.length,
+    tests: 664,
+    findings: [
+      { a: 'Computer hours', b: 'Sleep midpoint', lag: 'same-day', n: 28, r: 0.68, ci: [0.42, 0.84], q: 0.009 },
+      { a: 'Computer hours', b: 'Unlocks', lag: 'same-day', n: 31, r: -0.67, ci: [-0.83, -0.42], q: 0.009 },
+      { a: 'Work hours', b: 'Steps', lag: 'same-day', n: 28, r: -0.65, ci: [-0.82, -0.36], q: 0.02 },
+      { a: 'Sleep duration', b: 'Mood', lag: 'next-day', n: 14, r: 0.55, ci: [0.05, 0.83], q: 0.06 },
+    ],
+  };
+  return { v: 1, patterns, days, count: days.length, skipped: 0, range: { from: days[0].day, to: days[days.length - 1].day }, generatedAt: '2026-10-18T12:00:00Z', updatedAt: '2026-10-18 04:00:00' };
 }
 
 const FULL = buildFull();
@@ -535,6 +548,9 @@ const LIFE_STATE = `(function () {
     heartBands: q('[data-chart="heart"] .lh-band').length,
     heartAvg: q('[data-chart="heart"] .lh-avg').length,
     heartWeekday: q('[data-chart="heart"] .life-rail .life-row').length,
+    patternRows: q('[data-chart="patterns"] .lp-card').length,
+    patternDots: q('[data-chart="patterns"] .lp-dot').length,
+    patternCis: q('[data-chart="patterns"] .lp-ci').length,
     coverageRows: q('[data-chart="coverage"] .lc-row').length,
     coverageCells: q('[data-chart="coverage"] .lc-cells i.is-on').length,
     means: q('.life-mean').length,
@@ -623,8 +639,8 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   console.log('  live badge:', liveBadge);
   if (!/TODAY/.test(liveBadge)) throw new Error('latest day should be marked TODAY · LIVE');
   if (state.cards !== 6) throw new Error(`expected 6 KPI cards, got ${state.cards}`);
-  if (state.panels !== 15) {
-    throw new Error(`expected 15 panels (radar + sleep + brain + 5 charts + weather + nutrition + coverage + heart + weekday + github + archive), got ${state.panels}`);
+  if (state.panels !== 16) {
+    throw new Error(`expected 16 panels (radar + sleep + brain + 5 charts + weather + nutrition + coverage + heart + patterns + weekday + github + archive), got ${state.panels}`);
   }
 
   // 三张新图。断言的重点不是「画了多少根」，而是「缺的那几天没有被画成 0」——
@@ -639,6 +655,11 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
   if (state.heartBands <= 0) throw new Error('heart panel drew no min-max bands');
   if (state.heartAvg < state.heartBands) throw new Error('every heart band should carry an average marker');
   if (state.heartWeekday !== 7) throw new Error(`heart rail should list 7 weekdays, got ${state.heartWeekday}`);
+
+  // 相关性卡：每条一个点（r）+ 一条置信区间；两者数量必须一致
+  if (state.patternRows !== 4) throw new Error(`patterns should list 4 findings, got ${state.patternRows}`);
+  if (state.patternDots !== state.patternRows) throw new Error('every finding should have an r dot');
+  if (state.patternCis !== state.patternRows) throw new Error('every finding should have a CI bar');
 
   // 覆盖率面板：9 个源各一行；有数据的格子数必须少于 源数×天数（桩数据里有缺口）
   if (state.coverageRows !== 9) throw new Error(`coverage should list 9 sources, got ${state.coverageRows}`);
@@ -1339,7 +1360,7 @@ await withPage({ width: 1440, height: 1000, label: 'empty', mode: 'empty' }, asy
   if (state.numbers.length !== 0) throw new Error('empty: expected no odometers');
   // 没数据时三张新图各自显示空态文案，但**面板本身还在** ——
   // 少一块会让整页的编号错位，也看不出是「这个源没开」还是「页面坏了」。
-  if (state.panels !== 15) throw new Error(`empty: expected 15 panels, got ${state.panels}`);
+  if (state.panels !== 16) throw new Error(`empty: expected 16 panels, got ${state.panels}`);
   await shot('top');
 });
 

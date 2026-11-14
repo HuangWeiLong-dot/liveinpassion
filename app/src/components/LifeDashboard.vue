@@ -20,6 +20,7 @@ import LifeWeather from './LifeWeather.vue';
 import LifeNutrition from './LifeNutrition.vue';
 import LifeCoverage from './LifeCoverage.vue';
 import LifeHeart from './LifeHeart.vue';
+import LifePatterns from './LifePatterns.vue';
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -44,6 +45,8 @@ const props = defineProps({
   city: { type: String, default: '' },
   lastUpdated: { type: String, default: '—' },
   latestIsToday: { type: Boolean, default: false },
+  // 跨天的相关性结论（/api/life 顶层字段）
+  patterns: { type: Object, default: null },
   cmsBase: { type: String, default: '' },
   reduced: { type: Boolean, default: false },
 });
@@ -864,6 +867,18 @@ function openDay(day) {
         <span class="stats-panel-sub">SOURCES × DAYS</span>
       </div>
       <LifeCoverage :rows="rows" compact />
+    </article>
+
+    <!-- 18 PATTERNS：跨天结论 -->
+    <article class="dash-tile span-12" data-chart="patterns">
+      <div class="stats-panel-head">
+        <div class="stats-panel-title">
+          <span class="stats-panel-index">18</span>
+          <h2>PATTERNS</h2>
+        </div>
+        <span class="stats-panel-sub">CORRELATION · FDR-CORRECTED</span>
+      </div>
+      <LifePatterns :patterns="patterns" />
     </article>
   </div>
 </template>

@@ -103,7 +103,7 @@
         <div class="life-rail-head">AVERAGE BY WEEKDAY</div>
         <div class="lc-sub-row">
           <div v-for="d in byWeekday" :key="d.label" class="lc-sub-col">
-            <span class="lc-sub-bar" :style="{ height: d.pct + '%' }"></span>
+            <span class="lc-sub-bar" :style="{ height: d.px + 'px' }"></span>
             <em>{{ d.label }}</em>
             <b>{{ d.value }}</b>
           </div>
@@ -249,7 +249,9 @@ const byWeekday = computed(() => {
   return LABELS.map((label, i) => ({
     label,
     value: avgs[i] == null ? '—' : `${avgs[i].toFixed(1)}h`,
-    pct: avgs[i] == null ? 0 : 18 + ((avgs[i] - min) / Math.max(0.1, max - min)) * 82,
+    // 用**像素**高度，不用百分比：flex 列里的百分比高度解析不到容器高度，
+    // 会退化成一个个小方块（实测就是这么坏的）。
+    px: avgs[i] == null ? 0 : Math.round(8 + ((avgs[i] - min) / Math.max(0.1, max - min)) * 54),
   }));
 });
 
