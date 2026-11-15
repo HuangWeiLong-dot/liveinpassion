@@ -66,10 +66,38 @@ const networkLabel = computed(() => {
 
 const networkIcon = computed(() => (phone.value?.network?.mode === 'wifi' ? 'wifi' : 'signal'));
 
-// 通知滚动条：重复一遍列表，translateY(-50%) 才能无缝循环
+// ── 通知脱敏 ────────────────────────────────────────────────────
+// 公开页面**不还原任何真实通知**：应用名按类别模糊化，正文一律用固定长度的
+// 方块替代（长度也写死，避免从字数反推内容）。这里只表达"有消息进来"。
+const NOTIF_RULES = [
+  [/wechat|messages|sms|telegram|whatsapp|messenger|signal|qq|dingtalk|line|kakaotalk|bridge/i, 'MESSAGE'],
+  [/gmail|mail|outlook|proton/i, 'MAIL'],
+  [/instagram|xiaohongshu|xhs|weibo|twitter|facebook|tiktok|douyin|bilibili|reddit|discord/i, 'SOCIAL'],
+  [/android|system ui|systemui|incallui|finddevice|gadgetbridge|clock|settings|voiceassist|aicr|plugin|camera|packageinstaller|^com\./i, 'SYSTEM'],
+];
+function vagueNotifLabel(app) {
+  const name = String(app || '');
+  for (const [re, label] of NOTIF_RULES) if (re.test(name)) return label;
+  return 'APP';
+}
+
+// 通知滚动条：先把每一条映射成类别 → 去掉相邻重复 → 重复一遍让 -50% 无缝回卷。
 const notifFeed = computed(() => {
-  const list = phone.value?.notificationsRecent || [];
-  return [...list, ...list];
+  const list = (phone.value?.notificationsRecent || []).map((n) => vagueNotifLabel(n.app));
+  const labels = list.filter((label, i) => i === 0 || label !== list[i - 1]);
+  const base = labels.length ? labels : ['APP'];
+  const doubled = [...base, ...base];
+  return doubled.map((label) => ({ label, redacted: '██████' }));
+});
+
+// 按应用统计的条数同样只给类别，不暴露具体 App。
+const notifTop = computed(() => {
+  const map = new Map();
+  for (const [app, n] of phone.value?.notificationsTop || []) {
+    const label = vagueNotifLabel(app);
+    map.set(label, (map.get(label) || 0) + (Number(n) || 0));
+  }
+  return [...map.entries()];
 });
 
 // ── 歌词 ──────────────────────────────────────────────────────
@@ -455,13 +483,14 @@ onBeforeUnmount(() => {
               <div
                 v-if="phone.notificationsRecent && phone.notificationsRecent.length"
                 class="life-notif-feed"
+                aria-label="通知内容已隐藏"
               >
-                <div class="life-notif-track">
+                <div class="life-notif-track" aria-hidden="true">
                   <div
                     v-for="(n, i) in notifFeed"
                     :key="i"
                     class="life-notif-item"
-                  ><span class="life-notif-app">{{ n.app }}</span> {{ n.text || n.title }}</div>
+                  ><span class="life-notif-app">{{ n.label }}</span> <span class="life-notif-redacted">{{ n.redacted }}</span></div>
                 </div>
               </div>
             </div>
@@ -472,9 +501,9 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="phone.notificationsTop && phone.notificationsTop.length" class="life-now-toplist">
-            <span v-for="[app, n] in phone.notificationsTop" :key="app">
-              {{ app }} <b>{{ n }}</b>
+          <div v-if="notifTop.length" class="life-now-toplist">
+            <span v-for="[label, n] in notifTop" :key="label">
+              {{ label }} <b>{{ n }}</b>
             </span>
           </div>
 
@@ -747,6 +776,12 @@ onBeforeUnmount(() => {
 
 .life-notif-app {
   color: var(--text-primary);
+}
+
+/* 脱敏后的正文：固定长度方块，不还原任何真实文字 */
+.life-notif-redacted {
+  letter-spacing: 0.16em;
+  opacity: 0.5;
 }
 
 /* 解锁：一条扫描线从上往下走 */
