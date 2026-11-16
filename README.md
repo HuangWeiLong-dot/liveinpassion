@@ -48,7 +48,16 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
-### fix: 101.1 — 2026-11-15
+### fix: 103.1 — 2026-11-16
+
+#### 详情页返回列表时封面不飞回
+
+- Esc / 点空白 / 返回按钮原本用正则匹 `history.state.back` 的路径判断「是不是回
+  ECHOES」，但 GitHub Pages 上列表的 fullPath 是 `/echoes/`（带尾斜杠），
+  `/^\/echoes(?:[?#]|$)/` 判成「不是回列表」，整趟退化成普通 Back —— 只剩通用黑场
+  转场，封面不飞。改为交给 `router.resolve()` 解析后按路由名判 `echoes`。
+
+### update: 103 — 2026-11-15
 
 #### LIFE 通知栏脱敏
 
@@ -60,6 +69,19 @@
 - 通知内容仍会随 `/api/life/now` 下发到浏览器（接口层未裁剪）；本次只处理前台展示。
 - 验收：打桩真实 `/api/life/now` 数据后，DOM 里搜不到任何真实应用名 / 消息正文，
   只剩类别 + 方块；零 console 报错。
+
+### update: 102 — 2026-11-14
+
+#### PATTERNS 重做成卡片网格
+
+- 新增 `app/src/components/LifePatterns.vue`：LIFE 的相关性结论从纯文本列表改成卡片
+  网格，每张卡是一个指标对（如 屏幕时间 ↔ 入睡时刻）的方向、强度与样本数；卡片之间
+  用细分小柱表示相关强弱，整组补上内边距，不再贴边。
+- `worker/migrations/0011_life_patterns.sql` 建 `life_meta`（key-value）：相关性结论
+  是跨天的，不属于某一天，塞进 `life_days` 的某一格会被「最后一天」绑架，且每天重发
+  会覆盖其余天。目前只有 `patterns` 一个 key，之后要存周复盘 / 月度摘要不用再建表。
+- worker `routes/life.js` 增加 `patterns` 的读写；LifeDashboard / LifeSleep /
+  LifeWeather / LifeView 随之调整版式，验收脚本 `tools/verify-life.mjs` 同步更新。
 
 ### update: 101 — 2026-11-14
 
