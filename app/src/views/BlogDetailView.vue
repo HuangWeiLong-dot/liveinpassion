@@ -907,7 +907,15 @@ function close() {
   // 会整片消失（用户报的就是这个）。这里直接照 AppHeader.goBack 的行为：
   // 不挂幕布、不起飞行层、不跳过通用转场，普通 router.back()。
   const backPath = String(window.history.state?.back || '');
-  const goingToList = !backPath || /^\/echoes(?:[?#]|$)/.test(backPath);
+  // ⚠ 别拿正则匹 path：GitHub Pages 上列表的 fullPath 是 `/echoes/`（带尾斜杠），
+  //   `/^\/echoes(?:[?#]|$)/` 会把它判成"不是回列表"，于是 Esc / 点空白整趟退化成
+  //   普通 Back —— 只剩通用黑场转场，封面不飞回（用户报的就是这个）。
+  //   交给 router 解析、按 name 判（BlogsView 的返回 watcher 也是这么做的）。
+  let backName = '';
+  if (backPath) {
+    try { backName = String(router.resolve(backPath).name || ''); } catch { backName = ''; }
+  }
+  const goingToList = !backPath || backName === 'echoes';
   if (!goingToList) {
     stopTyping();
     clearTimeout(typeSafety);
