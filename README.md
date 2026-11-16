@@ -48,6 +48,22 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 104 — 2026-11-16
+
+#### LIFE 手机-only 日入库
+
+- 新增 `POST /api/life/phone/ingest`：服务器侧 phone-publisher 专用入口，只发
+  `{ day, phone, dimensions?, collapsedHours? }`，不需要笔记本的完整 day。已有完整
+  快照的日期只替换 `phone`，保留桌面 / 位置 / 健康 / 七维 —— 否则笔记本合盖时一次
+  手机更新就会把桌面数据抹成 0；还没有快照的日期建一个 `phoneOnly: true` 的壳，
+  七维与并集只由手机算出，笔记本下一次完整发布自然覆盖（它的 payload 没有这个字段）。
+- 请求上限 30 天（`MAX_PHONE_DAYS_PER_REQUEST`，正好装下 30 天窗口）；校验抽成
+  `validatePhone`，逐字段返回 `phone.<field>` 定位问题；歌名放宽到 120 字符。
+- `life_raw.js` 增加 `phone` 原始文档类型：归档页不单开 tab，但它的日期会并进
+  EVENTS 的日期列表，`GET /life/raw/events/<day>` 读取时把手机事件合并进来，按
+  `(ts_utc, domain, metric, value_text)` 去重 —— 笔记本关机时 EVENTS 仍有当天的
+  手机、随手记与问答。
+
 ### fix: 103.1 — 2026-11-16
 
 #### 详情页返回列表时封面不飞回

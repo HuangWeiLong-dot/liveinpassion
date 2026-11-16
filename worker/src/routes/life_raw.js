@@ -21,7 +21,14 @@ const PREFIX = 'life/raw/';
 // watch：服务器侧单独发布的「手表路线」文档（GPX/FIT 解析结果）。
 // 笔记本关机时它仍然每 15 分钟更新一次，地图靠它画虚线；笔记本发布的那份
 // `events` 里也可能有同一批 watch_track，站点按开始时间去重，不会画两条。
-const KINDS = new Set(['journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly', 'vault', 'watch']);
+const KINDS = new Set([
+  'journal', 'notes', 'tasks', 'qa', 'events', 'blocks', 'weekly', 'vault',
+  'watch',
+  // phone：服务器侧把中继的手机事件直接发上来的原始文档。归档页不单独开
+  // tab —— GET /life/raw/events/<day> 会把它合并进笔记本那份 events 里，
+  // 笔记本关机时 EVENTS 仍然能看到手机 / 笔记 / 问答。
+  'phone',
+]);
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const WEEK_RE = /^\d{4}-W\d{2}$/;
 const VAULT_ID_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
@@ -126,6 +133,10 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
   // watch 不进 `kinds`（归档页只认那 8 个），但**日期要能列出来**：
   // 笔记本整天关机时，那天的原始数据只有 watch 一份，地图得知道有这一天。
   const watchDays = [];
+  // phone 同理，但它要**出现在 EVENTS 的日期列表里**：笔记本关机时，
+  // 那天可能只有服务器发的 phone 文档。把它的 id 并进 kinds.events，
+  // 归档页点进去时 GET /events/<day> 会自动合并，不需要前端改一个 tab。
+  const phoneDays = [];
   let cursor = undefined;
 
   try {
@@ -143,6 +154,11 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
           watchDays.push(metaOf(obj).id);
           continue;
         }
+        if (kind === 'phone') {
+          // 服务器发的手机事件：不单独列 kind，但日期要能进 EVENTS。
+          phoneDays.push(metaOf(obj));
+          continue;
+        }
         (kinds[kind] ||= []).push(metaOf(obj));
       }
       if (!res.truncated) break;
@@ -151,6 +167,15 @@ lifeRawRoutes.get('/life/raw/index', async (c) => {
   } catch (err) {
     console.error('life raw index failed:', err?.message || err);
     return c.json({ error: 'store unavailable' }, 503);
+  }
+
+  // 只有 phone 文档的日期也要出现在 EVENTS 的选择器里。key 指向 events
+  // 路径（GET 时会合并两份），size 用 phone 的，够前端展示大小。
+  for (const m of phoneDays) {
+    const arr = (kinds.events ||= []);
+    if (!arr.some((x) => x.id === m.id)) {
+      arr.push({ ...m, key: objectKey('events', m.id, 'json') });
+    }
   }
 
   for (const kind of Object.keys(kinds)) {
@@ -184,6 +209,49 @@ lifeRawRoutes.get('/life/raw/:kind/:id', async (c) => {
 
   const format = kind === 'journal' || kind === 'vault' ? 'md' : 'json';
   const key = objectKey(kind, id, format);
+
+  // events 特殊：把服务器发的 phone 文档合并进来。笔记本没开机 / 还没到
+  // 23:00 时，EVENTS 仍然能看到当天的手机、随手记和问答；笔记本那份到了
+  // 之后按 (ts_utc, domain, metric, value_text) 去重，不会出现两遍。
+  if (kind === 'events') {
+    const phoneKey = objectKey('phone', id, 'json');
+    let obj;
+    let phoneObj;
+    try {
+      [obj, phoneObj] = await Promise.all([
+        c.env.IMG_BUCKET.get(key),
+        c.env.IMG_BUCKET.get(phoneKey),
+      ]);
+    } catch (err) {
+      console.error('life raw read failed:', err?.message || err);
+      return c.json({ error: 'store unavailable' }, 503);
+    }
+    if (!obj && !phoneObj) return c.json({ error: 'not found', kind, id }, 404);
+
+    const parseArray = (text, label) => {
+      try {
+        const v = JSON.parse(text);
+        return Array.isArray(v) ? v : [];
+      } catch {
+        console.error('life raw json is invalid:', label);
+        return [];
+      }
+    };
+    const base = obj ? parseArray(await obj.text(), key) : [];
+    const extra = phoneObj ? parseArray(await phoneObj.text(), phoneKey) : [];
+    const seen = new Set();
+    const merged = [];
+    for (const e of [...base, ...extra]) {
+      if (!e || typeof e !== 'object') continue;
+      const k = `${e.ts_utc || ''}|${e.domain || ''}|${e.metric || ''}|${e.value_text ?? ''}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(e);
+    }
+    merged.sort((a, b) => String(a.ts_utc || '').localeCompare(String(b.ts_utc || '')));
+    c.header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    return c.json({ v: 1, kind, id, format: 'json', data: merged });
+  }
 
   let obj;
   try {

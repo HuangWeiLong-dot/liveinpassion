@@ -15,6 +15,8 @@ export const lifeRoutes = new Hono();
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_DAY_BYTES = 32 * 1024;
 const MAX_DAYS_PER_REQUEST = 90;
+// 服务器侧 phone-publisher 每批最多送多少天。30 天窗口一次正好装得下。
+const MAX_PHONE_DAYS_PER_REQUEST = 30;
 // 读窗口要盖住前端雷达的 YEAR（365 天）。以前卡在 90 天，YEAR 其实只有 90 天的数据，
 // 标签却写着 YEAR —— 统计口径和展示对不上。按 400 天留余量。
 const MAX_DAYS_QUERY = 400;
@@ -40,6 +42,10 @@ const DAY_KEYS = new Set([
   'weather',
   // 饮食：只有合计和顿数。每顿的原文是用户自己写的话，不进聚合。
   'nutrition',
+  // 服务器在没有笔记本完整快照时建出来的「手机-only」日。为 true 时，
+  // /life/phone/ingest 可以用手机的七维 / 并集覆盖；笔记本的完整快照
+  // 一旦到达，这个字段自然消失（它的 payload 里没有）。
+  'phoneOnly',
 ]);
 // 睡眠窗口的钟点：`23:40` 这种形状，不接受日期或时区后缀。
 const HHMM_RE = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
@@ -154,6 +160,62 @@ function validatePatterns(p) {
   return null;
 }
 
+function validateDimensions(dim) {
+  if (!isObj(dim) || !onlyKeys(dim, DIMENSION_KEYS)) return 'dimensions';
+  for (const key of DIMENSION_KEYS) {
+    if (!isNum(dim[key], 0, 24)) return `dimensions.${key}`;
+  }
+  return null;
+}
+
+// 手机聚合的校验。抽出来是因为服务器侧的 `/life/phone/ingest` 只发这一段，
+// 不能为了复用去伪造一个完整的 day。
+function validatePhone(p) {
+  if (!isObj(p) || !onlyKeys(p, PHONE_KEYS)) return 'phone';
+  if (!isOptNum(p.unlocks, 0, 1000000)) return 'phone.unlocks';
+  if (!isOptNum(p.screenOn, 0, 1000000)) return 'phone.screenOn';
+  if (!isOptNum(p.screenOff, 0, 1000000)) return 'phone.screenOff';
+  if (!isOptNum(p.screenMinutes, 0, 1440)) return 'phone.screenMinutes';
+  if (!isOptNum(p.appSwitches, 0, 1000000)) return 'phone.appSwitches';
+  if (p.topApps !== null && !isAppPairs(p.topApps, 40, 1440)) return 'phone.topApps';
+
+  if (p.battery != null) {
+    const b = p.battery;
+    if (!isObj(b) || !onlyKeys(b, PHONE_BATTERY_KEYS)) return 'phone.battery';
+    if (!isOptNum(b.start, 0, 100) || !isOptNum(b.end, 0, 100)
+      || !isOptNum(b.min, 0, 100) || !isOptNum(b.max, 0, 100)) return 'phone.battery.level';
+    if (!isOptNum(b.drop, -100, 100)) return 'phone.battery.drop';
+    if (!isOptNum(b.chargingMinutes, 0, 1440)) return 'phone.battery.chargingMinutes';
+    if (!isOptNum(b.samples, 0, 10000)) return 'phone.battery.samples';
+  }
+
+  if (p.network != null) {
+    const n = p.network;
+    if (!isObj(n) || !onlyKeys(n, PHONE_NETWORK_KEYS)) return 'phone.network';
+    if (!isOptNum(n.wifiMinutes, 0, 1440)) return 'phone.network.wifiMinutes';
+    if (!isOptNum(n.mobileMinutes, 0, 1440)) return 'phone.network.mobileMinutes';
+    if (n.last !== null && !isName(n.last, 24)) return 'phone.network.last';
+    if (!isOptNum(n.changes, 0, 10000)) return 'phone.network.changes';
+  }
+
+  if (p.music != null) {
+    const m = p.music;
+    if (!isObj(m) || !onlyKeys(m, PHONE_MUSIC_KEYS)) return 'phone.music';
+    if (!isOptNum(m.plays, 0, 100000)) return 'phone.music.plays';
+    if (m.last !== null && !isName(m.last, 200)) return 'phone.music.last';
+    // 歌名天然比应用名长（实测 83 字符），单独放宽到 120
+    if (m.tracks !== null && !isPairs(m.tracks, 40, 100000, 120)) return 'phone.music.tracks';
+  }
+
+  if (p.notifications != null) {
+    const nf = p.notifications;
+    if (!isObj(nf) || !onlyKeys(nf, PHONE_NOTIF_KEYS)) return 'phone.notifications';
+    if (!isOptNum(nf.total, 0, 100000)) return 'phone.notifications.total';
+    if (nf.byApp !== null && !isPairs(nf.byApp, 40, 100000)) return 'phone.notifications.byApp';
+  }
+  return null;
+}
+
 // 返回出错的字段名；null 表示通过。
 function validateDay(d) {
   if (!isObj(d)) return 'day';
@@ -228,11 +290,8 @@ function validateDay(d) {
   }
 
   if (d.dimensions !== undefined && d.dimensions !== null) {
-    const dim = d.dimensions;
-    if (!isObj(dim) || !onlyKeys(dim, DIMENSION_KEYS)) return 'dimensions';
-    for (const key of DIMENSION_KEYS) {
-      if (!isNum(dim[key], 0, 24)) return `dimensions.${key}`;
-    }
+    const bad = validateDimensions(d.dimensions);
+    if (bad) return bad;
   }
 
   // 睡眠：钟点 + 时长 + 来源。没有数据的日子是 null，不是 00:00。
@@ -296,49 +355,8 @@ function validateDay(d) {
   }
 
   if (d.phone !== null) {
-    const p = d.phone;
-    if (!isObj(p) || !onlyKeys(p, PHONE_KEYS)) return 'phone';
-    if (!isOptNum(p.unlocks, 0, 1000000)) return 'phone.unlocks';
-    if (!isOptNum(p.screenOn, 0, 1000000)) return 'phone.screenOn';
-    if (!isOptNum(p.screenOff, 0, 1000000)) return 'phone.screenOff';
-    if (!isOptNum(p.screenMinutes, 0, 1440)) return 'phone.screenMinutes';
-    if (!isOptNum(p.appSwitches, 0, 1000000)) return 'phone.appSwitches';
-    if (p.topApps !== null && !isAppPairs(p.topApps, 40, 1440)) return 'phone.topApps';
-
-    if (p.battery != null) {
-      const b = p.battery;
-      if (!isObj(b) || !onlyKeys(b, PHONE_BATTERY_KEYS)) return 'phone.battery';
-      if (!isOptNum(b.start, 0, 100) || !isOptNum(b.end, 0, 100)
-        || !isOptNum(b.min, 0, 100) || !isOptNum(b.max, 0, 100)) return 'phone.battery.level';
-      if (!isOptNum(b.drop, -100, 100)) return 'phone.battery.drop';
-      if (!isOptNum(b.chargingMinutes, 0, 1440)) return 'phone.battery.chargingMinutes';
-      if (!isOptNum(b.samples, 0, 10000)) return 'phone.battery.samples';
-    }
-
-    if (p.network != null) {
-      const n = p.network;
-      if (!isObj(n) || !onlyKeys(n, PHONE_NETWORK_KEYS)) return 'phone.network';
-      if (!isOptNum(n.wifiMinutes, 0, 1440)) return 'phone.network.wifiMinutes';
-      if (!isOptNum(n.mobileMinutes, 0, 1440)) return 'phone.network.mobileMinutes';
-      if (n.last !== null && !isName(n.last, 24)) return 'phone.network.last';
-      if (!isOptNum(n.changes, 0, 10000)) return 'phone.network.changes';
-    }
-
-    if (p.music != null) {
-      const m = p.music;
-      if (!isObj(m) || !onlyKeys(m, PHONE_MUSIC_KEYS)) return 'phone.music';
-      if (!isOptNum(m.plays, 0, 100000)) return 'phone.music.plays';
-      if (m.last !== null && !isName(m.last, 200)) return 'phone.music.last';
-      // 歌名天然比应用名长（实测 83 字符），单独放宽到 120
-      if (m.tracks !== null && !isPairs(m.tracks, 40, 100000, 120)) return 'phone.music.tracks';
-    }
-
-    if (p.notifications != null) {
-      const nf = p.notifications;
-      if (!isObj(nf) || !onlyKeys(nf, PHONE_NOTIF_KEYS)) return 'phone.notifications';
-      if (!isOptNum(nf.total, 0, 100000)) return 'phone.notifications.total';
-      if (nf.byApp !== null && !isPairs(nf.byApp, 40, 100000)) return 'phone.notifications.byApp';
-    }
+    const bad = validatePhone(d.phone);
+    if (bad) return bad;
   }
 
   if (d.ai !== null) {
@@ -451,6 +469,118 @@ lifeRoutes.post('/life/ingest', async (c) => {
 
   c.header('Cache-Control', 'no-store');
   return c.json({ ok: true, accepted: body.days.length });
+});
+
+// ---------- POST /api/life/phone/ingest ----------
+//
+// 服务器侧 phone-publisher 专用：只合并 `phone`（以及手机-only 日子的
+// 七维 / 并集），**不需要**笔记本的完整 day。
+//
+//   · 已有笔记本完整快照的日期：只替换 phone，保留桌面 / 位置 / 健康 /
+//     七维 —— 否则笔记本睡觉时，一次手机更新就会把桌面数据抹成 0。
+//   · 还没有快照的日期：建一个 `phoneOnly: true` 的壳，七维和并集只由
+//     手机算出。笔记本下一次完整发布自然会覆盖它（它的 payload 没有这个字段）。
+lifeRoutes.post('/life/phone/ingest', async (c) => {
+  const denied = await lifeAuth(c);
+  if (denied) return denied;
+
+  const declared = Number(c.req.header('Content-Length') || 0);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    return c.json({ error: 'payload too large' }, 413);
+  }
+  const raw = await c.req.text();
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+    return c.json({ error: 'payload too large' }, 413);
+  }
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return c.json({ error: 'invalid json' }, 400);
+  }
+  if (!isObj(body) || body.v !== 1 || !Array.isArray(body.days)) {
+    return c.json({ error: 'invalid body' }, 400);
+  }
+  if (body.days.length < 1 || body.days.length > MAX_PHONE_DAYS_PER_REQUEST) {
+    return c.json({ error: 'invalid days length' }, 400);
+  }
+
+  const PHONE_DAY_KEYS = new Set(['day', 'phone', 'dimensions', 'collapsedHours']);
+  const seen = new Set();
+  for (const d of body.days) {
+    if (!isObj(d) || !onlyKeys(d, PHONE_DAY_KEYS)) return c.json({ error: 'invalid day' }, 400);
+    if (typeof d.day !== 'string' || !DAY_RE.test(d.day) || !isRealDate(d.day)) {
+      return c.json({ error: 'invalid day', day: isObj(d) ? d.day : null }, 400);
+    }
+    if (seen.has(d.day)) return c.json({ error: 'duplicate day', day: d.day }, 400);
+    seen.add(d.day);
+    const bad = validatePhone(d.phone);
+    if (bad) return c.json({ error: 'invalid day', day: d.day, field: bad }, 400);
+    if (d.dimensions !== undefined && d.dimensions !== null) {
+      const dimBad = validateDimensions(d.dimensions);
+      if (dimBad) return c.json({ error: 'invalid day', day: d.day, field: dimBad }, 400);
+    }
+    if (d.collapsedHours !== undefined && d.collapsedHours !== null
+      && !isNum(d.collapsedHours, 0, 24.5)) {
+      return c.json({ error: 'invalid day', day: d.day, field: 'collapsedHours' }, 400);
+    }
+  }
+
+  let created = 0;
+  let merged = 0;
+  try {
+    for (const d of body.days) {
+      const row = await c.env.DB.prepare(
+        'SELECT payload FROM life_days WHERE day = ?',
+      ).bind(d.day).first();
+      let payload;
+      if (row) {
+        payload = JSON.parse(row.payload);
+        const phoneOnly = payload.phoneOnly === true;
+        payload = { ...payload, phone: d.phone };
+        if (phoneOnly) {
+          if (d.dimensions != null) payload.dimensions = d.dimensions;
+          if (d.collapsedHours != null) payload.collapsedHours = d.collapsedHours;
+        }
+        merged += 1;
+      } else {
+        payload = {
+          v: 1,
+          day: d.day,
+          categories: null,
+          trackedHours: 0,
+          topApps: null,
+          topSites: [],
+          health: null,
+          location: null,
+          phone: d.phone,
+          ai: null,
+          workouts: [],
+          dimensions: d.dimensions ?? null,
+          collapsedHours: d.collapsedHours ?? null,
+          phoneOnly: true,
+        };
+        created += 1;
+      }
+      const bad = validateDay(payload);
+      if (bad) {
+        return c.json({ error: 'invalid day', day: d.day, field: bad }, 400);
+      }
+      await c.env.DB.prepare(
+        `INSERT INTO life_days (day, payload, updated_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT(day) DO UPDATE SET
+           payload = excluded.payload,
+           updated_at = excluded.updated_at`,
+      ).bind(d.day, JSON.stringify(payload)).run();
+    }
+  } catch (err) {
+    console.error('life phone ingest failed:', err?.message || err);
+    return c.json({ error: 'store unavailable' }, 503);
+  }
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({ ok: true, accepted: body.days.length, created, merged });
 });
 
 // ---------- GET /api/life?days=N ----------
