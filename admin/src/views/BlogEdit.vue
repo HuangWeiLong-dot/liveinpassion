@@ -10,6 +10,7 @@ import { startPressDrag } from '../utils/pressDrag.js';
 import { lintMarkdown } from '../utils/mdLint.js';
 import { isDark } from '../theme.js';
 import AdminIcon from '../components/AdminIcon.vue';
+import '../styles/nocturne-editor.css';
 
 // 编辑器预览内置 js-xss 过滤，默认会：
 //   1) 剥离非白名单协议（blob: 不在其列）→ 编辑期暂存图片无法显示
@@ -69,6 +70,26 @@ const isNew = computed(() => !route.params.id);
 const coarsePointer = window.matchMedia('(hover: none)');
 const narrowScreen = window.matchMedia('(max-width: 768px)');
 const isNarrow = ref(narrowScreen.matches);
+
+// Typewriter Nocturne 写作模式：一张稿纸、一种墨色、一盏台灯。
+// 默认打开（这就是编辑器的日常皮肤），关掉后回到 CMS 原本的极简面板；选择记在本机。
+const NOCTURNE_KEY = 'cms-nocturne';
+function readNocturne() {
+  try {
+    return localStorage.getItem(NOCTURNE_KEY) !== '0';
+  } catch {
+    return true; // 隐私模式读不到存储时按默认开启
+  }
+}
+const nocturne = ref(readNocturne());
+function toggleNocturne() {
+  nocturne.value = !nocturne.value;
+  try {
+    localStorage.setItem(NOCTURNE_KEY, nocturne.value ? '1' : '0');
+  } catch {
+    /* 隐私模式下忽略 */
+  }
+}
 
 const form = ref({
   slug: '',
@@ -1248,10 +1269,21 @@ onUnmounted(() => {
 
     </div>
 
-    <div class="editor-panel">
+    <div class="editor-panel" :class="{ 'is-nocturne': nocturne }">
       <div class="editor-head">
         <span>Markdown — Editor</span>
         <span class="editor-head__right">
+          <button
+            type="button"
+            class="nocturne-toggle"
+            :class="{ 'is-on': nocturne }"
+            :aria-pressed="nocturne"
+            title="Typewriter Nocturne — paper, ink and lamplight"
+            @click="toggleNocturne"
+          >
+            <span class="nocturne-toggle__lamp" aria-hidden="true"></span>
+            <span>Nocturne</span>
+          </button>
           <button
             type="button"
             class="lint-toggle"

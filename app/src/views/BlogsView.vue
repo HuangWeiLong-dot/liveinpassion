@@ -2431,18 +2431,26 @@ function onVisibility() {
 :global(html.blogs-lookback body) {
   background: var(--jb-bg);
 }
-/* header 是 fixed 的：把这页的调色板映射到它的变量上，两者才同色 */
-:global(html.blogs-lookback header) {
+/* header 是 fixed 的：把这页的调色板映射到它的变量上，两者才同色。
+   深色页面不要毛玻璃：条面直接给纸面色（不混透明），窗帘也用这页的调色板。 */
+:global(html.blogs-lookback #header) {
   --bg: var(--jb-bg);
   --text-primary: var(--jb-fg);
   --text-secondary: var(--jb-dim);
   --border: var(--jb-line);
   --border-color: var(--jb-line);
+  --nav-surface: color-mix(in oklab, var(--jb-bg) 68%, transparent);
+  --nav-border-color: var(--jb-line);
+  --nav-item-color: var(--jb-dim);
+  --nav-item-active: var(--jb-fg);
+  --nav-curtain-bg: var(--jb-bg);
+  --nav-curtain-line: var(--jb-line);
+  --nav-curtain-ink: var(--jb-fg);
+  --nav-curtain-muted: var(--jb-dim);
 }
-/* 滚到一半时 header 那条浅色磨砂底会把轨道切断 */
-:global(html.blogs-lookback header.scrolled) {
-  background-color: var(--jb-bg);
-  backdrop-filter: none;
+
+:global(html.dark.blogs-lookback #header) {
+  --nav-surface: color-mix(in oklab, var(--jb-bg) 62%, transparent);
 }
 
 /* ── 版心 ────────────────────────────────────────────────────────────── */

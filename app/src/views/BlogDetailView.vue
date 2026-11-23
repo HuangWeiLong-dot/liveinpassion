@@ -1686,19 +1686,7 @@ if (typeof window !== 'undefined') {
   transition: opacity 0.24s ease;
 }
 
-/* 详情页里站点 header 要变成实心：正文从它下面滚过去，而 header 默认是透明的
-   （只有 .scrolled 那一档有底），两层字会直接叠在一起。
-   配色沿用 main.css 里 header.scrolled 的那一套（0.9 + 毛玻璃），保持同一门语言。 */
-:global(html.blog-detail-open header),
-:global(html.blog-detail-open header.scrolled) {
-  background-color: rgba(250, 250, 250, 0.9);
-  backdrop-filter: blur(10px);
-}
-
-:global(html.dark.blog-detail-open header),
-:global(html.dark.blog-detail-open header.scrolled) {
-  background-color: rgba(26, 26, 26, 0.9);
-}
+/* 导航现在是通栏实心条，详情页不再需要单独压一层底色覆盖。 */
 
 /* ⚠ 这里原来有一条 `html.bd-cover-open .dock { opacity: 0 }`（拉开封面抽屉时把底部
    那条 Dock 收起来）。封面改成整屏常驻背景之后**没有这个状态了** —— 背景一直都在，

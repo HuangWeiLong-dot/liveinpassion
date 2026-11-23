@@ -48,6 +48,43 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 105 — 2026-11-23
+
+#### CMS 编辑器 Typewriter Nocturne + 全站导航重做
+
+- CMS 的 Markdown 编辑器默认变成一张稿纸：深色书桌 + 台灯暖光 + 程序化 SVG 纸纹，
+  配色取自 Typewriter-Nocturne 的两套主题 —— 浅色 Paper & Ink（象牙纸、古铜墨），
+  深色 Midnight Study（深纸、琥珀灯），随 CMS 明暗自动切换。页头换成书桌铭牌排版
+  （斜体衬线 + 黄铜 `NOCTURNE`），稿纸下方留一道桌沿。
+- 新样式在 `admin/src/styles/nocturne-editor.css`，只挂在 `.editor-panel.is-nocturne`
+  下；开关在编辑器页头，默认打开，选择记进 `localStorage`（`cms-nocturne`），关掉后
+  编辑器回到原来的极简皮肤。
+- 输入区：Courier Prime、单一墨色（压掉 One Dark 的语法彩字，标题字号 / 粗细仍保留）、
+  2px 墨线光标带一点洇开的晕、墨色选区、纸色行号槽与黄铜滚动条；预览按打字稿排：
+  EB Garamond / 宋体标题、暖色引用块、胡桃木代码块。手机只留文稿与 8px 桌沿，
+  开关在触屏下 44px。
+- 新增 Courier Prime / EB Garamond 两个 Google Fonts 家族（`admin/index.html`），
+  编辑器路由才用到。
+- 验收：Chrome headless 截图深 / 浅 / 关灯 / 390px 四态；无横向溢出，触屏开关
+  86×44，关灯态与原编辑器一致。
+
+**全站导航重做**（`AppHeader` + `main.css`）：
+
+- 头部换成顶部居中的悬浮胶囊（`max-content`、30px 项高、直角、半透明纸面 +
+  `backdrop-filter`）。条里只有字标、当前板块名和「三个点」，**不再放板块入口**。
+- 三个点（窄屏是汉堡）打开 FilterPanel 式窗帘：750ms `clip-path` 从中间竖向缝隙
+  向两侧展开，实心纸面，装全部板块入口与头像 / 社交 / 主题 / 音乐 / 背景开关；
+  Esc、路由变化、再次点击都能收起。
+- 站内没有编号、没有分割线；条内项目在 `uiReady` 之后按 300ms + i×70ms 错峰淡入，
+  就绪前 `#header` 带 `inert`。居中用 `left/right:0 + margin-inline:auto`，
+  **不能用** `translateX(-50%)` —— `#header` 里挂着 `position: fixed` 的窗帘，
+  祖先有 transform 会把 fixed 关进头部盒子。
+- 各页按自己的调色板映射导航变量：LOOKBACK 深色页取消毛玻璃、条面直接给纸色；
+  PROJECTION 用暗场玻璃 + 反色图标；详情页不再需要单独压一层 header 底色。
+- 去掉 `scrollY > 50` 的滚动监听，悬浮条一直保持同一种材质。
+- 验收：`tools/verify-shell.mjs` 同步新导航结构。
+- 内容快照：同步 CMS 11 月新文章（5 篇）与 LATEST ECHO。
+
 ### update: 104 — 2026-11-16
 
 #### LIFE 手机-only 日入库

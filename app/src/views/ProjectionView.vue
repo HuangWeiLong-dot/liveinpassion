@@ -1111,17 +1111,42 @@ onBeforeUnmount(() => {
   transition: opacity 0.6s ease;
 }
 
-/* 这一页永远是黑底：浅色主题下头部原本是深色字，会消失在黑色里 */
-:global(html.projection-page #header),
-:global(html.projection-page #header .logo),
-:global(html.projection-page #header nav a),
-:global(html.projection-page #header .menu-toggle),
-:global(html.projection-page #header .back-link) {
+/* 这一页永远是黑底：导航也跟着换成暗场配色。
+   悬浮条在这里是深色玻璃 + 1px 描边。 */
+:global(html.projection-page #header) {
+  --nav-surface: rgba(20, 18, 15, 0.72);
+  --nav-border-color: rgba(233, 228, 218, 0.16);
+  --nav-item-color: #b9b2a6;
+  --nav-item-active: #fff;
+  --nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --nav-curtain-bg: #141210;
+  --nav-curtain-line: rgba(233, 228, 218, 0.16);
+  --nav-curtain-ink: #e9e4da;
+  --nav-curtain-muted: #b9b2a6;
   color: #e9e4da;
 }
 
-:global(html.projection-page #header nav a.router-link-active) {
-  color: #fff;
+:global(html.projection-page .nav-curtain .nav-tool img) {
+  filter: invert(1);
+}
+
+:global(html.projection-page .nav-curtain .nav-tool:hover img),
+:global(html.projection-page .nav-curtain .nav-tool.is-active img) {
+  filter: invert(0);
+}
+
+:global(html.projection-page #header .logo),
+:global(html.projection-page #header nav a),
+:global(html.projection-page #header .menu-toggle),
+:global(html.projection-page #header .back-link),
+:global(html.projection-page #header .nav-dots) {
+  color: var(--nav-item-color);
+}
+
+:global(html.projection-page #header nav a.is-active),
+:global(html.projection-page #header nav a.router-link-active),
+:global(html.projection-page #header .logo.router-link-exact-active) {
+  color: var(--nav-item-active);
 }
 
 /* ── 手机 ─────────────────────────────────────────────────────────────── */

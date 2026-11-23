@@ -18,7 +18,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 注意这段代码在 document-start 执行，那时 document.documentElement 还是 null，
 // 所以既不能直接读它的 className，也不能把它当观察目标——观察 document 本身即可。
 const INJECT = `
-window.__marks = { themeAtStart: '(尚未存在)', themeByBody: null, plays: [], loaderHiddenAt: null, noScrollClearedAt: null };
+// 首屏预载默认 LIVE，测试里要跳过：否则 ENTER 会先下几百张图才进场。
+try { localStorage.setItem('lip:first-screen-preload-v2', 'none'); } catch (e) {}
+window.__marks = { themeAtStart: '(尚未存在)', themeByBody: null, plays: [], brandGoneAt: null, noScrollClearedAt: null };
 (function () {
   try {
     if (document.documentElement) window.__marks.themeAtStart = document.documentElement.className;
@@ -29,9 +31,9 @@ window.__marks = { themeAtStart: '(尚未存在)', themeByBody: null, plays: [],
         window.__marks.themeAtStart = document.documentElement.className;
       }
       if (document.body && window.__marks.themeByBody === null) window.__marks.themeByBody = document.documentElement.className;
-      var loader = document.getElementById('loader');
-      if (loader && loader.classList.contains('hidden') && window.__marks.loaderHiddenAt === null) {
-        window.__marks.loaderHiddenAt = performance.now();
+      var brand = document.querySelector('.brand');
+      if (brand && brand.classList.contains('is-gone') && window.__marks.brandGoneAt === null) {
+        window.__marks.brandGoneAt = performance.now();
       }
       if (document.body && !document.body.classList.contains('no-scroll') && window.__marks.noScrollClearedAt === null) {
         window.__marks.noScrollClearedAt = performance.now();
@@ -114,20 +116,20 @@ const check = (label, ok, detail = '') => {
     const stored = await evaluate(`localStorage.getItem('themeState')`);
     check('无存储时默认暗色且不写入 localStorage（与旧版一致）', stored === null, String(stored));
 
-    console.log('\n加载器:');
+    console.log('\n首屏:');
     await sleep(2900);
-    const loader = await evaluate(`JSON.stringify({
-      hidden: document.getElementById('loader').classList.contains('hidden'),
-      hiddenAt: window.__marks.loaderHiddenAt,
+    const brand = JSON.parse(await evaluate(`JSON.stringify({
+      hasBrand: !!document.querySelector('.brand'),
+      wordmark: document.querySelector('.brand__solid') ? document.querySelector('.brand__solid').textContent.trim() : null,
+      enterVisible: !!document.querySelector('.brand__enter')
+        && getComputedStyle(document.querySelector('.brand__enter')).display !== 'none',
       noScroll: document.body.classList.contains('no-scroll'),
-      noScrollClearedAt: window.__marks.noScrollClearedAt
-    })`);
-    const l = JSON.parse(loader);
-    check('加载器已隐藏', l.hidden === true);
-    // 显示时长 = max(1000ms 下限, min(load, 2500ms 兜底))。
-    // 下限是为了不让遮罩一闪而过（旧站实测 1.5-2.5s，新站原生只要 ~100ms）。
-    check('显示时长在 1000-2500ms 之间', l.hiddenAt !== null && l.hiddenAt >= 950 && l.hiddenAt <= 3200, `${Math.round(l.hiddenAt)}ms`);
-    check('body 的 no-scroll 已移除（可滚动）', l.noScroll === false);
+      plays: window.__marks.plays.length,
+    })`));
+    // 旧版的加载器（#loader）已经被品牌遮罩取代，这里断言遮罩本身
+    check('首屏品牌遮罩在，第一次访问显示 LIVEINPASSION', brand.hasBrand && brand.wordmark === 'LIVEINPASSION', `"${brand.wordmark}"`);
+    check('ENTER 已可用、页面初始锁滚动', brand.enterVisible === true && brand.noScroll === true, `enter=${brand.enterVisible} noScroll=${brand.noScroll}`);
+    check('挂载时未调用 play()', brand.plays === 0, `${brand.plays} 次`);
 
     console.log('\n音乐播放器初始状态:');
     const audio = JSON.parse(await evaluate(`JSON.stringify({
@@ -140,14 +142,20 @@ const check = (label, ok, detail = '') => {
     check('初始不静音（起播就出声）', audio.muted === false);
     check('音量 0.3', Math.abs(audio.volume - 0.3) < 0.001, String(audio.volume));
     // 起始曲目固定第一首（旧版是 Math.random() 抽一首）
-    check('固定选中第一首 Almost Nothing', /music\/Almost Nothing - Silent PoetsOkay Kaya\.mp3$/.test(audio.src), audio.src.split('/').pop());
-    check('挂载时未调用 play()', audio.plays === 0, `${audio.plays} 次`);
+    check('固定选中第一首 Almost Nothing', /Almost Nothing - Silent PoetsOkay Kaya\.mp3/.test(audio.src), audio.src.split('/').pop());
 
-    // 首次用户交互触发一次播放，且监听器自移除
-    await evaluate(`document.body.click()`);
+    // 点 ENTER 进站：ENTER 就是首次交互 → 音乐起播、遮罩演完后退场
+    await evaluate(`document.querySelector('.brand__enter').click(); 1`);
+    let brandGone = false;
+    for (let i = 0; i < 60 && !brandGone; i++) {
+      brandGone = await evaluate(`!!document.querySelector('.brand.is-gone')`);
+      if (!brandGone) await sleep(200);
+    }
+    check('点 ENTER 后品牌遮罩退场', brandGone === true);
+    check('遮罩退场后滚动放开', (await evaluate(`document.body.classList.contains('no-scroll')`)) === false);
     await sleep(600);
     const afterFirst = await evaluate(`window.__marks.plays.length`);
-    check('首次交互后播放一次', afterFirst === 1, `${afterFirst} 次`);
+    check('ENTER（首次交互）后播放一次', afterFirst === 1, `${afterFirst} 次`);
     // 起播的**状态**也要跟上：旧版自动起播只调 play() 不置 isPlaying，
     // 于是进度条在走、按钮还显示"播放"，用户要点两下才停得下来。
     const playIconAfter = await evaluate(`document.querySelector('.play-icon').style.display`);
@@ -158,9 +166,27 @@ const check = (label, ok, detail = '') => {
     check('再次交互不再重复播放（监听器已移除）', afterSecond === 1, `${afterSecond} 次`);
 
     console.log('\n头部:');
-    const headerHome = await evaluate(`document.getElementById('header').className`);
-    check('首页无 centered', !headerHome.includes('centered'), `"${headerHome}"`);
-    // 撑高页面再滚动：当前视图内容很少，不撑高的话窗口根本滚不动，测不到 scrolled
+    const headerHome = JSON.parse(await evaluate(`JSON.stringify((function(){
+      var h = document.getElementById('header');
+      var p = document.querySelector('.nav-pill');
+      var r = h.getBoundingClientRect();
+      var cs = getComputedStyle(p);
+      var cur = document.querySelector('.nav-current');
+      return {
+        left: Math.round(r.left), right: Math.round(innerWidth - r.right), top: Math.round(r.top),
+        pillBg: cs.backgroundColor,
+        pillBlur: cs.backdropFilter || cs.webkitBackdropFilter || 'none',
+        current: cur ? cur.textContent.trim() : '',
+        dots: !!document.querySelector('.nav-dots'),
+        back: !!document.getElementById('backLink')
+      };
+    })())`));
+    // 悬浮条：左/右留白相等 = 居中；top 贴顶
+    check('导航悬浮在顶部且水平居中', Math.abs(headerHome.left - headerHome.right) <= 1 && headerHome.top === 0, `left=${headerHome.left} right=${headerHome.right} top=${headerHome.top}`);
+    check('首页不显示当前板块、没有返回键', headerHome.current === '' && headerHome.back === false, `current="${headerHome.current}" back=${headerHome.back}`);
+    check('条里有三个点', headerHome.dots === true);
+    check('条面有毛玻璃或底色', headerHome.pillBlur !== 'none' || !/rgba\(0, 0, 0, 0\)/.test(headerHome.pillBg), `blur=${headerHome.pillBlur} bg=${headerHome.pillBg}`);
+    // 撑高页面再滚动：头部是 fixed 的悬浮条，滚动时不应该跟着走
     await evaluate(`(function () {
       var spacer = document.createElement('div');
       spacer.id = '__spacer';
@@ -170,29 +196,59 @@ const check = (label, ok, detail = '') => {
       return 1;
     })()`);
     await sleep(250);
-    const headerScrolled = await evaluate(`document.getElementById('header').className`);
-    check('滚动超过 50px 后加 scrolled', headerScrolled.includes('scrolled'), `"${headerScrolled}"`);
+    const headerScrolled = await evaluate(`Math.round(document.getElementById('header').getBoundingClientRect().top)`);
+    check('滚动后头部仍在顶部', headerScrolled === 0, `top=${headerScrolled}`);
     await evaluate(`window.scrollTo(0, 0); document.getElementById('__spacer').remove(); 1`);
     await sleep(200);
+
+    // 三个点：所有板块入口只在窗帘里，且不写编号、不画分割线
+    await evaluate(`document.querySelector('.nav-dots').click(); 1`);
+    await sleep(1300);
+    const curtain = JSON.parse(await evaluate(`JSON.stringify((function(){
+      var c = document.getElementById('navCurtain');
+      var links = c ? [...c.querySelectorAll('.nav-curtain__link')] : [];
+      var first = links[0];
+      var linksBox = c ? c.querySelector('.nav-curtain__links') : null;
+      return {
+        open: !!c && c.classList.contains('is-open'),
+        linkCount: links.length,
+        labels: links.map(function (a) { return a.textContent.trim(); }),
+        indexes: c ? c.querySelectorAll('.nav-curtain__index').length : -1,
+        linksBorder: linksBox ? getComputedStyle(linksBox).borderTopWidth : null,
+        firstBorder: first ? getComputedStyle(first).borderBottomWidth : null,
+        dotsMinus: document.querySelector('.nav-dots').classList.contains('is-open'),
+        bodyLocked: document.documentElement.classList.contains('nav-curtain-open'),
+      };
+    })())`));
+    check('三个点打开窗帘', curtain.open === true);
+    check('窗帘里是全部板块入口', curtain.linkCount === 6 && curtain.labels.slice(0, 5).join(',') === 'HOME,ECHOES,FILM,PHOTO,LIFE', `${curtain.linkCount}: ${curtain.labels.join(',')}`);
+    check('窗帘不写编号', curtain.indexes === 0, `${curtain.indexes} 个`);
+    check('窗帘不画分割线', curtain.linksBorder === '0px' && curtain.firstBorder === '0px', `top=${curtain.linksBorder} bottom=${curtain.firstBorder}`);
+    check('三个点变成横向减号、页面滚动被锁住', curtain.dotsMinus === true && curtain.bodyLocked === true);
+    await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); 1`);
+    await sleep(950);
+    check('Esc 收起并卸载窗帘', (await evaluate(`!document.getElementById('navCurtain')`)) === true);
 
     console.log('\n跨路由不卸载:');
     await evaluate(`window.__audioEl = document.getElementById('audioPlayer'); window.__audioEl.__probe = 'kept'; document.getElementById('audioPlayer').currentTime = 1; 1`);
     await evaluate(`window.history.pushState({}, '', '/blogs'); window.dispatchEvent(new PopStateEvent('popstate')); 1`);
-    await sleep(700);
+    // /blogs 会重定向到 /echoes，转场板子演完才换路由 —— 给足时间
+    for (let i = 0; i < 20 && (await evaluate(`location.pathname`)) === '/'; i++) await sleep(200);
+    await sleep(600);
     const nav = JSON.parse(await evaluate(`JSON.stringify({
       path: location.pathname,
       sameElement: document.getElementById('audioPlayer') === window.__audioEl,
       probe: document.getElementById('audioPlayer') && document.getElementById('audioPlayer').__probe,
       currentTime: document.getElementById('audioPlayer').currentTime,
-      headerClass: document.getElementById('header').className,
-      loaderStillHidden: document.getElementById('loader').classList.contains('hidden'),
-      backVisible: getComputedStyle(document.getElementById('backLink')).display
+      current: document.querySelector('.nav-current') ? document.querySelector('.nav-current').textContent.trim() : null,
+      brandGone: !!document.querySelector('.brand.is-gone'),
+      backVisible: document.getElementById('backLink') ? getComputedStyle(document.getElementById('backLink')).display : null
     })`));
-    check('已切到 /blogs 且未整页刷新', nav.path === '/blogs' && nav.sameElement === true);
+    check('已切到 /echoes 且未整页刷新', nav.path === '/echoes' && nav.sameElement === true, nav.path);
     check('audio 元素身份未变、进度保留', nav.probe === 'kept' && nav.currentTime >= 0.9, `currentTime=${nav.currentTime.toFixed(2)}`);
-    check('非首页加 centered', nav.headerClass.includes('centered'), `"${nav.headerClass}"`);
-    check('返回按钮显示', nav.backVisible === 'flex', nav.backVisible);
-    check('路由切换没有重新显示加载器', nav.loaderStillHidden === true);
+    check('条里显示当前板块 ECHOES', nav.current === 'ECHOES', `"${nav.current}"`);
+    check('返回按钮显示', nav.backVisible === 'inline-flex', nav.backVisible);
+    check('路由切换没有重新显示首屏遮罩', nav.brandGone === true);
 
     console.log('\n主题切换:');
     // 点击后要等 Vue 的重渲染（微任务）落地再读按钮 class，否则读到的是旧值

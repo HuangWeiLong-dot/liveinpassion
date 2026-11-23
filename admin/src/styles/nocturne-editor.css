@@ -1,0 +1,424 @@
+/* ============ Typewriter Nocturne 写作模式 ============
+   把 Markdown 编辑器变成一张稿纸：深色书桌、纸张与墨色、台灯暖光。
+   配色取自 Typewriter-Nocturne 的两套主题（app/nocturne/themes.ts）：
+   浅色 = Paper & Ink，深色 = Midnight Study；切换 CMS 明暗即切换书房。
+   只挂在 .editor-panel.is-nocturne 下，关掉开关后编辑器回到原来的极简皮肤。 */
+
+.editor-panel.is-nocturne {
+  --tn-room: #241a14;
+  --tn-room-edge: #070504;
+  --tn-desk-ink: #d9c9a8;
+  --tn-desk-muted: rgba(217, 201, 168, 0.65);
+  --tn-sheet: #f4ecdb;
+  --tn-sheet-edge: #e1d1b0;
+  --tn-ink: #2b231c;
+  --tn-ink-muted: #6e6153;
+  --tn-ink-faint: #a89a85;
+  --tn-accent: #b08a4a;
+  --tn-accent-soft: #d9c08a;
+  --tn-link: #8a5a2b;
+  --tn-border: #c9b48e;
+  --tn-cursor: #3a2c20;
+  --tn-selection: rgba(52, 64, 112, 0.22);
+  --tn-glow: rgba(255, 210, 154, 0.16);
+  --tn-lamp: rgba(255, 179, 92, 0.18);
+  --tn-stain: rgba(120, 90, 50, 0.05);
+  --tn-vignette: rgba(24, 14, 6, 0.26);
+  --tn-shadow: rgba(24, 14, 6, 0.55);
+  --tn-font-mono: 'Courier Prime', 'Courier New', ui-monospace, monospace;
+  --tn-font-serif: 'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia,
+    'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', SimSun, serif;
+  /* 颗粒：程序化 SVG 噪点，和 Nocturne 里画布生成的纸纹一个意思，不占请求 */
+  --tn-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.055'/%3E%3C/svg%3E");
+
+  position: relative;
+  padding: 16px 16px 30px;
+  border: 1px solid rgba(176, 138, 74, 0.4);
+  background-color: var(--tn-room);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 50% 106%, rgba(255, 210, 154, 0.1), transparent 70%),
+    radial-gradient(ellipse 120% 95% at 50% 35%, var(--tn-room), var(--tn-room-edge));
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+/* 书桌下沿的黄铜铭牌：和打字机底座的 NOCTURNE 一个意思 */
+.editor-panel.is-nocturne::after {
+  content: 'NOCTURNE';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9px;
+  text-align: center;
+  text-indent: 0.55em;
+  font-family: var(--tn-font-serif);
+  font-size: 0.55rem;
+  font-weight: 500;
+  letter-spacing: 0.55em;
+  color: rgba(201, 164, 92, 0.6);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Midnight Study：深纸、琥珀灯、更深的书房 */
+html.dark .editor-panel.is-nocturne {
+  --tn-room: #140f0b;
+  --tn-room-edge: #030202;
+  --tn-desk-ink: #d8ccb6;
+  --tn-desk-muted: rgba(216, 204, 182, 0.65);
+  --tn-sheet: #1c1714;
+  --tn-sheet-edge: #2c241e;
+  --tn-ink: #eadfc8;
+  --tn-ink-muted: #a39580;
+  --tn-ink-faint: #6b5f52;
+  --tn-accent: #c9a45c;
+  --tn-accent-soft: #8a6f3d;
+  --tn-link: #d2ac6a;
+  --tn-border: #3a2f27;
+  --tn-cursor: #f2b45c;
+  --tn-selection: rgba(201, 164, 92, 0.3);
+  --tn-glow: rgba(255, 179, 92, 0.1);
+  --tn-lamp: rgba(255, 179, 92, 0.2);
+  --tn-stain: rgba(201, 164, 92, 0.045);
+  --tn-vignette: rgba(0, 0, 0, 0.4);
+  --tn-shadow: rgba(0, 0, 0, 0.7);
+}
+
+/* ---------- 书桌：页头 / Lint / 开关 ---------- */
+
+.editor-panel.is-nocturne .editor-head {
+  border-bottom-color: rgba(176, 138, 74, 0.28);
+  color: var(--tn-desk-ink);
+  font-family: var(--tn-font-serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.07em;
+  text-transform: none;
+}
+
+.editor-panel.is-nocturne .editor-tip {
+  color: var(--tn-desk-muted);
+  font-family: var(--tn-font-mono);
+  font-style: normal;
+  font-size: 0.58rem;
+}
+
+.nocturne-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+.nocturne-toggle:hover { color: var(--text-primary); border-color: var(--text-primary); }
+.nocturne-toggle__lamp {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  transition: opacity 0.18s ease, box-shadow 0.18s ease;
+}
+.nocturne-toggle.is-on .nocturne-toggle__lamp {
+  opacity: 1;
+  box-shadow: 0 0 5px 1px currentColor, 0 0 12px rgba(255, 190, 100, 0.5);
+}
+
+/* 模式打开后，开关本身也落到书桌配色里 */
+.editor-panel.is-nocturne .nocturne-toggle {
+  border-color: rgba(176, 138, 74, 0.4);
+  color: var(--tn-accent);
+}
+.editor-panel.is-nocturne .nocturne-toggle:hover {
+  border-color: var(--tn-accent);
+  color: var(--tn-accent-soft);
+}
+.editor-panel.is-nocturne .lint-toggle {
+  border-color: rgba(176, 138, 74, 0.35);
+  color: var(--tn-desk-muted);
+}
+.editor-panel.is-nocturne .lint-toggle:hover {
+  border-color: var(--tn-accent);
+  color: var(--tn-accent);
+}
+.editor-panel.is-nocturne .lint-toggle.is-error { color: #e08c6c; border-color: rgba(224, 140, 108, 0.5); }
+.editor-panel.is-nocturne .lint-toggle.is-clean { color: var(--tn-desk-muted); }
+
+.editor-panel.is-nocturne .lint-panel {
+  border-bottom-color: rgba(176, 138, 74, 0.28);
+  background: rgba(0, 0, 0, 0.22);
+}
+.editor-panel.is-nocturne .lint-empty { color: var(--tn-desk-muted); }
+.editor-panel.is-nocturne .lint-item {
+  border-bottom-color: rgba(176, 138, 74, 0.16);
+  color: var(--tn-desk-ink);
+}
+.editor-panel.is-nocturne .lint-item:hover { background: rgba(255, 210, 154, 0.06); }
+.editor-panel.is-nocturne .lint-item__sev,
+.editor-panel.is-nocturne .lint-item__line,
+.editor-panel.is-nocturne .lint-foot { color: var(--tn-desk-muted); }
+.editor-panel.is-nocturne .lint-item.is-error .lint-item__sev { color: #e08c6c; }
+
+/* ---------- 稿纸 ---------- */
+
+.editor-panel.is-nocturne .md-editor {
+  --md-color: var(--tn-ink);
+  --md-border-color: var(--tn-border);
+  --md-border-hover-color: var(--tn-accent);
+  --md-border-active-color: var(--tn-accent);
+  --md-bk-color: var(--tn-sheet);
+  --md-bk-color-outstand: var(--tn-sheet-edge);
+  --md-bk-hover-color: rgba(176, 138, 74, 0.14);
+  --md-hover-color: var(--tn-ink);
+  --md-scrollbar-bg-color: transparent;
+  --md-scrollbar-thumb-color: rgba(110, 97, 83, 0.45);
+  --md-scrollbar-thumb-hover-color: rgba(110, 97, 83, 0.65);
+  --md-scrollbar-thumb-active-color: rgba(110, 97, 83, 0.8);
+  border: 0 !important;
+  background-color: var(--tn-sheet);
+  background-image:
+    radial-gradient(ellipse 85% 60% at 50% -12%, var(--tn-glow), transparent 70%),
+    radial-gradient(circle at 84% -4%, var(--tn-lamp), transparent 46%),
+    radial-gradient(ellipse 38% 26% at 16% 24%, var(--tn-stain), transparent 72%),
+    radial-gradient(ellipse 34% 24% at 84% 78%, var(--tn-stain), transparent 72%),
+    var(--tn-grain);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.2),
+    0 18px 36px -16px var(--tn-shadow),
+    inset 0 0 90px rgba(0, 0, 0, 0.04);
+}
+
+/* 暗角：像台灯照不到的书桌边角。不拦指针，不影响输入 */
+.editor-panel.is-nocturne .md-editor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(ellipse 88% 80% at 50% 42%, transparent 55%, var(--tn-vignette) 100%);
+}
+
+html.dark .editor-panel.is-nocturne .md-editor {
+  --md-scrollbar-thumb-color: rgba(201, 164, 92, 0.35);
+  --md-scrollbar-thumb-hover-color: rgba(201, 164, 92, 0.55);
+  --md-scrollbar-thumb-active-color: rgba(201, 164, 92, 0.7);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 18px 36px -16px var(--tn-shadow),
+    inset 0 0 90px rgba(0, 0, 0, 0.22);
+}
+
+.editor-panel.is-nocturne .md-editor .md-editor-toolbar-wrapper {
+  background: transparent;
+  border-bottom: 1px solid rgba(176, 138, 74, 0.28);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-toolbar { background: transparent; }
+.editor-panel.is-nocturne .md-editor .md-editor-toolbar-item {
+  border-radius: 0;
+  color: var(--tn-ink-muted);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-toolbar-item:hover {
+  background: rgba(176, 138, 74, 0.14);
+  color: var(--tn-ink);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-divider {
+  background-color: rgba(176, 138, 74, 0.4);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-footer {
+  border-top-color: rgba(176, 138, 74, 0.22);
+  color: var(--tn-ink-muted);
+  font-family: var(--tn-font-mono);
+  letter-spacing: 0.04em;
+}
+.editor-panel.is-nocturne .md-editor .md-editor-footer-item { color: inherit; }
+.editor-panel.is-nocturne .md-editor .md-editor-resize-operate { background-color: transparent; }
+
+/* ---------- 输入区：打字机字体、墨色、纸上的笔尖光标 ---------- */
+
+.editor-panel.is-nocturne .cm-editor { background: transparent !important; }
+.editor-panel.is-nocturne .cm-editor .cm-scroller {
+  font-family: var(--tn-font-mono);
+  line-height: 1.9;
+  font-size: 15px;
+  color: var(--tn-ink);
+}
+.editor-panel.is-nocturne .cm-editor .cm-content {
+  padding: 18px 22px 45% 10px;
+  color: var(--tn-ink);
+  caret-color: transparent;
+  text-shadow: 0 0.3px 0 rgba(43, 32, 20, 0.16);
+}
+html.dark .editor-panel.is-nocturne .cm-editor .cm-content {
+  text-shadow: 0 0.3px 0 rgba(0, 0, 0, 0.4);
+}
+.editor-panel.is-nocturne .cm-editor .cm-gutters {
+  border-right: 1px solid rgba(176, 138, 74, 0.22);
+  background: transparent;
+  color: var(--tn-ink-faint);
+  font-family: var(--tn-font-mono);
+  font-size: 0.72rem;
+}
+.editor-panel.is-nocturne .cm-editor .cm-activeLine { background: rgba(176, 138, 74, 0.07); }
+.editor-panel.is-nocturne .cm-editor .cm-activeLineGutter {
+  background: rgba(176, 138, 74, 0.1);
+  color: var(--tn-ink-muted);
+}
+.editor-panel.is-nocturne .cm-editor .cm-lineNumbers .cm-gutterElement { padding: 0 10px 0 16px; }
+
+/* 稿纸只有一种墨：语法高亮的 One Dark 彩字在米色纸上会脏，全部落回墨色。
+   标题的字号、粗体 / 斜体仍由 CodeMirror 的语法样式保留。 */
+.editor-panel.is-nocturne .cm-editor .cm-line span { color: var(--tn-ink) !important; }
+.editor-panel.is-nocturne .cm-editor .cm-content .cm-placeholder {
+  color: var(--tn-ink-faint) !important;
+  font-style: italic;
+}
+
+.editor-panel.is-nocturne .cm-editor .cm-selectionBackground,
+.editor-panel.is-nocturne .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--tn-selection) !important;
+}
+.editor-panel.is-nocturne .cm-editor .cm-selectionMatch {
+  background: rgba(176, 138, 74, 0.18) !important;
+}
+
+/* 光标：一支落在纸上的墨线，边缘有一点洇开的晕 */
+.editor-panel.is-nocturne .cm-editor .cm-cursor,
+.editor-panel.is-nocturne .cm-editor .cm-dropCursor {
+  border-left: 0 !important;
+  width: 2px !important;
+  background: var(--tn-cursor) !important;
+  border-radius: 1px;
+  box-shadow:
+    0 0 1px var(--tn-cursor),
+    0 0 5px color-mix(in srgb, var(--tn-cursor) 45%, transparent);
+}
+
+/* 滚动条：黄铜滑轨而不是纸夹，保持编辑器自身的滚动逻辑 */
+.editor-panel.is-nocturne .cm-editor .cm-scroller::-webkit-scrollbar { width: 8px; }
+.editor-panel.is-nocturne .cm-editor .cm-scroller::-webkit-scrollbar-track { background: transparent; }
+.editor-panel.is-nocturne .cm-editor .cm-scroller::-webkit-scrollbar-thumb {
+  background: rgba(176, 138, 74, 0.35);
+  border-radius: 4px;
+}
+.editor-panel.is-nocturne .cm-editor .cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: rgba(176, 138, 74, 0.55);
+}
+
+/* ---------- 预览：一张排好版的打字稿 ---------- */
+
+.editor-panel.is-nocturne .md-editor .md-editor-preview {
+  --md-theme-color: var(--tn-ink);
+  --md-theme-color-reverse: var(--tn-sheet);
+  --md-theme-color-hover: color-mix(in srgb, var(--tn-ink) 82%, var(--tn-sheet));
+  --md-theme-color-hover-inset: color-mix(in srgb, var(--tn-ink) 70%, var(--tn-sheet));
+  --md-theme-link-color: var(--tn-link);
+  --md-theme-link-hover-color: var(--tn-accent);
+  --md-theme-border-color: var(--tn-border);
+  --md-theme-border-color-reverse: var(--tn-border);
+  --md-theme-border-color-inset: color-mix(in srgb, var(--tn-border) 65%, transparent);
+  --md-theme-bg-color: transparent;
+  --md-theme-bg-color-inset: rgba(176, 138, 74, 0.08);
+  --md-theme-code-active-color: var(--tn-accent);
+  --md-theme-code-inline-color: inherit;
+  --md-theme-code-inline-bg-color: rgba(176, 138, 74, 0.14);
+  --md-theme-code-inline-radius: 0;
+  --md-theme-code-block-color: #ece2cc;
+  --md-theme-code-block-bg-color: #241a14;
+  --md-theme-code-before-bg-color: #241a14;
+  --md-theme-code-block-radius: 0;
+  --md-theme-code-copy-tips-color: #ece2cc;
+  --md-theme-code-copy-tips-bg-color: #3a2c20;
+  --md-theme-quote-color: var(--tn-ink-muted);
+  --md-theme-quote-bg-color: rgba(176, 138, 74, 0.08);
+  --md-theme-quote-border-color: var(--tn-accent);
+  --md-theme-table-color: var(--tn-ink);
+  --md-theme-table-border-color: var(--tn-border);
+  --md-theme-table-td-border-color: color-mix(in srgb, var(--tn-border) 75%, transparent);
+  --md-theme-table-stripe-color: rgba(176, 138, 74, 0.06);
+  --md-theme-table-thead-bg-color: rgba(176, 138, 74, 0.12);
+  --md-theme-table-th-color: var(--tn-ink);
+  --md-theme-table-tht-color: var(--tn-ink);
+  color: var(--tn-ink);
+  font-family: var(--tn-font-mono);
+  font-size: 0.92rem;
+  line-height: 1.9;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview-wrapper {
+  background: transparent;
+  padding: 18px 32px 44px;
+}
+
+.editor-panel.is-nocturne .md-editor .md-editor-preview h1,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h2,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h3,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h4,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h5,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h6 {
+  font-family: var(--tn-font-serif);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--tn-ink);
+  border-bottom-color: var(--tn-border);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview h1,
+.editor-panel.is-nocturne .md-editor .md-editor-preview h2 { font-weight: 600; }
+
+.editor-panel.is-nocturne .md-editor .md-editor-preview a {
+  color: var(--tn-link);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview a:hover { color: var(--tn-accent); }
+
+.editor-panel.is-nocturne .md-editor .md-editor-preview hr {
+  border-top: 1px solid var(--tn-border);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview strong { color: var(--tn-ink); }
+.editor-panel.is-nocturne .md-editor .md-editor-preview blockquote {
+  border-left: 2px solid var(--tn-accent);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview code {
+  font-family: var(--tn-font-mono);
+  padding: 1px 4px;
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview pre {
+  border: 1px solid rgba(176, 138, 74, 0.35);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview pre code {
+  font-family: var(--tn-font-mono);
+  font-size: 0.86rem;
+  line-height: 1.7;
+  text-shadow: none;
+}
+.editor-panel.is-nocturne .md-editor .md-editor-preview img { opacity: 0.94; }
+.editor-panel.is-nocturne .md-editor .md-editor-preview input[type='checkbox'] {
+  accent-color: var(--tn-accent);
+}
+
+@media (pointer: coarse) {
+  .nocturne-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
+}
+
+@media (max-width: 700px) {
+  .editor-panel.is-nocturne { padding: 8px 8px 24px; }
+  .editor-panel.is-nocturne::after { bottom: 7px; font-size: 0.5rem; }
+  .editor-panel.is-nocturne .md-editor .md-editor-preview-wrapper { padding: 14px 18px 36px; }
+  .editor-panel.is-nocturne .md-editor .md-editor-preview { font-size: 0.88rem; }
+  .editor-panel.is-nocturne .cm-editor .cm-scroller { font-size: 16px; }
+  .editor-panel.is-nocturne .cm-editor .cm-content { padding-right: 12px; }
+}

@@ -172,56 +172,524 @@
             -webkit-focus-ring-color: transparent;
         }
 
-        header {
+        /* ── 导航：顶部居中悬浮条 ────────────────────────────────────────────
+           布局和动效照 dianedesclaux.com 的 Header 逆向数据（w-max 居中、30px 项高、
+           4px 内边距 / 间距、活动胶囊 0.5s ease-fluid、就绪后 300ms + i*70ms 错峰淡入）。
+           视觉语言照参考站的 glass 纸面：半透明底 + backdrop blur + 1px 描边。
+           直角、不圆角 —— 和站内其它卡片、按钮一致。
+           ⚠ 居中不用 transform：窗帘面板是 #header 里 position: fixed 的子元素，
+           祖先一旦有 transform，面板就会被关进头部那个小盒子里。 */
+        #header {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             z-index: 100;
-            padding: 24px 64px;
+            width: max-content;
+            max-width: calc(100vw - 20px);
+            margin-inline: auto;
+            padding: 8px 10px;
+            /* 条本身不再占满整行：只有中间这条悬浮纸面接指针。 */
+            pointer-events: none;
+            --nav-ease: cubic-bezier(0.16, 1, 0.3, 1);
+            --nav-ease-fade: cubic-bezier(0.33, 1, 0.68, 1);
+            /* 页面级覆盖（详情页 / 放映页 / ECHOES 暗场）只改这几个变量。 */
+            --nav-surface: color-mix(in oklab, var(--bg) 66%, transparent);
+            --nav-border-color: color-mix(in oklab, var(--text-primary) 16%, transparent);
+            --nav-item-color: var(--text-secondary);
+            --nav-item-active: var(--text-primary);
+            --nav-hover-bg: color-mix(in oklab, var(--text-primary) 9%, transparent);
+            --nav-blur: blur(14px) saturate(1.7);
+            /* 窗帘面板是实心纸面（参考站 FilterPanel 就是 bg-paper，不做玻璃） */
+            --nav-curtain-bg: var(--bg);
+            --nav-curtain-line: var(--border);
+            --nav-curtain-ink: var(--text-primary);
+            --nav-curtain-muted: var(--text-secondary);
+        }
+
+        :root.dark #header {
+            --nav-surface: color-mix(in oklab, var(--bg) 60%, transparent);
+            --nav-border-color: color-mix(in oklab, var(--text-primary) 18%, transparent);
+            --nav-hover-bg: rgba(255, 255, 255, 0.09);
+        }
+
+        /* 不支持 backdrop-filter：退回实心纸面，别让半透明底压不住背后的字 */
+        @supports not (backdrop-filter: blur(1px)) {
+            #header {
+                --nav-surface: var(--bg);
+            }
+        }
+
+        /* 系统要求减少透明度：同退实心 */
+        @media (prefers-reduced-transparency: reduce) {
+            #header {
+                --nav-surface: var(--bg);
+                --nav-blur: none;
+            }
+        }
+
+        .nav-pill {
+            position: relative;
+            /* 压在这层 header 自己的窗帘之上：面板拉开时导航还得看得见、点得着。 */
+            z-index: 2;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            transition: background-color 0.3s ease;
+            gap: 4px;
+            padding: 4px;
+            background: var(--nav-surface);
+            /* 用 inset 阴影当 1px 描边：胶囊的坐标是相对 padding 盒量的，
+               真边框会让它整体偏移 1px。 */
+            box-shadow: inset 0 0 0 1px var(--nav-border-color);
+            -webkit-backdrop-filter: var(--nav-blur);
+            backdrop-filter: var(--nav-blur);
+            /* 只有这条纸面接指针 */
+            pointer-events: auto;
+            /* 就绪前整体下压淡入（参考站 translateY(-10px) scale(.96)） */
+            opacity: 0;
+            transform: translateY(-10px) scale(0.96);
+            transition: opacity 0.54s var(--nav-ease-fade),
+                transform 0.9s var(--nav-ease);
         }
 
-        .header-left {
-            display: flex;
+        #header.is-ready .nav-pill {
+            opacity: 1;
+            transform: none;
+        }
+
+        .nav-item {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
             align-items: center;
-            gap: 24px;
-        }
-
-        header.scrolled {
-            background-color: rgba(250, 250, 250, 0.9);
-            backdrop-filter: blur(10px);
-        }
-
-        :root.dark header.scrolled {
-            background-color: rgba(26, 26, 26, 0.9);
-        }
-
-        .menu-toggle {
-            display: none;
-            background: none;
-            border: none;
-            color: var(--text-primary);
+            justify-content: center;
+            height: 30px;
+            padding: 0 12px;
+            border: 0;
+            background: transparent;
+            color: var(--nav-item-color);
+            font-family: inherit;
+            font-size: 14px;
+            line-height: 1;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            text-decoration: none;
             cursor: pointer;
-            padding: 8px;
-            z-index: 101;
+            /* 入场前先藏住；就绪后由下面的 animation 逐个放出来 */
+            opacity: 0;
+            transition: color 0.3s var(--nav-ease),
+                background-color 0.3s var(--nav-ease);
         }
 
-        .menu-toggle svg {
-            width: 24px;
-            height: 24px;
+        .nav-item:hover {
+            background: var(--nav-hover-bg);
+            color: var(--nav-item-active);
+        }
+
+        .nav-item.is-active {
+            color: var(--nav-item-active);
+        }
+
+        /* 参考站：当前项不响应 hover 底色 —— 它已经压在胶囊上 */
+        .nav-item.is-active:hover {
+            background: transparent;
+        }
+
+        /* 入场：参考站 nav 内项目 opacity 500ms fade-in，
+           延迟 = 300 + index * 70ms。用 animation 而不是 transition，
+           结束后不残留 delay，hover 的变色仍然是即时的。 */
+        #header.is-ready .nav-item {
+            animation: nav-item-in 0.5s var(--nav-ease-fade) both;
+            animation-delay: calc(300ms + var(--i, 0) * 70ms);
+        }
+
+        @keyframes nav-item-in {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .nav-pill,
+            .nav-curtain__panel {
+                transition: none;
+            }
+
+            .nav-item,
+            .nav-current,
+            .nav-dots {
+                opacity: 1;
+            }
+
+            #header.is-ready .nav-item,
+            #header.is-ready .nav-current,
+            #header.is-ready .nav-dots,
+            .nav-curtain.is-open .nav-curtain__link {
+                animation: none;
+            }
+
+            .nav-curtain__link {
+                opacity: 1;
+            }
+
+            .nav-dots circle {
+                transition: none;
+            }
         }
 
         .logo {
             font-family: 'Oswald', sans-serif;
-            font-size: 1.5rem;
             font-weight: 600;
+        }
+
+        .nav-item--brand {
+            padding: 0 14px;
+            font-size: 15px;
             letter-spacing: 0.15em;
-            color: var(--text-primary);
+        }
+
+        /* 字标后面的当前板块：只有文字和一个小方点，不做凸起的实心块。
+           所有板块入口都在三个点打开的窗帘里，这里只负责「你在哪」。 */
+        .nav-current {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            height: 30px;
+            padding: 0 10px;
+            color: var(--nav-item-active);
+            font-size: 14px;
+            line-height: 1;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .nav-current::before {
+            content: '';
+            width: 4px;
+            height: 4px;
+            margin-right: 8px;
+            background: currentColor;
+        }
+
+        #header.is-ready .nav-current {
+            animation: nav-item-in 0.5s var(--nav-ease-fade) both;
+            animation-delay: 370ms;
+        }
+
+        .nav-back {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--nav-item-color);
+            cursor: pointer;
+            transition: color 0.3s var(--nav-ease),
+                background-color 0.3s var(--nav-ease);
+        }
+
+        .nav-back:hover {
+            background: var(--nav-hover-bg);
+            color: var(--nav-item-active);
+        }
+
+        .nav-back svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        .menu-toggle {
+            position: relative;
+            z-index: 1;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--nav-item-active);
+            cursor: pointer;
+            transition: background-color 0.3s var(--nav-ease);
+        }
+
+        .menu-toggle:hover {
+            background: var(--nav-hover-bg);
+        }
+
+        .menu-toggle__lines {
+            position: relative;
+            display: block;
+            width: 15px;
+            height: 10px;
+        }
+
+        .menu-toggle__lines span {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 1.5px;
+            background: currentColor;
+            transition: transform 0.35s var(--nav-ease),
+                top 0.35s var(--nav-ease);
+        }
+
+        .menu-toggle__lines span:nth-child(1) {
+            top: 1px;
+        }
+
+        .menu-toggle__lines span:nth-child(2) {
+            top: 8px;
+        }
+
+        .menu-toggle.is-open .menu-toggle__lines span:nth-child(1) {
+            top: 4.5px;
+            transform: rotate(45deg);
+        }
+
+        .menu-toggle.is-open .menu-toggle__lines span:nth-child(2) {
+            top: 4.5px;
+            transform: rotate(-45deg);
+        }
+
+        /* ── 三个点（参考站 IconDots）─────────────────────────────────────
+           竖排三点，打开后逐颗缩掉、同一位置横排三点再逐颗长出来，
+           每颗错开 70ms、单颗 160ms。 */
+        .nav-dots {
+            position: relative;
+            z-index: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 30px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: var(--nav-item-active);
+            cursor: pointer;
+            opacity: 0;
+            transition: background-color 0.3s var(--nav-ease);
+        }
+
+        #header.is-ready .nav-dots {
+            animation: nav-item-in 0.5s var(--nav-ease-fade) both;
+            animation-delay: calc(300ms + var(--i, 0) * 70ms);
+        }
+
+        .nav-dots:hover {
+            background: var(--nav-hover-bg);
+        }
+
+        .nav-dots__icon {
+            display: block;
+            width: 24px;
+            height: 24px;
+        }
+
+        .nav-dots circle {
+            transform-box: fill-box;
+            transform-origin: center;
+            transition: transform 0.16s cubic-bezier(0.77, 0, 0.175, 1);
+            transition-delay: calc(var(--i, 0) * 70ms);
+        }
+
+        .nav-dots__h {
+            transform: scale(0);
+        }
+
+        .nav-dots.is-open .nav-dots__v {
+            transform: scale(0);
+        }
+
+        .nav-dots.is-open .nav-dots__h {
+            transform: scale(1);
+        }
+
+        /* ── 窗帘面板（参考站 FilterPanel）───────────────────────────────
+           遮罩铺满视口；实心纸面板居中、666px 宽（窄屏 92vw）、满高。
+           展开是 clip-path 从中间一条竖缝向两侧撕开：750ms expo.inOut
+           （cubic-bezier(.87,0,.13,1)），起手再等 380ms；收回没有延迟。 */
+        .nav-curtain {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: auto;
+        }
+
+        .nav-curtain__panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 666px;
+            max-width: 92vw;
+            height: 100vh;
+            height: 100svh;
+            padding: 8px 4px;
+            background: var(--nav-curtain-bg);
+            color: var(--nav-curtain-ink);
+            transform: translate(-50%, -50%);
+            clip-path: inset(0 50% 0 50%);
+            transition: clip-path 0.75s cubic-bezier(0.87, 0, 0.13, 1);
+            overflow: hidden;
+        }
+
+        .nav-curtain.is-open .nav-curtain__panel {
+            clip-path: inset(0 0 0 0);
+            transition-delay: 380ms;
+        }
+
+        .nav-curtain__inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 72px 48px 40px;
+            border: 1px solid var(--nav-curtain-line);
+            text-align: center;
+            overflow-y: auto;
+        }
+
+        .nav-curtain__eyebrow {
+            margin: 0 0 24px;
+            color: var(--nav-curtain-muted);
+            font-size: 11px;
+            letter-spacing: 0.34em;
+        }
+
+        /* 不画分割线、不写编号：入口靠字号和留白分层 */
+        .nav-curtain__links {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 6px;
+        }
+
+        .nav-curtain__link {
+            position: relative;
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            padding: 10px 4px;
+            color: var(--nav-curtain-muted);
             text-decoration: none;
+            opacity: 0;
+            transition: color 0.3s var(--nav-ease);
+        }
+
+        .nav-curtain__link:hover,
+        .nav-curtain__link.is-active {
+            color: var(--nav-curtain-ink);
+        }
+
+        .nav-curtain__label {
+            font-family: 'Oswald', sans-serif;
+            font-size: clamp(2rem, 4.4vw, 3.4rem);
+            font-weight: 500;
+            line-height: 1.06;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        /* 面板快完全打开时才轮到条目逐个进来 */
+        .nav-curtain.is-open .nav-curtain__link {
+            animation: curtain-link-in 0.6s var(--nav-ease-fade) both;
+            animation-delay: calc(820ms + var(--i, 0) * 50ms);
+        }
+
+        @keyframes curtain-link-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .nav-curtain__tools {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin-top: 40px;
+        }
+
+        .nav-curtain__avatar {
+            width: 44px;
+            height: 44px;
+            margin-right: 8px;
+            border: 1px solid var(--nav-curtain-muted);
+            border-radius: 0;
+            object-fit: cover;
+        }
+
+        /* 条外（窗帘里）的工具按钮沿用站内同一套 40px 直角空心按钮，
+           但颜色必须走窗帘自己的变量 —— 放映页在浅色主题下也是深底。 */
+        .nav-curtain .nav-tool {
+            border-color: var(--nav-curtain-muted);
+            color: var(--nav-curtain-ink);
+        }
+
+        .nav-curtain .nav-tool:hover,
+        .nav-curtain .nav-tool.is-active {
+            background: var(--nav-curtain-ink);
+            color: var(--nav-curtain-bg);
+        }
+
+        .nav-curtain .nav-tool:hover img,
+        .nav-curtain .nav-tool.is-active img {
+            filter: invert(calc(1 - var(--invert)));
+        }
+
+        .nav-curtain .nav-tool svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .nav-curtain .nav-tool img {
+            width: 17px;
+            height: 17px;
+        }
+
+        /* 面板打开期间锁住页面滚动 */
+        html.nav-curtain-open,
+        html.nav-curtain-open body {
+            overflow: hidden;
+        }
+
+        /* 左下角头像塔在 header 的层叠之外（z 999），面板拉开时得先让开；
+   底部歌词/频谱（z 996）同理，别在菜单上飘一层字。
+   ⚠ 塔的显隐在 App.vue 里有一条带 scoped 属性的 `.shell.is-ready > .author-tower`，
+   权重比这里高，只能用 !important 盖。 */
+        html.nav-curtain-open .author-tower,
+        html.nav-curtain-open .now-playing {
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        /* 矮屏（笔记本横屏 / 手机横屏）：内容可能高过面板，从顶部排、
+           超出部分交给内在滚动，而不是把首项挤到面板外。 */
+        @media (max-height: 760px) {
+            .nav-curtain__inner {
+                justify-content: flex-start;
+            }
         }
 
         /* ── 左下角的「Ava 塔」 ──────────────────────────────────────────
@@ -376,28 +844,6 @@
         .brand-tool.is-off,
         .nav-tool.is-off {
             opacity: 0.42;
-        }
-
-        /* 汉堡里的控件行：宽屏不显示，≤1024px 才跟着导航一起出来 */
-        .nav-tools {
-            display: none;
-        }
-
-        nav {
-            display: flex;
-            gap: 32px;
-        }
-
-        nav > a {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: color 0.3s ease;
-            letter-spacing: 0.02em;
-        }
-
-        nav > a:hover {
-            color: var(--text-primary);
         }
 
         .hero {
@@ -4646,8 +5092,8 @@
         }
 
         @media (max-width: 1024px) {
-            header {
-                padding: 24px 32px;
+            #header {
+                padding: 8px 10px;
             }
 
             .hero {
@@ -4787,69 +5233,61 @@
                 display: none !important;
             }
 
-            nav {
-                position: fixed;
-                top: 0;
-                right: -100%;
-                width: 100%;
-                height: 100vh;
-                padding: 88px 24px 40px;
-                background-color: var(--bg);
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                gap: 26px;
-                overflow-y: auto;
-                transition: right 0.3s ease;
+            /* 窄屏：悬浮条里只留「返回 / 字标 / 当前板块 / 汉堡」；
+               板块入口与工具都收进三点/汉堡打开的窗帘面板。 */
+            .nav-item--brand {
+                padding: 0 10px;
+                font-size: 14px;
+                letter-spacing: 0.12em;
             }
 
-            nav.active {
-                right: 0;
+            .nav-current {
+                display: inline-flex;
+                max-width: 34vw;
+                padding: 0 10px;
+                font-size: 11px;
+                letter-spacing: 0.14em;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
 
-            nav > a {
-                font-size: 1.5rem;
+            /* 窄屏用汉堡（X 变形），三个点只在桌面出现 */
+            .nav-dots {
+                display: none;
             }
 
             .menu-toggle {
-                display: block;
+                display: inline-flex;
             }
 
-            .nav-tools {
-                display: flex;
-                align-items: center;
-                justify-content: center;
+            .nav-curtain__inner {
+                padding: 68px 20px 24px;
+            }
+
+            .nav-curtain__eyebrow {
+                margin-bottom: 18px;
+            }
+
+            .nav-curtain__link {
+                padding: 10px 2px;
+            }
+
+            .nav-curtain__tools {
                 flex-wrap: wrap;
-                gap: 8px;
-                max-width: 340px;
-                margin-top: 6px;
-                padding-top: 24px;
-                border-top: 1px solid var(--border);
+                margin-top: 28px;
             }
+        }
 
-            .nav-tools__avatar {
-                width: 44px;
-                height: 44px;
-                border: 1px solid var(--border);
-                object-fit: cover;
-                display: block;
-            }
-
-            .nav-tool {
-                width: 44px;
-                height: 44px;
+        @media (max-width: 360px) {
+            /* 320px 上字标 + 当前板块一起会顶到汉堡，先把板块名让掉。 */
+            .nav-current {
+                display: none;
             }
         }
 
         @media (max-width: 800px) {
-            header {
-                padding: 20px 24px;
-            }
-
-            header.centered .logo {
-                position: absolute;
-                left: 50%;
-                transform: translateX(-50%);
+            #header {
+                padding: 8px 10px;
             }
 
             .hero {

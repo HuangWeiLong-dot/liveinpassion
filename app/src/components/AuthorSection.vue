@@ -4,7 +4,7 @@
 //
 // 之所以拆回左下角：这批控件本来就在屏幕底部，鼠标不用横跨整个屏幕；
 // 头像本身就是一个明确的锚点，悬停它比悬停 LOGO 更符合直觉。
-// ≤1024px 整个塔让位（那批控件在右上角汉堡里，见 AppHeader 的 nav-tools）。
+// ≤1024px 整个塔让位（那批控件在右上角汉堡打开的窗帘里，见 AppHeader）。
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { ICONS, LOCAL_ASSETS } from '../data/assets.js';
 import { useMusicPlayer } from '../composables/useMusicPlayer.js';
