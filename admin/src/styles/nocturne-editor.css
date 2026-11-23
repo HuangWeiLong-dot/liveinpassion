@@ -461,10 +461,13 @@
   opacity: 0.35;
 }
 
-/* 声音开关移到页头，占自己的一块位置，和左边的 LIVEINPASSION 用一道细线隔开 */
+/* 声音开关移到页头，占自己的一块位置，和左边的 LIVEINPASSION 用一道细线隔开。
+   字号 / 行高按页头其余按钮来（否则继承控制条的 15px 行盒，整颗按钮会比旁边的高一截）。 */
 .ns-toggle--head {
   position: relative;
   margin-left: 12px;
+  font-size: 0.55rem;
+  line-height: normal;
 }
 .ns-toggle--head::before {
   content: '';
@@ -732,3 +735,10 @@ html.dark .tn-stage.is-live .tn-sheet {
   .editor-panel.is-nocturne .letter-panel { display: none; }
   .editor-body { display: block; }
 }
+
+/* Lint 总开关：关掉时按钮与指示灯一起变暗 */
+.editor-panel.is-nocturne .lint-toggle.is-off {
+  color: var(--tn-desk-muted);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.editor-panel.is-nocturne .lint-toggle.is-off .lint-toggle__dot { opacity: 0.3; }

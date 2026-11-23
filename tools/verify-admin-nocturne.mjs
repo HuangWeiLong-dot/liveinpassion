@@ -242,6 +242,41 @@ const state = async () => json(`(function () {
     check('信头写 LIVEINPASSION，正文是渲染好的 Markdown', Boolean(letter && letter.brand === 'LIVEINPASSION' && letter.hasBody), JSON.stringify(letter && { brand: letter.brand, hasBody: letter.hasBody }));
     check('打字机那一栏不再自带分栏预览', Boolean(letter && letter.mainPreviewCount === 0), JSON.stringify(letter && { mainPreviewCount: letter.mainPreviewCount }));
 
+    section('Lint：点击开关 + 实时检测');
+    const lintState = async () => json(`(function () {
+      const btn = document.querySelector('.lint-toggle');
+      const panel = document.querySelector('.lint-panel');
+      return {
+        label: btn ? btn.textContent.trim().replace(/\\s+/g, ' ') : '',
+        on: btn ? btn.getAttribute('aria-pressed') === 'true' : false,
+        panel: Boolean(panel),
+        issues: panel ? panel.querySelectorAll('.lint-item').length : 0,
+      };
+    })()`);
+    const lintBefore = await lintState();
+    check('默认 Lint 关闭：按钮写 off、面板不在', lintBefore.on === false && lintBefore.panel === false && /off$/i.test(lintBefore.label), JSON.stringify(lintBefore));
+    await click('.lint-toggle');
+    await sleep(450);
+    const lintAfter = await lintState();
+    check('点击后 Lint 打开：面板出现', lintAfter.on === true && lintAfter.panel === true, JSON.stringify(lintAfter));
+    // 通过编辑器视图在文末补一个错字，等实时检查跑完
+    await evaluate(`(function () {
+      const stage = document.querySelector('.tn-stage');
+      const view = stage && stage.__nocturne && stage.__nocturne.getView();
+      if (!view) return false;
+      view.dispatch({ changes: { from: view.state.doc.length, insert: '\\n\\nteh cat' } });
+      return true;
+    })()`);
+    // 没有防抖：一次改动后 150ms 内就必须看到新问题
+    await sleep(150);
+    const lintTyped = await lintState();
+    check('实时检测：输入后 150ms 内问题数就更新', lintTyped.issues > lintAfter.issues, `${lintAfter.issues} → ${lintTyped.issues}`);
+    check('按钮摘要跟着更新（不是 clean）', /issue/i.test(lintTyped.label), lintTyped.label);
+    await click('.lint-toggle');
+    await sleep(350);
+    const lintOff = await lintState();
+    check('再点一下关闭：面板收起、检测停止', lintOff.on === false && lintOff.panel === false, JSON.stringify(lintOff));
+
     section('打字：声音与打字头');
     await click('.cm-content');
     const before = await state();

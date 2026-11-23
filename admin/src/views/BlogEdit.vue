@@ -257,14 +257,22 @@ function insertPageBreak() {
 }
 
 // ===== 静态检查：Markdown 语法 + 拼写 =====
-// 输入停下 400ms 后跑一遍 utils/mdLint.js 的纯文本规则，结果列在编辑器上方的 Lint 面板。
+// 页头的 Lint 按钮是总开关：打开后每次改动都立刻重跑一遍（lintMarkdown 是纯文本分析，
+// 几万字的稿子也只有几毫秒），面板与页头摘要同帧刷新；再点一下关掉，检测与面板一起停。
 // 面板里只列「能指出行号」的问题；错字的大头交给编辑器里的浏览器原生拼写检查（红下划线）。
+const LINT_KEY = 'cms-lint';
+function readLint() {
+  try {
+    return localStorage.getItem(LINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+const lintOn = ref(readLint());
 const lintIssues = ref([]);
 const lintStats = ref({ words: 0, pages: 1, readTime: 1 });
-const lintOpen = ref(false);
 const SEV_LABEL = { error: 'ERR', warn: 'WARN', info: 'NOTE' };
 const LINT_VISIBLE_MAX = 80;
-let lintTimer = 0;
 
 function runLint() {
   const { issues, stats } = lintMarkdown(form.value.contentMd);
@@ -275,13 +283,11 @@ function runLint() {
 watch(
   () => form.value.contentMd,
   () => {
-    window.clearTimeout(lintTimer);
-    lintTimer = window.setTimeout(runLint, 400);
+    // 不设防抖：每次输入都同步重跑，问题列表跟着键击立刻变
+    if (lintOn.value) runLint();
   },
   { immediate: true }
 );
-
-onUnmounted(() => window.clearTimeout(lintTimer));
 
 const lintErrors = computed(() => lintIssues.value.filter((i) => i.severity === 'error').length);
 const lintWarns = computed(() => lintIssues.value.filter((i) => i.severity === 'warn').length);
@@ -291,6 +297,7 @@ const lintSummary = computed(() => {
   return `${total} issue${total > 1 ? 's' : ''}`;
 });
 const lintTone = computed(() => {
+  if (!lintOn.value) return 'is-off';
   if (lintErrors.value) return 'is-error';
   if (lintWarns.value) return 'is-warn';
   if (lintIssues.value.length) return 'is-info';
@@ -299,9 +306,25 @@ const lintTone = computed(() => {
 const lintVisible = computed(() => lintIssues.value.slice(0, LINT_VISIBLE_MAX));
 
 function toggleLint() {
-  lintOpen.value = !lintOpen.value;
-  if (lintOpen.value) runLint();
+  lintOn.value = !lintOn.value;
+  try {
+    localStorage.setItem(LINT_KEY, lintOn.value ? '1' : '0');
+  } catch {
+    /* 隐私模式下忽略 */
+  }
+  if (lintOn.value) {
+    runLint();
+  } else {
+    lintIssues.value = [];
+  }
 }
+
+// 右侧信件的字数 / 阅读时长：与 Lint 开关无关的轻量统计
+const letterWords = computed(() => {
+  const text = form.value.contentMd.replace(/<[^>]+>/g, ' ').replace(/[#>*_`~\-|]/g, ' ');
+  return (text.match(/[A-Za-z0-9一-鿿]+/g) || []).length;
+});
+const letterRead = computed(() => Math.max(1, Math.ceil(letterWords.value / 220)));
 
 // 点一条问题 → 光标选中对应那一段并滚到可视区
 function gotoLintIssue(issue) {
@@ -1368,11 +1391,12 @@ onUnmounted(() => {
             type="button"
             class="lint-toggle"
             :class="lintTone"
-            :aria-expanded="lintOpen"
+            :aria-pressed="lintOn"
+            :title="lintOn ? 'Lint is on — click to stop live checking' : 'Lint is off — click for live checking'"
             @click="toggleLint"
           >
             <span class="lint-toggle__dot"></span>
-            <span>Lint — {{ lintSummary }}</span>
+            <span>Lint — {{ lintOn ? lintSummary : 'off' }}</span>
           </button>
           <span class="editor-tip">
             <template v-if="imgProgress">{{ imgProgress }}</template>
@@ -1409,7 +1433,7 @@ onUnmounted(() => {
         <span class="nocturne-studio__hint">The type head follows the caret</span>
       </div>
 
-      <div v-if="lintOpen" class="lint-panel">
+      <div v-if="lintOn" class="lint-panel">
         <div v-if="!lintIssues.length" class="lint-empty">
           Nothing to fix — syntax and spelling look clean.
         </div>
@@ -1480,7 +1504,7 @@ onUnmounted(() => {
             />
             <div class="letter-foot">
               <span>{{ form.category || 'UNFILED' }}</span>
-              <span>{{ lintStats.words }} words · {{ lintStats.readTime }} min read</span>
+              <span>{{ letterWords }} words · {{ letterRead }} min read</span>
             </div>
           </div>
         </aside>
