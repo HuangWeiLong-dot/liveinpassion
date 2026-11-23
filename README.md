@@ -48,6 +48,46 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 106 — 2026-11-23
+
+#### CMS 编辑器接入真正的 Typewriter Nocturne：3D 打字机 + 打字音效 + 台灯聚光
+
+- 编辑器稿纸下面放进一台真的 3D 打字机（three.js，取自 Typewriter-Nocturne 1.2.0 的
+  `typewriter-machine.js` / `textures.js`）：压纸滚筒、纸夹、卷轴、色带、打字头都在。
+  打字头的横向位置**跟着 CodeMirror 的光标走**，每次按键都掷向纸面（弹簧回弹），
+  回车时压纸滚筒转一格，左右方向键让车架在导轨上退一齿。
+- **打字头聚光灯**：移植原项目的物理光照层（`light-model.ts` → `light-model.js`、
+  `paper-light.ts` → `paper-light.js`、`glow-layer.ts` → `glow-layer.js`）。灯就挂在
+  打字头上，锥形光束从打字头向上照在纸面上、跟着打字头横向移动；纸张用 Cotton 纸纹
+  （分形噪声 + 纸纤维法线）乘在编辑器上，光束里还有悬浮的尘埃和打字头附近的光晕。
+  **字符落点（光标）不额外打光**；CSS 里也不再叠第二套暖色光斑/暗角，灯光只有光源一处。
+  纸面固定为 **Paper & Ink**（象牙纸、暖色灯），**周围书桌与控件保持黑白**（中性深灰桌面、
+  白色边线和按钮，和 CMS 的单色界面一致）；CMS 明暗开关只影响外部后台，深色下也不再是
+  一张黑白稿纸（Midnight Study 的深纸映射已弃用）。
+- 书写区与纸边留出距离（整块编辑区上下左右内缩，正文再缩进），工具按钮改成实体纸色底 +
+  黄铜细边，不再透明到看不见；左栏变窄后工具条自动折行，不会溢出稿纸盖到右边的信上。
+  页头「Markdown — Editor」和右边提示恢复 CMS 原来的等宽大写排版。品牌统一为
+  **LIVEINPASSION**：开关、桌沿铭牌、打字机正面的铜牌都换了字。
+- **左右分栏**：左边是打字机 + 稿纸（实际在敲的那张），右边另起一张「打印出来的信」——
+  独立的信纸（LIVEINPASSION 信头、日期、正文、分类 / 字数页脚），不在台灯的光照里；
+  预览编辑（照片块的拖拽 / 换版式 / 删除）改挂到 `.editor-body`，两种模式下都能用。
+  窄屏（≤1024px）收起信件，编辑区独占整行。声音开关移到页头单独一块，指示灯全部改方形。
+- **打字音效**全部是 Web Audio 合成的，不带音频文件（`admin/src/nocturne/sound.js`，
+  移植自 `sound-engine.ts`）：按键 / 空格 / 退格 / 回车 / Tab / 上下翻阅 / 左右走纸 /
+  输入法选词 / 上屏 / 页边铃，四种音色（Standard / Portable / Electric / Whisper）
+  各四个变体，随机音高与力度，带一点房间混响；中文输入法按 composition 事件逐字发声。
+  声音开关放在页头独立位置，页头下一条机器铭牌式控制条放 VOICE / VOL，选择记进
+  `localStorage`（`cms-nocturne-sound` / `-voice` / `-volume`）。
+- 键盘监听是**捕获阶段、passive**，从不 `preventDefault` / `stopPropagation`，
+  CodeMirror 与输入法收到的按键和以前完全一样；关掉 Nocturne 后舞台收起、机器与光照
+  全部停止（含 rAF），编辑器回到原来的 62vh 极简面板。
+- 代码：`admin/src/nocturne/`（机器 / 光照 / 声音 / 舞台调度）+ `components/
+  NocturneTypewriter.vue`；`three` 加进 `admin/package.json`，模型走动态 import，
+  只有编辑器页打开 Nocturne 时才下载（~600 kB 独立 chunk）。
+- 验收：`tools/verify-admin-nocturne.mjs`（31 项：模型编译并画出、打字头跟光标并落位、
+  每次按键都起一个音频源、回车走纸、静音后不再发声、左右分栏与信件、开关与明暗切换、390px 不溢出、
+  零报错）。
+
 ### update: 105 — 2026-11-23
 
 #### CMS 编辑器 Typewriter Nocturne + 全站导航重做

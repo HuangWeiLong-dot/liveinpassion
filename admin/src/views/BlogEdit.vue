@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, h, defineComponent, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MdEditor, config } from 'md-editor-v3';
+import { MdEditor, MdPreview, config } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { EditorView } from '@codemirror/view';
 import { blogApi, uploadApi } from '../api.js';
@@ -10,6 +10,8 @@ import { startPressDrag } from '../utils/pressDrag.js';
 import { lintMarkdown } from '../utils/mdLint.js';
 import { isDark } from '../theme.js';
 import AdminIcon from '../components/AdminIcon.vue';
+import NocturneTypewriter from '../components/NocturneTypewriter.vue';
+import { VOICE_LABELS } from '../nocturne/sound.js';
 import '../styles/nocturne-editor.css';
 
 // 编辑器预览内置 js-xss 过滤，默认会：
@@ -90,6 +92,70 @@ function toggleNocturne() {
     /* 隐私模式下忽略 */
   }
 }
+
+// 打字音效：音色 / 音量 / 开关各自记住。关掉 Nocturne 外观不会丢掉这些偏好。
+const SOUND_KEY = 'cms-nocturne-sound';
+const VOLUME_KEY = 'cms-nocturne-volume';
+const VOICE_KEY = 'cms-nocturne-voice';
+function readSound() {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+function readVolume() {
+  try {
+    const raw = localStorage.getItem(VOLUME_KEY);
+    if (raw === null) {
+      return 0.4;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0.4;
+  } catch {
+    return 0.4;
+  }
+}
+function readVoice() {
+  try {
+    const value = localStorage.getItem(VOICE_KEY);
+    return value && VOICE_LABELS[value] ? value : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+const soundOn = ref(readSound());
+const soundVolume = ref(readVolume());
+const soundVoice = ref(readVoice());
+
+// Nocturne 模式下编辑器只留输入区，右侧另开一张「打印出来的信」；
+// 预览 / 目录 / 纯预览这几个工具在这个布局里没有意义，直接从工具条里拿掉。
+const editorToolbars = computed(() => {
+  const bars = [
+    'bold', 'underline', 'italic', 'strikeThrough', 'sub', 'sup', '-',
+    'title', 'quote', 'unorderedList', 'orderedList', 'task', '-',
+    'codeRow', 'code', 'link', 'image', 0, 1, 'table', 'mermaid', 'katex', '-',
+    'revoke', 'next', '-',
+    'save', 'prettier', '=',
+    'preview', 'previewOnly', 'htmlPreview', 'catalog', 'pageFullscreen', 'fullscreen',
+  ];
+  if (!nocturne.value) {
+    return bars;
+  }
+  const hide = new Set(['preview', 'previewOnly', 'htmlPreview', 'catalog']);
+  return bars.filter((bar) => typeof bar !== 'string' || !hide.has(bar));
+});
+
+const letterDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+watch([soundOn, soundVolume, soundVoice], ([on, volume, voice]) => {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? '1' : '0');
+    localStorage.setItem(VOLUME_KEY, String(volume));
+    localStorage.setItem(VOICE_KEY, String(voice));
+  } catch {
+    /* 隐私模式下忽略 */
+  }
+});
 
 const form = ref({
   slug: '',
@@ -1096,7 +1162,9 @@ function hideFly() {
 }
 
 function initPreviewEditing() {
-  editorRoot = document.querySelector('.md-editor');
+  // 监听挂在稳定的 .editor-body 上：Nocturne 模式下预览搬到右侧信件里，
+  // 关掉时又回到 md-editor 自带的分栏，两者都在这个容器里。
+  editorRoot = document.querySelector('.editor-body');
   if (!editorRoot) {
     // 编辑器组件还没挂载完，再等一小拍
     setTimeout(initPreviewEditing, 200);
@@ -1278,11 +1346,23 @@ onUnmounted(() => {
             class="nocturne-toggle"
             :class="{ 'is-on': nocturne }"
             :aria-pressed="nocturne"
-            title="Typewriter Nocturne — paper, ink and lamplight"
+            title="Live in Passion — paper, ink and lamplight"
             @click="toggleNocturne"
           >
             <span class="nocturne-toggle__lamp" aria-hidden="true"></span>
-            <span>Nocturne</span>
+            <span>LIVEINPASSION</span>
+          </button>
+          <button
+            v-if="nocturne"
+            type="button"
+            class="ns-toggle ns-toggle--head"
+            :class="{ 'is-on': soundOn }"
+            :aria-pressed="soundOn"
+            title="Typewriter sound on / off"
+            @click="soundOn = !soundOn"
+          >
+            <span class="ns-toggle__dot" aria-hidden="true"></span>
+            <span>{{ soundOn ? 'SOUND ON' : 'MUTED' }}</span>
           </button>
           <button
             type="button"
@@ -1305,6 +1385,30 @@ onUnmounted(() => {
         </span>
       </div>
 
+      <!-- 打字机控制条：只在 Nocturne 模式下出现，像机器本身的黄铜铭牌一排 -->
+      <div v-if="nocturne" class="nocturne-studio">
+        <span class="nocturne-studio__brand">TYPEWRITER</span>
+        <label class="ns-field">
+          <span>VOICE</span>
+          <select v-model="soundVoice" aria-label="Typewriter voice">
+            <option v-for="(label, id) in VOICE_LABELS" :key="id" :value="id">{{ label }}</option>
+          </select>
+        </label>
+        <label class="ns-field ns-field--volume">
+          <span>VOL</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            v-model.number="soundVolume"
+            aria-label="Typewriter volume"
+          />
+          <span class="ns-readout">{{ Math.round(soundVolume * 100) }}</span>
+        </label>
+        <span class="nocturne-studio__hint">The type head follows the caret</span>
+      </div>
+
       <div v-if="lintOpen" class="lint-panel">
         <div v-if="!lintIssues.length" class="lint-empty">
           Nothing to fix — syntax and spelling look clean.
@@ -1325,32 +1429,62 @@ onUnmounted(() => {
           <span>Spelling: known typos + browser spellcheck underlines</span>
         </div>
       </div>
-      <MdEditor
-        ref="editorRef"
-        v-model="form.contentMd"
-        :on-upload-img="onEditorUploadImg"
-        :on-save="onEditorSave"
-        :def-toolbars="[photoLayoutToolbar, pageBreakToolbar]"
-        language="en-US"
-        :theme="isDark ? 'dark' : 'light'"
-        :preview="!isNarrow"
-        :no-highlight="!hasCodeBlock"
-        :no-katex="!hasMath"
-        :no-mermaid="!hasMermaid"
-        :show-code-row-number="true"
-        :auto-detect-code="true"
-        :table-shape="[6, 4]"
-        placeholder="Start writing in Markdown…"
-        :toolbars="[
-          'bold', 'underline', 'italic', 'strikeThrough', 'sub', 'sup', '-',
-          'title', 'quote', 'unorderedList', 'orderedList', 'task', '-',
-          'codeRow', 'code', 'link', 'image', 0, 1, 'table', 'mermaid', 'katex', '-',
-          'revoke', 'next', '-',
-          'save', 'prettier', '=',
-          'preview', 'previewOnly', 'htmlPreview', 'catalog', 'pageFullscreen', 'fullscreen',
-        ]"
-        style="height:62vh;min-height:420px;"
-      />
+      <div class="editor-body">
+        <div class="editor-main">
+          <NocturneTypewriter
+            :active="nocturne"
+            :sound="soundOn"
+            :volume="soundVolume"
+            :voice="soundVoice"
+            :get-view="editorView"
+          >
+            <MdEditor
+              ref="editorRef"
+              :key="nocturne ? 'tn-editor' : 'plain-editor'"
+              v-model="form.contentMd"
+              :on-upload-img="onEditorUploadImg"
+              :on-save="onEditorSave"
+              :def-toolbars="[photoLayoutToolbar, pageBreakToolbar]"
+              language="en-US"
+              :theme="isDark ? 'dark' : 'light'"
+              :preview="nocturne ? false : !isNarrow"
+              :no-highlight="!hasCodeBlock"
+              :no-katex="!hasMath"
+              :no-mermaid="!hasMermaid"
+              :show-code-row-number="true"
+              :auto-detect-code="true"
+              :table-shape="[6, 4]"
+              placeholder="Start writing in Markdown…"
+              :toolbars="editorToolbars"
+              style="height:62vh;min-height:420px;"
+            />
+          </NocturneTypewriter>
+        </div>
+
+        <!-- 右侧：打印出来的那一页，像一封刚打好的信 -->
+        <aside v-if="nocturne" class="letter-panel" aria-label="Printed letter">
+          <div class="letter-sheet">
+            <div class="letter-head">
+              <span class="letter-brand">LIVEINPASSION</span>
+              <span class="letter-date">{{ letterDate }}</span>
+            </div>
+            <MdPreview
+              class="letter-preview"
+              :model-value="form.contentMd"
+              language="en-US"
+              theme="light"
+              :no-highlight="!hasCodeBlock"
+              :no-katex="!hasMath"
+              :no-mermaid="!hasMermaid"
+              :show-code-row-number="true"
+            />
+            <div class="letter-foot">
+              <span>{{ form.category || 'UNFILED' }}</span>
+              <span>{{ lintStats.words }} words · {{ lintStats.readTime }} min read</span>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
 
     <div class="action-bar">
