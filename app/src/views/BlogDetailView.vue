@@ -250,6 +250,16 @@ function syncNarrow(e) {
   isNarrow.value = e.matches;
 }
 
+// 分页书需要足够的纸高：窗口矮于 820px 时退回连续正文（仍保留左右两栏），
+// 否则一页正文会被可用高度切成一堆碎片。
+const shortMql = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  ? window.matchMedia('(max-height: 820px)')
+  : null;
+const isShort = ref(shortMql ? shortMql.matches : false);
+function syncShort(e) {
+  isShort.value = e.matches;
+}
+
 // ── 分页 / 书页模式 ─────────────────────────────────────────────────────
 // CMS 正文里的 <div class="page-break"></div> 就是页分隔；前台按它切页。
 // 只有"宽屏 + 平铺视图 + 至少两页"才进书页；窄屏、墙角、封面视图继续用整篇流式正文，
@@ -263,7 +273,7 @@ function splitHtmlPages(html) {
 }
 const pages = computed(() => splitHtmlPages(post.value?.body || ''));
 const bookMode = computed(
-  () => pages.value.length > 1 && !isNarrow.value && !anyView.value
+  () => pages.value.length > 1 && !isNarrow.value && !isShort.value && !anyView.value
 );
 // 书页模式下正文由 BlogBook 自己按页渲染；其余模式把页拼回一整篇
 const bodyHtml = computed(() => {
@@ -1297,6 +1307,8 @@ onMounted(() => {
   lockPageScroll(true);
   narrowMql?.addEventListener('change', syncNarrow);
   syncNarrow(narrowMql || { matches: false });
+  shortMql?.addEventListener('change', syncShort);
+  syncShort(shortMql || { matches: false });
   solidifyHeader(true);
   loadFeatured();
   scheduleEnter();
@@ -1347,6 +1359,7 @@ onDeactivated(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown);
   narrowMql?.removeEventListener('change', syncNarrow);
+  shortMql?.removeEventListener('change', syncShort);
   lockPageScroll(false);
   solidifyHeader(false);
   timeline?.kill();

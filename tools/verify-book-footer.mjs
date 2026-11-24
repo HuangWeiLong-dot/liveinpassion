@@ -153,6 +153,35 @@ try {
   })()`);
   check('滚到页底后页脚可见（长页也可达）', reachable.found && reachable.visible, JSON.stringify(reachable));
 
+  console.log('\n窄屏 / 低屏：切回连续正文，页脚在文章末尾');
+  // 1296×810 ≈ 1440×900 缩到 90%：宽度还在宽屏范围，但高度低于书页阈值。
+  await send('Emulation.setDeviceMetricsOverride', { width: 1296, height: 810, deviceScaleFactor: 1, mobile: false });
+  await sleep(1500);
+  const narrow = await json(`(function () {
+    const panel = document.querySelector('.bd-panel-inner');
+    const info = document.querySelector('.bd-info');
+    const footer = info?.querySelector('.site-footer.is-compact')
+      || panel?.querySelector('.site-footer.is-compact');
+    const article = document.querySelector('.blog-detail-content');
+    if (panel) panel.scrollTop = panel.scrollHeight;
+    const pr = panel?.getBoundingClientRect();
+    const fr = footer?.getBoundingClientRect();
+    return {
+      book: !!document.querySelector('.bd-book'),
+      article: !!article,
+      footer: !!footer,
+      insidePanel: !!(footer && panel && panel.contains(footer)),
+      footerVisible: !!(fr && fr.width > 0 && fr.height > 0),
+      footerBottom: fr ? Math.round(fr.bottom) : null,
+      panelBottom: pr ? Math.round(pr.bottom) : null,
+      scrollable: panel ? panel.scrollHeight > panel.clientHeight + 2 : false,
+    };
+  })()`);
+  check('低屏不再进入分页书', narrow.book === false, JSON.stringify(narrow));
+  check('低屏显示连续正文', narrow.article === true, JSON.stringify(narrow));
+  check('页脚在阅读面板内部，不是面板外面的另一块', narrow.footer && narrow.insidePanel, JSON.stringify(narrow));
+  check('滚到文章末尾时页脚完整可见', narrow.footerVisible && narrow.footerBottom <= narrow.panelBottom + 1, JSON.stringify(narrow));
+  check('文章高度包含页脚（面板可滚到页脚）', narrow.scrollable === true, JSON.stringify(narrow));
 
   console.log('\n控制台');
   check('无控制台报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));

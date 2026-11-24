@@ -23,6 +23,7 @@ const paperRef = ref(null);
 const leafRef = ref(null);
 const underRef = ref(null);
 const measureRef = ref(null);
+const footerMeasureRef = ref(null);
 
 const index = ref(0);
 // 真正渲染的页：[{ html, lh }] —— html 是这一页的正文，lh 是按纸高算出来的行高倍数
@@ -501,6 +502,9 @@ function measureCtx() {
 const BASE_LH = 1.92;
 const MAX_LH = 24;
 const FILL_RATIO = 0.72;
+// 纸面太矮时不再按高度硬切：窄窗口 / 低屏上一页会被切成很多碎片，
+// 保留作者的语义页，让纸内滚动接住超出的部分（onWheel 会先滚纸内再翻页）。
+const MIN_SPLIT_HEIGHT = 520;
 
 function heightOf(nodes, mirror) {
   mirror.style.lineHeight = '';
@@ -629,26 +633,64 @@ function splitPageToFit(html, ctx) {
   return out.length ? out.map(serialize) : [html];
 }
 
+function footerHeight() {
+  const el = footerMeasureRef.value;
+  return el ? Math.ceil(el.getBoundingClientRect().height) : 0;
+}
+
+function htmlHeight(html, ctx) {
+  ctx.mirror.style.lineHeight = '';
+  ctx.mirror.innerHTML = html;
+  return ctx.mirror.scrollHeight;
+}
+
 function buildDisplayPages() {
   const ctx = measureCtx();
   const fallback = props.pages.map((html) => ({ html, lh: 0 }));
   if (!ctx) return fallback;
-  const out = [];
-  for (const html of props.pages) {
-    ctx.mirror.style.lineHeight = '';
-    ctx.mirror.innerHTML = html;
-    if (ctx.mirror.scrollHeight <= ctx.maxH + 1) {
-      out.push(html);
-      continue;
+
+  // 页脚也是最后一页的一部分：先把它的高度从最后一页的可用高度里扣掉。
+  const reserve = footerHeight();
+  const lastMax = ctx.maxH - reserve;
+  const lastCtx = { ...ctx, maxH: Math.max(1, lastMax) };
+
+  let pages;
+  if (ctx.maxH < MIN_SPLIT_HEIGHT) {
+    // 窄窗口 / 低屏：不按高度把每一页切碎，保留语义页，超出部分交给纸内滚动。
+    pages = props.pages.slice();
+  } else {
+    const out = [];
+    for (const html of props.pages) {
+      ctx.mirror.style.lineHeight = '';
+      ctx.mirror.innerHTML = html;
+      if (ctx.mirror.scrollHeight <= ctx.maxH + 1) {
+        out.push(html);
+        continue;
+      }
+      if (MEDIA_RE.test(html)) {
+        out.push(html);
+        continue;
+      }
+      out.push(...splitPageToFit(html, ctx));
     }
-    if (MEDIA_RE.test(html)) {
-      out.push(html);
-      continue;
-    }
-    out.push(...splitPageToFit(html, ctx));
+    pages = out.length ? out : props.pages.slice();
   }
-  const pages = out.length ? out : props.pages;
-  return pages.map((html) => ({ html, lh: fillLineHeight(html, ctx) }));
+
+  // 最后一段 + 页脚如果超过纸高，按「纸高 − 页脚」再切一次。
+  // 这样正文和页脚一起构成一页，页脚不会被推到纸面之外。
+  if (reserve > 0 && lastMax > 120 && pages.length) {
+    const last = pages[pages.length - 1];
+    if (!MEDIA_RE.test(last) && htmlHeight(last, ctx) + reserve > ctx.maxH + 1) {
+      pages.pop();
+      pages.push(...splitPageToFit(last, lastCtx));
+    }
+  }
+
+  const lastIndex = pages.length - 1;
+  return pages.map((html, i) => ({
+    html,
+    lh: fillLineHeight(html, i === lastIndex ? lastCtx : ctx),
+  }));
 }
 
 // reset=true：换篇/首挂载，回第 0 页。
@@ -780,6 +822,14 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- 量最后一页页脚的高度（隐藏）：分页时要把这段高度从最后一页的正文容量里扣掉，
+             这样正文 + 页脚才是完整的一页，页脚不会掉到纸面外面。 -->
+        <div ref="footerMeasureRef" class="bd-book__footer-measure" aria-hidden="true">
+          <div class="bd-book__colophon">
+            <slot name="last-page" />
+          </div>
+        </div>
+
         <!-- 页码是阅读器的 UI，不跟着纸滑 -->
         <div class="bd-book__stamp" aria-hidden="true">{{ pad(index + 1) }} <i>/</i> {{ pad(total) }}</div>
       </div>
@@ -871,14 +921,26 @@ onBeforeUnmount(() => {
    排在正文之后（短页跟正文一起居中，长页排到可滚动内容的末尾）。 */
 .bd-book__body { display: contents; }
 
-/* 最后一页的经典网站页脚（父组件的 AppFooter compact 插槽） */
+/* 最后一页的经典网站页脚（父组件的 AppFooter compact 插槽）。
+   它是正文流里的最后一项：分页时会先把它的高度从最后一页的可用高度里扣掉，
+   所以「正文 + 页脚」才是完整的一页，页脚不会被挤到纸面之外。 */
 .bd-book__colophon {
   flex: 0 0 auto;
   width: 100%;
-  margin-top: clamp(28px, 5vh, 56px);
-  padding-top: clamp(14px, 2vh, 22px);
+  padding-top: clamp(28px, 5vh, 56px);
   border-top: 1px solid var(--border);
   line-height: 1.5;
+}
+/* 隐藏的量高副本：宽度和正文列一致，页脚换行高度变化时也能量准 */
+.bd-book__footer-measure {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+  padding: 0 clamp(26px, 2.6vw, 36px);
 }
 /* 页脚自己的 p 间距由 AppFooter 控制，别被正文的 1.15em 段落间距顶开 */
 .bd-book__colophon :deep(p) { margin-bottom: 0; }
