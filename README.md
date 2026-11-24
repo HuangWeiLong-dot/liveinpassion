@@ -2,7 +2,7 @@
 
 # LIVEINPASSION
 
-**For Her.**
+**For.....**
 
 [![Live](https://img.shields.io/badge/LIVE-liveinpassion.me-000000?style=flat-square\&logo=googlechrome\&logoColor=white)](https://liveinpassion.me)
 [![Vue 3](https://img.shields.io/badge/Vue-3-42b883?style=flat-square\&logo=vue.js\&logoColor=white)](https://vuejs.org)
