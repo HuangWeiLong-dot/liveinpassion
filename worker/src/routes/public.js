@@ -14,7 +14,8 @@ app.get('/posts', async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT slug, card_title, title, content_format, content_html,
-            cover_key, cover_full_key, read_time_min, category, tags_json,
+            cover_key, cover_full_key, cover_credit, cover_credit_url,
+            read_time_min, category, tags_json,
             published_at
      FROM posts WHERE status='published' ORDER BY published_at DESC, slug DESC`
   ).all();
@@ -32,6 +33,8 @@ app.get('/posts', async (c) => {
       src: row.cover_key ? `${CDN_BASE}/${row.cover_key}` : null,
       fullSrc: row.cover_full_key ? `${CDN_BASE}/${row.cover_full_key}` : null,
     },
+    coverCredit: row.cover_credit || '',
+    coverCreditUrl: row.cover_credit_url || '',
     body: row.content_html,
   }));
 
@@ -305,7 +308,8 @@ app.get('/posts/:slug', async (c) => {
   const slug = c.req.param('slug');
   const row = await db.prepare(
     `SELECT slug, card_title, title, content_format, content_html,
-            cover_key, cover_full_key, read_time_min, category, tags_json,
+            cover_key, cover_full_key, cover_credit, cover_credit_url,
+            read_time_min, category, tags_json,
             published_at
      FROM posts WHERE slug=? AND status='published'`
   ).bind(slug).first();
@@ -325,6 +329,8 @@ app.get('/posts/:slug', async (c) => {
       src: row.cover_key ? `${CDN_BASE}/${row.cover_key}` : null,
       fullSrc: row.cover_full_key ? `${CDN_BASE}/${row.cover_full_key}` : null,
     },
+    coverCredit: row.cover_credit || '',
+    coverCreditUrl: row.cover_credit_url || '',
     body: row.content_html,
   });
 });

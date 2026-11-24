@@ -113,6 +113,24 @@ function safeTags(raw) {
 const ratio = ref('4 / 5');
 
 const post = computed(() => blogBySlug[route.params.slug] || null);
+
+// 封面来源：有的封面是别人的作品，作者会在 CMS 里写一句说明 / 原书链接。
+// 只写了链接时，标签就用域名兜底（不把整条 URL 铺在标题下面）。
+const coverCredit = computed(() => {
+  const p = post.value;
+  const note = String(p?.coverCredit || '').trim();
+  const url = String(p?.coverCreditUrl || '').trim();
+  if (!note && !url) return null;
+  let label = note;
+  if (!label && url) {
+    try {
+      label = new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      label = 'SOURCE';
+    }
+  }
+  return { label, url };
+});
 const index = computed(() => blogPosts.findIndex((p) => p.slug === route.params.slug));
 const prevPost = computed(() => (index.value > 0 ? blogPosts[index.value - 1] : null));
 const nextPost = computed(() => (
@@ -894,8 +912,8 @@ function close() {
   // 从 1 **啪一下归零**、再花 1 秒淡回来，实测是这一段里最明显的一下"闪"。
   // 起飞时先把它淡到 0（时长同 TAKEOVER，见 App.vue 那条权重说明），
   // 换页那一刻它本来就是 0，淡入就接得上了。
-  // 另外顺带盖住了 header 本身的样式切换：详情页那条实心底（blog-detail-open）
-  // 会在 activate() 里被摘掉，背着淡入的话那一档底色是硬切的。
+  // 导航现在是常驻的悬浮玻璃条，不再有"详情页实心底"那一档切换；
+  // blog-detail-open 只负责这页里左下角 Ava 塔的显隐。
   // 清除交给 BlogsView.activate()（它本来就会摘这个类）。
   //
   // ⚠ "减少动态效果"下**不挂**：那时没有飞行，挂上去只会让 header 先淡没、
@@ -1255,9 +1273,9 @@ function scheduleEnter() {
   }));
 }
 
-// 站点 header 是 fixed 的。详情页里正文会从它下面滚过去 —— header 默认是**透明**的
-// （只有 .scrolled 那档才有底），于是两层字会直接叠在一起。
-// 给 <html> 挂个类，让 header 在这条路上变成实心（样式见本文件里的 :global 规则）。
+// 详情页打开 / 关闭时给 <html> 挂 blog-detail-open。
+// 导航已经变成常驻的悬浮玻璃条（正文从它下面滚过也压得住），这个类现在只负责
+// 左下角 Ava 塔在详情页里的显隐（见 main.css 的 html.blog-detail-open 规则）。
 function solidifyHeader(on) {
   document.documentElement.classList.toggle('blog-detail-open', on);
 }
@@ -1524,6 +1542,19 @@ if (typeof window !== 'undefined') {
                 v-if="post.category && post.category !== 'UNFILED'"
                 class="bd-tag bd-category"
               >{{ post.category }}</span>
+              <a
+                v-if="coverCredit"
+                class="bd-tag bd-cover-credit"
+                :class="{ 'is-link': !!coverCredit.url }"
+                :href="coverCredit.url || null"
+                :target="coverCredit.url ? '_blank' : null"
+                :rel="coverCredit.url ? 'noopener noreferrer' : null"
+                :title="coverCredit.url || null"
+              >
+                <span class="bd-cover-credit__label">Cover</span>
+                <span class="bd-cover-credit__text">{{ coverCredit.label }}</span>
+                <span v-if="coverCredit.url" class="bd-cover-credit__arrow" aria-hidden="true">↗</span>
+              </a>
             </div>
             <!-- 标题与正文都由 startTyping() 逐字敲出来（不要在模板里拆字：
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
@@ -2171,6 +2202,36 @@ if (typeof window !== 'undefined') {
 .bd-category {
   padding-left: 14px;
   border-left: 1px solid var(--border);
+}
+
+/* 封面来源：和日期 / 阅读时长 / 分类同一行。说明可能很长，所以允许整行换行，
+   文字用省略号收尾；有链接时整枚可点，箭头提示会开新标签页。 */
+.bd-info .blog-meta {
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.bd-cover-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+.bd-cover-credit__label { opacity: 0.55; }
+.bd-cover-credit__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bd-cover-credit.is-link:hover { color: var(--text-primary); }
+.bd-cover-credit.is-link:hover .bd-cover-credit__text {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .blog-tags {
   display: flex;

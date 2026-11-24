@@ -164,6 +164,8 @@ const form = ref({
   contentMd: '',
   coverKey: '',
   coverFullKey: '',
+  coverCredit: '',
+  coverCreditUrl: '',
   category: 'UNFILED',
   tags: [],
   tagDraft: '',
@@ -389,6 +391,14 @@ function applyCategory(value) {
   form.value.category = value;
 }
 
+// 封面来源链接：没写协议时补 https://；空值保持空。
+// Worker 端还会再校验一次，这里主要是让输入框失焦后就显示成完整 URL。
+function normalizeCreditUrlInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
 function addTag() {
   const raw = String(form.value.tagDraft || '').trim();
   if (!raw) return;
@@ -467,6 +477,8 @@ onMounted(async () => {
       form.value.contentMd = data.contentMd || '';
       form.value.coverKey = data.coverKey || '';
       form.value.coverFullKey = data.coverFullKey || '';
+      form.value.coverCredit = data.coverCredit || '';
+      form.value.coverCreditUrl = data.coverCreditUrl || '';
       form.value.category = normalizeCategoryInput(data.category);
       form.value.tags = Array.isArray(data.tags)
         ? [...new Set(
@@ -522,6 +534,8 @@ async function saveMeta() {
       title: form.value.title,
       coverKey: form.value.coverKey,
       coverFullKey: form.value.coverFullKey,
+      coverCredit: form.value.coverCredit,
+      coverCreditUrl: normalizeCreditUrlInput(form.value.coverCreditUrl),
       category: normalizeCategoryInput(form.value.category),
       tags: form.value.tags.slice(0, TAG_LIMIT),
     });
@@ -575,6 +589,8 @@ async function save(status) {
       contentMd: form.value.contentMd,
       coverKey: form.value.coverKey,
       coverFullKey: form.value.coverFullKey,
+      coverCredit: form.value.coverCredit,
+      coverCreditUrl: normalizeCreditUrlInput(form.value.coverCreditUrl),
       category: normalizeCategoryInput(form.value.category),
       tags: tagsArr,
     };
@@ -1298,6 +1314,26 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <div class="field cover-credit-field">
+          <label class="field-label">04b / Cover Credit</label>
+          <input
+            v-model="form.coverCredit"
+            maxlength="160"
+            placeholder="Photo by … / From the book …"
+          />
+          <input
+            v-model="form.coverCreditUrl"
+            class="cover-credit-url"
+            maxlength="500"
+            inputmode="url"
+            placeholder="https://original-source"
+            @blur="form.coverCreditUrl = normalizeCreditUrlInput(form.coverCreditUrl)"
+          />
+          <div class="field-hint">
+            Optional. Shown with the cover on the post page; the link opens in a new tab.
+          </div>
+        </div>
+
         <div class="field tags-field">
           <label class="field-label">05 / Tags</label>
           <input
@@ -1664,6 +1700,7 @@ onUnmounted(() => {
   padding: 0 12px;
 }
 .cover-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.cover-credit-url { margin-top: 8px; }
 .cover-btn { position: relative; overflow: hidden; }
 .cover-btn input { display: none; }
 .is-uploading { opacity: 0.6; cursor: wait; }

@@ -7,6 +7,29 @@ import { normalizeCategory, normalizeTags, tagsToStored } from '../lib/meta.js';
 
 const app = new Hono();
 
+// 封面来源：一句说明 + 原图 / 原书链接。链接只允许 http(s)，
+// 没写协议时补 https://；其它协议（javascript: 等）直接拒绝。
+function normalizeCredit(value) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
+}
+
+function normalizeCreditUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return { url: '' };
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return { error: true };
+    return { url: parsed.toString().slice(0, 500) };
+  } catch {
+    return { error: true };
+  }
+}
+
 // ---------- Admin 写接口（需鉴权） ----------
 
 // 创建文章
@@ -34,16 +57,21 @@ app.post('/', requireAccessAuth, async (c) => {
   const readTime = estimateReadTime(contentMd || body.contentHtml || '');
   const category = normalizeCategory(body.category);
   const tagsJson = tagsToStored(body.tags);
+  const coverCredit = normalizeCredit(body.coverCredit);
+  const coverCreditUrl = normalizeCreditUrl(body.coverCreditUrl);
+  if (coverCreditUrl.error) {
+    return c.json({ error: 'coverCreditUrl must start with http:// or https://' }, 400);
+  }
 
   try {
     const result = await db.prepare(
       `INSERT INTO posts (slug, card_title, title, status, content_format, content_md, content_html,
-        cover_key, cover_full_key, read_time_min, category, tags_json,
+        cover_key, cover_full_key, cover_credit, cover_credit_url, read_time_min, category, tags_json,
         published_at, updated_at)
-       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
+       VALUES (?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, datetime('now'))`
     ).bind(
       slug, cardTitle, title, format, contentMd || null, contentHtml,
-      coverKey || null, coverFullKey || null, readTime,
+      coverKey || null, coverFullKey || null, coverCredit, coverCreditUrl.url, readTime,
       category, tagsJson
     ).run();
 
@@ -88,10 +116,22 @@ app.put('/:id', requireAccessAuth, async (c) => {
   const category = hasCategory ? normalizeCategory(body.category) : existing.category;
   const tagsJson = hasTags ? tagsToStored(body.tags) : existing.tags_json;
 
+  // 封面来源同样允许局部更新
+  const hasCredit = 'coverCredit' in body;
+  const hasCreditUrl = 'coverCreditUrl' in body;
+  const coverCredit = hasCredit ? normalizeCredit(body.coverCredit) : (existing.cover_credit || '');
+  const creditUrl = hasCreditUrl
+    ? normalizeCreditUrl(body.coverCreditUrl)
+    : { url: existing.cover_credit_url || '' };
+  if (creditUrl.error) {
+    return c.json({ error: 'coverCreditUrl must start with http:// or https://' }, 400);
+  }
+
   try {
     await db.prepare(
       `UPDATE posts SET slug=?, card_title=?, title=?, content_format=?, content_md=?, content_html=?,
-        cover_key=?, cover_full_key=?, read_time_min=?, category=?, tags_json=?,
+        cover_key=?, cover_full_key=?, cover_credit=?, cover_credit_url=?,
+        read_time_min=?, category=?, tags_json=?,
         updated_at=datetime('now')
        WHERE id=?`
     ).bind(
@@ -99,6 +139,7 @@ app.put('/:id', requireAccessAuth, async (c) => {
       format, contentMd, contentHtml,
       body.coverKey !== undefined ? body.coverKey : existing.cover_key,
       body.coverFullKey !== undefined ? body.coverFullKey : existing.cover_full_key,
+      coverCredit, creditUrl.url,
       readTime,
       category, tagsJson,
       id
@@ -153,7 +194,7 @@ app.get('/', requireAccessAuth, async (c) => {
   const db = c.env.DB;
   const rows = await db.prepare(
     `SELECT id, slug, card_title, title, status, content_format, read_time_min,
-            cover_key, cover_full_key, category, tags_json,
+            cover_key, cover_full_key, cover_credit, cover_credit_url, category, tags_json,
             published_at, created_at, updated_at
      FROM posts ORDER BY COALESCE(published_at, created_at) DESC, id DESC`
   ).all();
@@ -185,6 +226,8 @@ function rowToPostAdmin(row, withContent = false) {
     readTimeMin: row.read_time_min,
     coverKey: row.cover_key,
     coverFullKey: row.cover_full_key,
+    coverCredit: row.cover_credit || '',
+    coverCreditUrl: row.cover_credit_url || '',
     category: row.category || 'UNFILED',
     tags,
     publishedAt: row.published_at,
