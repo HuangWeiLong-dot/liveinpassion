@@ -32,6 +32,10 @@ const leafHtml = ref('');
 const leafLh = ref(0);
 const underHtml = ref('');
 const underLh = ref(0);
+// 纸面上正在显示的是第几页（换页动画期间 leaf 可能比 index 早/晚一页）。
+// 最后一页的网站页脚要靠它判断，不能只看 index。
+const leafIndex = ref(0);
+const underIndex = ref(-1);
 const turning = ref(false);
 
 const total = computed(() => displayPages.value.length);
@@ -67,20 +71,27 @@ function pageAt(i) {
   return displayPages.value[i] || { html: '', lh: 0 };
 }
 
-function setLeaf(page) {
+function setLeaf(page, i = -1) {
   leafHtml.value = page?.html || '';
   leafLh.value = page?.lh || 0;
+  leafIndex.value = i;
 }
 
-function setUnder(page) {
+function setUnder(page, i = -1) {
   underHtml.value = page?.html || '';
   underLh.value = page?.lh || 0;
+  underIndex.value = i;
 }
 
 function clearUnder() {
   underHtml.value = '';
   underLh.value = 0;
+  underIndex.value = -1;
 }
+
+// 最后一页才在纸面上挂经典网站页脚（由父组件通过 #last-page 插槽传入）。
+const leafIsLast = computed(() => total.value > 0 && leafIndex.value === total.value - 1);
+const underIsLast = computed(() => total.value > 0 && underIndex.value === total.value - 1);
 
 // p = 0：当前页；p = 1：下一页已经完整落进来（或上一页已经完整翻回来）。
 // 两张纸并排横向滑动，阅读框负责裁切。
@@ -150,7 +161,7 @@ function runQueue() {
 
 function finishForward() {
   index.value = Math.min(total.value - 1, index.value + 1);
-  setLeaf(pageAt(index.value));
+  setLeaf(pageAt(index.value), index.value);
   clearUnder();
   resetSheets();
   resetScroll();
@@ -161,7 +172,7 @@ function finishForward() {
 
 function finishBackward() {
   index.value = Math.max(0, index.value - 1);
-  setLeaf(pageAt(index.value));
+  setLeaf(pageAt(index.value), index.value);
   clearUnder();
   resetSheets();
   resetScroll();
@@ -173,7 +184,7 @@ function finishBackward() {
 function turnForward() {
   if (!hasNext.value) return;
   turning.value = true;
-  setUnder(pageAt(index.value + 1));
+  setUnder(pageAt(index.value + 1), index.value + 1);
   if (!leafRef.value || !underRef.value || reduced) {
     finishForward();
     return;
@@ -186,8 +197,8 @@ function turnBackward() {
   if (!hasPrev.value) return;
   turning.value = true;
   // 上一页先在左侧待命，当前页垫在框里
-  setUnder(pageAt(index.value));
-  setLeaf(pageAt(index.value - 1));
+  setUnder(pageAt(index.value), index.value);
+  setLeaf(pageAt(index.value - 1), index.value - 1);
   if (!leafRef.value || !underRef.value || reduced) {
     finishBackward();
     return;
@@ -220,7 +231,7 @@ function jumpTo(target) {
   const i = Math.max(0, Math.min(total.value - 1, target));
   if (i === index.value) return false;
   index.value = i;
-  setLeaf(pageAt(i));
+  setLeaf(pageAt(i), i);
   clearUnder();
   resetSheets();
   resetScroll();
@@ -307,14 +318,14 @@ function startDrag(x, y, id) {
 }
 
 function beginForwardDrag() {
-  setUnder(pageAt(index.value + 1));
+  setUnder(pageAt(index.value + 1), index.value + 1);
   applySlide(0, 1);
 }
 
 function beginBackwardDrag() {
   // 上一页在左侧待命，当前页留在框里
-  setUnder(pageAt(index.value));
-  setLeaf(pageAt(index.value - 1));
+  setUnder(pageAt(index.value), index.value);
+  setLeaf(pageAt(index.value - 1), index.value - 1);
   applySlide(0, -1);
 }
 
@@ -389,7 +400,7 @@ function finishDrag() {
   } else {
     animateSlide(d.p, 0, -1, 0.18, 'power2.out', () => {
       clearUnder();
-      setLeaf(pageAt(index.value)); // 把左侧待命的上一页换回当前页
+      setLeaf(pageAt(index.value), index.value); // 把左侧待命的上一页换回当前页
       resetSheets();
       turning.value = false;
       timeline = null;
@@ -658,7 +669,7 @@ function repaginate({ reset = false } = {}) {
     const ratio = oldTotal > 1 ? oldIndex / (oldTotal - 1) : 0;
     index.value = Math.min(next.length - 1, Math.round(ratio * (next.length - 1)));
   }
-  setLeaf(pageAt(index.value));
+  setLeaf(pageAt(index.value), index.value);
   clearUnder();
   nextTick(resetSheets);
   resetScroll();
@@ -675,7 +686,7 @@ watch(() => props.pages, (pages) => {
   queuedDir = 0;
   index.value = 0;
   displayPages.value = pages.map((html) => ({ html, lh: 0 }));
-  setLeaf(pageAt(0));
+  setLeaf(pageAt(0), 0);
   clearUnder();
   turning.value = false;
   nextTick(() => {
@@ -748,8 +759,12 @@ onBeforeUnmount(() => {
           <div
             class="bd-book__content blog-detail-content"
             :style="underLh ? { lineHeight: underLh } : null"
-            v-html="underHtml"
-          ></div>
+          >
+            <div class="bd-book__body" v-html="underHtml"></div>
+            <div v-if="underIsLast" class="bd-book__colophon">
+              <slot name="last-page" />
+            </div>
+          </div>
         </div>
 
         <!-- 当前页 -->
@@ -757,8 +772,12 @@ onBeforeUnmount(() => {
           <div
             class="bd-book__content blog-detail-content"
             :style="leafLh ? { lineHeight: leafLh } : null"
-            v-html="leafHtml"
-          ></div>
+          >
+            <div class="bd-book__body" v-html="leafHtml"></div>
+            <div v-if="leafIsLast" class="bd-book__colophon">
+              <slot name="last-page" />
+            </div>
+          </div>
         </div>
 
         <!-- 页码是阅读器的 UI，不跟着纸滑 -->
@@ -847,6 +866,22 @@ onBeforeUnmount(() => {
 }
 .bd-book__content::-webkit-scrollbar { display: none; }
 .bd-book__under .bd-book__content { overflow: hidden; }
+
+/* 正文包一层 display:contents：不改变现有 flex 排版，页脚才能作为独立项
+   排在正文之后（短页跟正文一起居中，长页排到可滚动内容的末尾）。 */
+.bd-book__body { display: contents; }
+
+/* 最后一页的经典网站页脚（父组件的 AppFooter compact 插槽） */
+.bd-book__colophon {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: clamp(28px, 5vh, 56px);
+  padding-top: clamp(14px, 2vh, 22px);
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
+/* 页脚自己的 p 间距由 AppFooter 控制，别被正文的 1.15em 段落间距顶开 */
+.bd-book__colophon :deep(p) { margin-bottom: 0; }
 
 .bd-book__content :deep(p) {
   margin-bottom: 1.15em;

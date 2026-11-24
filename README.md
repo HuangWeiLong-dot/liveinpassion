@@ -48,6 +48,16 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### update: 109 — 2026-11-24
+
+#### 分页书最后一页补上经典网站页脚
+
+- 文章有 `page-break` 进入分页书模式时，最后一页在正文之后渲染 `AppFooter compact`：
+  LIVEINPASSION 字标 + Be Brave / Genuine / Humble + 版权，与不分页文章的结尾一致。
+- 只挂在最后一页（按 `leafIndex` / `underIndex` 判断，换页动画中不会误挂）；前面的页不出现。
+  正文用 `display: contents` 包装保持原来的居中排版，页脚单独排在最后；长页滚到页底也可达。
+- 验收：新增 `tools/verify-book-footer.mjs`，10 项全部通过。
+
 ### update: 108 — 2026-11-24
 
 #### CMS 移动端：导航菜单、编辑器预览开关与保存后的滚动保持

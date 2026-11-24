@@ -1560,7 +1560,12 @@ if (typeof window !== 'undefined') {
                  换篇时 v-html 会把正文整个换掉，拆字必须在那之后做） -->
             <h1 ref="titleRef" class="blog-detail-title">{{ post.title }}</h1>
             <div v-if="!bookMode" ref="bodyRef" class="blog-detail-content" v-html="bodyHtml"></div>
-            <BlogBook v-else ref="bookRef" :pages="pages" />
+            <BlogBook v-else ref="bookRef" :pages="pages">
+              <!-- 分页书的最后一页挂经典网站页脚；非分页模式继续用下面那条 compact 页脚 -->
+              <template #last-page>
+                <AppFooter compact />
+              </template>
+            </BlogBook>
             <!-- 标签放在正文最下方：书页模式下紧接书页，平铺模式下接在正文之后。
                  点击标签仍跳到 ECHOES 的 ARCHIVE 并挂上筛选。 -->
             <div v-if="safeTags(post.tags).length" class="blog-tags blog-tags--foot">
