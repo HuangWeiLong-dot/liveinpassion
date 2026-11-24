@@ -305,23 +305,26 @@ async function tap(sel) {
     const lo = await json('window.__overflow()');
     check('页面不横向溢出', lo.scrollWidth <= lo.clientWidth,
       `${lo.scrollWidth} / ${lo.clientWidth}` + (lo.over.length ? '  溢出: ' + JSON.stringify(lo.over) : ''));
-    // 窄屏下导航条本身就设计成横向滚动（admin.css 的 .nav-links），
-    // 断言重点从"一次全塞进视口"改成"每个按钮都能滚进视口"。
+    // 窄屏导航 = 右上角菜单按钮 + 下拉面板（admin.css）。
+    // 打开后所有入口、主题按钮、退出都应在视口内，不再是一条被裁掉的横向滚动条。
+    await evaluate(`document.querySelector('.nav-menu-toggle').click(); 1`);
+    await sleep(350);
     const navBox = await json(`(function () {
       var links = document.querySelector('.nav-links');
-      var items = [...document.querySelectorAll('.nav-item')].filter(function (e) {
-        return e.offsetParent !== null && e.getBoundingClientRect().width > 0;
+      var items = [...document.querySelectorAll('.nav-item, .theme-toggle')].filter(function (e) {
+        var b = e.getBoundingClientRect();
+        return b.width > 0 && b.height > 0;
       });
-      var reachable = items.every(function (e) {
-        e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      var inView = items.every(function (e) {
         var r = e.getBoundingClientRect();
         return r.left >= -1 && r.right <= window.innerWidth + 1;
       });
-      links.scrollLeft = 0;
-      return { scrollW: links.scrollWidth, clientW: links.clientWidth,
-               scrollable: getComputedStyle(links).overflowX === 'auto', reachable };
+      return { open: getComputedStyle(links).display !== 'none', count: items.length,
+               inView: inView, toggle: !!document.querySelector('.nav-menu-toggle') };
     })()`);
-    check('导航可横向滚动，每个按钮都能滚进视口', navBox.reachable && navBox.scrollable, JSON.stringify(navBox));
+    check('手机导航打开后所有入口都在视口内', navBox.toggle && navBox.open && navBox.inView && navBox.count >= 7, JSON.stringify(navBox));
+    await evaluate(`document.querySelector('.nav-menu-toggle').click(); 1`);
+    await sleep(250);
     const listSmall = await json('window.__tapTargets()');
     check('列表页无 <44px 的点按目标', listSmall.length === 0, listSmall.length ? JSON.stringify(listSmall.slice(0, 6)) : '');
 

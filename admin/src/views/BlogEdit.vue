@@ -72,6 +72,9 @@ const isNew = computed(() => !route.params.id);
 const coarsePointer = window.matchMedia('(hover: none)');
 const narrowScreen = window.matchMedia('(max-width: 768px)');
 const isNarrow = ref(narrowScreen.matches);
+// 手机默认收起右侧信件预览；平板 / 桌面默认展开。
+// 窄屏上它不再挤在编辑区旁边，而是变成编辑区下方的一整块，由 PREVIEW 按钮切换。
+const previewOpen = ref(!isNarrow.value);
 
 // Typewriter Nocturne 写作模式：一张稿纸、一种墨色、一盏台灯。
 // 默认打开（这就是编辑器的日常皮肤），关掉后回到 CMS 原本的极简面板；选择记在本机。
@@ -180,6 +183,14 @@ const saving = ref(false);
 const postStatus = ref('draft');
 const uploading = ref(false);
 const error = ref('');
+// 保存成功的轻提示：不用 alert（会打断滚动 / 焦点），也不跳回列表。
+const savedNotice = ref('');
+let savedTimer = 0;
+function showSaved(message) {
+  savedNotice.value = message;
+  clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => { savedNotice.value = ''; }, 6000);
+}
 const coverPreview = ref('');
 const editorRef = ref(null);
 
@@ -539,8 +550,8 @@ async function saveMeta() {
       category: normalizeCategoryInput(form.value.category),
       tags: form.value.tags.slice(0, TAG_LIMIT),
     });
-    alert('Updated. Pages will rebuild in 1-2 minutes.');
-    router.push('/');
+    // 留在原页：编辑到一半时保存元信息，不应该把人踢回列表顶部。
+    showSaved('Updated — pages will rebuild in 1–2 minutes.');
   } catch (e) {
     error.value = e.message;
   } finally {
@@ -608,16 +619,20 @@ async function save(status) {
       await blogApi.setStatus(id, status);
       postStatus.value = status;
     }
-    if (status === 'published') {
-      alert(wasPublished
-        ? 'Updated. Pages will rebuild in 1-2 minutes.'
-        : 'Published. Pages will rebuild in 1-2 minutes.');
-    } else if (wasPublished) {
-      alert('Updated. Pages will rebuild in 1-2 minutes.');
-    } else {
-      alert('Saved as draft.');
+    // 新文章建好后换成编辑地址：不整页刷新，再点保存就是更新而不是重复创建。
+    if (isNew.value) {
+      await router.replace(`/blogs/${id}`);
     }
-    router.push('/');
+    // 留在编辑器里。保存正文或元信息都不跳回列表，滚动位置与书写焦点保持不动。
+    if (status === 'published') {
+      showSaved(wasPublished
+        ? 'Updated — pages will rebuild in 1–2 minutes.'
+        : 'Published — pages will rebuild in 1–2 minutes.');
+    } else if (wasPublished) {
+      showSaved('Updated — pages will rebuild in 1–2 minutes.');
+    } else {
+      showSaved('Saved as draft.');
+    }
   } catch (e) {
     error.value = e.message;
     imgProgress.value = '';
@@ -643,6 +658,7 @@ onUnmounted(() => {
     URL.revokeObjectURL(blobUrl);
   }
   pendingImages.clear();
+  clearTimeout(savedTimer);
 });
 
 // 编辑器内 Ctrl+S / 工具栏保存按钮：存为草稿
@@ -1414,6 +1430,14 @@ onUnmounted(() => {
           <button
             v-if="nocturne"
             type="button"
+            class="preview-toggle"
+            :class="{ 'is-on': previewOpen }"
+            :aria-pressed="previewOpen"
+            @click="previewOpen = !previewOpen"
+          >{{ previewOpen ? 'HIDE PREVIEW' : 'PREVIEW' }}</button>
+          <button
+            v-if="nocturne"
+            type="button"
             class="ns-toggle ns-toggle--head"
             :class="{ 'is-on': soundOn }"
             :aria-pressed="soundOn"
@@ -1522,7 +1546,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 右侧：打印出来的那一页，像一封刚打好的信 -->
-        <aside v-if="nocturne" class="letter-panel" aria-label="Printed letter">
+        <aside v-if="nocturne && previewOpen" class="letter-panel" aria-label="Printed letter">
           <div class="letter-sheet">
             <div class="letter-head">
               <span class="letter-brand">LIVEINPASSION</span>
@@ -1590,6 +1614,9 @@ onUnmounted(() => {
         </template>
       </div>
     </div>
+
+    <!-- 保存提示：固定定位，不参与文档流，保存时不会把滚动位置顶走 -->
+    <div v-if="savedNotice" class="save-toast" role="status">{{ savedNotice }}</div>
 
     <!-- 照片排版弹窗 -->
     <div v-if="layoutModal" class="layout-overlay" @click.self="closeLayoutModal">
@@ -1802,6 +1829,34 @@ onUnmounted(() => {
   gap: 14px;
   min-width: 0;
 }
+/* 窄屏才出现的预览开关：把右侧信件放到编辑区下方，默认手机收起、平板展开 */
+.preview-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.preview-toggle.is-on {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+@media (max-width: 1024px) {
+  .preview-toggle { display: inline-flex; }
+}
+@media (hover: none) {
+  .preview-toggle { min-height: 44px; }
+}
+
 .lint-toggle {
   display: inline-flex;
   align-items: center;
@@ -1900,6 +1955,24 @@ onUnmounted(() => {
   .lint-item { min-height: 44px; align-items: center; }
 }
 
+/* 保存提示：固定定位的轻 toast，不占文档流，不改变滚动位置 */
+.save-toast {
+  position: fixed;
+  top: calc(var(--nav-h) + 14px);
+  right: 24px;
+  z-index: 1200;
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 10px 14px;
+  border: 1px solid var(--text-primary);
+  border-left-width: 3px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.2);
+}
+
 .action-bar {
   position: sticky;
   bottom: 0;
@@ -1971,9 +2044,30 @@ onUnmounted(() => {
 
 @media (max-width: 700px) {
   .form-grid { grid-template-columns: 1fr; gap: 20px; }
+  .save-toast {
+    top: calc(var(--nav-h) + 10px);
+    left: 14px;
+    right: 14px;
+    max-width: none;
+    text-align: center;
+  }
   .field--wide { grid-column: auto; }
   .editor-head { flex-wrap: wrap; row-gap: 8px; }
-  .editor-head__right { width: 100%; justify-content: space-between; gap: 10px; }
+  /* 手机上把提示文字单独放一行；不给它宽度的话会被 flex 压成一列竖排的碎字。 */
+  .editor-head__right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .editor-tip {
+    flex: 1 1 100%;
+    white-space: normal;
+    line-height: 1.55;
+  }
+  .nocturne-toggle,
+  .ns-toggle,
+  .lint-toggle { white-space: nowrap; }
   .lint-item { grid-template-columns: 34px 40px minmax(0, 1fr); }
   .lint-item__rule { display: none; }
   .action-bar { flex-wrap: wrap; row-gap: 10px; }

@@ -588,8 +588,8 @@ html.dark .tn-stage.is-live .tn-sheet {
 
 @media (pointer: coarse) {
   .ns-toggle { min-height: 44px; }
-  .ns-field select { height: 40px; }
-  .ns-field--volume input[type='range'] { width: 120px; height: 40px; }
+  .ns-field select { height: 44px; }
+  .ns-field--volume input[type='range'] { width: 120px; height: 44px; }
   .ns-field--volume input[type='range']::-webkit-slider-thumb { height: 28px; width: 14px; }
   .ns-field--volume input[type='range']::-moz-range-thumb { height: 28px; width: 14px; }
 }
@@ -633,6 +633,16 @@ html.dark .tn-stage.is-live .tn-sheet {
     right: 8px;
     height: calc(var(--tn-text-h, 60vh) - 8px) !important;
   }
+  /* 手机工具条：一行横向滑动。折行会吃掉本就有限的稿纸高度，
+     按钮还会被压成两行字。 */
+  .editor-panel.is-nocturne .md-editor .md-editor-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .editor-panel.is-nocturne .md-editor .md-editor-toolbar::-webkit-scrollbar { display: none; }
+  .editor-panel.is-nocturne .md-editor .md-editor-toolbar-item { flex: 0 0 auto; }
 }
 
 /* ---------- 左：打字机与稿纸 ｜ 右：打印出来的信 ---------- */
@@ -731,9 +741,16 @@ html.dark .tn-stage.is-live .tn-sheet {
 }
 
 @media (max-width: 1024px) {
-  /* 窄屏不再并排：信件让位，编辑区独占整行 */
-  .editor-panel.is-nocturne .letter-panel { display: none; }
+  /* 窄屏不再并排：编辑区独占整行，信件由 PREVIEW 开关放到它下面（见 .preview-toggle）。
+     手机默认收起；平板默认展开，所以这里只负责纵向排布与高度。 */
   .editor-body { display: block; }
+  .editor-panel.is-nocturne .letter-panel {
+    display: block;
+    width: 100%;
+    height: 66vh;
+    min-height: 360px;
+    margin-top: 18px;
+  }
 }
 
 /* Lint 总开关：关掉时按钮与指示灯一起变暗 */

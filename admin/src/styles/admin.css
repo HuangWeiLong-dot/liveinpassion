@@ -98,6 +98,10 @@ a, button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 
 .nav-links { display: flex; align-items: center; }
 
+/* 手机导航按钮：桌面隐藏，≤768px 由下面的响应式段打开 */
+.nav-menu-toggle { display: none; }
+.nav-backdrop { display: none; }
+
 .nav-item {
   position: relative;
   display: inline-flex;
@@ -405,27 +409,6 @@ select { cursor: pointer; }
   .brand-mark { font-size: 0.82rem; letter-spacing: 0.1em; }
   .brand-sub { font-size: 0.43rem; letter-spacing: 0.16em; margin-top: 2px; }
 
-  /* 导航项多了（Posts / Albums / Showcase / Films / Logout）之后，
-     窄屏放不下一整行：让右侧导航自己横向滚动，品牌不跟着挤。 */
-  .nav-links {
-    flex: 0 1 auto;
-    min-width: 0;
-    margin-left: 10px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .nav-links::-webkit-scrollbar { display: none; }
-  .nav-item { flex-shrink: 0; }
-
-  .nav-item { height: var(--nav-h); padding: 0 6px; font-size: 0.68rem; letter-spacing: 0.08em; }
-  /* 必须带上 .nav-item 前缀：基础规则 .nav-item .nav-en 的特异性更高，
-     只写 .nav-en 会被它压住，手机导航就会多出一截编号。 */
-  .nav-item .nav-en { display: none; }
-  .nav-item--ghost { display: none; }
-  .nav-item.router-link-exact-active::after { left: 6px; right: 6px; }
-  /* 导航项多了以后 nav-links 会横向滚动，主题按钮不能被 flex 压窄 */
-  .theme-toggle { margin-left: 4px; flex-shrink: 0; }
-
   .admin-main { padding: calc(var(--nav-h) + 26px) 0 52px; }
   .admin-main__inner { padding: 0 14px; }
 
@@ -442,6 +425,94 @@ select { cursor: pointer; }
   .panel { padding: 18px; }
 }
 
+/* 平板 / 手机导航：菜单按钮 + 下拉面板。
+   1024px 以下是同一套 —— 820px 时六个入口 + 主题 + 退出也放不进一行。 */
+@media (max-width: 1024px) {
+  .nav-menu-toggle {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    margin-left: 10px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .nav-menu-toggle__bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .nav-menu-toggle.is-open .nav-menu-toggle__bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-menu-toggle.is-open .nav-menu-toggle__bar:nth-child(2) { opacity: 0; }
+  .nav-menu-toggle.is-open .nav-menu-toggle__bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: var(--nav-h) 0 0;
+    z-index: 120;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .nav-links {
+    display: none;
+    position: fixed;
+    top: calc(var(--nav-h) + 8px);
+    left: 14px;
+    right: 14px;
+    z-index: 130;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+    padding: 6px 12px;
+    background: var(--bg);
+    border: 1px solid var(--text-primary);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
+    max-height: calc(100dvh - var(--nav-h) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .nav-links.is-open { display: flex; }
+
+  .nav-item {
+    height: 50px;
+    padding: 0 2px;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-item:last-of-type { border-bottom: 0; }
+  .nav-item .nav-en { display: inline-flex; }
+  .nav-item--ghost { display: flex; border-left: 0; }
+  .nav-item.router-link-exact-active::after {
+    left: 0;
+    right: auto;
+    top: 12px;
+    bottom: 12px;
+    width: 2px;
+    height: auto;
+  }
+  .nav-logout-form { display: block; }
+  .nav-item--logout { width: 100%; border-top: 1px solid var(--border); border-bottom: 0; }
+  .nav-links .theme-toggle {
+    width: 100%;
+    height: 48px;
+    margin: 6px 0 0;
+    border-color: var(--border);
+    flex-shrink: 0;
+  }
+}
+
 @media (max-width: 480px) {
   .admin-main { padding: calc(var(--nav-h) + 22px) 0 44px; }
   .admin-main__inner { padding: 0 12px; }
@@ -456,4 +527,5 @@ select { cursor: pointer; }
   .theme-toggle { width: 44px; height: 44px; }
   .nav-item { min-width: 44px; }
   input, textarea, select { font-size: 16px; }
+  select { min-height: 44px; }
 }

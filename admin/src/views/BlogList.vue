@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { blogApi } from '../api.js';
 import { askDeleteGuard } from '../composables/useDeleteGuard.js';
@@ -8,6 +8,29 @@ const router = useRouter();
 const posts = ref([]);
 const loading = ref(true);
 const error = ref('');
+
+// 列表滚动位置：去编辑器改文章、保存完再回来时，不要把人送回列表顶部。
+// 用 sessionStorage（同一标签页内有效），数据渲染完再滚，避免列表还没铺开就落位。
+const SCROLL_KEY = 'cms:posts-scroll';
+function saveListScroll() {
+  try {
+    sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+  } catch {
+    /* 隐私模式忽略 */
+  }
+}
+function restoreListScroll() {
+  let raw = null;
+  try {
+    raw = sessionStorage.getItem(SCROLL_KEY);
+  } catch {
+    return;
+  }
+  if (raw === null) return;
+  const y = Number(raw);
+  if (!Number.isFinite(y) || y <= 0) return;
+  requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'auto' }));
+}
 
 const publishedCount = computed(() => posts.value.filter((p) => p.status === 'published').length);
 const coverBase = 'https://img.liveinpassion.me/';
@@ -67,7 +90,12 @@ function padIndex(i) {
   return String(posts.value.length - i).padStart(2, '0');
 }
 
-onMounted(load);
+onMounted(async () => {
+  await load();
+  await nextTick();
+  restoreListScroll();
+});
+onBeforeUnmount(saveListScroll);
 </script>
 
 <template>
