@@ -23,7 +23,7 @@ function parseTags(raw) {
 async function loadPublished(db) {
   const rows = await db.prepare(
     `SELECT id, slug, card_title, title, category, tags_json, published_at
-     FROM posts WHERE status='published' ORDER BY published_at DESC`
+     FROM posts WHERE status='published' ORDER BY published_at DESC, id DESC`
   ).all();
   return rows.results.map((row) => ({
     id: row.id,
@@ -50,6 +50,8 @@ function aggregate(posts) {
 
 // 只写有变化的行；每条 UPDATE 都再确认一次 status='published'，
 // 避免读取与写入之间文章被取消发布时误改草稿。
+// 注意：只动 category / tags_json / updated_at —— published_at 一律不碰，
+// 改分类或标签不会改写发布时间，也不会影响按发布时间的排序。
 async function saveChanges(db, changes) {
   if (!changes.length) return 0;
   const statements = changes.map(({ id, category, tags }) => db.prepare(

@@ -155,7 +155,7 @@ app.get('/', requireAccessAuth, async (c) => {
     `SELECT id, slug, card_title, title, status, content_format, read_time_min,
             cover_key, cover_full_key, category, tags_json,
             published_at, created_at, updated_at
-     FROM posts ORDER BY COALESCE(published_at, created_at) DESC`
+     FROM posts ORDER BY COALESCE(published_at, created_at) DESC, id DESC`
   ).all();
   return c.json({ posts: rows.results.map(rowToPostAdmin) });
 });

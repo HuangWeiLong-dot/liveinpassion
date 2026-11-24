@@ -16,7 +16,7 @@ app.get('/posts', async (c) => {
     `SELECT slug, card_title, title, content_format, content_html,
             cover_key, cover_full_key, read_time_min, category, tags_json,
             published_at
-     FROM posts WHERE status='published' ORDER BY published_at DESC`
+     FROM posts WHERE status='published' ORDER BY published_at DESC, slug DESC`
   ).all();
 
   const posts = rows.results.map((row) => ({
