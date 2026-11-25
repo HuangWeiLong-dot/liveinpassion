@@ -6,6 +6,28 @@ const MODEL = '@cf/zai-org/glm-4.7-flash';
 const MAX_CONTEXT_LENGTH = 600;
 const MAX_SUGGESTION_LENGTH = 120;
 
+function textValue(value) {
+  if (typeof value === 'string') return value;
+  if (!Array.isArray(value)) return '';
+  return value
+    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text)
+    .join('');
+}
+
+function extractGeneratedText(result) {
+  const candidates = [
+    result?.response,
+    result?.choices?.[0]?.message?.content,
+    result?.result?.response,
+    result?.result?.choices?.[0]?.message?.content,
+    result?.output_text,
+    result?.text,
+    result?.content,
+  ];
+  return candidates.map(textValue).find((text) => text.trim()) || '';
+}
+
 app.post('/poetic-completion', requireAccessAuth, async (c) => {
   if (!c.env.AI) return c.json({ error: 'Workers AI binding is not configured' }, 503);
 
@@ -41,13 +63,27 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
     });
 
     if (result?.success === false) {
+      const errors = Array.isArray(result.errors)
+        ? result.errors.slice(0, 3).map((item) => ({
+          code: item?.code,
+          message: String(item?.message || '').slice(0, 200),
+        }))
+        : [];
+      console.error('Workers AI inference was rejected:', errors);
       throw new Error('Workers AI returned an invalid response');
     }
 
-    const generated = typeof result?.response === 'string'
-      ? result.response
-      : result?.choices?.[0]?.message?.content;
-    if (typeof generated !== 'string') {
+    const generated = extractGeneratedText(result);
+    if (!generated) {
+      const choice = result?.choices?.[0];
+      console.error('Workers AI returned an unsupported response shape:', {
+        keys: Object.keys(result || {}).slice(0, 12),
+        responseType: typeof result?.response,
+        choicesType: Array.isArray(result?.choices) ? 'array' : typeof result?.choices,
+        firstChoiceKeys: Object.keys(choice || {}).slice(0, 8),
+        messageKeys: Object.keys(choice?.message || {}).slice(0, 8),
+        contentType: typeof choice?.message?.content,
+      });
       throw new Error('Workers AI returned an invalid response');
     }
 
