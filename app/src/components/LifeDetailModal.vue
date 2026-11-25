@@ -91,6 +91,56 @@ const battery = computed(() => phone.value?.battery || null);
 const network = computed(() => phone.value?.network || null);
 const music = computed(() => phone.value?.music || null);
 const notifications = computed(() => phone.value?.notifications || null);
+// 2026-11-25 新增：打字字数 / 照片张数 / 步数 / 流量 / 行为 / 勿扰 / 应用增减
+const typing = computed(() => phone.value?.typing || null);
+const photos = computed(() => phone.value?.photos || null);
+const traffic = computed(() => phone.value?.traffic || null);
+const activity = computed(() => phone.value?.activity || null);
+const deviceState = computed(() => phone.value?.state || null);
+const appChanges = computed(() => phone.value?.appChanges || null);
+
+function dataLabel(mb) {
+  const v = Number(mb);
+  if (!Number.isFinite(v) || v <= 0) return '0 MB';
+  return v >= 1024 ? `${(v / 1024).toFixed(1)} GB` : `${Math.round(v)} MB`;
+}
+
+const phoneExtras = computed(() => {
+  const out = [];
+  const typed = typing.value?.chars;
+  if (typed != null) out.push(['TYPED', `${num(typed)} chars`]);
+  if (photos.value?.added != null) out.push(['PHOTOS ADDED', `+${num(photos.value.added)}`]);
+  if (phone.value?.steps != null) out.push(['STEPS', num(phone.value.steps)]);
+  if (traffic.value) {
+    out.push(['MOBILE DATA', dataLabel(traffic.value.mobileMB)]);
+    out.push(['WI-FI DATA', dataLabel(traffic.value.wifiMB)]);
+  }
+  const a = activity.value;
+  if (a) {
+    const moving = ['walking', 'running', 'cycling', 'vehicle', 'onFoot']
+      .reduce((s, k) => s + (Number(a[k]) || 0), 0);
+    if (moving > 0) out.push(['IN MOTION', minutesLabel(moving)]);
+    if (a.still != null) out.push(['STILL', minutesLabel(a.still)]);
+  }
+  const st = deviceState.value;
+  if (st?.dndMinutes) out.push(['DO NOT DISTURB', minutesLabel(st.dndMinutes)]);
+  else if (st?.silentMinutes) out.push(['SILENT', minutesLabel(st.silentMinutes)]);
+  if (notifications.value
+    && (notifications.value.clicked || notifications.value.dismissed || notifications.value.cleared)) {
+    out.push(['NOTIF ACTIONS',
+      `${num(notifications.value.clicked || 0)} opened · ${num(notifications.value.dismissed || 0)} dismissed`]);
+  }
+  return out;
+});
+
+const appChangeRows = computed(() => {
+  const c = appChanges.value;
+  if (!c) return [];
+  return [
+    c.installed?.length && { label: 'INSTALLED', names: c.installed },
+    c.uninstalled?.length && { label: 'UNINSTALLED', names: c.uninstalled },
+  ].filter(Boolean);
+});
 // Tasker 的 %MTRACK 是「Artist - Title」一行；拆开展示，拆不开就整行当曲名
 const musicTracks = computed(() => rows(music.value?.tracks).map((t) => {
   const i = t.name.indexOf(' - ');
@@ -259,6 +309,21 @@ watch(
                   <b>{{ notifications ? num(notifications.total) : '—' }}</b>
                 </span>
               </div>
+
+              <div v-if="phoneExtras.length" class="life-day-stats life-detail-stats">
+                <span v-for="x in phoneExtras" :key="x[0]">
+                  <em>{{ x[0] }}</em>
+                  <b>{{ x[1] }}</b>
+                </span>
+              </div>
+
+              <section v-if="appChangeRows.length" class="life-day-block">
+                <h4>APPS</h4>
+                <div v-for="g in appChangeRows" :key="g.label" class="life-day-kv-row">
+                  <span>{{ g.label }}</span>
+                  <b>{{ g.names.join(', ') }}</b>
+                </div>
+              </section>
 
               <section v-if="phoneApps.length" class="life-day-block">
                 <h4>APPLICATIONS · {{ phoneApps.length }}</h4>

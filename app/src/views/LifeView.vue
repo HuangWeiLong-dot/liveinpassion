@@ -339,6 +339,13 @@ function minutesLabel(m) {
   return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, '0')}m`;
 }
 
+/** 流量：聚合里单位是 MB。 */
+function dataLabel(mb) {
+  const v = Number(mb);
+  if (!Number.isFinite(v) || v <= 0) return '0 MB';
+  return v >= 1024 ? `${(v / 1024).toFixed(1)} GB` : `${Math.round(v)} MB`;
+}
+
 /** 秒 → m:ss（区间时长用）。超过一小时补成 h:mm:ss。 */
 function zoneTimeLabel(seconds) {
   const s = Math.max(0, Math.round(Number(seconds) || 0));
@@ -1322,9 +1329,15 @@ const phoneChips = computed(() => {
   const list = payloads.value.filter((p) => p.phone);
   const screen = sum(list.map((p) => p.phone.screenMinutes).filter((v) => v != null));
   const switches = sum(list.map((p) => p.phone.appSwitches).filter((v) => v != null));
+  const typed = sum(list.map((p) => p.phone.typing?.chars).filter((v) => v != null));
+  const photos = sum(list.map((p) => p.phone.photos?.added).filter((v) => v != null));
+  const steps = sum(list.map((p) => p.phone.steps).filter((v) => v != null));
   return [
     { label: 'SCREEN TIME', value: list.length ? minutesLabel(screen) : '—' },
     { label: 'APP SWITCHES', value: list.length ? fmt(Math.round(switches)) : '—' },
+    { label: 'TYPED', value: typed ? `${compact(typed)} chars` : '—' },
+    { label: 'PHOTOS', value: photos ? `+${compact(photos)}` : '—' },
+    { label: 'STEPS', value: steps ? compact(steps) : '—' },
     { label: 'DAYS', value: String(list.length) },
   ];
 });
@@ -1545,6 +1558,26 @@ const dayView = computed(() => {
 
   const ph = p.phone;
   const phoneApps = ph?.topApps?.length ? pairRows(ph.topApps, 1) : [];
+  // 2026-11-25 新增的手机状态量。没有的项直接不出现，避免一排 "—"。
+  const moving = ph?.activity
+    ? ['walking', 'running', 'cycling', 'vehicle', 'onFoot']
+      .reduce((s, k) => s + (Number(ph.activity[k]) || 0), 0)
+    : 0;
+  const phoneFacts = ph ? [
+    ph.typing?.chars != null && ['TYPED', `${fmt(ph.typing.chars)} chars`],
+    ph.photos?.added != null && ['PHOTOS ADDED', `+${fmt(ph.photos.added)}`],
+    ph.steps != null && ['STEPS', fmt(ph.steps)],
+    ph.traffic && ['MOBILE DATA', dataLabel(ph.traffic.mobileMB)],
+    ph.traffic && ['WI-FI DATA', dataLabel(ph.traffic.wifiMB)],
+    ph.activity && ['IN MOTION', minutesLabel(moving)],
+    ph.state?.dndMinutes != null && ['DO NOT DISTURB', minutesLabel(ph.state.dndMinutes)],
+    ph.state?.silentMinutes != null && ['SILENT / VIBRATE', minutesLabel(ph.state.silentMinutes)],
+    ph.notifications?.clicked != null && ['NOTIF OPENED', fmt(ph.notifications.clicked)],
+    ph.notifications?.dismissed != null && ['NOTIF DISMISSED', fmt(ph.notifications.dismissed)],
+    ph.notifications?.cleared != null && ['NOTIF CLEARED', fmt(ph.notifications.cleared)],
+    ph.appChanges?.installed?.length && ['APPS INSTALLED', ph.appChanges.installed.join(', ')],
+    ph.appChanges?.uninstalled?.length && ['APPS REMOVED', ph.appChanges.uninstalled.join(', ')],
+  ].filter(Boolean) : [];
 
   const a = p.ai;
   const aiGroups = a ? [
@@ -1562,6 +1595,7 @@ const dayView = computed(() => {
     healthRows,
     districts,
     phoneApps,
+    phoneFacts,
     aiGroups,
   };
 });
@@ -4176,6 +4210,10 @@ onBeforeUnmount(() => {
                     <div class="life-day-kv-row">
                       <span>APP SWITCHES</span>
                       <b>{{ dayView.payload.phone.appSwitches == null ? '—' : fmt(dayView.payload.phone.appSwitches) }}</b>
+                    </div>
+                    <div v-for="f in dayView.phoneFacts" :key="f[0]" class="life-day-kv-row">
+                      <span>{{ f[0] }}</span>
+                      <b>{{ f[1] }}</b>
                     </div>
                     <div v-for="a in dayView.phoneApps" :key="a.name" class="life-day-row">
                       <span class="life-rank">{{ a.rank }}</span>

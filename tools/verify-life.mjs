@@ -57,6 +57,22 @@ function buildFull() {
       screenMinutes: 210 + idx * 4,
       appSwitches: 180 + idx * 5,
       topApps: [['WeChat', 60 + idx], ['DeepSeek', 20 + idx * 2]],
+      battery: {
+        start: 91, end: 74, min: 60, max: 92, drop: 17,
+        chargingMinutes: 30, samples: 90, tempMin: 28.1, tempMax: 36.4,
+      },
+      network: { wifiMinutes: 200, mobileMinutes: 90, last: 'wifi', changes: 4 },
+      music: { plays: 3, last: 'Best Part', tracks: [['Daniel Caesar - Best Part', 3]] },
+      notifications: {
+        total: 120, byApp: [['WeChat', 30]], clicked: 12, dismissed: 20, cleared: 1,
+      },
+      typing: { chars: 3120 + idx },
+      photos: { added: 6 },
+      steps: 5400,
+      traffic: { mobileMB: 120.5, wifiMB: 800.2 },
+      activity: { still: 500, walking: 42, vehicle: 35 },
+      state: { dndMinutes: 30, silentMinutes: 20, avgBrightness: 120 },
+      appChanges: { installed: ['DeepSeek'], uninstalled: [] },
     };
 
     let ai = null;
@@ -1086,6 +1102,9 @@ await withPage({ width: 1440, height: 1000, label: 'desk' }, async ({ evalJs, sh
     throw new Error('today phone card did not open phone detail');
   }
   if (!/WeChat/.test(phoneDetail)) throw new Error('phone detail missing app list');
+  if (!/TYPED/.test(phoneDetail) || !/PHOTOS ADDED/.test(phoneDetail)) {
+    throw new Error('phone detail missing typing / photos stats');
+  }
   if (/SITES|CATEGORIES|DESKTOP/.test(phoneDetail)) {
     throw new Error('phone detail leaked desktop sections');
   }

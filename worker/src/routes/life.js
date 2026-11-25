@@ -82,13 +82,29 @@ const PHONE_KEYS = new Set([
   'unlocks', 'screenOn', 'screenOff', 'screenMinutes', 'appSwitches', 'topApps',
   // 2026-11 新增：电量 / 网络 / 音乐 / 通知。全部是聚合值，不含正文。
   'battery', 'network', 'music', 'notifications',
+  // 2026-11-25 新增：打字 / 照片 / 步数 / 流量 / 行为 / 设备状态 / 应用增减。
+  // 新闻、键入内容、照片本身、SSID 和设备名都**不在**这里 —— 只进聚合数字。
+  'typing', 'photos', 'steps', 'traffic', 'activity', 'state', 'appChanges',
 ]);
 const PHONE_BATTERY_KEYS = new Set([
   'start', 'end', 'min', 'max', 'drop', 'chargingMinutes', 'samples',
+  'tempMin', 'tempMax',
 ]);
 const PHONE_NETWORK_KEYS = new Set(['wifiMinutes', 'mobileMinutes', 'last', 'changes']);
 const PHONE_MUSIC_KEYS = new Set(['plays', 'last', 'tracks']);
-const PHONE_NOTIF_KEYS = new Set(['total', 'byApp']);
+const PHONE_NOTIF_KEYS = new Set([
+  'total', 'byApp',
+  // 通知的结局（次数）。正文始终不进聚合。
+  'clicked', 'dismissed', 'cleared',
+]);
+const PHONE_TYPING_KEYS = new Set(['chars']);
+const PHONE_PHOTOS_KEYS = new Set(['added']);
+const PHONE_TRAFFIC_KEYS = new Set(['mobileMB', 'wifiMB']);
+const PHONE_ACTIVITY_KEYS = new Set([
+  'still', 'walking', 'running', 'cycling', 'vehicle', 'onFoot',
+]);
+const PHONE_STATE_KEYS = new Set(['dndMinutes', 'silentMinutes', 'avgBrightness']);
+const PHONE_APPCHANGE_KEYS = new Set(['installed', 'uninstalled']);
 const AI_KEYS = new Set([
   'cost', 'costSource', 'dailyCost', 'spend', 'estimatedCost',
   'calls', 'callsSource', 'models', 'projects',
@@ -187,6 +203,8 @@ function validatePhone(p) {
     if (!isOptNum(b.drop, -100, 100)) return 'phone.battery.drop';
     if (!isOptNum(b.chargingMinutes, 0, 1440)) return 'phone.battery.chargingMinutes';
     if (!isOptNum(b.samples, 0, 10000)) return 'phone.battery.samples';
+    if (b.tempMin !== undefined && !isOptNum(b.tempMin, -40, 100)) return 'phone.battery.tempMin';
+    if (b.tempMax !== undefined && !isOptNum(b.tempMax, -40, 100)) return 'phone.battery.tempMax';
   }
 
   if (p.network != null) {
@@ -212,6 +230,58 @@ function validatePhone(p) {
     if (!isObj(nf) || !onlyKeys(nf, PHONE_NOTIF_KEYS)) return 'phone.notifications';
     if (!isOptNum(nf.total, 0, 100000)) return 'phone.notifications.total';
     if (nf.byApp !== null && !isPairs(nf.byApp, 40, 100000)) return 'phone.notifications.byApp';
+    if (!isOptNum(nf.clicked, 0, 100000)) return 'phone.notifications.clicked';
+    if (!isOptNum(nf.dismissed, 0, 100000)) return 'phone.notifications.dismissed';
+    if (!isOptNum(nf.cleared, 0, 100000)) return 'phone.notifications.cleared';
+  }
+
+  if (p.typing != null) {
+    const t = p.typing;
+    if (!isObj(t) || !onlyKeys(t, PHONE_TYPING_KEYS)) return 'phone.typing';
+    if (!isOptNum(t.chars, 0, 10000000)) return 'phone.typing.chars';
+  }
+
+  if (p.photos != null) {
+    const ph = p.photos;
+    if (!isObj(ph) || !onlyKeys(ph, PHONE_PHOTOS_KEYS)) return 'phone.photos';
+    if (!isOptNum(ph.added, 0, 100000)) return 'phone.photos.added';
+  }
+
+  if (p.steps !== undefined && !isOptNum(p.steps, 0, 200000)) return 'phone.steps';
+
+  if (p.traffic != null) {
+    const tr = p.traffic;
+    if (!isObj(tr) || !onlyKeys(tr, PHONE_TRAFFIC_KEYS)) return 'phone.traffic';
+    if (!isOptNum(tr.mobileMB, 0, 1000000)) return 'phone.traffic.mobileMB';
+    if (!isOptNum(tr.wifiMB, 0, 1000000)) return 'phone.traffic.wifiMB';
+  }
+
+  if (p.activity != null) {
+    const ac = p.activity;
+    if (!isObj(ac) || !onlyKeys(ac, PHONE_ACTIVITY_KEYS)) return 'phone.activity';
+    for (const key of PHONE_ACTIVITY_KEYS) {
+      if (!isOptNum(ac[key], 0, 1440)) return `phone.activity.${key}`;
+    }
+  }
+
+  if (p.state != null) {
+    const st = p.state;
+    if (!isObj(st) || !onlyKeys(st, PHONE_STATE_KEYS)) return 'phone.state';
+    if (!isOptNum(st.dndMinutes, 0, 1440)) return 'phone.state.dndMinutes';
+    if (!isOptNum(st.silentMinutes, 0, 1440)) return 'phone.state.silentMinutes';
+    if (!isOptNum(st.avgBrightness, 0, 255)) return 'phone.state.avgBrightness';
+  }
+
+  if (p.appChanges != null) {
+    const ch = p.appChanges;
+    if (!isObj(ch) || !onlyKeys(ch, PHONE_APPCHANGE_KEYS)) return 'phone.appChanges';
+    for (const key of PHONE_APPCHANGE_KEYS) {
+      const list = ch[key];
+      if (list !== undefined && list !== null) {
+        if (!Array.isArray(list) || list.length > 20) return `phone.appChanges.${key}`;
+        if (!list.every((x) => isName(x, 40))) return `phone.appChanges.${key}`;
+      }
+    }
   }
   return null;
 }
