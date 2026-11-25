@@ -62,9 +62,12 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
           content: `请续写这段文字：${JSON.stringify(body.context)}`,
         },
       ],
-      max_completion_tokens: 512,
+      max_completion_tokens: 160,
       temperature: 0.85,
       top_p: 0.9,
+      chat_template_kwargs: {
+        enable_thinking: false,
+      },
     });
 
     if (result?.success === false) {
