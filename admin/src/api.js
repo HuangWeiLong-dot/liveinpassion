@@ -33,6 +33,14 @@ export const blogApi = {
   remove: (id) => request(`/api/admin/posts/${id}`, { method: 'DELETE' }),
 };
 
+export const poeticApi = {
+  complete: (context, signal) => request('/api/admin/ai/poetic-completion', {
+    method: 'POST',
+    body: JSON.stringify({ context }),
+    signal,
+  }),
+};
+
 // 相册
 export const albumApi = {
   list: () => request('/api/admin/albums'),

@@ -230,6 +230,12 @@
 
 /* ---------- 输入区：打字机字体、墨色、纸上的笔尖光标 ---------- */
 
+.cm-editor .cm-line .cm-poetic-completion {
+  color: rgba(110, 97, 83, 0.62);
+  font-style: italic;
+  white-space: pre;
+  pointer-events: none;
+}
 .editor-panel.is-nocturne .cm-editor { background: transparent !important; }
 .editor-panel.is-nocturne .cm-editor .cm-scroller {
   font-family: var(--tn-font-mono);
@@ -265,6 +271,41 @@
   color: var(--tn-ink-faint) !important;
   font-style: italic;
 }
+.editor-panel.is-nocturne .cm-editor .cm-line .cm-poetic-completion {
+  color: var(--tn-accent) !important;
+  font-style: italic;
+  opacity: 0.72;
+  text-shadow: none;
+}
+
+.poetic-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--tn-desk-muted);
+  font: inherit;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.poetic-toggle.is-on { color: var(--tn-accent-soft); border-color: rgba(176, 138, 74, 0.55); }
+.poetic-toggle kbd {
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  font: inherit;
+  font-size: 0.48rem;
+  opacity: 0.75;
+}
+.poetic-status {
+  color: var(--tn-desk-muted);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+}
+.poetic-status.is-error { color: #e08c6c; }
 
 .editor-panel.is-nocturne .cm-editor .cm-selectionBackground,
 .editor-panel.is-nocturne .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
@@ -394,6 +435,7 @@
 
 @media (pointer: coarse) {
   .nocturne-toggle { min-height: 44px; min-width: 44px; justify-content: center; }
+  .poetic-toggle { min-height: 44px; }
 }
 
 @media (max-width: 700px) {
