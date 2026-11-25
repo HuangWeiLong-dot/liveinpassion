@@ -6,13 +6,18 @@ const MODEL = '@cf/zai-org/glm-4.7-flash';
 const MAX_CONTEXT_LENGTH = 600;
 const MAX_SUGGESTION_LENGTH = 120;
 
-function textValue(value) {
+function textValue(value, depth = 0) {
+  if (depth > 4) return '';
   if (typeof value === 'string') return value;
-  if (!Array.isArray(value)) return '';
-  return value
-    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
-    .map((part) => part.text)
-    .join('');
+  if (Array.isArray(value)) {
+    return value
+      .filter((part) => !part?.type || part.type === 'text' || part.type === 'output_text')
+      .map((part) => textValue(part, depth + 1))
+      .join('');
+  }
+  if (!value || typeof value !== 'object') return '';
+  if (typeof value.text === 'string') return value.text;
+  return textValue(value.content ?? value.parts ?? value.output_text, depth + 1);
 }
 
 function extractGeneratedText(result) {
@@ -83,6 +88,8 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
         firstChoiceKeys: Object.keys(choice || {}).slice(0, 8),
         messageKeys: Object.keys(choice?.message || {}).slice(0, 8),
         contentType: typeof choice?.message?.content,
+        contentKeys: Object.keys(choice?.message?.content || {}).slice(0, 8),
+        contentKind: choice?.message?.content?.type,
       });
       throw new Error('Workers AI returned an invalid response');
     }

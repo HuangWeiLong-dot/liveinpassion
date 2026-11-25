@@ -48,6 +48,13 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 111.3 — 2026-11-25
+
+#### Workers AI 的 message.content 对象可提取续写文本
+
+- GLM 响应的 `choices[0].message.content` 是对象而非字符串；递归读取其 `text` / `content` / `parts`
+  字段，不记录生成内容，并继续兼容字符串与数组响应。
+
 ### fix: 111.2 — 2026-11-25
 
 #### Workers AI 续写兼容新版内容结构并保留服务错误信息
