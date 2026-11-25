@@ -23,6 +23,10 @@ bucket_name = "liveinpassion"
 directory = "./admin-dist"
 binding = "ASSETS"
 
+# Cloudflare Workers AI，后端生成诗意续写
+[ai]
+binding = "AI"
+
 # 环境变量（通过 wrangler secret 设置，不写在仓库）
 # GITHUB_TOKEN - 用于触发 repository_dispatch
 # ACCESS_AUD - Cloudflare Access JWT audience tag

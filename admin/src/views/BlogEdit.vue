@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { MdEditor, MdPreview, config } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { EditorView } from '@codemirror/view';
-import { blogApi, uploadApi } from '../api.js';
+import { blogApi, poeticApi, uploadApi } from '../api.js';
 import { compressImage } from '../utils/imageCompress.js';
 import { startPressDrag } from '../utils/pressDrag.js';
 import { lintMarkdown } from '../utils/mdLint.js';
@@ -12,6 +12,7 @@ import { isDark } from '../theme.js';
 import AdminIcon from '../components/AdminIcon.vue';
 import NocturneTypewriter from '../components/NocturneTypewriter.vue';
 import { VOICE_LABELS } from '../nocturne/sound.js';
+import { createPoeticCompletionExtensions } from '../nocturne/poetic-completion.js';
 import '../styles/nocturne-editor.css';
 
 // 编辑器预览内置 js-xss 过滤，默认会：
@@ -57,6 +58,14 @@ config({
   // 面板里的「常见错拼 / 重复词」规则见 utils/mdLint.js，两者互补。
   codeMirrorExtensions(theme, extensions) {
     extensions.push(EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'en' }));
+    extensions.push(...createPoeticCompletionExtensions({
+      isEnabled: () => poeticAssistOn.value,
+      requestCompletion: async (context, signal) => {
+        const result = await poeticApi.complete(context, signal);
+        return result.suggestion;
+      },
+      onStatus: (status) => { poeticStatus.value = status; },
+    }));
     return extensions;
   },
 });
@@ -130,6 +139,27 @@ function readVoice() {
 const soundOn = ref(readSound());
 const soundVolume = ref(readVolume());
 const soundVoice = ref(readVoice());
+
+const POETIC_ASSIST_KEY = 'cms-poetic-assist';
+function readPoeticAssist() {
+  try {
+    return localStorage.getItem(POETIC_ASSIST_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+const poeticAssistOn = ref(readPoeticAssist());
+const poeticStatus = ref('idle');
+function togglePoeticAssist() {
+  poeticAssistOn.value = !poeticAssistOn.value;
+  try {
+    localStorage.setItem(POETIC_ASSIST_KEY, poeticAssistOn.value ? '1' : '0');
+  } catch {
+    /* 隐私模式下忽略 */
+  }
+  const view = editorView();
+  if (view) view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head) });
+}
 
 // Nocturne 模式下编辑器只留输入区，右侧另开一张「打印出来的信」；
 // 预览 / 目录 / 纯预览这几个工具在这个布局里没有意义，直接从工具条里拿掉。
@@ -1472,6 +1502,26 @@ onUnmounted(() => {
       <!-- 打字机控制条：只在 Nocturne 模式下出现，像机器本身的黄铜铭牌一排 -->
       <div v-if="nocturne" class="nocturne-studio">
         <span class="nocturne-studio__brand">TYPEWRITER</span>
+        <button
+          type="button"
+          class="poetic-toggle"
+          :class="{ 'is-on': poeticAssistOn }"
+          :aria-pressed="poeticAssistOn"
+          title="Send up to 600 recent characters to Cloudflare Workers AI; press Tab to accept"
+          @click="togglePoeticAssist"
+        >POETIC {{ poeticAssistOn ? 'ON' : 'OFF' }} <kbd>TAB</kbd></button>
+        <span
+          v-if="poeticStatus === 'loading'"
+          class="poetic-status"
+          role="status"
+          aria-live="polite"
+        >READING THE MOMENT…</span>
+        <span
+          v-else-if="poeticStatus === 'error'"
+          class="poetic-status is-error"
+          role="status"
+          title="Cloudflare Workers AI did not return a suggestion"
+        >AI UNAVAILABLE</span>
         <label class="ns-field">
           <span>VOICE</span>
           <select v-model="soundVoice" aria-label="Typewriter voice">

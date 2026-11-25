@@ -11,6 +11,7 @@ import { statsRoutes } from './routes/stats.js';
 import { lifeRoutes } from './routes/life.js';
 import { lifeRawRoutes } from './routes/life_raw.js';
 import { lifeNowRoutes } from './routes/life_now.js';
+import { aiRoutes } from './routes/ai.js';
 import {
   getAuthUser,
   checkPassword,
@@ -188,6 +189,7 @@ app.on('GET', ['/admin', '/admin/*'], async (c, next) => {
 
 // 路由：admin 写操作在 /api/admin/*，public 只读在 /api/*
 app.route('/api/admin/posts', postsRoutes);
+app.route('/api/admin/ai', aiRoutes);
 app.route('/api/admin/albums', albumsRoutes);
 app.route('/api/admin/uploads', uploadsRoutes);
 app.route('/api/admin/showcase', showcaseAdminRoutes);
