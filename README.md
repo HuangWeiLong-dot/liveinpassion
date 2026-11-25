@@ -48,6 +48,13 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 111.1 — 2026-11-25
+
+#### Workers AI 聊天模型响应按 choices 结构解析
+
+- GLM-4.7-Flash 返回 OpenAI 风格 `choices[0].message.content`；Worker 同时兼容此结构与
+  旧式 `response` 字段，避免生成成功却被误判为 AI 不可用。
+
 ### update: 111 — 2026-11-25
 
 #### CMS 编辑器接入 Cloudflare Workers AI 诗意续写

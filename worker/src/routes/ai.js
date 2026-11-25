@@ -40,12 +40,19 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
       top_p: 0.9,
     });
 
-    if (result?.success === false || typeof result?.response !== 'string') {
+    if (result?.success === false) {
+      throw new Error('Workers AI returned an invalid response');
+    }
+
+    const generated = typeof result?.response === 'string'
+      ? result.response
+      : result?.choices?.[0]?.message?.content;
+    if (typeof generated !== 'string') {
       throw new Error('Workers AI returned an invalid response');
     }
 
     const suggestion = Array.from(
-      result.response
+      generated
         .split(/\r?\n/, 1)[0]
         .replace(/^[\s"'“”‘’`>*#-]+|[\s"'“”‘’`]+$/g, '')
         .trim()
