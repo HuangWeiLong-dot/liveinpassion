@@ -230,9 +230,16 @@ function validatePhone(p) {
     if (!isObj(nf) || !onlyKeys(nf, PHONE_NOTIF_KEYS)) return 'phone.notifications';
     if (!isOptNum(nf.total, 0, 100000)) return 'phone.notifications.total';
     if (nf.byApp !== null && !isPairs(nf.byApp, 40, 100000)) return 'phone.notifications.byApp';
-    if (!isOptNum(nf.clicked, 0, 100000)) return 'phone.notifications.clicked';
-    if (!isOptNum(nf.dismissed, 0, 100000)) return 'phone.notifications.dismissed';
-    if (!isOptNum(nf.cleared, 0, 100000)) return 'phone.notifications.cleared';
+    // 这三个是可选：当天没有通知动作时上游不会带这个键
+    if (nf.clicked !== undefined && !isOptNum(nf.clicked, 0, 100000)) {
+      return 'phone.notifications.clicked';
+    }
+    if (nf.dismissed !== undefined && !isOptNum(nf.dismissed, 0, 100000)) {
+      return 'phone.notifications.dismissed';
+    }
+    if (nf.cleared !== undefined && !isOptNum(nf.cleared, 0, 100000)) {
+      return 'phone.notifications.cleared';
+    }
   }
 
   if (p.typing != null) {
@@ -260,7 +267,10 @@ function validatePhone(p) {
     const ac = p.activity;
     if (!isObj(ac) || !onlyKeys(ac, PHONE_ACTIVITY_KEYS)) return 'phone.activity';
     for (const key of PHONE_ACTIVITY_KEYS) {
-      if (!isOptNum(ac[key], 0, 1440)) return `phone.activity.${key}`;
+      // 只出现当天识别到的行为，没出现的键跳过
+      if (ac[key] !== undefined && !isOptNum(ac[key], 0, 1440)) {
+        return `phone.activity.${key}`;
+      }
     }
   }
 
@@ -269,7 +279,9 @@ function validatePhone(p) {
     if (!isObj(st) || !onlyKeys(st, PHONE_STATE_KEYS)) return 'phone.state';
     if (!isOptNum(st.dndMinutes, 0, 1440)) return 'phone.state.dndMinutes';
     if (!isOptNum(st.silentMinutes, 0, 1440)) return 'phone.state.silentMinutes';
-    if (!isOptNum(st.avgBrightness, 0, 255)) return 'phone.state.avgBrightness';
+    if (st.avgBrightness !== undefined && !isOptNum(st.avgBrightness, 0, 255)) {
+      return 'phone.state.avgBrightness';
+    }
   }
 
   if (p.appChanges != null) {
