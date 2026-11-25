@@ -48,6 +48,14 @@
 （单文件 `index.html`）时期，早期提交只写了版本号，这里按改动内容补主要节点。每个条目的日期
 与 commit 一一对应。
 
+### fix: 111.4 — 2026-11-25
+
+#### Workers AI 续写使用新 token 参数并记录空响应原因
+
+- 生产日志确认 GLM 返回聊天响应，但 `message.content` 没有可提取文本；将已弃用的 `max_tokens` 改为
+  `max_completion_tokens` 并给推理留出生成预算。
+- 未知响应只记录结束原因、token 数和内容结构，不记录用户文章或模型生成文本。
+
 ### fix: 111.3 — 2026-11-25
 
 #### Workers AI 的 message.content 对象可提取续写文本

@@ -62,7 +62,7 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
           content: `请续写这段文字：${JSON.stringify(body.context)}`,
         },
       ],
-      max_tokens: 80,
+      max_completion_tokens: 512,
       temperature: 0.85,
       top_p: 0.9,
     });
@@ -81,15 +81,24 @@ app.post('/poetic-completion', requireAccessAuth, async (c) => {
     const generated = extractGeneratedText(result);
     if (!generated) {
       const choice = result?.choices?.[0];
+      const content = choice?.message?.content;
       console.error('Workers AI returned an unsupported response shape:', {
         keys: Object.keys(result || {}).slice(0, 12),
         responseType: typeof result?.response,
         choicesType: Array.isArray(result?.choices) ? 'array' : typeof result?.choices,
         firstChoiceKeys: Object.keys(choice || {}).slice(0, 8),
         messageKeys: Object.keys(choice?.message || {}).slice(0, 8),
-        contentType: typeof choice?.message?.content,
-        contentKeys: Object.keys(choice?.message?.content || {}).slice(0, 8),
-        contentKind: choice?.message?.content?.type,
+        finishReason: choice?.finish_reason,
+        stopReason: choice?.stop_reason,
+        completionTokens: result?.usage?.completion_tokens,
+        contentType: typeof content,
+        contentIsNull: content === null,
+        contentIsArray: Array.isArray(content),
+        contentKeys: content && typeof content === 'object'
+          ? Object.getOwnPropertyNames(content).slice(0, 8)
+          : [],
+        contentKind: content?.type,
+        reasoningType: typeof choice?.message?.reasoning,
       });
       throw new Error('Workers AI returned an invalid response');
     }
