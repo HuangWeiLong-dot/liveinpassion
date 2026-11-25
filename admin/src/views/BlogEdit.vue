@@ -65,6 +65,7 @@ config({
         return result.suggestion;
       },
       onStatus: (status) => { poeticStatus.value = status; },
+      onAcceptAction: (action) => { poeticAcceptAction.value = action; },
     }));
     return extensions;
   },
@@ -150,6 +151,7 @@ function readPoeticAssist() {
 }
 const poeticAssistOn = ref(readPoeticAssist());
 const poeticStatus = ref('idle');
+const poeticAcceptAction = ref(null);
 function togglePoeticAssist() {
   poeticAssistOn.value = !poeticAssistOn.value;
   try {
@@ -1510,6 +1512,21 @@ onUnmounted(() => {
           title="Send up to 600 recent characters to Cloudflare Workers AI; press Tab to accept"
           @click="togglePoeticAssist"
         >POETIC {{ poeticAssistOn ? 'ON' : 'OFF' }} <kbd>TAB</kbd></button>
+        <button
+          v-if="poeticStatus === 'ready'"
+          type="button"
+          class="poetic-action"
+          title="Insert this suggestion into the article (Tab)"
+          @pointerdown.prevent
+          @click="poeticAcceptAction && poeticAcceptAction()"
+        >INSERT <kbd>TAB</kbd></button>
+        <button
+          type="button"
+          class="poetic-action"
+          :disabled="saving"
+          :title="postStatus === 'published' ? 'Save changes to this published post' : 'Save as draft'"
+          @click="onEditorSave"
+        >{{ saving ? 'SAVING…' : postStatus === 'published' ? 'SAVE CHANGES' : 'SAVE DRAFT' }}</button>
         <span
           v-if="poeticStatus === 'loading'"
           class="poetic-status"
@@ -1540,7 +1557,7 @@ onUnmounted(() => {
           />
           <span class="ns-readout">{{ Math.round(soundVolume * 100) }}</span>
         </label>
-        <span class="nocturne-studio__hint">The type head follows the caret</span>
+        <span class="nocturne-studio__hint">Tab inserts · Save stores the article</span>
       </div>
 
       <div v-if="lintOn" class="lint-panel">

@@ -231,9 +231,12 @@
 /* ---------- 输入区：打字机字体、墨色、纸上的笔尖光标 ---------- */
 
 .cm-editor .cm-line .cm-poetic-completion {
-  color: rgba(110, 97, 83, 0.62);
+  color: #70501f;
   font-style: italic;
+  font-weight: 600;
   white-space: pre;
+  background: rgba(176, 138, 74, 0.15);
+  border-bottom: 1px dotted currentColor;
   pointer-events: none;
 }
 .editor-panel.is-nocturne .cm-editor { background: transparent !important; }
@@ -272,9 +275,12 @@
   font-style: italic;
 }
 .editor-panel.is-nocturne .cm-editor .cm-line .cm-poetic-completion {
-  color: var(--tn-accent) !important;
+  color: #77521c !important;
   font-style: italic;
-  opacity: 0.72;
+  font-weight: 600;
+  background: rgba(176, 138, 74, 0.16);
+  border-bottom: 1px dotted currentColor;
+  opacity: 1;
   text-shadow: none;
 }
 
@@ -299,6 +305,28 @@
   font: inherit;
   font-size: 0.48rem;
   opacity: 0.75;
+}
+.poetic-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid rgba(217, 192, 138, 0.65);
+  border-radius: 0;
+  background: rgba(176, 138, 74, 0.2);
+  color: #f3e5c4;
+  font: inherit;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.poetic-action:hover:not(:disabled) { background: rgba(176, 138, 74, 0.36); }
+.poetic-action:disabled { opacity: 0.55; cursor: wait; }
+.poetic-action kbd {
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  font: inherit;
+  font-size: 0.48rem;
 }
 .poetic-status {
   color: var(--tn-desk-muted);

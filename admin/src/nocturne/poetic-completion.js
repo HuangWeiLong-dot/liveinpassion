@@ -60,6 +60,10 @@ class PoeticCompletionState {
     this.lastAccepted = '';
     this.timer = null;
     this.controller = null;
+    this.options.onAcceptAction?.(() => {
+      this.view.focus();
+      return this.accept(this.view);
+    });
     this.refresh(view);
   }
 
@@ -156,6 +160,7 @@ class PoeticCompletionState {
 
   destroy() {
     this.cancel();
+    this.options.onAcceptAction?.(null);
   }
 }
 
